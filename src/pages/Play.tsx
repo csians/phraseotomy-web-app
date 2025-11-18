@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isSupabaseConfigured } from '@/lib/supabaseClient';
 
-// Type for tenant configuration from session
+// Type for tenant configuration
 interface TenantConfig {
   id: string;
   name: string;
@@ -11,11 +11,12 @@ interface TenantConfig {
   verified: boolean;
 }
 
-interface SessionResponse {
-  hasSession: boolean;
-  tenant?: TenantConfig;
-  shop?: string;
-  error?: string;
+// Extend window to include embedded config
+declare global {
+  interface Window {
+    __PHRASEOTOMY_CONFIG__?: TenantConfig;
+    __PHRASEOTOMY_SHOP__?: string;
+  }
 }
 
 const Play = () => {
@@ -29,14 +30,25 @@ const Play = () => {
     // Check Supabase configuration
     setIsConfigured(isSupabaseConfigured());
 
-    // Fetch session data from the Vercel serverless function
+    // Check for embedded config from proxy (primary method)
+    if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
+      console.log('=== LOADED FROM PROXY ===');
+      console.log('Tenant:', window.__PHRASEOTOMY_CONFIG__.tenant_key);
+      console.log('Shop:', window.__PHRASEOTOMY_SHOP__);
+      setTenant(window.__PHRASEOTOMY_CONFIG__);
+      setShopDomain(window.__PHRASEOTOMY_SHOP__);
+      setLoading(false);
+      return;
+    }
+
+    // Fallback: Try to fetch session from API
     const fetchSession = async () => {
       try {
         const response = await fetch('/api/session');
-        const data: SessionResponse = await response.json();
+        const data = await response.json();
 
         if (data.hasSession && data.tenant && data.shop) {
-          console.log('=== SESSION LOADED ===');
+          console.log('=== LOADED FROM SESSION ===');
           console.log('Tenant:', data.tenant.tenant_key);
           console.log('Shop:', data.shop);
           setTenant(data.tenant);
@@ -89,7 +101,7 @@ const Play = () => {
           <p><strong>URL:</strong> {window.location.href}</p>
           <p><strong>Path:</strong> {window.location.pathname}</p>
           <p><strong>Shop:</strong> {shopDomain || '(not detected)'}</p>
-          <p><strong>Mode:</strong> {tenant ? 'Session ✓' : 'No Session'}</p>
+          <p><strong>Mode:</strong> {tenant ? (window.__PHRASEOTOMY_CONFIG__ ? 'Proxy ✓' : 'Session ✓') : 'No Config'}</p>
           <p><strong>Tenant:</strong> {tenant ? tenant.name : 'None'}</p>
           <p><strong>Verified:</strong> {tenant?.verified ? '✓' : '✗'}</p>
         </div>
