@@ -33,9 +33,12 @@ The Shopify App Proxy allows customers to access your app through their store do
 
 **How it works:**
 - Customers visit: `https://your-store.myshopify.com/apps/phraseotomy`
-- Shopify forwards the request with authentication params: `?shop=your-store.myshopify.com&timestamp=...&signature=...`
-- The Edge Function verifies HMAC and redirects to your React app at `https://phraseotomy.ourstagingserver.com/play?shop=...`
-- The React app reads the `shop` param and loads the correct tenant from Supabase
+- Browser URL stays on the store domain (no redirect)
+- Shopify forwards the HTTP request with authentication params to the edge function
+- The edge function verifies HMAC and returns HTML with:
+  - Embedded tenant configuration (as JavaScript global)
+  - Asset URLs pointing to your Vercel deployment
+- The React app loads and reads from the embedded config
 
 ## Step 3: Add Tenant Configuration to Supabase
 

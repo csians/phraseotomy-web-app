@@ -1,29 +1,47 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { getShopFromParams } from '@/lib/tenants';
 import { isSupabaseConfigured } from '@/lib/supabaseClient';
-import { useTenant } from '@/hooks/useTenant';
+
+// Type for embedded config from Shopify proxy entry
+interface TenantConfig {
+  id: string;
+  name: string;
+  tenant_key: string;
+  shop_domain: string;
+  environment: 'staging' | 'production';
+  verified: boolean;
+}
+
+declare global {
+  interface Window {
+    __PHRASEOTOMY_CONFIG__?: TenantConfig;
+    __PHRASEOTOMY_SHOP__?: string;
+  }
+}
 
 const Play = () => {
-  const [searchParams] = useSearchParams();
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [isConfigured, setIsConfigured] = useState(false);
-  const { tenant, loading: tenantLoading, error: tenantError } = useTenant(shopDomain);
+  const [tenant, setTenant] = useState<TenantConfig | null>(null);
+  const [tenantError, setTenantError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check Supabase configuration
     setIsConfigured(isSupabaseConfigured());
 
-    // Get shop parameter from URL
-    const shop = getShopFromParams(searchParams);
-    console.log('=== DEBUG INFO ===');
-    console.log('Full URL:', window.location.href);
-    console.log('Detected shop parameter:', shop);
-    console.log('All params:', Object.fromEntries(searchParams.entries()));
-    console.log('=================');
-
-    setShopDomain(shop);
-  }, [searchParams]);
+    // Check for embedded tenant configuration from Shopify proxy
+    if (window.__PHRASEOTOMY_CONFIG__) {
+      console.log('=== SHOPIFY PROXY MODE ===');
+      console.log('Embedded config:', window.__PHRASEOTOMY_CONFIG__);
+      console.log('Shop:', window.__PHRASEOTOMY_SHOP__);
+      setTenant(window.__PHRASEOTOMY_CONFIG__);
+      setShopDomain(window.__PHRASEOTOMY_SHOP__ || null);
+    } else {
+      console.log('=== DIRECT ACCESS MODE ===');
+      console.log('Full URL:', window.location.href);
+      console.log('No embedded config found');
+      setTenantError('App must be accessed through Shopify App Proxy');
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-8">
@@ -46,9 +64,10 @@ const Play = () => {
         <div className="text-xs font-mono space-y-1 text-yellow-900 dark:text-yellow-100">
           <p><strong>URL:</strong> {window.location.href}</p>
           <p><strong>Path:</strong> {window.location.pathname}</p>
-          <p><strong>Query:</strong> {window.location.search || '(none)'}</p>
           <p><strong>Shop:</strong> {shopDomain || '(not detected)'}</p>
-          <p><strong>Tenant:</strong> {tenant ? tenant.name : tenantLoading ? 'Loading...' : 'Not loaded'}</p>
+          <p><strong>Mode:</strong> {window.__PHRASEOTOMY_CONFIG__ ? 'Proxy ✓' : 'Direct'}</p>
+          <p><strong>Tenant:</strong> {tenant ? tenant.name : 'None'}</p>
+          <p><strong>Verified:</strong> {tenant?.verified ? '✓' : '✗'}</p>
         </div>
       </div>
 

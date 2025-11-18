@@ -130,16 +130,14 @@ Deno.serve(async (req) => {
 
     console.log('HMAC verified successfully for tenant:', tenant.tenant_key);
 
-    // After successful verification, redirect to the React app with the shop param
-    const redirectUrl = `https://phraseotomy.ourstagingserver.com/play?shop=${encodeURIComponent(shop!)}`;
-    console.log('Redirecting to app URL:', redirectUrl);
-
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: redirectUrl,
-      },
-    });
+    // Return HTML that loads the React app with embedded tenant data
+    return new Response(
+      generateAppHtml(tenant, shop),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      }
+    );
   } catch (error) {
     console.error('Error in shopify-proxy-entry:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -167,6 +165,9 @@ function generateAppHtml(tenant: any, shop: string): string {
     verified: true,
   };
 
+  // Use the Vercel deployment URL for assets
+  const baseUrl = 'https://phraseotomy.ourstagingserver.com';
+
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -178,8 +179,8 @@ function generateAppHtml(tenant: any, shop: string): string {
       window.__PHRASEOTOMY_CONFIG__ = ${JSON.stringify(tenantConfig)};
       window.__PHRASEOTOMY_SHOP__ = ${JSON.stringify(shop)};
     </script>
-    <script type="module" crossorigin src="/assets/index.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index.css">
+    <script type="module" crossorigin src="${baseUrl}/assets/index.js"></script>
+    <link rel="stylesheet" crossorigin href="${baseUrl}/assets/index.css">
   </head>
   <body>
     <div id="root"></div>
