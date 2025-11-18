@@ -1,16 +1,40 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client with environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Get environment variables
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Create and export the Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Check if Supabase is properly configured
+export function isSupabaseConfigured(): boolean {
+  return !!(supabaseUrl && supabaseAnonKey && 
+            supabaseUrl.trim() !== '' && supabaseAnonKey.trim() !== '');
+}
+
+// Create Supabase client only if configured, otherwise null
+let supabaseInstance: SupabaseClient | null = null;
+
+if (isSupabaseConfigured()) {
+  supabaseInstance = createClient(supabaseUrl!, supabaseAnonKey!);
+}
+
+// Export the client (may be null if not configured)
+export const supabase = supabaseInstance;
+
+// Helper to get client and throw error if not configured
+function getClient(): SupabaseClient {
+  if (!supabase) {
+    throw new Error(
+      'Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.'
+    );
+  }
+  return supabase;
+}
 
 // Example function to check connection and interact with a placeholder table
 export async function testConnection() {
   try {
-    const { data, error } = await supabase
+    const client = getClient();
+    const { data, error } = await client
       .from('game_sessions')
       .select('*')
       .limit(1);
@@ -34,7 +58,8 @@ export async function createGameSession(sessionData: {
   players?: number;
 }) {
   try {
-    const { data, error } = await supabase
+    const client = getClient();
+    const { data, error } = await client
       .from('game_sessions')
       .insert([
         {
@@ -54,9 +79,4 @@ export async function createGameSession(sessionData: {
     console.error('Error creating game session:', err);
     return { success: false, error: err };
   }
-}
-
-// Check if Supabase is properly configured
-export function isSupabaseConfigured(): boolean {
-  return !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== '' && supabaseAnonKey !== '');
 }
