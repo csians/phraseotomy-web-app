@@ -190,14 +190,39 @@ const Play = () => {
                     </div>
                   </>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Access:</span>
                       <span className="text-destructive font-semibold">No active code yet</span>
                     </div>
-                    <p className="text-xs text-muted-foreground pt-2 border-t border-border">
-                      This screen will show your active code and unlocked packs once the licensing backend is connected.
-                    </p>
+                    
+                    {/* Redeem Code Placeholder Section */}
+                    <div className="pt-3 border-t border-border space-y-3">
+                      <p className="text-xs text-game-yellow font-semibold uppercase tracking-wide">
+                        Redeem a Code (Coming Soon)
+                      </p>
+                      
+                      {/* Five disabled code input boxes */}
+                      <div className="flex gap-2 justify-center">
+                        {[...Array(5)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="w-12 h-12 bg-game-gray/30 border border-game-gray/50 rounded-md flex items-center justify-center text-game-gray/50 font-mono text-lg"
+                          >
+                            _
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="space-y-1 text-center">
+                        <p className="text-xs text-muted-foreground">
+                          You'll enter your 6-digit code here to unlock packs.
+                        </p>
+                        <p className="text-xs text-game-gray/60">
+                          Code redemption will be available in the next milestone.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </>
