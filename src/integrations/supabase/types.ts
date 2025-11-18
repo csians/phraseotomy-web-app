@@ -22,8 +22,8 @@ export type Database = {
           is_active: boolean
           name: string
           shop_domain: string
-          shopify_api_key: string
-          shopify_api_secret: string
+          shopify_client_id: string
+          shopify_client_secret: string
           tenant_key: string
           updated_at: string
         }
@@ -34,8 +34,8 @@ export type Database = {
           is_active?: boolean
           name: string
           shop_domain: string
-          shopify_api_key: string
-          shopify_api_secret: string
+          shopify_client_id: string
+          shopify_client_secret: string
           tenant_key: string
           updated_at?: string
         }
@@ -46,8 +46,8 @@ export type Database = {
           is_active?: boolean
           name?: string
           shop_domain?: string
-          shopify_api_key?: string
-          shopify_api_secret?: string
+          shopify_client_id?: string
+          shopify_client_secret?: string
           tenant_key?: string
           updated_at?: string
         }
