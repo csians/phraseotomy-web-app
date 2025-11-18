@@ -95,11 +95,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('HMAC verified successfully');
 
     // Generate HTML that loads the React app with embedded tenant data
-    const html = generateAppHtml(tenant, shop);
+    const html = await generateAppHtml(tenant, shop);
 
-    console.log('Returning app HTML');
+    console.log('Returning app HTML from Vercel with embedded config');
 
-    // Return the app HTML
     res.setHeader('Content-Type', 'text/html');
     return res.status(200).send(html);
 
@@ -109,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-function generateAppHtml(tenant: any, shop: string): string {
+async function generateAppHtml(tenant: any, shop: string): Promise<string> {
   const tenantConfig = {
     id: tenant.id,
     name: tenant.name,
@@ -119,25 +118,19 @@ function generateAppHtml(tenant: any, shop: string): string {
     verified: true,
   };
 
-  // Use the actual staging/production domain
-  const assetBaseUrl = 'https://phraseotomy.ourstagingserver.com';
+  // Fetch the built index.html from your Vercel deployment
+  const appUrl = 'https://phraseotomy.ourstagingserver.com/';
+  const response = await fetch(appUrl);
+  let html = await response.text();
 
-  return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Phraseotomy - Web Game</title>
-    <script type="module" crossorigin src="${assetBaseUrl}/assets/index.js"></script>
-    <link rel="stylesheet" crossorigin href="${assetBaseUrl}/assets/index.css" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script>
-      // Embed tenant configuration for React app to read
-      window.__PHRASEOTOMY_CONFIG__ = ${JSON.stringify(tenantConfig)};
-      window.__PHRASEOTOMY_SHOP__ = ${JSON.stringify(shop)};
-    </script>
-  </body>
-</html>`;
+  const injection = `\n    <script>\n      window.__PHRASEOTOMY_CONFIG__ = ${JSON.stringify(tenantConfig)};\n      window.__PHRASEOTOMY_SHOP__ = ${JSON.stringify(shop)};\n    </script>\n  `;
+
+  // Inject our config script just before </body>
+  if (html.includes('</body>')) {
+    html = html.replace('</body>', `${injection}</body>`);
+  } else {
+    html += injection;
+  }
+
+  return html;
 }
