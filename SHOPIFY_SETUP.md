@@ -25,12 +25,16 @@ This guide explains how to set up your Shopify app with the Phraseotomy applicat
 3. Enter the following settings:
    - **Subpath prefix**: `apps`
    - **Subpath**: `phraseotomy`
-   - **Proxy URL**: `https://phraseotomy.ourstagingserver.com/play`
+   - **Proxy URL**: `https://phraseotomy-web-app.vercel.app/play`
+   
+   ⚠️ **IMPORTANT**: Replace `phraseotomy-web-app.vercel.app` with your **actual Vercel deployment URL**
+   
 4. Save the configuration
 
 This will allow users to access your app at:
-- Production: `https://[shop-domain]/apps/phraseotomy`
-- The Shopify proxy will forward requests to your Vercel deployment
+- Staging: `https://testing-cs-store.myshopify.com/apps/phraseotomy`
+- Production: `https://phraseotomy.com/apps/phraseotomy`
+- The Shopify proxy will forward requests to your Vercel deployment and append query parameters like `?shop=testing-cs-store.myshopify.com`
 
 ## Step 3: Add Tenant Configuration to Supabase
 
@@ -108,20 +112,50 @@ VALUES (
 
 ## Troubleshooting
 
-### "Invalid signature" error
-- Verify the Client Secret is correct in your tenants table
-- Check that the shop domain matches exactly
+### White Page / App Not Loading
 
-### "Tenant not found" error
-- Verify the shop domain in your tenants table matches the shop parameter
-- Check that `is_active` is set to `true` for the tenant
+If you see a blank/white page when visiting `https://testing-cs-store.myshopify.com/apps/phraseotomy`:
 
-### App proxy not loading
-- Verify the proxy URL in Shopify matches your Vercel deployment URL
-- Check that your Vercel deployment has the correct environment variables:
-  - `VITE_SUPABASE_URL`
-  - `VITE_SUPABASE_PUBLISHABLE_KEY`
-  - `VITE_SUPABASE_PROJECT_ID`
+1. **Check App Proxy URL**:
+   - In Shopify Partner Dashboard → Your App → Configuration → App proxy
+   - Verify the **Proxy URL** points to your deployed Vercel app (e.g., `https://phraseotomy-web-app.vercel.app/play`)
+   - **Not**: Edge function URL, localhost, or placeholder domain
+   
+2. **Verify Vercel Deployment**:
+   - Visit your Vercel deployment directly: `https://phraseotomy-web-app.vercel.app/play?shop=testing-cs-store.myshopify.com`
+   - This should load the app and show tenant information
+   - If this doesn't work, your app isn't deployed correctly
+   
+3. **Check Browser Console**:
+   - Open Developer Tools (F12 or right-click → Inspect)
+   - Go to the Console tab
+   - Look for JavaScript errors (red messages)
+   - Go to Network tab and check if files are loading (200 status codes)
+
+4. **Verify Tenant Data**:
+   - Check Supabase → Table Editor → tenants table
+   - Ensure `shop_domain` is exactly `testing-cs-store.myshopify.com`
+   - Ensure `is_active` is `true`
+
+### "No shop parameter detected"
+
+This means the shop parameter isn't being passed:
+- Double-check your App Proxy configuration in Shopify
+- Make sure you're accessing via: `https://your-store.myshopify.com/apps/phraseotomy` (not the direct Vercel URL)
+
+### "Unknown tenant for this shop domain"
+
+This means the tenant record doesn't exist or doesn't match:
+- Verify you've run the SQL INSERT from Step 3
+- Check that `shop_domain` matches exactly (case-sensitive)
+- In Supabase, query: `SELECT * FROM tenants WHERE shop_domain = 'testing-cs-store.myshopify.com'`
+
+### Environment Variable Issues
+
+Your Vercel deployment needs these variables (should be set automatically):
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_PROJECT_ID`
 
 ## References
 
