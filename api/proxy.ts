@@ -119,9 +119,13 @@ async function generateAppHtml(tenant: any, shop: string): Promise<string> {
   };
 
   // Fetch the built index.html from your Vercel deployment
-  const appUrl = 'https://phraseotomy.ourstagingserver.com/';
-  const response = await fetch(appUrl);
+  const assetBaseUrl = 'https://phraseotomy.ourstagingserver.com';
+  const response = await fetch(`${assetBaseUrl}/`);
   let html = await response.text();
+
+  // Replace relative asset paths with absolute URLs
+  html = html.replace(/src="\.\/assets\//g, `src="${assetBaseUrl}/assets/`);
+  html = html.replace(/href="\.\/assets\//g, `href="${assetBaseUrl}/assets/`);
 
   const injection = `\n    <script>\n      window.__PHRASEOTOMY_CONFIG__ = ${JSON.stringify(tenantConfig)};\n      window.__PHRASEOTOMY_SHOP__ = ${JSON.stringify(shop)};\n    </script>\n  `;
 
