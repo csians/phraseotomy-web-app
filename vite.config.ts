@@ -5,7 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: '/',
+  // Use relative paths so assets work behind Shopify App Proxy
+  base: './',
   server: {
     host: "::",
     port: 8080,
