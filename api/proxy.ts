@@ -9,24 +9,38 @@ async function verifyShopifyHmac(
   queryParams: URLSearchParams,
   clientSecret: string
 ): Promise<boolean> {
-  // Shopify App Proxy sends signature as 'signature', not 'hmac'
+  // Shopify App Proxy sends signature as 'signature'
   const signature = queryParams.get('signature');
   if (!signature) {
     console.log('No signature parameter found');
     return false;
   }
 
-  const params = new URLSearchParams(queryParams);
-  params.delete('signature');
-  params.sort();
+  // Build the message exactly as in Shopify docs:
+  // 1) Remove signature
+  // 2) For each key, join multiple values with commas
+  // 3) Sort by key
+  // 4) Concatenate as key=value with NO separator between pairs
+  const paramMap = new Map<string, string[]>();
+  for (const [key, value] of queryParams.entries()) {
+    if (key === 'signature') continue;
+    const existing = paramMap.get(key) ?? [];
+    existing.push(value);
+    paramMap.set(key, existing);
+  }
 
-  const message = params.toString();
+  const sortedPairs = Array.from(paramMap.entries())
+    .map(([key, values]) => `${key}=${values.join(',')}`)
+    .sort();
+
+  const message = sortedPairs.join('');
+
   const generatedHash = createHmac('sha256', clientSecret)
     .update(message)
     .digest('hex');
 
   const isValid = generatedHash === signature;
-  console.log('HMAC verification:', { isValid, generatedHash, providedSignature: signature });
+  console.log('HMAC verification:', { isValid, generatedHash, providedSignature: signature, message });
   
   return isValid;
 }
