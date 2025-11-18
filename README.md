@@ -1,73 +1,208 @@
-# Welcome to your Lovable project
+# Phraseotomy Web App
 
-## Project info
+A mobile-first web application for the Phraseotomy board game, designed to be embedded in Shopify stores.
 
-**URL**: https://lovable.dev/projects/46e7a4fc-a12f-4e7f-812c-75f62bdac4d4
+## Tech Stack
 
-## How can I edit this code?
+- **Frontend**: React 18 + Vite + TypeScript
+- **Routing**: React Router v6
+- **Styling**: Tailwind CSS
+- **Backend**: Supabase (PostgreSQL database, authentication, storage)
+- **UI Components**: shadcn/ui
 
-There are several ways of editing your application.
+## Project Structure
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/46e7a4fc-a12f-4e7f-812c-75f62bdac4d4) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+src/
+├── components/     # Reusable UI components
+├── pages/         # Route pages
+│   ├── Play.tsx   # Main game screen
+│   └── NotFound.tsx
+├── lib/           # Core utilities and integrations
+│   ├── supabaseClient.ts  # Supabase client setup
+│   ├── tenants.ts         # Multi-tenant configuration
+│   └── utils.ts
+└── App.tsx        # Main app with routing
 ```
 
-**Edit a file directly in GitHub**
+## Getting Started
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Prerequisites
 
-**Use GitHub Codespaces**
+- Node.js 18+ and npm
+- A Supabase account and project (free tier works)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Installation
 
-## What technologies are used for this project?
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd phraseotomy-app
+   ```
 
-This project is built with:
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+3. **Set up environment variables**
+   
+   Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Then fill in your Supabase credentials:
+   ```env
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key
+   VITE_APP_ENV=development
+   ```
 
-## How can I deploy this project?
+4. **Run the development server**
+   ```bash
+   npm run dev
+   ```
+   
+   The app will be available at `http://localhost:8080`
 
-Simply open [Lovable](https://lovable.dev/projects/46e7a4fc-a12f-4e7f-812c-75f62bdac4d4) and click on Share -> Publish.
+### Testing Multi-Tenant Features
 
-## Can I connect a custom domain to my Lovable project?
+The app supports multiple Shopify stores via tenant detection:
 
-Yes, you can!
+- **Staging**: `http://localhost:8080/play?shop=testing-cs-store.myshopify.com`
+- **Production**: `http://localhost:8080/play?shop=phraseotomy.myshopify.com`
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Multi-Tenant System
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+The app uses a tenant configuration system to support multiple Shopify stores:
+
+### How It Works
+
+1. **Shop Parameter**: The app reads the `shop` query parameter from the URL (e.g., `?shop=testing-cs-store.myshopify.com`)
+
+2. **Tenant Detection**: `src/lib/tenants.ts` contains the `getTenantConfig()` function that maps shop domains to tenant configurations
+
+3. **Current Tenants**:
+   - `testing-cs-store.myshopify.com` → Staging environment
+   - `phraseotomy.myshopify.com` → Production environment
+
+### Adding New Tenants
+
+Edit `src/lib/tenants.ts` and add a new entry to the `tenants` array:
+
+```typescript
+{
+  id: 'new-tenant',
+  shopDomain: 'your-store.myshopify.com',
+  displayName: 'Your Store Name',
+  themeColor: '#FCD34D',
+}
+```
+
+## Supabase Integration
+
+### Client Setup
+
+The Supabase client is configured in `src/lib/supabaseClient.ts` and reads from environment variables:
+
+- `VITE_SUPABASE_URL`: Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY`: Your Supabase anonymous/public key
+
+### Example Functions
+
+Two example functions are included:
+
+- `testConnection()`: Tests the database connection
+- `createGameSession()`: Creates a new game session record
+
+### Database Schema (Placeholder)
+
+The code references a `game_sessions` table. You'll need to create this in Supabase:
+
+```sql
+create table game_sessions (
+  id uuid default uuid_generate_v4() primary key,
+  shop_domain text not null,
+  tenant_id text not null,
+  players integer,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+```
+
+## Shopify Embedding (Future)
+
+This app is designed to be embedded in Shopify stores via an App Proxy. When deployed:
+
+1. The Shopify store sends traffic to your deployed app with shop info in the URL
+2. The app detects the shop domain and loads the appropriate tenant configuration
+3. Users interact with the game within their Shopify storefront
+
+## Development
+
+### Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build locally
+- `npm run lint` - Run ESLint
+
+### Environment Variables
+
+All environment variables must be prefixed with `VITE_` to be accessible in the browser:
+
+- ✅ `VITE_SUPABASE_URL`
+- ✅ `VITE_APP_ENV`
+- ❌ `SUPABASE_URL` (won't work)
+
+## Deployment
+
+### Vercel (Recommended)
+
+1. Push your code to GitHub
+2. Import the repository in Vercel
+3. Add environment variables in Vercel dashboard
+4. Deploy
+
+### Other Platforms
+
+The app can be deployed to any static hosting platform that supports Vite:
+- Netlify
+- Cloudflare Pages
+- AWS S3 + CloudFront
+
+## Design System
+
+The app uses a custom Phraseotomy theme:
+
+- **Background**: Black (`#000000`)
+- **Primary/Accent**: Yellow (`#FCD34D`)
+- **Typography**: Bold, game-focused
+- **Layout**: Mobile-first, full-screen
+
+All design tokens are defined in:
+- `src/index.css` (CSS variables)
+- `tailwind.config.ts` (Tailwind theme)
+
+## Contributing
+
+This is a development build. The skeleton is in place for:
+
+- Multi-tenant Shopify support ✅
+- Supabase backend integration ✅
+- Mobile-first UI ✅
+- Routing infrastructure ✅
+
+Next steps:
+- Implement game logic
+- Add player management
+- Build score tracking
+- Create admin dashboard
+
+## License
+
+[Your License Here]
+
+## Support
+
+For issues or questions, contact [your-contact-info]
