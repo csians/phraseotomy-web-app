@@ -94,43 +94,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('HMAC verified successfully');
 
-    // Prepare tenant data for cookie (sanitize sensitive fields)
-    const tenantData = {
-      id: tenant.id,
-      name: tenant.name,
-      tenant_key: tenant.tenant_key,
-      shop_domain: tenant.shop_domain,
-      environment: tenant.environment,
-      verified: true,
-    };
+    // Generate HTML that loads the React app with embedded tenant data
+    const html = generateAppHtml(tenant, shop);
 
-    // Set secure HTTP-only cookie with tenant data
-    const cookieValue = JSON.stringify(tenantData);
-    const isProduction = process.env.NODE_ENV === 'production';
-    
-    const cookies = [
-      `phraseotomy_tenant=${encodeURIComponent(cookieValue)}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`,
-      `phraseotomy_shop=${shop}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`
-    ];
+    console.log('Returning app HTML');
 
-    console.log('Cookies set, fetching app HTML from Vercel');
-
-    // Fetch the React app HTML from the Vercel deployment
-    const vercelDomain = process.env.VERCEL_URL || 'phraseotomy.ourstagingserver.com';
-    const appUrl = `https://${vercelDomain}/`;
-    
-    const appResponse = await fetch(appUrl);
-    const appHtml = await appResponse.text();
-
-    console.log('Returning app HTML with cookies');
-
-    // Return the app HTML with cookies set
-    res.setHeader('Set-Cookie', cookies);
+    // Return the app HTML
     res.setHeader('Content-Type', 'text/html');
-    return res.status(200).send(appHtml);
+    return res.status(200).send(html);
 
   } catch (error) {
     console.error('Error in proxy handler:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
+}
+
+function generateAppHtml(tenant: any, shop: string): string {
+  const tenantConfig = {
+    id: tenant.id,
+    name: tenant.name,
+    tenant_key: tenant.tenant_key,
+    shop_domain: tenant.shop_domain,
+    environment: tenant.environment,
+    verified: true,
+  };
+
+  const assetBaseUrl = process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}` 
+    : 'https://phraseotomy.ourstagingserver.com';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Phraseotomy - Web Game</title>
+    <script type="module" crossorigin src="${assetBaseUrl}/assets/index.js"></script>
+    <link rel="stylesheet" crossorigin href="${assetBaseUrl}/assets/index.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // Embed tenant configuration for React app to read
+      window.__PHRASEOTOMY_CONFIG__ = ${JSON.stringify(tenantConfig)};
+      window.__PHRASEOTOMY_SHOP__ = ${JSON.stringify(shop)};
+    </script>
+  </body>
+</html>`;
 }
