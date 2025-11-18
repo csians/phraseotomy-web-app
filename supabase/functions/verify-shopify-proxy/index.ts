@@ -7,11 +7,12 @@ const corsHeaders = {
 
 /**
  * Verifies Shopify App Proxy HMAC signature
- * @see https://shopify.dev/docs/apps/build/online-store/app-proxies#verify-proxy-requests
+ * Uses the Client Secret from Shopify App Credentials
+ * @see https://shopify.dev/docs/apps/build/online-store/app-proxies/authenticate-app-proxies
  */
 async function verifyShopifyHmac(
   queryParams: URLSearchParams,
-  apiSecret: string
+  clientSecret: string
 ): Promise<boolean> {
   const signature = queryParams.get('signature');
   if (!signature) return false;
@@ -30,9 +31,9 @@ async function verifyShopifyHmac(
     .map(([key, value]) => `${key}=${value}`)
     .join('');
 
-  // Create HMAC
+  // Create HMAC using Client Secret
   const encoder = new TextEncoder();
-  const keyData = encoder.encode(apiSecret);
+  const keyData = encoder.encode(clientSecret);
   const msgData = encoder.encode(sortedParams);
   
   const cryptoKey = await crypto.subtle.importKey(
@@ -96,8 +97,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify HMAC signature
-    const isValid = await verifyShopifyHmac(queryParams, tenant.shopify_api_secret);
+    // Verify HMAC signature using Shopify Client Secret
+    const isValid = await verifyShopifyHmac(queryParams, tenant.shopify_client_secret);
 
     if (!isValid) {
       return new Response(
@@ -116,6 +117,7 @@ Deno.serve(async (req) => {
           shop_domain: tenant.shop_domain,
           environment: tenant.environment,
           tenant_key: tenant.tenant_key,
+          client_id: tenant.shopify_client_id,
         },
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
