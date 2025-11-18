@@ -14,8 +14,18 @@ const Play = () => {
     // Check Supabase configuration
     setIsConfigured(isSupabaseConfigured());
 
+    // Debug logging - output current URL and parameters
+    console.log('=== DEBUG INFO ===');
+    console.log('Full URL:', window.location.href);
+    console.log('Pathname:', window.location.pathname);
+    console.log('Search:', window.location.search);
+    console.log('All searchParams:', Object.fromEntries(searchParams.entries()));
+    
     // Get shop parameter from URL
     const shop = getShopFromParams(searchParams);
+    console.log('Detected shop parameter:', shop);
+    console.log('=================');
+    
     setShopDomain(shop);
   }, [searchParams]);
 
@@ -32,6 +42,18 @@ const Play = () => {
         <p className="text-sm text-muted-foreground uppercase tracking-wider">
           Web App
         </p>
+      </div>
+
+      {/* Debug Info - Visible on page */}
+      <div className="w-full max-w-md bg-yellow-50 dark:bg-yellow-950 border-2 border-yellow-400 dark:border-yellow-600 rounded-xl p-4 mb-4 space-y-2">
+        <h3 className="text-sm font-bold text-yellow-900 dark:text-yellow-100">🐛 Debug Info</h3>
+        <div className="text-xs font-mono space-y-1 text-yellow-900 dark:text-yellow-100">
+          <p><strong>URL:</strong> {window.location.href}</p>
+          <p><strong>Path:</strong> {window.location.pathname}</p>
+          <p><strong>Query:</strong> {window.location.search || '(none)'}</p>
+          <p><strong>Shop param:</strong> {shopDomain || '(not detected)'}</p>
+          <p><strong>All params:</strong> {JSON.stringify(Object.fromEntries(searchParams.entries()))}</p>
+        </div>
       </div>
 
       {/* Status Card */}
