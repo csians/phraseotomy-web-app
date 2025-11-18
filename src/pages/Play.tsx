@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { getShopFromParams } from '@/lib/tenants';
 import { isSupabaseConfigured } from '@/lib/supabaseClient';
+import { supabase } from '@/integrations/supabase/client';
 
-// Type for embedded config from Shopify proxy entry
+// Type for tenant config from verify endpoint
 interface TenantConfig {
   id: string;
   name: string;
@@ -11,37 +14,67 @@ interface TenantConfig {
   verified: boolean;
 }
 
-declare global {
-  interface Window {
-    __PHRASEOTOMY_CONFIG__?: TenantConfig;
-    __PHRASEOTOMY_SHOP__?: string;
-  }
-}
-
 const Play = () => {
+  const [searchParams] = useSearchParams();
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [isConfigured, setIsConfigured] = useState(false);
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
+  const [tenantLoading, setTenantLoading] = useState(false);
   const [tenantError, setTenantError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check Supabase configuration
     setIsConfigured(isSupabaseConfigured());
 
-    // Check for embedded tenant configuration from Shopify proxy
-    if (window.__PHRASEOTOMY_CONFIG__) {
-      console.log('=== SHOPIFY PROXY MODE ===');
-      console.log('Embedded config:', window.__PHRASEOTOMY_CONFIG__);
-      console.log('Shop:', window.__PHRASEOTOMY_SHOP__);
-      setTenant(window.__PHRASEOTOMY_CONFIG__);
-      setShopDomain(window.__PHRASEOTOMY_SHOP__ || null);
+    // Get shop parameter from URL (Shopify adds it via proxy)
+    const shop = getShopFromParams(searchParams);
+    console.log('=== DEBUG INFO ===');
+    console.log('Full URL:', window.location.href);
+    console.log('Detected shop parameter:', shop);
+    console.log('All params:', Object.fromEntries(searchParams.entries()));
+    console.log('=================');
+    
+    setShopDomain(shop);
+
+    // If we have a shop parameter, verify with edge function
+    if (shop) {
+      verifyShopifyRequest(shop);
     } else {
-      console.log('=== DIRECT ACCESS MODE ===');
-      console.log('Full URL:', window.location.href);
-      console.log('No embedded config found');
-      setTenantError('App must be accessed through Shopify App Proxy');
+      setTenantError('No shop parameter detected. App must be accessed through Shopify App Proxy.');
     }
-  }, []);
+  }, [searchParams]);
+
+  const verifyShopifyRequest = async (shop: string) => {
+    setTenantLoading(true);
+    setTenantError(null);
+
+    try {
+      // Call the verify edge function with all current URL params
+      const allParams = new URLSearchParams(window.location.search);
+      
+      const { data, error } = await supabase.functions.invoke('shopify-proxy-entry', {
+        body: { shop, params: Object.fromEntries(allParams.entries()) }
+      });
+
+      if (error) {
+        console.error('Error verifying Shopify request:', error);
+        setTenantError(error.message);
+        setTenant(null);
+      } else if (data && data.verified) {
+        console.log('Verification successful:', data);
+        setTenant(data);
+      } else {
+        setTenantError(data?.error || 'Verification failed');
+        setTenant(null);
+      }
+    } catch (err) {
+      console.error('Error calling verify function:', err);
+      setTenantError('Failed to verify tenant configuration');
+      setTenant(null);
+    } finally {
+      setTenantLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-8">
@@ -66,8 +99,8 @@ const Play = () => {
           <p><strong>Path:</strong> {window.location.pathname}</p>
           <p><strong>Query:</strong> {window.location.search || '(none)'}</p>
           <p><strong>Shop:</strong> {shopDomain || '(not detected)'}</p>
-          <p><strong>Mode:</strong> {window.__PHRASEOTOMY_CONFIG__ ? 'Shopify Proxy' : 'Direct Access'}</p>
-          <p><strong>Config:</strong> {window.__PHRASEOTOMY_CONFIG__ ? 'Embedded ✓' : 'None ✗'}</p>
+          <p><strong>Tenant:</strong> {tenant ? tenant.name : tenantLoading ? 'Loading...' : 'Not loaded'}</p>
+          <p><strong>Verified:</strong> {tenant?.verified ? '✓' : '✗'}</p>
         </div>
       </div>
 

@@ -20,26 +20,25 @@ This guide explains how to set up your Shopify app with the Phraseotomy applicat
 
 ## Step 2: Configure Shopify App Proxy
 
-The Shopify App Proxy allows customers to access your app through their store domain. The proxy forwards requests to a Supabase Edge Function that handles HMAC verification and serves the React app.
+The Shopify App Proxy allows customers to access your app through their store domain.
 
 1. In your app configuration, scroll to **App proxy** section
 2. Click **Set up** (or **Configure** if already set up)
 3. Enter the following settings:
    - **Subpath prefix**: `apps`
    - **Subpath**: `phraseotomy`
-   - **Proxy URL**: `https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/shopify-proxy-entry`
+   - **Proxy URL**: `https://phraseotomy.ourstagingserver.com/play`
+   
+   ⚠️ **IMPORTANT**: This should point to your Vercel deployment where the React app is hosted
    
 4. Save the configuration
 
 **How it works:**
 - Customers visit: `https://your-store.myshopify.com/apps/phraseotomy`
-- Shopify adds authentication params: `?shop=your-store.myshopify.com&timestamp=...&signature=...`
-- Shopify forwards the request to the Edge Function
-- The Edge Function:
-  - Verifies the HMAC signature
-  - Looks up the tenant configuration
-  - Serves the React app with embedded tenant data
-- The customer sees the app with their store's branding
+- Shopify forwards the request with authentication params: `?shop=your-store.myshopify.com&timestamp=...&signature=...`
+- Your React app loads and calls the `shopify-proxy-entry` edge function to verify the request
+- The edge function verifies HMAC and returns tenant configuration
+- The app displays with the correct store branding
 
 ## Step 3: Add Tenant Configuration to Supabase
 
