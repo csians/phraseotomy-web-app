@@ -130,23 +130,16 @@ Deno.serve(async (req) => {
 
     console.log('HMAC verified successfully for tenant:', tenant.tenant_key);
 
-    // Return sanitized tenant configuration
-    const tenantConfig = {
-      id: tenant.id,
-      name: tenant.name,
-      tenant_key: tenant.tenant_key,
-      shop_domain: tenant.shop_domain,
-      environment: tenant.environment,
-      verified: true,
-    };
+    // After successful verification, redirect to the React app with the shop param
+    const redirectUrl = `https://phraseotomy.ourstagingserver.com/play?shop=${encodeURIComponent(shop!)}`;
+    console.log('Redirecting to app URL:', redirectUrl);
 
-    return new Response(
-      JSON.stringify(tenantConfig),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: redirectUrl,
+      },
+    });
   } catch (error) {
     console.error('Error in shopify-proxy-entry:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
