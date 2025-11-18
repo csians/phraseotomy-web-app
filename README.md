@@ -16,11 +16,13 @@ A mobile-first web application for the Phraseotomy board game, designed to be em
 src/
 ├── components/     # Reusable UI components
 ├── pages/         # Route pages
-│   ├── Play.tsx   # Main game screen
+│   ├── Play.tsx   # Home screen (main entry point)
 │   └── NotFound.tsx
 ├── lib/           # Core utilities and integrations
 │   ├── supabaseClient.ts  # Supabase client setup
 │   ├── tenants.ts         # Multi-tenant configuration
+│   ├── types.ts           # TypeScript type definitions
+│   ├── access.ts          # Access status and licensing logic
 │   └── utils.ts
 └── App.tsx        # Main app with routing
 ```
@@ -73,19 +75,35 @@ The app supports multiple Shopify stores via tenant detection:
 - **Staging**: `http://localhost:8080/play?shop=testing-cs-store.myshopify.com`
 - **Production**: `http://localhost:8080/play?shop=phraseotomy.myshopify.com`
 
-## Multi-Tenant System
+## Home Screen (`/play`)
 
-The app uses a tenant configuration system to support multiple Shopify stores:
+The `/play` route is the main entry point for the Phraseotomy app. It displays:
 
-### How It Works
+- **Phraseotomy branding** with logo and wordmark
+- **Development build card** showing app version and access status
+- **Game mode buttons** for Table Top and Online game modes
+- **Footer debug info** showing tenant, shop domain, and environment
 
-1. **Shop Parameter**: The app reads the `shop` query parameter from the URL (e.g., `?shop=testing-cs-store.myshopify.com`)
+### Shop Parameter and Tenant Detection
 
-2. **Tenant Detection**: `src/lib/tenants.ts` contains the `getTenantConfig()` function that maps shop domains to tenant configurations
+The app reads the `shop` query parameter from the URL when accessed via Shopify App Proxy:
 
-3. **Current Tenants**:
-   - `testing-cs-store.myshopify.com` → Staging environment
-   - `phraseotomy.myshopify.com` → Production environment
+- The proxy injects `window.__PHRASEOTOMY_CONFIG__` with tenant information
+- The proxy injects `window.__PHRASEOTOMY_SHOP__` with the shop domain
+- If accessed directly (not via proxy), it falls back to `/api/session`
+
+### Access Status System
+
+The home screen displays the user's access status (active license, unlocked packs, etc.):
+
+- **Logic**: `src/lib/access.ts` contains the `loadAccessStatus()` function
+- **Currently**: Returns mocked data based on shop domain
+- **Future**: Will query Supabase tables (`access_codes`, `pack_unlocks`) - see TODO comments in `src/lib/access.ts`
+
+Mock data per tenant:
+- **Staging** (`testing-cs-store.myshopify.com`): 30-day license, 3 packs unlocked
+- **Production** (`phraseotomy.myshopify.com`): 90-day license, 4 packs unlocked
+- **Demo** (no shop): No active license
 
 ### Adding New Tenants
 
