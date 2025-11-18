@@ -27,18 +27,19 @@ The Shopify App Proxy allows customers to access your app through their store do
 3. Enter the following settings:
    - **Subpath prefix**: `apps`
    - **Subpath**: `phraseotomy`
-   - **Proxy URL**: `https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/shopify-proxy-entry`
+   - **Proxy URL**: `https://phraseotomy.com/api/proxy`
    
 4. Save the configuration
 
 **How it works:**
 - Customers visit: `https://your-store.myshopify.com/apps/phraseotomy`
-- Browser URL stays on the store domain (no redirect)
-- Shopify forwards the HTTP request with authentication params to the edge function
-- The edge function verifies HMAC and returns HTML with:
-  - Embedded tenant configuration (as JavaScript global)
-  - Asset URLs pointing to your Vercel deployment
-- The React app loads and reads from the embedded config
+- Browser URL stays on the store domain throughout the session
+- Shopify forwards the HTTP request with authentication params to the Vercel serverless function
+- The serverless function:
+  - Verifies HMAC signature using the tenant's Shopify client secret
+  - Sets a secure HTTP-only cookie with tenant configuration
+  - Redirects to `/play` (keeping the store domain)
+- The React app fetches session data from `/api/session` and displays tenant-specific content
 
 ## Step 3: Add Tenant Configuration to Supabase
 
@@ -102,10 +103,13 @@ VALUES (
 
 ## How It Works
 
-1. **Shopify App Proxy**: When a customer visits `/apps/phraseotomy` on any Shopify store with your app installed, Shopify forwards the request to your proxy URL
-2. **HMAC Verification**: Your app verifies the request came from Shopify using HMAC signature with the Client Secret
-3. **Tenant Loading**: The app looks up the tenant configuration in Supabase based on the `shop` parameter
-4. **Environment-Specific Config**: Different stores can have different configurations (staging vs production)
+1. **Shopify App Proxy**: When a customer visits `/apps/phraseotomy` on any Shopify store with your app installed, Shopify forwards the request to `https://phraseotomy.com/api/proxy`
+2. **HMAC Verification**: The Vercel serverless function verifies the request came from Shopify using HMAC signature with the Client Secret
+3. **Tenant Loading**: The function looks up the tenant configuration in Supabase based on the `shop` parameter
+4. **Session Cookie**: A secure HTTP-only cookie is set with tenant data (expires in 24 hours)
+5. **Redirect**: The function redirects to `/play` while keeping the user on the Shopify store domain
+6. **React App**: The `/play` page fetches session data from `/api/session` and displays tenant-specific content
+7. **Environment-Specific Config**: Different stores can have different configurations (staging vs production)
 
 ## Security Notes
 
