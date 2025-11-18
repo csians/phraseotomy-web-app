@@ -131,11 +131,14 @@ Deno.serve(async (req) => {
     console.log('HMAC verified successfully for tenant:', tenant.tenant_key);
 
     // Return HTML that loads the React app with embedded tenant data
+    // Shopify App Proxy requires application/liquid or text/html without charset
     return new Response(
       generateAppHtml(tenant, shop),
       {
         status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        headers: { 
+          'Content-Type': 'text/html',
+        },
       }
     );
   } catch (error) {
