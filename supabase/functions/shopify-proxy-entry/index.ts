@@ -55,13 +55,24 @@ Deno.serve(async (req) => {
   console.log('Shop:', shop);
   console.log('Query params:', Object.fromEntries(queryParams.entries()));
 
-  // If no shop parameter, return error HTML
+  // CORS headers for browser requests
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  // If no shop parameter, return error
   if (!shop) {
     return new Response(
-      generateErrorHtml('No shop parameter', 'Missing shop parameter in request'),
+      JSON.stringify({ error: 'No shop parameter', verified: false }),
       {
         status: 400,
-        headers: { 'Content-Type': 'text/html' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
@@ -81,10 +92,10 @@ Deno.serve(async (req) => {
     if (tenantError) {
       console.error('Error fetching tenant:', tenantError);
       return new Response(
-        generateErrorHtml('Database Error', tenantError.message),
+        JSON.stringify({ error: tenantError.message, verified: false }),
         {
           status: 500,
-          headers: { 'Content-Type': 'text/html' },
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
@@ -92,10 +103,10 @@ Deno.serve(async (req) => {
     if (!tenant) {
       console.log('Tenant not found for shop:', shop);
       return new Response(
-        generateErrorHtml('Unknown Tenant', `No active tenant found for shop: ${shop}`),
+        JSON.stringify({ error: `No active tenant found for shop: ${shop}`, verified: false }),
         {
           status: 404,
-          headers: { 'Content-Type': 'text/html' },
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
@@ -109,32 +120,41 @@ Deno.serve(async (req) => {
     if (!isValidSignature) {
       console.log('Invalid HMAC signature for shop:', shop);
       return new Response(
-        generateErrorHtml('Invalid Signature', 'HMAC signature verification failed'),
+        JSON.stringify({ error: 'HMAC signature verification failed', verified: false }),
         {
           status: 401,
-          headers: { 'Content-Type': 'text/html' },
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
 
     console.log('HMAC verified successfully for tenant:', tenant.tenant_key);
 
-    // Return HTML that loads the React app with embedded tenant data
+    // Return sanitized tenant configuration
+    const tenantConfig = {
+      id: tenant.id,
+      name: tenant.name,
+      tenant_key: tenant.tenant_key,
+      shop_domain: tenant.shop_domain,
+      environment: tenant.environment,
+      verified: true,
+    };
+
     return new Response(
-      generateAppHtml(tenant, shop),
+      JSON.stringify(tenantConfig),
       {
         status: 200,
-        headers: { 'Content-Type': 'text/html' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   } catch (error) {
     console.error('Error in shopify-proxy-entry:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      generateErrorHtml('Server Error', errorMessage),
+      JSON.stringify({ error: errorMessage, verified: false }),
       {
         status: 500,
-        headers: { 'Content-Type': 'text/html' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
