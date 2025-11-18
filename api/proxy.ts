@@ -119,9 +119,8 @@ function generateAppHtml(tenant: any, shop: string): string {
     verified: true,
   };
 
-  const assetBaseUrl = process.env.VERCEL_URL 
-    ? `https://${process.env.VERCEL_URL}` 
-    : 'https://phraseotomy.ourstagingserver.com';
+  // Use the actual staging/production domain
+  const assetBaseUrl = 'https://phraseotomy.ourstagingserver.com';
 
   return `<!DOCTYPE html>
 <html lang="en">
