@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isSupabaseConfigured } from '@/lib/supabaseClient';
 
-// Type for embedded config from Shopify proxy entry
+// Type for tenant configuration from session
 interface TenantConfig {
   id: string;
   name: string;
@@ -11,11 +11,11 @@ interface TenantConfig {
   verified: boolean;
 }
 
-declare global {
-  interface Window {
-    __PHRASEOTOMY_CONFIG__?: TenantConfig;
-    __PHRASEOTOMY_SHOP__?: string;
-  }
+interface SessionResponse {
+  hasSession: boolean;
+  tenant?: TenantConfig;
+  shop?: string;
+  error?: string;
 }
 
 const Play = () => {
@@ -23,25 +23,49 @@ const Play = () => {
   const [isConfigured, setIsConfigured] = useState(false);
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
   const [tenantError, setTenantError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Check Supabase configuration
     setIsConfigured(isSupabaseConfigured());
 
-    // Check for embedded tenant configuration from Shopify proxy
-    if (window.__PHRASEOTOMY_CONFIG__) {
-      console.log('=== SHOPIFY PROXY MODE ===');
-      console.log('Embedded config:', window.__PHRASEOTOMY_CONFIG__);
-      console.log('Shop:', window.__PHRASEOTOMY_SHOP__);
-      setTenant(window.__PHRASEOTOMY_CONFIG__);
-      setShopDomain(window.__PHRASEOTOMY_SHOP__ || null);
-    } else {
-      console.log('=== DIRECT ACCESS MODE ===');
-      console.log('Full URL:', window.location.href);
-      console.log('No embedded config found');
-      setTenantError('App must be accessed through Shopify App Proxy');
-    }
+    // Fetch session data from the Vercel serverless function
+    const fetchSession = async () => {
+      try {
+        const response = await fetch('/api/session');
+        const data: SessionResponse = await response.json();
+
+        if (data.hasSession && data.tenant && data.shop) {
+          console.log('=== SESSION LOADED ===');
+          console.log('Tenant:', data.tenant.tenant_key);
+          console.log('Shop:', data.shop);
+          setTenant(data.tenant);
+          setShopDomain(data.shop);
+        } else {
+          console.log('=== NO SESSION ===');
+          setTenantError(data.error || 'This app must be accessed through the Shopify App Proxy.');
+        }
+      } catch (error) {
+        console.error('Error fetching session:', error);
+        setTenantError('Failed to load session. Please access via Shopify App Proxy.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSession();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-8">
@@ -65,7 +89,7 @@ const Play = () => {
           <p><strong>URL:</strong> {window.location.href}</p>
           <p><strong>Path:</strong> {window.location.pathname}</p>
           <p><strong>Shop:</strong> {shopDomain || '(not detected)'}</p>
-          <p><strong>Mode:</strong> {window.__PHRASEOTOMY_CONFIG__ ? 'Proxy ✓' : 'Direct'}</p>
+          <p><strong>Mode:</strong> {tenant ? 'Session ✓' : 'No Session'}</p>
           <p><strong>Tenant:</strong> {tenant ? tenant.name : 'None'}</p>
           <p><strong>Verified:</strong> {tenant?.verified ? '✓' : '✗'}</p>
         </div>
