@@ -108,16 +108,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const cookieValue = JSON.stringify(tenantData);
     const isProduction = process.env.NODE_ENV === 'production';
     
-    res.setHeader('Set-Cookie', [
-      `phraseotomy_tenant=${encodeURIComponent(cookieValue)}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax${isProduction ? '; Secure' : ''}`,
-      `phraseotomy_shop=${shop}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax${isProduction ? '; Secure' : ''}`
-    ]);
+    const cookies = [
+      `phraseotomy_tenant=${encodeURIComponent(cookieValue)}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`,
+      `phraseotomy_shop=${shop}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`
+    ];
 
-    console.log('Cookie set, redirecting to /play');
+    console.log('Cookies set, fetching app HTML from Vercel');
 
-    // Redirect to /play page
-    res.setHeader('Location', '/play');
-    return res.status(302).end();
+    // Fetch the React app HTML from the Vercel deployment
+    const vercelDomain = process.env.VERCEL_URL || 'phraseotomy.ourstagingserver.com';
+    const appUrl = `https://${vercelDomain}/`;
+    
+    const appResponse = await fetch(appUrl);
+    const appHtml = await appResponse.text();
+
+    console.log('Returning app HTML with cookies');
+
+    // Return the app HTML with cookies set
+    res.setHeader('Set-Cookie', cookies);
+    res.setHeader('Content-Type', 'text/html');
+    return res.status(200).send(appHtml);
 
   } catch (error) {
     console.error('Error in proxy handler:', error);
