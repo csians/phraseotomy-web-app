@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getTenantConfig, getShopFromParams, type TenantConfig } from '@/lib/tenants';
+import { getShopFromParams } from '@/lib/tenants';
 import { isSupabaseConfigured } from '@/lib/supabaseClient';
+import { useTenant } from '@/hooks/useTenant';
 
 const Play = () => {
   const [searchParams] = useSearchParams();
-  const [tenant, setTenant] = useState<TenantConfig | null>(null);
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [isConfigured, setIsConfigured] = useState(false);
+  const { tenant, loading: tenantLoading, error: tenantError } = useTenant(shopDomain);
 
   useEffect(() => {
     // Check Supabase configuration
@@ -16,12 +17,6 @@ const Play = () => {
     // Get shop parameter from URL
     const shop = getShopFromParams(searchParams);
     setShopDomain(shop);
-
-    // Get tenant configuration
-    if (shop) {
-      const config = getTenantConfig(shop);
-      setTenant(config);
-    }
   }, [searchParams]);
 
   return (
@@ -64,19 +59,42 @@ const Play = () => {
               </p>
             </div>
 
-            {tenant ? (
+            {tenantLoading ? (
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Loading tenant configuration...
+                </p>
+              </div>
+            ) : tenantError ? (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                <p className="text-sm text-destructive">
+                  ⚠️ Error loading tenant: {tenantError}
+                </p>
+              </div>
+            ) : tenant ? (
               <>
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
                     Tenant
                   </p>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block px-3 py-1 bg-primary/20 text-primary text-sm font-medium rounded">
-                      {tenant.id}
-                    </span>
-                    <span className="text-sm text-card-foreground">
-                      {tenant.displayName}
-                    </span>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block px-3 py-1 bg-primary/20 text-primary text-sm font-medium rounded">
+                        {tenant.tenant_key}
+                      </span>
+                      <span className="text-sm text-card-foreground">
+                        {tenant.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                        tenant.environment === 'production' 
+                          ? 'bg-green-500/20 text-green-500' 
+                          : 'bg-yellow-500/20 text-yellow-500'
+                      }`}>
+                        {tenant.environment}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </>
