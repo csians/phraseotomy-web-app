@@ -119,6 +119,17 @@ const Play = () => {
   // Load customer data when logged in
   useEffect(() => {
     if (!loading && customer && shopDomain) {
+      // Log successful login
+      console.log("✅ Login successful!", {
+        customer: {
+          id: customer.id,
+          email: customer.email,
+          name: customer.name,
+        },
+        shopDomain,
+        timestamp: new Date().toISOString(),
+      });
+
       const fetchCustomerData = async () => {
         setDataLoading(true);
         try {
@@ -129,6 +140,11 @@ const Play = () => {
 
           setLicenses(customerLicenses);
           setSessions(customerSessions);
+
+          console.log("✅ Customer data loaded:", {
+            licenses: customerLicenses.length,
+            sessions: customerSessions.length,
+          });
         } catch (error) {
           console.error("Error loading customer data:", error);
         } finally {
@@ -198,17 +214,19 @@ const Play = () => {
       return;
     }
 
-    // Get the current full URL - this should be the app proxy URL
-    // Use the complete URL including protocol, host, pathname, and search params
-    const currentUrl = new URL(window.location.href);
+    // Use the specific app URL for return redirect
+    // This ensures Shopify redirects back to your app after login
+    const appBaseUrl =
+      import.meta.env.VITE_APP_URL || "https://id-preview--46e7a4fc-a12f-4e7f-812c-75f62bdac4d4.lovable.app";
+    const returnUrl = `${appBaseUrl}/play`;
 
-    // Remove any existing query parameters that might interfere
-    // Keep only the pathname and construct a clean return URL
-    const returnUrl = `${currentUrl.protocol}//${currentUrl.host}${currentUrl.pathname}`;
+    console.log("Redirecting to login with return URL:", returnUrl);
 
     // Construct login URL with return_url parameter
     // Shopify will redirect back to this URL after successful login
     const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
+
+    console.log("Login URL:", loginUrl);
 
     // Direct redirect - works in App Proxy context and standalone
     window.location.href = loginUrl;
@@ -282,7 +300,7 @@ const Play = () => {
                   <Input
                     placeholder="Enter lobby code"
                     value={lobbyCode}
-                    onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLobbyCode(e.target.value.toUpperCase())}
                     maxLength={6}
                   />
                 </div>
@@ -291,7 +309,7 @@ const Play = () => {
                   <Input
                     placeholder="Enter your name"
                     value={guestName}
-                    onChange={(e) => setGuestName(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestName(e.target.value)}
                   />
                 </div>
                 <Button onClick={handleJoinGame} className="w-full" size="lg">
@@ -362,7 +380,9 @@ const Play = () => {
                     <Input
                       placeholder="Enter code"
                       value={redemptionCode}
-                      onChange={(e) => setRedemptionCode(e.target.value.toUpperCase())}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setRedemptionCode(e.target.value.toUpperCase())
+                      }
                       maxLength={6}
                     />
                     <Button onClick={handleRedeemCode} disabled={redemptionCode.length !== 6}>
@@ -441,7 +461,7 @@ const Play = () => {
                   <Input
                     placeholder="Enter lobby code"
                     value={lobbyCode}
-                    onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLobbyCode(e.target.value.toUpperCase())}
                     maxLength={6}
                   />
                 </div>
