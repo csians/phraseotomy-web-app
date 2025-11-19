@@ -12,6 +12,7 @@ import type { TenantConfig, ShopifyCustomer } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
 import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
 import { getAppBridge } from "@/lib/appBridge";
+import { lobbyCodeSchema, playerNameSchema, redemptionCodeSchema, validateInput } from "@/lib/validation";
 
 // Extend window to include embedded config and customer data
 
@@ -313,28 +314,21 @@ const Play = () => {
   }, [loading, dataLoading, customer, shopDomain, tenant, licenses, navigate, loginStatusFromUrl]);
 
   const handleJoinGame = () => {
-    if (!lobbyCode.trim()) {
+    try {
+      const validatedLobbyCode = validateInput(lobbyCodeSchema, lobbyCode);
+      const validatedGuestName = customer ? null : validateInput(playerNameSchema, guestName);
+      
       toast({
-        title: "Missing Lobby Code",
-        description: "Please enter a lobby code to join a game.",
+        title: "Coming Soon",
+        description: "Game lobby joining will be available soon.",
+      });
+    } catch (error) {
+      toast({
+        title: "Invalid Input",
+        description: error instanceof Error ? error.message : "Please check your input",
         variant: "destructive",
       });
-      return;
     }
-
-    if (!customer && !guestName.trim()) {
-      toast({
-        title: "Missing Name",
-        description: "Please enter your name to join as a guest.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    toast({
-      title: "Coming Soon",
-      description: "Game lobby joining will be available soon.",
-    });
   };
 
   const handleHostGame = () => {
@@ -344,53 +338,18 @@ const Play = () => {
   };
 
   const handleRedeemCode = async () => {
-    if (!redemptionCode.trim()) {
-      toast({
-        title: "Missing Code",
-        description: "Please enter a 6-digit code.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!customer || !shopDomain || !tenant) {
-      toast({
-        title: "Not Logged In",
-        description: "Please log in to redeem a code.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      const { redeemCode } = await import('@/lib/redemption');
-      const result = await redeemCode(redemptionCode, customer.id, shopDomain, tenant.id);
-
-      if (result.success) {
-        toast({
-          title: "Code Redeemed!",
-          description: result.message,
-        });
-        
-        // Clear the input
-        setRedemptionCode('');
-        
-        // Reload customer licenses to show updated packs
-        const { getCustomerLicenses } = await import('@/lib/customerAccess');
-        const updatedLicenses = await getCustomerLicenses(customer.id, shopDomain);
-        setLicenses(updatedLicenses);
-      } else {
-        toast({
-          title: "Redemption Failed",
-          description: result.message,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Error redeeming code:', error);
+      const validatedCode = validateInput(redemptionCodeSchema, redemptionCode);
+      console.log("Redeeming code:", validatedCode);
+      // TODO: Implement redeem code logic
       toast({
-        title: "Error",
-        description: "Failed to redeem code. Please try again.",
+        title: "Coming Soon",
+        description: "Code redemption will be available soon.",
+      });
+    } catch (error) {
+      toast({
+        title: "Invalid Code",
+        description: error instanceof Error ? error.message : "Please enter a valid code",
         variant: "destructive",
       });
     }

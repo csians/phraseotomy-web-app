@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Pencil } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { redemptionCodeSchema, packsArraySchema, validateInput } from "@/lib/validation";
 
 type LicenseCode = Tables<"license_codes">;
 
@@ -72,44 +73,46 @@ const Codes = () => {
       });
       return;
     }
-    if (!formData.code || formData.code.length !== 6) {
+
+    try {
+      // Validate code format
+      const validatedCode = validateInput(redemptionCodeSchema, formData.code);
+      
+      // Parse and validate packs
+      const packsList = formData.packs.split(',').map(p => p.trim()).filter(Boolean);
+      const validatedPacks = validateInput(packsArraySchema, packsList);
+
+      const { error } = await supabase.from("license_codes").insert({
+        tenant_id: tenant.id,
+        code: validatedCode,
+        packs_unlocked: validatedPacks,
+        status: "unused",
+      });
+
+      if (error) {
+        toast({
+          title: "Error creating code",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
-        title: "Invalid code",
-        description: "Code must be exactly 6 characters",
+        title: "Code created",
+        description: `Code ${validatedCode} has been added`,
+      });
+
+      setIsAddDialogOpen(false);
+      setFormData({ code: "", packs: "", status: "unused" });
+      loadCodes(tenant.id);
+    } catch (error) {
+      toast({
+        title: "Validation Error",
+        description: error instanceof Error ? error.message : "Invalid input",
         variant: "destructive",
       });
-      return;
     }
-
-    const packsArray = formData.packs
-      .split(",")
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0);
-
-    const { error } = await supabase.from("license_codes").insert({
-      tenant_id: tenant.id,
-      code: formData.code.toUpperCase(),
-      packs_unlocked: packsArray,
-      status: "unused",
-    });
-
-    if (error) {
-      toast({
-        title: "Error creating code",
-        description: error.message,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    toast({
-      title: "Code created",
-      description: `Code ${formData.code.toUpperCase()} has been added`,
-    });
-
-    setIsAddDialogOpen(false);
-    setFormData({ code: "", packs: "", status: "unused" });
-    loadCodes(tenant.id);
   };
 
   const handleEditCode = async () => {
