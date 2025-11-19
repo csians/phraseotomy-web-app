@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/hooks/useTenant";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -9,15 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Pencil } from "lucide-react";
-import { Link } from "react-router-dom";
 import type { Tables } from "@/integrations/supabase/types";
 
 type LicenseCode = Tables<"license_codes">;
 
 const Codes = () => {
+  const [searchParams] = useSearchParams();
+  const shop = searchParams.get('shop');
+  const { tenant, loading: tenantLoading, error: tenantError } = useTenant(shop);
+  
   const [codes, setCodes] = useState<LicenseCode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCode, setEditingCode] = useState<LicenseCode | null>(null);
   const { toast } = useToast();
@@ -33,30 +37,12 @@ const Codes = () => {
     status: "unused",
   });
 
-  // Load tenant and codes
+  // Load codes when tenant is available
   useEffect(() => {
-    loadTenantAndCodes();
-  }, []);
-
-  const loadTenantAndCodes = async () => {
-    setLoading(true);
-    
-    // For now, get the first active tenant
-    // In production, you'd get this from the session or context
-    const { data: tenantData } = await supabase
-      .from("tenants")
-      .select("id")
-      .eq("is_active", true)
-      .limit(1)
-      .single();
-
-    if (tenantData) {
-      setTenantId(tenantData.id);
-      await loadCodes(tenantData.id);
+    if (tenant?.id) {
+      loadCodes(tenant.id);
     }
-    
-    setLoading(false);
-  };
+  }, [tenant?.id]);
 
   const loadCodes = async (tenant_id: string) => {
     const { data, error } = await supabase
@@ -78,7 +64,14 @@ const Codes = () => {
   };
 
   const handleAddCode = async () => {
-    if (!tenantId) return;
+    if (!tenant?.id) {
+      toast({
+        title: "Error",
+        description: "Tenant not found",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!formData.code || formData.code.length !== 6) {
       toast({
         title: "Invalid code",
@@ -94,7 +87,7 @@ const Codes = () => {
       .filter((p) => p.length > 0);
 
     const { error } = await supabase.from("license_codes").insert({
-      tenant_id: tenantId,
+      tenant_id: tenant.id,
       code: formData.code.toUpperCase(),
       packs_unlocked: packsArray,
       status: "unused",
@@ -116,7 +109,7 @@ const Codes = () => {
 
     setIsAddDialogOpen(false);
     setFormData({ code: "", packs: "", status: "unused" });
-    loadCodes(tenantId);
+    loadCodes(tenant.id);
   };
 
   const handleEditCode = async () => {
@@ -153,7 +146,7 @@ const Codes = () => {
 
     setEditingCode(null);
     setFormData({ code: "", packs: "", status: "unused" });
-    if (tenantId) loadCodes(tenantId);
+    if (tenant?.id) loadCodes(tenant.id);
   };
 
   const openEditDialog = (code: LicenseCode) => {
@@ -170,19 +163,44 @@ const Codes = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  if (tenantLoading) {
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (tenantError || !tenant) {
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Error Loading Shop</CardTitle>
+            <CardDescription>
+              {tenantError || "Could not find shop configuration. Make sure you're accessing this from within Shopify Admin."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link to="/admin">
+            <Link to={`/admin?shop=${shop}`}>
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
             <div>
               <h1 className="text-3xl font-bold text-foreground">License Codes</h1>
-              <p className="text-muted-foreground mt-1">Manage 6-digit codes for your customers</p>
+              <p className="text-muted-foreground mt-1">
+                {tenant.name} - Manage 6-digit codes for your customers
+              </p>
             </div>
           </div>
 

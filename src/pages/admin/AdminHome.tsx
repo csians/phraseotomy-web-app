@@ -1,15 +1,45 @@
-import { Link } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
+import { useTenant } from "@/hooks/useTenant";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Key } from "lucide-react";
 
 const AdminHome = () => {
+  const [searchParams] = useSearchParams();
+  const shop = searchParams.get('shop');
+  const { tenant, loading, error } = useTenant(shop);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (error || !tenant) {
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Error Loading Shop</CardTitle>
+            <CardDescription>
+              {error || "Could not find shop configuration. Make sure you're accessing this from within Shopify Admin with the shop parameter."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Phraseotomy Admin</h1>
-          <p className="text-muted-foreground mt-2">Manage your app settings and license codes</p>
+          <p className="text-muted-foreground mt-2">
+            {tenant.name} ({tenant.shop_domain})
+          </p>
+          <p className="text-muted-foreground text-sm">Manage your app settings and license codes</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -24,7 +54,7 @@ const AdminHome = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Link to="/admin/codes">
+              <Link to={`/admin/codes?shop=${shop}`}>
                 <Button className="w-full">Manage Codes</Button>
               </Link>
             </CardContent>
