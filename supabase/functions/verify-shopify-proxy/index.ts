@@ -74,13 +74,9 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get tenant configuration
-    const { data: tenant, error: tenantError } = await supabase
-      .from('tenants')
-      .select('*')
-      .eq('shop_domain', shop)
-      .eq('is_active', true)
-      .maybeSingle();
+    // Get tenant configuration using secure function (no secrets exposed)
+    const { data: tenantData, error: tenantError } = await supabase
+      .rpc('verify_tenant_for_proxy', { shop_domain_param: shop });
 
     if (tenantError) {
       console.error('Error fetching tenant:', tenantError);
@@ -90,15 +86,32 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!tenant) {
+    if (!tenantData || tenantData.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Tenant not found for this shop' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const tenant = tenantData[0];
+
+    // Retrieve client secret separately for HMAC verification (uses service role key)
+    const { data: secretData, error: secretError } = await supabase
+      .from('tenants')
+      .select('shopify_client_secret, shopify_client_id')
+      .eq('shop_domain', shop)
+      .single();
+
+    if (secretError || !secretData) {
+      console.error('Error fetching tenant credentials');
+      return new Response(
+        JSON.stringify({ error: 'Configuration error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Verify HMAC signature using Shopify Client Secret
-    const isValid = await verifyShopifyHmac(queryParams, tenant.shopify_client_secret);
+    const isValid = await verifyShopifyHmac(queryParams, secretData.shopify_client_secret);
 
     if (!isValid) {
       return new Response(
@@ -112,12 +125,11 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         tenant: {
-          id: tenant.id,
-          name: tenant.name,
+          id: tenant.tenant_id,
+          name: tenant.tenant_name,
           shop_domain: tenant.shop_domain,
           environment: tenant.environment,
-          tenant_key: tenant.tenant_key,
-          client_id: tenant.shopify_client_id,
+          client_id: secretData.shopify_client_id,
         },
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
