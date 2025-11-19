@@ -204,6 +204,7 @@ const Play = () => {
   };
 
   const handleLogin = () => {
+    console.log("first url");
     const effectiveShopDomain = shopDomain || tenant?.shop_domain;
     if (!effectiveShopDomain) {
       toast({
@@ -213,6 +214,8 @@ const Play = () => {
       });
       return;
     }
+
+    console.log("hiii");
 
     // Use the specific app URL for return redirect
     // This ensures Shopify redirects back to your app after login
