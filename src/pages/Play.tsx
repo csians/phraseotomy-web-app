@@ -219,9 +219,8 @@ const Play = () => {
 
     // Use the specific app URL for return redirect
     // This ensures Shopify redirects back to your app after login
-    const appBaseUrl =
-      import.meta.env.VITE_APP_URL || "https://id-preview--46e7a4fc-a12f-4e7f-812c-75f62bdac4d4.lovable.app";
-    const returnUrl = `${appBaseUrl}/play`;
+    const appBaseUrl = "https://id-preview--46e7a4fc-a12f-4e7f-812c-75f62bdac4d4.lovable.app";
+    const returnUrl = `${appBaseUrl}/apps/phraseotomy`;
 
     console.log("Redirecting to login with return URL:", returnUrl);
 
