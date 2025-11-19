@@ -40,6 +40,77 @@ const Play = () => {
   const [guestName, setGuestName] = useState("");
   const [redemptionCode, setRedemptionCode] = useState("");
 
+  const [loginStatusFromUrl, setLoginStatusFromUrl] = useState<{
+    status: "success" | "failed" | "unknown";
+    params: Record<string, string>;
+  } | null>(null);
+
+  // Check for Shopify login success/failure parameters in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+
+    // Common Shopify login redirect parameters
+    const loginStatus = urlParams.get("login");
+    const error = urlParams.get("error");
+    const errorDescription = urlParams.get("error_description");
+    const errorCode = urlParams.get("error_code");
+    const customerAccount = urlParams.get("customer_account");
+    const returnUrl = urlParams.get("return_url");
+    const checkoutToken = urlParams.get("checkout_token");
+    const state = urlParams.get("state");
+
+    // Collect all parameters for logging
+    const allParams: Record<string, string> = {};
+    urlParams.forEach((value, key) => {
+      allParams[key] = value;
+    });
+
+    // Determine login status
+    let status: "success" | "failed" | "unknown" = "unknown";
+
+    // Check for success indicators
+    if (loginStatus === "success" || customerAccount || checkoutToken) {
+      status = "success";
+      console.log("✅ Shopify login successful (from URL parameter)", {
+        loginStatus,
+        customerAccount,
+        checkoutToken,
+        returnUrl,
+        allParams,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Check for failure indicators
+    if (loginStatus === "failed" || error || errorCode) {
+      status = "failed";
+      console.error("❌ Shopify login failed (from URL parameter)", {
+        loginStatus,
+        error,
+        errorCode,
+        errorDescription,
+        allParams,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Log all URL parameters for debugging (always log if there are any params)
+    if (urlParams.toString()) {
+      console.log("📋 All URL Parameters after Shopify redirect:", allParams);
+      setLoginStatusFromUrl({
+        status,
+        params: allParams,
+      });
+    }
+
+    // Clean up URL parameters after reading them (optional - removes them from URL bar)
+    // Uncomment the lines below if you want to clean the URL after reading parameters
+    // if (urlParams.toString()) {
+    //   const cleanUrl = window.location.pathname;
+    //   window.history.replaceState({}, document.title, cleanUrl);
+    // }
+  }, []);
+
   useEffect(() => {
     // Check for embedded config from proxy (primary method)
     if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
