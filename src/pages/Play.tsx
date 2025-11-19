@@ -218,11 +218,10 @@ const Play = () => {
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Lobby Code</label>
                   <Input
-                    placeholder="Enter 6-digit lobby code"
+                    placeholder="Enter lobby code"
                     value={lobbyCode}
                     onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
                     maxLength={6}
-                    className="font-mono text-lg tracking-wider"
                   />
                 </div>
                 <div className="space-y-2">
@@ -307,11 +306,10 @@ const Play = () => {
                   </label>
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Enter 6-digit code"
+                      placeholder="Enter code"
                       value={redemptionCode}
                       onChange={(e) => setRedemptionCode(e.target.value.toUpperCase())}
                       maxLength={6}
-                      className="font-mono text-lg tracking-wider"
                     />
                     <Button 
                       onClick={handleRedeemCode}
@@ -396,11 +394,10 @@ const Play = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Input
-                    placeholder="Enter 6-digit lobby code"
+                    placeholder="Enter lobby code"
                     value={lobbyCode}
                     onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
                     maxLength={6}
-                    className="font-mono text-lg tracking-wider"
                   />
                 </div>
                 <Button 
