@@ -200,25 +200,13 @@ const Play = () => {
           if (data?.valid && data?.shop) {
             console.log('✅ Token verified, shop:', data.shop);
             const verifiedShop = data.shop;
-            setShopDomain(verifiedShop);
             
-            // Clean up token from URL but keep shop parameter
-            urlParams.delete('r');
-            if (!urlParams.has('shop')) {
-              urlParams.set('shop', verifiedShop);
-            }
-            const cleanUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '');
-            window.history.replaceState({}, document.title, cleanUrl);
-            
-            // Load tenant for verified shop (token indicates customer logged in)
-            await loadTenantForShop(verifiedShop, true);
-            
-            // Redirect to create lobby after successful login
-            toast({
-              title: "Login Successful",
-              description: "Welcome! Let's create your game lobby.",
-            });
-            navigate('/create-lobby');
+            // Redirect through the Shopify app proxy to get customer data
+            // The proxy will inject customer, shop, and tenant data
+            const proxyUrl = `https://${verifiedShop}/apps/phraseotomy`;
+            console.log('Redirecting to proxy URL:', proxyUrl);
+            window.location.href = proxyUrl;
+            return; // Stop execution as we're redirecting
           } else {
             console.warn('⚠️ Invalid or expired token');
             
