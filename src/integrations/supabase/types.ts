@@ -14,6 +14,116 @@ export type Database = {
   }
   public: {
     Tables: {
+      customer_licenses: {
+        Row: {
+          activated_at: string
+          created_at: string
+          customer_email: string | null
+          customer_id: string
+          customer_name: string | null
+          id: string
+          license_code_id: string
+          shop_domain: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string
+          created_at?: string
+          customer_email?: string | null
+          customer_id: string
+          customer_name?: string | null
+          id?: string
+          license_code_id: string
+          shop_domain: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string
+          created_at?: string
+          customer_email?: string | null
+          customer_id?: string
+          customer_name?: string | null
+          id?: string
+          license_code_id?: string
+          shop_domain?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_licenses_license_code_id_fkey"
+            columns: ["license_code_id"]
+            isOneToOne: false
+            referencedRelation: "license_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_licenses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_sessions: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          host_customer_id: string
+          host_customer_name: string | null
+          id: string
+          lobby_code: string
+          packs_used: string[]
+          shop_domain: string
+          started_at: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          host_customer_id: string
+          host_customer_name?: string | null
+          id?: string
+          lobby_code: string
+          packs_used?: string[]
+          shop_domain: string
+          started_at?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          host_customer_id?: string
+          host_customer_name?: string | null
+          id?: string
+          lobby_code?: string
+          packs_used?: string[]
+          shop_domain?: string
+          started_at?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       license_codes: {
         Row: {
           code: string
@@ -97,27 +207,6 @@ export type Database = {
           shopify_client_secret?: string
           tenant_key?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      user_roles: {
-        Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
         }
         Relationships: []
       }
