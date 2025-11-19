@@ -58,9 +58,55 @@ const Play = () => {
           setTenant(data.tenant);
           setShopDomain(data.shop);
           setCustomer(data.customer || null);
+        } else {
+          // If no session, try to load tenant from database for testing
+          // This allows the app to work outside of Shopify proxy
+          const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
+            .from('tenants')
+            .select('*')
+            .eq('is_active', true)
+            .limit(1)
+            .single();
+          
+          if (dbTenant) {
+            const mappedTenant: TenantConfig = {
+              id: dbTenant.id,
+              name: dbTenant.name,
+              tenant_key: dbTenant.tenant_key,
+              shop_domain: dbTenant.shop_domain,
+              environment: dbTenant.environment,
+              verified: true,
+            };
+            setTenant(mappedTenant);
+            setShopDomain(dbTenant.shop_domain);
+          }
         }
       } catch (error) {
         console.error('Error fetching session:', error);
+        // Try to load tenant from database as fallback
+        try {
+          const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
+            .from('tenants')
+            .select('*')
+            .eq('is_active', true)
+            .limit(1)
+            .single();
+          
+          if (dbTenant) {
+            const mappedTenant: TenantConfig = {
+              id: dbTenant.id,
+              name: dbTenant.name,
+              tenant_key: dbTenant.tenant_key,
+              shop_domain: dbTenant.shop_domain,
+              environment: dbTenant.environment,
+              verified: true,
+            };
+            setTenant(mappedTenant);
+            setShopDomain(dbTenant.shop_domain);
+          }
+        } catch (err) {
+          console.error('Error loading tenant:', err);
+        }
       } finally {
         setLoading(false);
       }
@@ -137,12 +183,14 @@ const Play = () => {
   };
 
   const handleLogin = () => {
-    if (shopDomain) {
-      window.location.href = `https://${shopDomain}/account/login`;
+    const effectiveShopDomain = shopDomain || tenant?.shop_domain;
+    
+    if (effectiveShopDomain) {
+      window.location.href = `https://${effectiveShopDomain}/account/login`;
     } else {
       toast({
         title: 'Cannot Login',
-        description: 'Shop domain not available.',
+        description: 'Shop domain not available. Please access this app through your Shopify store.',
         variant: 'destructive',
       });
     }
