@@ -83,10 +83,10 @@ Deno.serve(async (req) => {
     // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch tenant configuration
+    // Fetch tenant configuration (excluding secrets)
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('*')
+      .select('id, name, tenant_key, shop_domain, environment, is_active')
       .eq('shop_domain', shop)
       .eq('is_active', true)
       .maybeSingle();
@@ -116,10 +116,28 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Fetch client secret separately for HMAC verification
+    const { data: secretData, error: secretError } = await supabase
+      .from('tenants')
+      .select('shopify_client_secret')
+      .eq('shop_domain', shop)
+      .single();
+
+    if (secretError || !secretData) {
+      console.error('Error fetching tenant credentials');
+      return new Response(
+        generateErrorHtml('Configuration Error', 'Unable to verify request authenticity.'),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'text/html' },
+        }
+      );
+    }
+
     // Verify HMAC signature
     const isValidSignature = await verifyShopifyHmac(
       queryParams,
-      tenant.shopify_client_secret
+      secretData.shopify_client_secret
     );
 
     if (!isValidSignature) {
