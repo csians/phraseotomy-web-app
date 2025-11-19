@@ -170,14 +170,9 @@ Deno.serve(async (req) => {
       headers.append('Set-Cookie', `phraseotomy_customer=${encodeURIComponent(JSON.stringify(customerData))}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=3600`);
     }
 
-    // Pass token to the app if present
-    const appData = {
-      customer: customerData,
-      token: returnToken,
-    };
-
+    // Pass token and customer data to app
     return new Response(
-      generateAppHtml(tenant, shop, customerData, returnToken),
+      generateAppHtml(tenant, shop, customerData),
       {
         status: 200,
         headers,
