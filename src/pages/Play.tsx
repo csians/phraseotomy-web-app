@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Redirect } from "@shopify/app-bridge/actions";
 import { isSupabaseConfigured } from "@/lib/supabaseClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { TenantConfig } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
 import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
+import { getAppBridge } from "@/lib/appBridge";
 
 // Extend window to include embedded config and customer data
 declare global {
@@ -258,8 +260,15 @@ const Play = () => {
     const returnUrl = window.location.href;
     const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
 
-    // use redirect helper so Shopify iframe allows it
-    window.location.href = `/redirect.html?to=${encodeURIComponent(loginUrl)}`;
+    const appBridge = getAppBridge();
+    if (appBridge) {
+      // Running inside Shopify - use App Bridge for navigation
+      const redirect = Redirect.create(appBridge);
+      redirect.dispatch(Redirect.Action.REMOTE, loginUrl);
+    } else {
+      // Running outside Shopify (e.g. testing) - use standard redirect
+      window.location.href = loginUrl;
+    }
   };
 
   if (loading) {
