@@ -13,3 +13,9 @@ verify_jwt = false
 
 [functions.upload-audio]
 verify_jwt = false
+
+[functions.generate-login-token]
+verify_jwt = false
+
+[functions.verify-login-token]
+verify_jwt = false
