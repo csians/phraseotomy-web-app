@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const payload = verifySignedToken(token);
+    const payload = await verifySignedToken(token);
     
     if (!payload) {
       return new Response(
