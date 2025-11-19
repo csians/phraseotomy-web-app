@@ -132,9 +132,36 @@ const Play = () => {
       const customerData = window.__PHRASEOTOMY_CUSTOMER__ || null;
       setCustomer(customerData);
       
-      // Generate session token if customer is logged in
+      // Log customer data when available from proxy
       if (customerData) {
-        generateAndStoreSessionToken(customerData.id, window.__PHRASEOTOMY_SHOP__);
+        console.log('👤 Customer Data from Proxy:', {
+          id: customerData.id,
+          email: customerData.email,
+          name: customerData.name,
+          firstName: customerData.firstName,
+          lastName: customerData.lastName,
+        });
+        
+        // Generate session token if customer is logged in
+        generateAndStoreSessionToken(customerData.id, window.__PHRASEOTOMY_SHOP__).then(() => {
+          // After session token is generated, fetch and log full customer data
+          const sessionToken = localStorage.getItem('phraseotomy_session_token');
+          if (sessionToken) {
+            supabase.functions.invoke('get-customer-data', {
+              body: { sessionToken },
+            }).then(({ data: customerData, error }) => {
+              if (!error && customerData) {
+                console.log('📦 Full Customer Data (licenses & sessions):', {
+                  licenses: customerData.licenses || [],
+                  sessions: customerData.sessions || [],
+                  tenantId: customerData.tenantId,
+                });
+              }
+            });
+          }
+        });
+      } else {
+        console.log('ℹ️ No customer data in proxy - user not logged in');
       }
       
       setLoading(false);
@@ -145,6 +172,7 @@ const Play = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('r');
     const shopParam = urlParams.get('shop');
+    const customerIdParam = urlParams.get('customer_id');
     
     // Helper function to load tenant for a shop
     const loadTenantForShop = async (shop: string, hasToken?: boolean) => {
@@ -200,128 +228,210 @@ const Play = () => {
           if (data?.valid && data?.shop) {
             console.log('✅ Token verified, shop:', data.shop);
             const verifiedShop = data.shop;
+
+            console.log('verifiedShop', verifiedShop);
             
-            // Load tenant data for the verified shop
-            await loadTenantForShop(verifiedShop, true);
-            
-            // Try to get customer data from multiple sources
-            let customerData = null;
-            
-            // 1. Check cookies (set by Shopify proxy if accessed through it)
-            try {
-              const customerCookie = document.cookie
-                .split('; ')
-                .find(row => row.startsWith('phraseotomy_customer='));
-              
-              if (customerCookie) {
-                const customerDataStr = decodeURIComponent(customerCookie.split('=')[1]);
-                customerData = JSON.parse(customerDataStr);
-                console.log('✅ Found customer data in cookie:', customerData);
+            // Try to fetch customer data if session token exists
+            const sessionToken = localStorage.getItem('phraseotomy_session_token');
+            if (sessionToken) {
+              try {
+                const { data: customerData, error: customerError } = await supabase.functions.invoke('get-customer-data', {
+                  body: { sessionToken },
+                });
+
+                if (!customerError && customerData) {
+                  console.log('📦 Customer Data after token verification:', {
+                    licenses: customerData.licenses || [],
+                    sessions: customerData.sessions || [],
+                    tenantId: customerData.tenantId,
+                    sessionToken: sessionToken.substring(0, 20) + '...', // Log partial token for debugging
+                  });
+
+                  // Also decode session token to get customer_id
+                  try {
+                    const [payloadB64] = sessionToken.split('.');
+                    if (payloadB64) {
+                      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+                      console.log('👤 Customer Info from session token:', {
+                        customer_id: payload.customer_id,
+                        shop: payload.shop,
+                        exp: payload.exp,
+                        expiresAt: new Date(payload.exp * 1000).toISOString(),
+                      });
+                    }
+                  } catch (decodeError) {
+                    console.warn('Could not decode session token:', decodeError);
+                  }
+                } else {
+                  console.warn('⚠️ Could not fetch customer data:', customerError);
+                }
+              } catch (error) {
+                console.error('Error fetching customer data:', error);
               }
-            } catch (cookieError) {
-              console.log('No customer data in cookie');
+            } else {
+              console.log('ℹ️ No session token found - customer data will be available after proxy redirect');
             }
             
-            // 2. Check URL parameters for customer ID (can be passed as customer_id or logged_in_customer_id)
-            const customerIdFromUrl = urlParams.get('customer_id') || urlParams.get('logged_in_customer_id');
+            // Load tenant for verified shop and continue flow
+            let loadedTenantId: string | undefined;
+            try {
+              const { data: dbTenant } = await supabase
+                .from("tenants")
+                .select("id, name, tenant_key, shop_domain, environment")
+                .eq("shop_domain", verifiedShop)
+                .eq("is_active", true)
+                .maybeSingle();
+
+              if (dbTenant) {
+                const mappedTenant: TenantConfig = {
+                  id: dbTenant.id,
+                  name: dbTenant.name,
+                  tenant_key: dbTenant.tenant_key,
+                  shop_domain: dbTenant.shop_domain,
+                  environment: dbTenant.environment,
+                  verified: true,
+                };
+                loadedTenantId = dbTenant.id;
+                setTenant(mappedTenant);
+                setShopDomain(dbTenant.shop_domain);
+                console.log('✅ Tenant loaded after token verification:', mappedTenant);
+              } else {
+                console.warn('⚠️ Tenant not found for shop:', verifiedShop);
+              }
+            } catch (error) {
+              console.error('Error loading tenant:', error);
+            } finally {
+              setLoading(false);
+            }
             
-            // If we have customer_id but no customer data, redirect to Shopify app proxy
-            // The proxy will extract customer data and redirect back to our app
-            if (!customerData && customerIdFromUrl) {
-              console.log('✅ Found customer ID in URL, redirecting to Shopify app proxy to get customer data...');
+            // Handle customer_id from URL (after Shopify login)
+            if (customerIdParam && verifiedShop) {
+              console.log('👤 Customer ID detected in URL:', customerIdParam);
               
-              // Get the current app URL (localhost or staging domain)
-              const currentOrigin = window.location.origin;
-              const redirectTo = `${currentOrigin}/play`;
+              // Generate session token for this customer
+              try {
+                const { data: sessionData, error: sessionError } = await supabase.functions.invoke('generate-session-token', {
+                  body: { customerId: customerIdParam, shopDomain: verifiedShop },
+                });
+
+                if (sessionError) {
+                  console.error('Error generating session token:', sessionError);
+                } else if (sessionData?.sessionToken) {
+                  localStorage.setItem('phraseotomy_session_token', sessionData.sessionToken);
+                  console.log('✅ Session token generated and stored');
+
+                  // Fetch full customer data
+                  const { data: customerData, error: customerError } = await supabase.functions.invoke('get-customer-data', {
+                    body: { sessionToken: sessionData.sessionToken },
+                  });
+
+                  if (!customerError && customerData) {
+                    console.log('📦 Full Customer Data Retrieved:', {
+                      customer_id: customerIdParam,
+                      shop: verifiedShop,
+                      licenses: customerData.licenses || [],
+                      sessions: customerData.sessions || [],
+                      tenantId: customerData.tenantId,
+                    });
+
+                    // Set customer state (basic customer object)
+                    const customerObj: ShopifyCustomer = {
+                      id: customerIdParam,
+                      email: null, // Will be available from Shopify if needed
+                      firstName: null,
+                      lastName: null,
+                      name: null,
+                    };
+                    setCustomer(customerObj);
+
+                    // Set licenses and sessions
+                    setLicenses(customerData.licenses || []);
+                    setSessions(customerData.sessions || []);
+
+                    // Clean up URL parameters
+                    const cleanUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanUrl);
+                  } else {
+                    console.warn('⚠️ Could not fetch customer data:', customerError);
+                  }
+                }
+              } catch (error) {
+                console.error('Error processing customer data:', error);
+              }
+            }
+            
+            // Redirect through the Shopify app proxy to get customer data
+            // The proxy will inject customer, shop, and tenant data
+            const appEnv = import.meta.env.VITE_APP_ENV || "development";
+            
+            if (appEnv === "development") {
+              // Local development: Continue without redirect
+              // Customer data will be available when user logs in through Shopify
+              // The existing useEffect will detect customer data from window.__PHRASEOTOMY_CUSTOMER__
+              console.log('ℹ️ Local development: Continuing without redirect');
               
-              const proxyUrl = `https://${verifiedShop}/apps/phraseotomy?shop=${encodeURIComponent(verifiedShop)}&r=${encodeURIComponent(token)}&customer_id=${encodeURIComponent(customerIdFromUrl)}&redirect_to=${encodeURIComponent(redirectTo)}`;
-              console.log('Redirecting to app proxy URL:', proxyUrl);
-              console.log('Will redirect back to:', redirectTo);
+              // Summary of current state
+              console.log('📊 Current State Summary:', {
+                tokenVerified: true,
+                shop: verifiedShop,
+                tenantLoaded: !!loadedTenantId,
+                tenantId: loadedTenantId,
+                hasSessionToken: !!localStorage.getItem('phraseotomy_session_token'),
+                hasCustomerId: !!customerIdParam,
+                hasCustomerData: !!customer,
+                nextStep: customerIdParam 
+                  ? 'Customer data processing completed' 
+                  : 'Customer data will be available after Shopify login or when window.__PHRASEOTOMY_CUSTOMER__ is set',
+              });
+              
+              // Set up a periodic check for customer data (only if customer_id not in URL)
+              // This is a fallback in case customer data comes from window.__PHRASEOTOMY_CUSTOMER__
+              if (!customerIdParam) {
+                let checkCount = 0;
+                const maxChecks = 15; // 15 checks * 2 seconds = 30 seconds
+                const customerDataCheck = setInterval(() => {
+                  checkCount++;
+                  const customerData = window.__PHRASEOTOMY_CUSTOMER__;
+                  const newSessionToken = localStorage.getItem('phraseotomy_session_token');
+                  
+                  if (customerData) {
+                    console.log('✅ Customer data detected from window!', {
+                      id: customerData.id,
+                      email: customerData.email,
+                      name: customerData.name,
+                    });
+                    clearInterval(customerDataCheck);
+                  } else if (newSessionToken && newSessionToken !== sessionToken) {
+                    console.log('✅ New session token detected! Fetching customer data...');
+                    // Fetch customer data with new session token
+                    supabase.functions.invoke('get-customer-data', {
+                      body: { sessionToken: newSessionToken },
+                    }).then(({ data: customerData, error }) => {
+                      if (!error && customerData) {
+                        console.log('📦 Customer Data Retrieved:', {
+                          licenses: customerData.licenses || [],
+                          sessions: customerData.sessions || [],
+                          tenantId: customerData.tenantId,
+                        });
+                      }
+                    });
+                    clearInterval(customerDataCheck);
+                  } else if (checkCount >= maxChecks) {
+                    console.log('ℹ️ Customer data check completed. No customer data detected yet.');
+                    clearInterval(customerDataCheck);
+                  }
+                }, 2000);
+              }
+              
+              // Don't redirect, continue with loaded tenant
+            } else {
+              // Production: redirect through Shopify app proxy to get customer data
+              const proxyUrl = `https://${verifiedShop}/apps/phraseotomy/play?r=${encodeURIComponent(token)}`;
+              console.log('🔄 Redirecting to proxy URL to get customer data:', proxyUrl);
+              console.log('ℹ️ If customer is logged in, customer data will be available after redirect');
               window.location.href = proxyUrl;
               return; // Stop execution as we're redirecting
-            } else if (!customerData) {
-              // 3. Check URL parameters (from redirect back from proxy or Shopify redirect)
-              const customerId = urlParams.get('customer_id') || urlParams.get('logged_in_customer_id');
-              const customerEmail = urlParams.get('customer_email');
-              const customerFirstName = urlParams.get('customer_first_name');
-              const customerLastName = urlParams.get('customer_last_name');
-              const customerImageUrl = urlParams.get('customer_image_url');
-              const loggedIn = urlParams.get('logged_in') === 'true';
-              
-              if (customerId && loggedIn) {
-                customerData = {
-                  id: customerId,
-                  email: customerEmail,
-                  firstName: customerFirstName,
-                  lastName: customerLastName,
-                  name: [customerFirstName, customerLastName].filter(Boolean).join(' ') || customerEmail || null,
-                  imageUrl: customerImageUrl || null,
-                };
-                console.log('✅ Found customer data in URL parameters (from redirect):', customerData);
-              }
             }
-            
-            // If we have customer data, set it and prepare for redirect
-            if (customerData) {
-              setCustomer(customerData);
-              
-              // Generate session token if customer is logged in
-              generateAndStoreSessionToken(customerData.id, verifiedShop);
-              
-              // Clean up URL by removing token and customer parameters
-              const newUrl = new URL(window.location.href);
-              newUrl.searchParams.delete('r');
-              newUrl.searchParams.delete('customer_id');
-              newUrl.searchParams.delete('logged_in_customer_id');
-              newUrl.searchParams.delete('customer_email');
-              newUrl.searchParams.delete('customer_first_name');
-              newUrl.searchParams.delete('customer_last_name');
-              window.history.replaceState({}, '', newUrl.toString());
-              
-              // Set a flag to indicate we just logged in (for auto-redirect)
-              setLoginStatusFromUrl({
-                status: 'success',
-                params: { r: token, just_logged_in: 'true' },
-              });
-              
-              setLoading(false);
-              // Auto-redirect will happen in the useEffect below
-              return;
-            }
-            
-            // If no customer data found, token is still valid - user is authenticated
-            // Try to redirect to CreateLobby anyway - it will handle missing customer data
-            console.log('✅ Token verified, but no customer data available yet');
-            console.log('⚠️ Customer data should be available when accessing through Shopify app proxy');
-            
-            // Clean up URL by removing token parameter
-            const newUrl = new URL(window.location.href);
-            newUrl.searchParams.delete('r');
-            window.history.replaceState({}, '', newUrl.toString());
-            
-            // Even without customer data, redirect to CreateLobby
-            // CreateLobby will show appropriate message if customer data is missing
-            if (tenant) {
-              setTimeout(() => {
-                console.log('🔄 Redirecting to CreateLobby (customer data may be limited)');
-                navigate("/create-lobby", {
-                  state: { 
-                    customer: null, // No customer data yet
-                    shopDomain: verifiedShop, 
-                    tenant: tenant 
-                  },
-                  replace: true,
-                });
-              }, 500);
-            } else {
-              toast({
-                title: 'Login Successful',
-                description: 'You have been authenticated. Please continue using the app.',
-                duration: 3000,
-              });
-            }
-            
-            setLoading(false);
           } else {
             console.warn('⚠️ Invalid or expired token');
             
@@ -410,8 +520,32 @@ const Play = () => {
           setSessions(customerSessions);
 
           console.log("✅ Customer data loaded:", {
-            licenses: customerLicenses.length,
-            sessions: customerSessions.length,
+            customer: {
+              id: customer.id,
+              email: customer.email,
+              name: customer.name,
+            },
+            licenses: {
+              count: customerLicenses.length,
+              details: customerLicenses.map(l => ({
+                id: l.id,
+                code: l.code,
+                packs_unlocked: l.packs_unlocked,
+                status: l.status,
+                expires_at: l.expires_at,
+              })),
+            },
+            sessions: {
+              count: customerSessions.length,
+              details: customerSessions.map(s => ({
+                id: s.id,
+                lobby_code: s.lobby_code,
+                status: s.status,
+                packs_used: s.packs_used,
+                created_at: s.created_at,
+              })),
+            },
+            shopDomain,
           });
         } catch (error) {
           console.error("Error loading customer data:", error);
@@ -424,23 +558,16 @@ const Play = () => {
     }
   }, [loading, customer, shopDomain]);
 
-  // Auto-redirect to CreateLobby when customer is logged in
+  // Auto-redirect to CreateLobby when customer is logged in AND has redeemed codes
   useEffect(() => {
-    // Check if customer just logged in (from URL params, token, or fresh customer data)
-    const urlParams = new URLSearchParams(window.location.search);
-    const justLoggedIn = 
-      loginStatusFromUrl?.status === 'success' || 
-      urlParams.get('logged_in_customer_id') !== null ||
-      urlParams.get('customer_account') !== null ||
-      urlParams.get('r') !== null; // Token in URL means just logged in
-
     // Only redirect if:
     // 1. Initial loading is complete
-    // 2. Customer data loading is complete (or not needed if we have customer from embedded config)
-    // 3. We have shop domain and tenant info
-    // 4. We're on the /play route (not already on create-lobby)
-    // 5. Either: (a) customer just logged in, OR (b) customer has customer data AND active licenses
-    if (!loading && !dataLoading && shopDomain && tenant) {
+    // 2. Customer data loading is complete
+    // 3. Customer is logged in (has customer data from Shopify)
+    // 4. Customer has active licenses (redeemed codes)
+    // 5. We have shop domain and tenant info
+    // 6. We're on the /play route (not already on create-lobby)
+    if (!loading && !dataLoading && customer && shopDomain && tenant && licenses.length > 0) {
       const currentPath = window.location.pathname;
       const isOnPlayPage = currentPath === '/play' || currentPath === '/apps/phraseotomy' || currentPath === '/';
       
@@ -449,26 +576,28 @@ const Play = () => {
         return;
       }
 
-      // Redirect if customer just logged in OR (customer has data AND licenses)
-      const shouldRedirect = justLoggedIn || (customer && licenses.length > 0);
+      // Check if customer just logged in (from URL params or fresh customer data)
+      const urlParams = new URLSearchParams(window.location.search);
+      const justLoggedIn = 
+        loginStatusFromUrl?.status === 'success' || 
+        urlParams.get('logged_in_customer_id') !== null ||
+        urlParams.get('customer_account') !== null;
 
-      if (shouldRedirect) {
-        // Small delay to ensure all data is loaded and UI is ready
-        const redirectTimer = setTimeout(() => {
-          console.log("🔄 Auto-redirecting logged-in customer to CreateLobby", {
-            customer: customer?.email || customer?.id || 'no customer data',
-            shopDomain,
-            licensesCount: licenses.length,
-            justLoggedIn,
-          });
-          navigate("/create-lobby", {
-            state: { customer: customer || null, shopDomain, tenant },
-            replace: true,
-          });
-        }, justLoggedIn ? 500 : 1000); // Faster redirect if just logged in
+      // Small delay to ensure all data is loaded and UI is ready
+      const redirectTimer = setTimeout(() => {
+        console.log("🔄 Auto-redirecting logged-in customer with redeemed codes to CreateLobby", {
+          customer: customer.email || customer.id,
+          shopDomain,
+          licensesCount: licenses.length,
+          justLoggedIn,
+        });
+        navigate("/create-lobby", {
+          state: { customer, shopDomain, tenant },
+          replace: true,
+        });
+      }, 1000); // Delay to let user see they're logged in and have access
 
-        return () => clearTimeout(redirectTimer);
-      }
+      return () => clearTimeout(redirectTimer);
     }
   }, [loading, dataLoading, customer, shopDomain, tenant, licenses, navigate, loginStatusFromUrl]);
 
