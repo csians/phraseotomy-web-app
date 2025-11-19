@@ -14,17 +14,6 @@ import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type Ga
 import { getAppBridge } from "@/lib/appBridge";
 
 // Extend window to include embedded config and customer data
-declare global {
-  interface Window {
-    __PHRASEOTOMY_CONFIG__?: TenantConfig;
-    __PHRASEOTOMY_SHOP__?: string;
-    __PHRASEOTOMY_CUSTOMER__?: {
-      id: string;
-      email: string;
-      name: string;
-    };
-  }
-}
 
 const Play = () => {
   const navigate = useNavigate();

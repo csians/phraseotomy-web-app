@@ -40,7 +40,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate session exists
+    // Validate file size (10MB max)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (audioFile.size > MAX_FILE_SIZE) {
+      return new Response(
+        JSON.stringify({ error: 'File size exceeds 10MB limit' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate MIME type
+    const ALLOWED_MIME_TYPES = ['audio/webm', 'audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/ogg'];
+    if (!audioFile.type || !ALLOWED_MIME_TYPES.includes(audioFile.type)) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid file type. Allowed: webm, wav, mp3, ogg' 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate session exists and player is in the session
     const { data: session, error: sessionError } = await supabase
       .from('game_sessions')
       .select('id')
@@ -50,6 +70,37 @@ Deno.serve(async (req) => {
     if (sessionError || !session) {
       return new Response(
         JSON.stringify({ error: 'Invalid session ID' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify player is in the session
+    const { data: player, error: playerError } = await supabase
+      .from('game_players')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('player_id', playerId)
+      .single();
+
+    if (playerError || !player) {
+      return new Response(
+        JSON.stringify({ error: 'Player not found in this session' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if audio already exists for this round/player
+    const { data: existingAudio } = await supabase
+      .from('game_audio')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('player_id', playerId)
+      .eq('round_number', parseInt(roundNumber))
+      .single();
+
+    if (existingAudio) {
+      return new Response(
+        JSON.stringify({ error: 'Audio already uploaded for this round' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
