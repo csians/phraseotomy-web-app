@@ -10,8 +10,6 @@ import { useToast } from '@/hooks/use-toast';
 import type { TenantConfig } from '@/lib/types';
 import { APP_VERSION } from '@/lib/types';
 import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from '@/lib/customerAccess';
-import createApp from '@shopify/app-bridge';
-import { Redirect } from '@shopify/app-bridge/actions';
 
 // Extend window to include embedded config and customer data
 declare global {
@@ -23,7 +21,6 @@ declare global {
       email: string;
       name: string;
     };
-    appBridge?: any;
   }
 }
 
@@ -200,29 +197,8 @@ const Play = () => {
     const returnUrl = window.location.href;
     const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
 
-    // If App Bridge is available, use it (preferred for embedded apps)
-    if (window.appBridge) {
-      try {
-        const redirect = Redirect.create(window.appBridge);
-        redirect.dispatch(Redirect.Action.REMOTE, loginUrl);
-        return;
-      } catch (err) {
-        console.error('App Bridge redirect failed:', err);
-      }
-    }
-
-    // Try top-level redirect; catch SecurityError if in iframe
-    try {
-      if (window.top && window.top !== window) {
-        window.top.location.assign(loginUrl);
-      } else {
-        window.location.assign(loginUrl);
-      }
-    } catch (err) {
-      console.error('Top-level redirect blocked:', err);
-      // Fallback: navigate to backend redirect page
-      window.location.href = `/api/redirect?to=${encodeURIComponent(loginUrl)}`;
-    }
+    // Direct redirect - works in App Proxy context and standalone
+    window.location.href = loginUrl;
   };
 
   if (loading) {
