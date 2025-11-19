@@ -232,6 +232,8 @@ const Play = () => {
 
     // Direct redirect - works in App Proxy context and standalone
     window.location.href = loginUrl;
+
+    console.log("hiiii");
   };
 
   if (loading) {
