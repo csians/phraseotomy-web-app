@@ -186,7 +186,16 @@ const Play = () => {
     const effectiveShopDomain = shopDomain || tenant?.shop_domain;
     
     if (effectiveShopDomain) {
-      window.location.href = `https://${effectiveShopDomain}/account/login`;
+      // Get the current URL for return after login
+      const returnUrl = window.location.href;
+      const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
+      
+      // Use window.top to break out of any iframe context
+      if (window.top) {
+        window.top.location.href = loginUrl;
+      } else {
+        window.location.href = loginUrl;
+      }
     } else {
       toast({
         title: 'Cannot Login',
