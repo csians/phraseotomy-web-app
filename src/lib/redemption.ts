@@ -35,6 +35,25 @@ export async function redeemCode(
       };
     }
 
+    // Look up tenant_id server-side based on shop_domain for security
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('shop_domain', shopDomain)
+      .eq('is_active', true)
+      .single();
+
+    if (tenantError || !tenant) {
+      console.error('Failed to fetch tenant:', tenantError);
+      return {
+        success: false,
+        message: 'Invalid shop domain',
+        error: 'INVALID_SHOP',
+      };
+    }
+
+    const tenantId = tenant.id;
+
     // Find the license code
     const { data: licenseCode, error: codeError } = await supabase
       .from('license_codes')
@@ -105,6 +124,7 @@ export async function redeemCode(
         customer_id: customerId,
         license_code_id: licenseCode.id,
         shop_domain: shopDomain,
+        tenant_id: tenantId,
         status: 'active',
         activated_at: new Date().toISOString(),
       })
