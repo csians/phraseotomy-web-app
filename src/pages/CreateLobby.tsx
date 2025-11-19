@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getCustomerLicenses } from '@/lib/customerAccess';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const AVAILABLE_PACKS = [
+const ALL_PACKS = [
   { id: 'base', name: 'Base Pack', description: 'Core game cards' },
   { id: 'expansion1', name: 'Expansion 1', description: 'Additional themed cards' },
   { id: 'expansion2', name: 'Expansion 2', description: 'More variety' },
@@ -23,11 +25,63 @@ export default function CreateLobby() {
   const [lobbyName, setLobbyName] = useState('');
   const [selectedPacks, setSelectedPacks] = useState<string[]>(['base']);
   const [isCreating, setIsCreating] = useState(false);
+  const [availablePacks, setAvailablePacks] = useState<string[]>(['base']); // Default to base pack
+  const [loadingPacks, setLoadingPacks] = useState(true);
 
   // Get customer and shop info from location state or window
   const customer = location.state?.customer || window.__PHRASEOTOMY_CUSTOMER__;
   const shopDomain = location.state?.shopDomain || window.__PHRASEOTOMY_SHOP__;
   const tenant = location.state?.tenant || window.__PHRASEOTOMY_CONFIG__;
+
+  // Load customer's available packs from redeemed codes
+  useEffect(() => {
+    const loadCustomerPacks = async () => {
+      if (!customer || !shopDomain) {
+        setLoadingPacks(false);
+        return;
+      }
+
+      try {
+        setLoadingPacks(true);
+        
+        // Get customer licenses (redeemed codes)
+        const licenses = await getCustomerLicenses(customer.id, shopDomain);
+        
+        // Extract all unique packs from all licenses
+        const allPacks = new Set<string>();
+        licenses.forEach(license => {
+          if (license.packs_unlocked && Array.isArray(license.packs_unlocked)) {
+            license.packs_unlocked.forEach(pack => allPacks.add(pack));
+          }
+        });
+        
+        const packsArray = Array.from(allPacks);
+        setAvailablePacks(packsArray.length > 0 ? packsArray : []);
+        
+        // Update selected packs to only include available ones
+        setSelectedPacks(prev => {
+          const filtered = prev.filter(packId => packsArray.includes(packId));
+          
+          // If no packs selected after filtering, select the first available pack
+          if (filtered.length === 0 && packsArray.length > 0) {
+            // Select base pack if available, otherwise first pack
+            const packToSelect = packsArray.includes('base') ? 'base' : packsArray[0];
+            return [packToSelect];
+          }
+          
+          return filtered;
+        });
+      } catch (error) {
+        console.error('Error loading customer packs:', error);
+        // On error, no packs available
+        setAvailablePacks([]);
+      } finally {
+        setLoadingPacks(false);
+      }
+    };
+
+    loadCustomerPacks();
+  }, [customer, shopDomain]);
 
   const handlePackToggle = (packId: string) => {
     setSelectedPacks(prev => 
@@ -123,6 +177,33 @@ export default function CreateLobby() {
     );
   }
 
+  // Check if customer has any redeemed codes (required to create lobby)
+  if (!loadingPacks && availablePacks.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>No Game Access</CardTitle>
+            <CardDescription>
+              You need to redeem a code to unlock game packs before creating a lobby.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Each Phraseotomy game comes with a redemption code. Enter your code to unlock game packs and start hosting games.
+            </p>
+            <Button 
+              onClick={() => navigate('/play')} 
+              className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold"
+            >
+              Go to Redeem Code
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-2xl mx-auto space-y-6 py-8">
@@ -151,28 +232,62 @@ export default function CreateLobby() {
 
             <div className="space-y-4">
               <Label>Select Packs</Label>
-              <div className="space-y-3">
-                {AVAILABLE_PACKS.map((pack) => (
-                  <div key={pack.id} className="flex items-start space-x-3">
-                    <Checkbox
-                      id={pack.id}
-                      checked={selectedPacks.includes(pack.id)}
-                      onCheckedChange={() => handlePackToggle(pack.id)}
-                    />
-                    <div className="space-y-1 leading-none">
-                      <Label
-                        htmlFor={pack.id}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              {loadingPacks ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {ALL_PACKS.map((pack) => {
+                    const isAvailable = availablePacks.includes(pack.id);
+                    const isSelected = selectedPacks.includes(pack.id);
+                    
+                    return (
+                      <div 
+                        key={pack.id} 
+                        className={`flex items-start space-x-3 p-3 rounded-lg border ${
+                          isAvailable 
+                            ? 'border-border bg-card' 
+                            : 'border-muted bg-muted/30 opacity-60'
+                        }`}
                       >
-                        {pack.name}
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        {pack.description}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                        <Checkbox
+                          id={pack.id}
+                          checked={isSelected}
+                          disabled={!isAvailable}
+                          onCheckedChange={() => isAvailable && handlePackToggle(pack.id)}
+                        />
+                        <div className="space-y-1 leading-none flex-1">
+                          <div className="flex items-center gap-2">
+                            <Label
+                              htmlFor={pack.id}
+                              className={`text-sm font-medium leading-none ${
+                                !isAvailable ? 'cursor-not-allowed opacity-70' : ''
+                              }`}
+                            >
+                              {pack.name}
+                            </Label>
+                            {!isAvailable && (
+                              <span className="text-xs text-muted-foreground italic">
+                                (Not available)
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {pack.description}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {!loadingPacks && availablePacks.length === 0 && (
+                <div className="text-center py-4 text-muted-foreground">
+                  <p>No packs available. Please contact support to assign packs to your account.</p>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3">
@@ -186,7 +301,8 @@ export default function CreateLobby() {
               <Button
                 onClick={handleCreateLobby}
                 disabled={isCreating || selectedPacks.length === 0}
-                className="flex-1"
+                className="flex-1 bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                size="lg"
               >
                 {isCreating ? 'Creating...' : 'Create Lobby'}
               </Button>

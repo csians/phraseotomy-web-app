@@ -105,10 +105,13 @@ Deno.serve(async (req) => {
     if (!tenant) {
       console.log('Tenant not found for shop:', shop);
       return new Response(
-        JSON.stringify({ error: `No active tenant found for shop: ${shop}`, verified: false }),
+        generateErrorHtml(
+          'Tenant Not Found',
+          `No active tenant found for shop: ${shop}. Please ensure the tenant is configured in Supabase with shop_domain matching exactly.`
+        ),
         {
           status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, 'Content-Type': 'text/html' },
         }
       );
     }
@@ -122,10 +125,13 @@ Deno.serve(async (req) => {
     if (!isValidSignature) {
       console.log('Invalid HMAC signature for shop:', shop);
       return new Response(
-        JSON.stringify({ error: 'HMAC signature verification failed', verified: false }),
+        generateErrorHtml(
+          'Authentication Failed',
+          'HMAC signature verification failed. Please check your Shopify Client Secret in the tenant configuration.'
+        ),
         {
           status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, 'Content-Type': 'text/html' },
         }
       );
     }
@@ -138,6 +144,9 @@ Deno.serve(async (req) => {
     const customerFirstName = queryParams.get('customer_first_name') || null;
     const customerLastName = queryParams.get('customer_last_name') || null;
     
+    // Extract token from URL if present (from app-login redirect)
+    const returnToken = queryParams.get('r') || null;
+    
     const customerData = customerId ? {
       id: customerId,
       email: customerEmail,
@@ -147,6 +156,9 @@ Deno.serve(async (req) => {
     } : null;
 
     console.log('Customer data:', customerData ? `Logged in: ${customerId}` : 'Not logged in');
+    if (returnToken) {
+      console.log('Return token present in request');
+    }
 
     // Return HTML that loads the React app with embedded tenant data
     const headers = new Headers({
@@ -158,8 +170,14 @@ Deno.serve(async (req) => {
       headers.append('Set-Cookie', `phraseotomy_customer=${encodeURIComponent(JSON.stringify(customerData))}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=3600`);
     }
 
+    // Pass token to the app if present
+    const appData = {
+      customer: customerData,
+      token: returnToken,
+    };
+
     return new Response(
-      generateAppHtml(tenant, shop, customerData),
+      generateAppHtml(tenant, shop, customerData, returnToken),
       {
         status: 200,
         headers,
@@ -169,10 +187,13 @@ Deno.serve(async (req) => {
     console.error('Error in shopify-proxy-entry:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: errorMessage, verified: false }),
+      generateErrorHtml(
+        'Server Error',
+        `An error occurred: ${errorMessage}. Please check the Edge Function logs in Supabase.`
+      ),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'text/html' },
       }
     );
   }
@@ -192,8 +213,10 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null): strin
     verified: true,
   };
 
-  // Use the Vercel deployment URL for assets
-  const baseUrl = 'https://phraseotomy.ourstagingserver.com';
+  // Get the app deployment URL from environment variable
+  // This should be your Vercel/Netlify deployment URL where the React app is hosted
+  // Format: https://your-app.vercel.app or https://your-app.netlify.app
+  const baseUrl = Deno.env.get('APP_DEPLOYMENT_URL') || 'https://phraseotomy-web-app.vercel.app';
 
   return `<!DOCTYPE html>
 <html lang="en">

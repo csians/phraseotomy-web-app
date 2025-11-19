@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import type { TenantConfig } from "@/lib/types";
+import type { TenantConfig, ShopifyCustomer } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
 import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
 import { getAppBridge } from "@/lib/appBridge";
@@ -20,7 +20,7 @@ const Play = () => {
   const { toast } = useToast();
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
-  const [customer, setCustomer] = useState<{ id: string; email: string; name: string } | null>(null);
+  const [customer, setCustomer] = useState<ShopifyCustomer | null>(null);
   const [licenses, setLicenses] = useState<CustomerLicense[]>([]);
   const [sessions, setSessions] = useState<GameSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,15 +110,20 @@ const Play = () => {
       return;
     }
 
-    // Fallback: Load tenant from database for direct access (not through proxy)
-    const fetchTenant = async () => {
+    // Check for signed token in URL (from Shopify app-login page)
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('r');
+    const shopParam = urlParams.get('shop');
+    
+    // Helper function to load tenant for a shop
+    const loadTenantForShop = async (shop: string, hasToken?: boolean) => {
+      // Load tenant from database
       try {
-        // Only select safe columns (exclude shopify_client_secret for security)
         const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
           .from("tenants")
           .select("id, name, tenant_key, shop_domain, environment")
+          .eq("shop_domain", shop)
           .eq("is_active", true)
-          .limit(1)
           .maybeSingle();
 
         if (dbTenant) {
@@ -140,8 +145,89 @@ const Play = () => {
       }
     };
 
-    fetchTenant();
-  }, []);
+    // Verify token if present
+    if (token) {
+      const verifyToken = async () => {
+        try {
+          const { verifySignedToken } = await import('@/lib/tokenAuth');
+          const payload = await verifySignedToken(token);
+          
+          if (payload) {
+            console.log('✅ Token verified, shop:', payload.shop);
+            const verifiedShop = payload.shop;
+            setShopDomain(verifiedShop);
+            
+            // Clean up token from URL but keep shop parameter
+            urlParams.delete('r');
+            if (!urlParams.has('shop')) {
+              urlParams.set('shop', verifiedShop);
+            }
+            const cleanUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '');
+            window.history.replaceState({}, document.title, cleanUrl);
+            
+            // Load tenant for verified shop (token indicates customer logged in)
+            await loadTenantForShop(verifiedShop, true);
+          } else {
+            console.warn('⚠️ Invalid or expired token');
+            
+            toast({
+              title: 'Invalid Token',
+              description: 'The authentication token is invalid or expired. Please try logging in again.',
+              variant: 'destructive',
+              duration: 5000,
+            });
+            
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error('Error verifying token:', error);
+          setLoading(false);
+        }
+      };
+      
+      verifyToken();
+      return; // Wait for token verification
+    }
+
+    // No token - use shop parameter or existing shopDomain
+    const shopToUse = shopParam;
+    if (shopToUse) {
+      loadTenantForShop(shopToUse, false);
+    } else if (shopDomain) {
+      // If shopDomain is already set (from previous render), use it
+      loadTenantForShop(shopDomain, false);
+    } else {
+      // No shop available, try to load any tenant
+      const fetchTenant = async () => {
+        try {
+          const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
+            .from("tenants")
+            .select("id, name, tenant_key, shop_domain, environment")
+            .eq("is_active", true)
+            .limit(1)
+            .maybeSingle();
+
+          if (dbTenant) {
+            const mappedTenant: TenantConfig = {
+              id: dbTenant.id,
+              name: dbTenant.name,
+              tenant_key: dbTenant.tenant_key,
+              shop_domain: dbTenant.shop_domain,
+              environment: dbTenant.environment,
+              verified: true,
+            };
+            setTenant(mappedTenant);
+            setShopDomain(dbTenant.shop_domain);
+          }
+        } catch (error) {
+          console.error("Error loading tenant:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchTenant();
+    }
+  }, [toast, shopDomain]);
 
   // Load customer data when logged in
   useEffect(() => {
@@ -183,6 +269,49 @@ const Play = () => {
     }
   }, [loading, customer, shopDomain]);
 
+  // Auto-redirect to CreateLobby when customer is logged in AND has redeemed codes
+  useEffect(() => {
+    // Only redirect if:
+    // 1. Initial loading is complete
+    // 2. Customer data loading is complete
+    // 3. Customer is logged in (has customer data from Shopify)
+    // 4. Customer has active licenses (redeemed codes)
+    // 5. We have shop domain and tenant info
+    // 6. We're on the /play route (not already on create-lobby)
+    if (!loading && !dataLoading && customer && shopDomain && tenant && licenses.length > 0) {
+      const currentPath = window.location.pathname;
+      const isOnPlayPage = currentPath === '/play' || currentPath === '/apps/phraseotomy' || currentPath === '/';
+      
+      if (!isOnPlayPage) {
+        // Already on a different page, don't redirect
+        return;
+      }
+
+      // Check if customer just logged in (from URL params or fresh customer data)
+      const urlParams = new URLSearchParams(window.location.search);
+      const justLoggedIn = 
+        loginStatusFromUrl?.status === 'success' || 
+        urlParams.get('logged_in_customer_id') !== null ||
+        urlParams.get('customer_account') !== null;
+
+      // Small delay to ensure all data is loaded and UI is ready
+      const redirectTimer = setTimeout(() => {
+        console.log("🔄 Auto-redirecting logged-in customer with redeemed codes to CreateLobby", {
+          customer: customer.email || customer.id,
+          shopDomain,
+          licensesCount: licenses.length,
+          justLoggedIn,
+        });
+        navigate("/create-lobby", {
+          state: { customer, shopDomain, tenant },
+          replace: true,
+        });
+      }, 1000); // Delay to let user see they're logged in and have access
+
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [loading, dataLoading, customer, shopDomain, tenant, licenses, navigate, loginStatusFromUrl]);
+
   const handleJoinGame = () => {
     if (!lobbyCode.trim()) {
       toast({
@@ -214,7 +343,7 @@ const Play = () => {
     });
   };
 
-  const handleRedeemCode = () => {
+  const handleRedeemCode = async () => {
     if (!redemptionCode.trim()) {
       toast({
         title: "Missing Code",
@@ -224,14 +353,50 @@ const Play = () => {
       return;
     }
 
-    toast({
-      title: "Coming Soon",
-      description: "Code redemption will be available soon.",
-    });
+    if (!customer || !shopDomain || !tenant) {
+      toast({
+        title: "Not Logged In",
+        description: "Please log in to redeem a code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { redeemCode } = await import('@/lib/redemption');
+      const result = await redeemCode(redemptionCode, customer.id, shopDomain, tenant.id);
+
+      if (result.success) {
+        toast({
+          title: "Code Redeemed!",
+          description: result.message,
+        });
+        
+        // Clear the input
+        setRedemptionCode('');
+        
+        // Reload customer licenses to show updated packs
+        const { getCustomerLicenses } = await import('@/lib/customerAccess');
+        const updatedLicenses = await getCustomerLicenses(customer.id, shopDomain);
+        setLicenses(updatedLicenses);
+      } else {
+        toast({
+          title: "Redemption Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error redeeming code:', error);
+      toast({
+        title: "Error",
+        description: "Failed to redeem code. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleLogin = () => {
-    console.log("first url");
+  const handleLogin = async () => {
     const effectiveShopDomain = shopDomain || tenant?.shop_domain;
     if (!effectiveShopDomain) {
       toast({
@@ -242,25 +407,46 @@ const Play = () => {
       return;
     }
 
-    console.log("hiii");
+    try {
+      // Generate signed token for secure authentication
+      // In production, this should be done server-side via Edge Function
+      // For local dev, we use client-side generation
+      const { generateSignedToken, createShopLoginUrl } = await import('@/lib/tokenAuth');
+      
+      // Call Supabase Edge Function to generate token
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-token`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ shop: effectiveShopDomain }),
+        }
+      );
 
-    // Use the specific app URL for return redirect
-    // This ensures Shopify redirects back to your app after login
-    const appBaseUrl = "https://id-preview--46e7a4fc-a12f-4e7f-812c-75f62bdac4d4.lovable.app";
-    const returnUrl = `${appBaseUrl}/apps/phraseotomy`;
+      if (!response.ok) {
+        throw new Error('Failed to generate token');
+      }
 
-    console.log("Redirecting to login with return URL:", returnUrl);
+      const data = await response.json();
+      const token = data.token;
+      const loginUrl = data.loginUrl;
 
-    // Construct login URL with return_url parameter
-    // Shopify will redirect back to this URL after successful login
-    const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
+      console.log("Redirecting to login with token:", token.substring(0, 20) + '...');
+      console.log("Login URL:", loginUrl);
 
-    console.log("Login URL:", loginUrl);
-
-    // Direct redirect - works in App Proxy context and standalone
-    window.location.href = loginUrl;
-
-    console.log("hiiii");
+      // Redirect to Shopify login with signed token
+      window.location.href = loginUrl;
+    } catch (error) {
+      console.error('Error generating login token:', error);
+      toast({
+        title: "Login Error",
+        description: "Failed to generate login token. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -532,7 +718,7 @@ const Play = () => {
             {customer && (
               <div className="flex justify-between">
                 <span className="font-semibold">Customer:</span>
-                <span>{customer.email}</span>
+                <span>{customer.email || customer.name || customer.id}</span>
               </div>
             )}
           </div>
