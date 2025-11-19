@@ -230,6 +230,39 @@ const Play = () => {
     });
   };
 
+  // const handleLogin = () => {
+  //   console.log("first url");
+  //   const effectiveShopDomain = shopDomain || tenant?.shop_domain;
+  //   if (!effectiveShopDomain) {
+  //     toast({
+  //       title: "Cannot Login",
+  //       description: "Shop domain not available. Please access this app through your Shopify store.",
+  //       variant: "destructive",
+  //     });
+  //     return;
+  //   }
+
+  //   console.log("hiii");
+
+  //   // Use the specific app URL for return redirect
+  //   // This ensures Shopify redirects back to your app after login
+  //   const appBaseUrl = "https://id-preview--46e7a4fc-a12f-4e7f-812c-75f62bdac4d4.lovable.app";
+  //   const returnUrl = `${appBaseUrl}/apps/phraseotomy`;
+
+  //   console.log("Redirecting to login with return URL:", returnUrl);
+
+  //   // Construct login URL with return_url parameter
+  //   // Shopify will redirect back to this URL after successful login
+  //   const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
+
+  //   console.log("Login URL:", loginUrl);
+
+  //   // Direct redirect - works in App Proxy context and standalone
+  //   window.location.href = loginUrl;
+
+  //   console.log("hiiii");
+  // };
+
   const handleLogin = () => {
     console.log("first url");
     const effectiveShopDomain = shopDomain || tenant?.shop_domain;
@@ -247,7 +280,7 @@ const Play = () => {
     // Use the specific app URL for return redirect
     // This ensures Shopify redirects back to your app after login
     const appBaseUrl = "https://id-preview--46e7a4fc-a12f-4e7f-812c-75f62bdac4d4.lovable.app";
-    const returnUrl = `${appBaseUrl}/apps/phraseotomy`;
+    const returnUrl = `${appBaseUrl}/apps/phraseotomy?login=success`;
 
     console.log("Redirecting to login with return URL:", returnUrl);
 
@@ -257,8 +290,8 @@ const Play = () => {
 
     console.log("Login URL:", loginUrl);
 
-    // Direct redirect - works in App Proxy context and standalone
-    window.location.href = loginUrl;
+    // Open login URL in a new tab/window
+    window.open(loginUrl, "_blank");
 
     console.log("hiiii");
   };
