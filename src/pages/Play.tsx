@@ -40,84 +40,8 @@ const Play = () => {
   const [guestName, setGuestName] = useState("");
   const [redemptionCode, setRedemptionCode] = useState("");
 
-  // useEffect(() => {
-  //   // Check for embedded config from proxy (primary method)
-  //   if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
-  //     setTenant(window.__PHRASEOTOMY_CONFIG__);
-  //     setShopDomain(window.__PHRASEOTOMY_SHOP__);
-  //     setCustomer(window.__PHRASEOTOMY_CUSTOMER__ || null);
-  //     setLoading(false);
-  //     return;
-  //   }
-
-  //   // Fallback: Try to fetch session from API
-  //   const fetchSession = async () => {
-  //     try {
-  //       const response = await fetch('/api/session');
-  //       const data = await response.json();
-
-  //       if (data.hasSession && data.tenant && data.shop) {
-  //         setTenant(data.tenant);
-  //         setShopDomain(data.shop);
-  //         setCustomer(data.customer || null);
-  //       } else {
-  //         // If no session, try to load tenant from database for testing
-  //         // This allows the app to work outside of Shopify proxy
-  //         const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
-  //           .from('tenants')
-  //           .select('*')
-  //           .eq('is_active', true)
-  //           .limit(1)
-  //           .single();
-
-  //         if (dbTenant) {
-  //           const mappedTenant: TenantConfig = {
-  //             id: dbTenant.id,
-  //             name: dbTenant.name,
-  //             tenant_key: dbTenant.tenant_key,
-  //             shop_domain: dbTenant.shop_domain,
-  //             environment: dbTenant.environment,
-  //             verified: true,
-  //           };
-  //           setTenant(mappedTenant);
-  //           setShopDomain(dbTenant.shop_domain);
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error('Error fetching session:', error);
-  //       // Try to load tenant from database as fallback
-  //       try {
-  //         const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
-  //           .from('tenants')
-  //           .select('*')
-  //           .eq('is_active', true)
-  //           .limit(1)
-  //           .single();
-
-  //         if (dbTenant) {
-  //           const mappedTenant: TenantConfig = {
-  //             id: dbTenant.id,
-  //             name: dbTenant.name,
-  //             tenant_key: dbTenant.tenant_key,
-  //             shop_domain: dbTenant.shop_domain,
-  //             environment: dbTenant.environment,
-  //             verified: true,
-  //           };
-  //           setTenant(mappedTenant);
-  //           setShopDomain(dbTenant.shop_domain);
-  //         }
-  //       } catch (err) {
-  //         console.error('Error loading tenant:', err);
-  //       }
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   fetchSession();
-  // }, []);
-
   useEffect(() => {
+    // Check for embedded config from proxy (primary method)
     if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
       setTenant(window.__PHRASEOTOMY_CONFIG__);
       setShopDomain(window.__PHRASEOTOMY_SHOP__);
@@ -126,38 +50,114 @@ const Play = () => {
       return;
     }
 
-    const loadTenantFromSupabase = async () => {
+    // Fallback: Try to fetch session from API
+    const fetchSession = async () => {
       try {
-        const { supabase } = await import("@/integrations/supabase/client");
-        const { data: dbTenant, error } = await supabase
-          .from("tenants")
-          .select("*")
-          .eq("is_active", true)
-          .limit(1)
-          .single();
+        const response = await fetch('/api/session');
+        const data = await response.json();
 
-        if (error) throw error;
+        if (data.hasSession && data.tenant && data.shop) {
+          setTenant(data.tenant);
+          setShopDomain(data.shop);
+          setCustomer(data.customer || null);
+        } else {
+          // If no session, try to load tenant from database for testing
+          // This allows the app to work outside of Shopify proxy
+          const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
+            .from('tenants')
+            .select('*')
+            .eq('is_active', true)
+            .limit(1)
+            .single();
 
-        if (dbTenant) {
-          setTenant({
-            id: dbTenant.id,
-            name: dbTenant.name,
-            tenant_key: dbTenant.tenant_key,
-            shop_domain: dbTenant.shop_domain,
-            environment: dbTenant.environment,
-            verified: true,
-          });
-          setShopDomain(dbTenant.shop_domain);
+          if (dbTenant) {
+            const mappedTenant: TenantConfig = {
+              id: dbTenant.id,
+              name: dbTenant.name,
+              tenant_key: dbTenant.tenant_key,
+              shop_domain: dbTenant.shop_domain,
+              environment: dbTenant.environment,
+              verified: true,
+            };
+            setTenant(mappedTenant);
+            setShopDomain(dbTenant.shop_domain);
+          }
         }
-      } catch (err) {
-        console.error("Failed to load tenant fallback:", err);
+      } catch (error) {
+        console.error('Error fetching session:', error);
+        // Try to load tenant from database as fallback
+        try {
+          const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
+            .from('tenants')
+            .select('*')
+            .eq('is_active', true)
+            .limit(1)
+            .single();
+
+          if (dbTenant) {
+            const mappedTenant: TenantConfig = {
+              id: dbTenant.id,
+              name: dbTenant.name,
+              tenant_key: dbTenant.tenant_key,
+              shop_domain: dbTenant.shop_domain,
+              environment: dbTenant.environment,
+              verified: true,
+            };
+            setTenant(mappedTenant);
+            setShopDomain(dbTenant.shop_domain);
+          }
+        } catch (err) {
+          console.error('Error loading tenant:', err);
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    loadTenantFromSupabase();
+    fetchSession();
   }, []);
+
+  // useEffect(() => {
+  //   if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
+  //     setTenant(window.__PHRASEOTOMY_CONFIG__);
+  //     setShopDomain(window.__PHRASEOTOMY_SHOP__);
+  //     setCustomer(window.__PHRASEOTOMY_CUSTOMER__ || null);
+  //     setLoading(false);
+  //     return;
+  //   }
+
+  //   const loadTenantFromSupabase = async () => {
+  //     try {
+  //       const { supabase } = await import("@/integrations/supabase/client");
+  //       const { data: dbTenant, error } = await supabase
+  //         .from("tenants")
+  //         .select("*")
+  //         .eq("is_active", true)
+  //         .limit(1)
+  //         .single();
+
+  //       if (error) throw error;
+
+  //       if (dbTenant) {
+  //         setTenant({
+  //           id: dbTenant.id,
+  //           name: dbTenant.name,
+  //           tenant_key: dbTenant.tenant_key,
+  //           shop_domain: dbTenant.shop_domain,
+  //           environment: dbTenant.environment,
+  //           verified: true,
+  //         });
+  //         setShopDomain(dbTenant.shop_domain);
+  //       }
+  //     } catch (err) {
+  //       console.error("Failed to load tenant fallback:", err);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
+
+  //   loadTenantFromSupabase();
+  // }, []);
 
   // Load customer data when logged in
   useEffect(() => {
@@ -226,36 +226,36 @@ const Play = () => {
     });
   };
 
-  // const handleLogin = () => {
-  //   const effectiveShopDomain = shopDomain || tenant?.shop_domain;
-
-  //   if (!effectiveShopDomain) {
-  //     toast({
-  //       title: 'Cannot Login',
-  //       description: 'Shop domain not available. Please access this app through your Shopify store.',
-  //       variant: 'destructive',
-  //     });
-  //     return;
-  //   }
-
-  //   const returnUrl = window.location.href;
-  //   const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
-
-  //   // Direct redirect - works in App Proxy context and standalone
-  //   window.location.href = loginUrl;
-  // };
-
   const handleLogin = () => {
     const effectiveShopDomain = shopDomain || tenant?.shop_domain;
 
     if (!effectiveShopDomain) {
       toast({
-        title: "Cannot Login",
-        description: "Shop domain not available. Please access this app through your Shopify store.",
-        variant: "destructive",
+        title: 'Cannot Login',
+        description: 'Shop domain not available. Please access this app through your Shopify store.',
+        variant: 'destructive',
       });
       return;
     }
+
+    const returnUrl = window.location.href;
+    const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
+
+    // Direct redirect - works in App Proxy context and standalone
+    window.location.href = loginUrl;
+  };
+
+  // const handleLogin = () => {
+  //   const effectiveShopDomain = shopDomain || tenant?.shop_domain;
+
+  //   if (!effectiveShopDomain) {
+  //     toast({
+  //       title: "Cannot Login",
+  //       description: "Shop domain not available. Please access this app through your Shopify store.",
+  //       variant: "destructive",
+  //     });
+  //     return;
+  //   }
 
     const appBridge = getAppBridge();
     
