@@ -257,11 +257,15 @@ const Play = () => {
       return;
     }
 
-    // Construct the return URL to point back to the app proxy path
-    const returnUrl = `https://${effectiveShopDomain}/apps/phraseotomy`;
+    const appBridge = getAppBridge();
+    
+    // Determine return URL based on context
+    const returnUrl = appBridge 
+      ? `https://${effectiveShopDomain}/apps/phraseotomy` // Inside Shopify proxy
+      : `${window.location.origin}/play`; // Direct access (testing/preview)
+    
     const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
 
-    const appBridge = getAppBridge();
     if (appBridge) {
       // Running inside Shopify - use App Bridge for navigation
       const redirect = Redirect.create(appBridge);
