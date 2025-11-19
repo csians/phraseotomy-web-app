@@ -723,6 +723,16 @@ const Play = () => {
   }, [toast]);
 
   useEffect(() => {
+    // Check for return token (r) parameter after Shopify login
+    const urlParams = new URLSearchParams(window.location.search);
+    const returnToken = urlParams.get('r');
+    const shopParam = urlParams.get('shop');
+
+    if (returnToken && shopParam) {
+      verifyLoginToken(returnToken, shopParam);
+      return;
+    }
+
     // Check for embedded config from proxy (primary method)
     if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
       setTenant(window.__PHRASEOTOMY_CONFIG__);
@@ -804,6 +814,46 @@ const Play = () => {
     }
   }, [loading, customer, shopDomain]);
 
+  const verifyLoginToken = async (token: string, shop: string) => {
+    try {
+      console.log("Verifying login token for shop:", shop);
+      
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error } = await supabase.functions.invoke('verify-login-token', {
+        body: { token, shopDomain: shop }
+      });
+
+      if (error) throw error;
+
+      if (data.valid) {
+        console.log("Token verified successfully, customer is now logged in");
+        toast({
+          title: "Login Successful",
+          description: "You have been logged in successfully!",
+        });
+        
+        // Clean up URL parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Reload to fetch customer data
+        window.location.reload();
+      } else {
+        toast({
+          title: "Login Failed",
+          description: "Login verification failed. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error verifying login token:", error);
+      toast({
+        title: "Login Failed",
+        description: "Login verification failed. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleJoinGame = () => {
     if (!lobbyCode.trim()) {
       toast({
@@ -851,14 +901,12 @@ const Play = () => {
     });
   };
 
-  const handleLogin = (e?: React.MouseEvent) => {
-    // Prevent any default behavior
+  const handleLogin = async (e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
 
-    console.log("first url");
     const effectiveShopDomain = shopDomain || tenant?.shop_domain;
     if (!effectiveShopDomain) {
       toast({
@@ -869,34 +917,24 @@ const Play = () => {
       return;
     }
 
-    console.log("hiii");
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error } = await supabase.functions.invoke('generate-login-token', {
+        body: { shopDomain: effectiveShopDomain }
+      });
 
-    // Use the specific app URL for return redirect
-    // This ensures Shopify redirects back to your app after login
-    const appBaseUrl = "https://id-preview--46e7a4fc-a12f-4e7f-812c-75f62bdac4d4.lovable.app";
-    const returnUrl = `${appBaseUrl}/apps/phraseotomy?login=success`;
+      if (error) throw error;
 
-    console.log("Redirecting to login with return URL:", returnUrl);
-
-    // Construct login URL with return_url parameter
-    // Shopify will redirect back to this URL after successful login
-    const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
-
-    console.log("Login URL:", loginUrl);
-
-    // Open login URL in a new tab/window
-    const newWindow = window.open(loginUrl, "_blank", "noopener,noreferrer");
-
-    // Check if popup was blocked
-    if (!newWindow || newWindow.closed || typeof newWindow.closed === "undefined") {
+      console.log("Redirecting to Shopify login with signed token");
+      window.top ? (window.top.location.href = data.loginUrl) : (window.location.href = data.loginUrl);
+    } catch (error) {
+      console.error("Error generating login URL:", error);
       toast({
-        title: "Popup Blocked",
-        description: "Please allow popups for this site to open the login page in a new tab.",
+        title: "Login Error",
+        description: "Failed to initiate login. Please try again.",
         variant: "destructive",
       });
     }
-
-    console.log("hiiii");
   };
 
   if (loading) {
