@@ -408,37 +408,27 @@ const Play = () => {
     }
 
     try {
-      // Generate signed token for secure authentication
-      // In production, this should be done server-side via Edge Function
-      // For local dev, we use client-side generation
-      const { generateSignedToken, createShopLoginUrl } = await import('@/lib/tokenAuth');
+      console.log('Generating login token for shop:', effectiveShopDomain);
       
-      // Call Supabase Edge Function to generate token
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-token`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ shop: effectiveShopDomain }),
-        }
-      );
+      // Call edge function to generate signed token
+      const { data, error } = await (await import("@/integrations/supabase/client")).supabase.functions.invoke('generate-login-token', {
+        body: { shopDomain: effectiveShopDomain }
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to generate token');
+      if (error) throw error;
+      if (!data?.loginUrl) throw new Error('No login URL returned');
+
+      console.log('Login URL generated, redirecting...');
+      
+      // Use App Bridge to navigate parent window (bypasses iframe security)
+      const appBridge = getAppBridge();
+      if (appBridge) {
+        const redirect = Redirect.create(appBridge);
+        redirect.dispatch(Redirect.Action.REMOTE, data.loginUrl);
+      } else {
+        // Fallback for non-Shopify environments
+        window.location.href = data.loginUrl;
       }
-
-      const data = await response.json();
-      const token = data.token;
-      const loginUrl = data.loginUrl;
-
-      console.log("Redirecting to login with token:", token.substring(0, 20) + '...');
-      console.log("Login URL:", loginUrl);
-
-      // Redirect to Shopify login with signed token
-      window.location.href = loginUrl;
     } catch (error) {
       console.error('Error generating login token:', error);
       toast({
