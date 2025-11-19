@@ -1,0 +1,124 @@
+{
+  "hash": "6cae7508",
+  "configHash": "e24d19ea",
+  "lockfileHash": "3b683202",
+  "browserHash": "b0828d94",
+  "optimized": {
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "bfbec64e",
+      "needsInterop": true
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "68ed4335",
+      "needsInterop": true
+    },
+    "@radix-ui/react-checkbox": {
+      "src": "../../node_modules/@radix-ui/react-checkbox/dist/index.mjs",
+      "file": "@radix-ui_react-checkbox.js",
+      "fileHash": "8832b020",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../node_modules/lucide-react/dist/esm/lucide-react.js",
+      "file": "lucide-react.js",
+      "fileHash": "5d28bfa5",
+      "needsInterop": false
+    },
+    "@supabase/supabase-js": {
+      "src": "../../node_modules/@supabase/supabase-js/dist/module/index.js",
+      "file": "@supabase_supabase-js.js",
+      "fileHash": "96ce9838",
+      "needsInterop": false
+    },
+    "class-variance-authority": {
+      "src": "../../node_modules/class-variance-authority/dist/index.mjs",
+      "file": "class-variance-authority.js",
+      "fileHash": "17d63299",
+      "needsInterop": false
+    },
+    "@shopify/app-bridge": {
+      "src": "../../node_modules/@shopify/app-bridge/index.js",
+      "file": "@shopify_app-bridge.js",
+      "fileHash": "df15bf46",
+      "needsInterop": true
+    },
+    "zod": {
+      "src": "../../node_modules/zod/index.js",
+      "file": "zod.js",
+      "fileHash": "9ba03b50",
+      "needsInterop": false
+    },
+    "@radix-ui/react-dialog": {
+      "src": "../../node_modules/@radix-ui/react-dialog/dist/index.mjs",
+      "file": "@radix-ui_react-dialog.js",
+      "fileHash": "c6aee779",
+      "needsInterop": false
+    },
+    "@radix-ui/react-select": {
+      "src": "../../node_modules/@radix-ui/react-select/dist/index.mjs",
+      "file": "@radix-ui_react-select.js",
+      "fileHash": "525a7ab1",
+      "needsInterop": false
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "6e6d6f13",
+      "needsInterop": true
+    },
+    "@tanstack/react-query": {
+      "src": "../../node_modules/@tanstack/react-query/build/modern/index.js",
+      "file": "@tanstack_react-query.js",
+      "fileHash": "15769d5c",
+      "needsInterop": false
+    },
+    "react-router-dom": {
+      "src": "../../node_modules/react-router-dom/dist/index.js",
+      "file": "react-router-dom.js",
+      "fileHash": "1839ca0e",
+      "needsInterop": false
+    },
+    "@shopify/app-bridge/actions": {
+      "src": "../../node_modules/@shopify/app-bridge/actions/index.js",
+      "file": "@shopify_app-bridge_actions.js",
+      "fileHash": "b6d93621",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "chunk-HUU23QPA": {
+      "file": "chunk-HUU23QPA.js"
+    },
+    "chunk-VMYYKUHW": {
+      "file": "chunk-VMYYKUHW.js"
+    },
+    "chunk-U54MCIHP": {
+      "file": "chunk-U54MCIHP.js"
+    },
+    "chunk-4H2WEFJG": {
+      "file": "chunk-4H2WEFJG.js"
+    },
+    "chunk-CAUPQY2B": {
+      "file": "chunk-CAUPQY2B.js"
+    },
+    "chunk-T4NT7ECI": {
+      "file": "chunk-T4NT7ECI.js"
+    },
+    "chunk-5L737GQX": {
+      "file": "chunk-5L737GQX.js"
+    },
+    "chunk-BYIBYIM7": {
+      "file": "chunk-BYIBYIM7.js"
+    },
+    "chunk-XW5JTHKA": {
+      "file": "chunk-XW5JTHKA.js"
+    },
+    "chunk-HXA6O6EE": {
+      "file": "chunk-HXA6O6EE.js"
+    }
+  }
+}
