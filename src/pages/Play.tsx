@@ -110,70 +110,36 @@ const Play = () => {
       return;
     }
 
-    // Fallback: Try to fetch session from API
-    const fetchSession = async () => {
+    // Fallback: Load tenant from database for direct access (not through proxy)
+    const fetchTenant = async () => {
       try {
-        const response = await fetch("/api/session");
-        const data = await response.json();
-        if (data.hasSession && data.tenant && data.shop) {
-          setTenant(data.tenant);
-          setShopDomain(data.shop);
-          setCustomer(data.customer || null);
-        } else {
-          // If no session, try to load tenant from database for testing
-          // This allows the app to work outside of Shopify proxy
-          const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
-            .from("tenants")
-            .select("*")
-            .eq("is_active", true)
-            .limit(1)
-            .single();
+        const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
+          .from("tenants")
+          .select("*")
+          .eq("is_active", true)
+          .limit(1)
+          .single();
 
-          if (dbTenant) {
-            const mappedTenant: TenantConfig = {
-              id: dbTenant.id,
-              name: dbTenant.name,
-              tenant_key: dbTenant.tenant_key,
-              shop_domain: dbTenant.shop_domain,
-              environment: dbTenant.environment,
-              verified: true,
-            };
-            setTenant(mappedTenant);
-            setShopDomain(dbTenant.shop_domain);
-          }
+        if (dbTenant) {
+          const mappedTenant: TenantConfig = {
+            id: dbTenant.id,
+            name: dbTenant.name,
+            tenant_key: dbTenant.tenant_key,
+            shop_domain: dbTenant.shop_domain,
+            environment: dbTenant.environment,
+            verified: true,
+          };
+          setTenant(mappedTenant);
+          setShopDomain(dbTenant.shop_domain);
         }
       } catch (error) {
-        console.error("Error fetching session:", error);
-        // Try to load tenant from database as fallback
-        try {
-          const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
-            .from("tenants")
-            .select("*")
-            .eq("is_active", true)
-            .limit(1)
-            .single();
-
-          if (dbTenant) {
-            const mappedTenant: TenantConfig = {
-              id: dbTenant.id,
-              name: dbTenant.name,
-              tenant_key: dbTenant.tenant_key,
-              shop_domain: dbTenant.shop_domain,
-              environment: dbTenant.environment,
-              verified: true,
-            };
-            setTenant(mappedTenant);
-            setShopDomain(dbTenant.shop_domain);
-          }
-        } catch (err) {
-          console.error("Error loading tenant:", err);
-        }
+        console.error("Error loading tenant:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSession();
+    fetchTenant();
   }, []);
 
   // Load customer data when logged in
