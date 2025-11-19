@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 
-export type Tenant = Tables<'tenants'>;
+export type Tenant = Pick<Tables<'tenants'>, 'id' | 'name' | 'shop_domain' | 'environment' | 'is_active'>;
 
 export function useTenant(shopDomain: string | null) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
