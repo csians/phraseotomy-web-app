@@ -117,48 +117,6 @@ const Play = () => {
     fetchSession();
   }, []);
 
-  // useEffect(() => {
-  //   if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
-  //     setTenant(window.__PHRASEOTOMY_CONFIG__);
-  //     setShopDomain(window.__PHRASEOTOMY_SHOP__);
-  //     setCustomer(window.__PHRASEOTOMY_CUSTOMER__ || null);
-  //     setLoading(false);
-  //     return;
-  //   }
-
-  //   const loadTenantFromSupabase = async () => {
-  //     try {
-  //       const { supabase } = await import("@/integrations/supabase/client");
-  //       const { data: dbTenant, error } = await supabase
-  //         .from("tenants")
-  //         .select("*")
-  //         .eq("is_active", true)
-  //         .limit(1)
-  //         .single();
-
-  //       if (error) throw error;
-
-  //       if (dbTenant) {
-  //         setTenant({
-  //           id: dbTenant.id,
-  //           name: dbTenant.name,
-  //           tenant_key: dbTenant.tenant_key,
-  //           shop_domain: dbTenant.shop_domain,
-  //           environment: dbTenant.environment,
-  //           verified: true,
-  //         });
-  //         setShopDomain(dbTenant.shop_domain);
-  //       }
-  //     } catch (err) {
-  //       console.error("Failed to load tenant fallback:", err);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   loadTenantFromSupabase();
-  // }, []);
-
   // Load customer data when logged in
   useEffect(() => {
     if (!loading && customer && shopDomain) {
@@ -239,42 +197,12 @@ const Play = () => {
     }
 
     const returnUrl = window.location.href;
+    console.log("returnUrl", returnUrl);
     const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
 
     // Direct redirect - works in App Proxy context and standalone
     window.location.href = loginUrl;
   };
-
-  // const handleLogin = () => {
-  //   const effectiveShopDomain = shopDomain || tenant?.shop_domain;
-
-  //   if (!effectiveShopDomain) {
-  //     toast({
-  //       title: "Cannot Login",
-  //       description: "Shop domain not available. Please access this app through your Shopify store.",
-  //       variant: "destructive",
-  //     });
-  //     return;
-  //   }
-
-  //   const appBridge = getAppBridge();
-
-  //   // Determine return URL based on context
-  //   const returnUrl = appBridge
-  //     ? `https://${effectiveShopDomain}/apps/phraseotomy` // Inside Shopify proxy
-  //     : `${window.location.origin}/play`; // Direct access (testing/preview)
-
-  //   const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
-
-  //   if (appBridge) {
-  //     // Running inside Shopify - use App Bridge for navigation
-  //     const redirect = Redirect.create(appBridge);
-  //     redirect.dispatch(Redirect.Action.REMOTE, loginUrl);
-  //   } else {
-  //     // Running outside Shopify (e.g. testing) - use standard redirect
-  //     window.location.href = loginUrl;
-  //   }
-  // };
 
   if (loading) {
     return (
