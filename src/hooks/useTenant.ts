@@ -24,7 +24,7 @@ export function useTenant(shopDomain: string | null) {
       try {
         const { data, error: fetchError } = await supabase
           .from('tenants')
-          .select('*')
+          .select('id, name, shop_domain, environment, is_active')
           .eq('shop_domain', shopDomain)
           .eq('is_active', true)
           .maybeSingle();
