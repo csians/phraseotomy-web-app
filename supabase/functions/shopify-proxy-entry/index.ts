@@ -51,9 +51,11 @@ Deno.serve(async (req) => {
   const queryParams = url.searchParams;
   const shop = queryParams.get('shop');
 
-  console.log('Shopify Proxy Entry - Request received');
-  console.log('Shop:', shop);
-  console.log('Query params:', Object.fromEntries(queryParams.entries()));
+  console.log('Proxy request received:', { 
+    shop, 
+    hasSignature: !!queryParams.get('signature'), 
+    hasCustomer: !!queryParams.get('logged_in_customer_id') 
+  });
 
   // CORS headers for browser requests
   const corsHeaders = {
