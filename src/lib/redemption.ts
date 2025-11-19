@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { redemptionCodeSchema, validateInput } from './validation';
 
 export interface RedemptionResult {
   success: boolean;
@@ -23,14 +24,15 @@ export async function redeemCode(
   tenantId: string
 ): Promise<RedemptionResult> {
   try {
-    // Normalize code (uppercase, trim)
-    const normalizedCode = code.toUpperCase().trim();
-
-    if (normalizedCode.length !== 6) {
+    // Validate and normalize the code
+    let normalizedCode: string;
+    try {
+      normalizedCode = validateInput(redemptionCodeSchema, code);
+    } catch (validationError) {
       return {
         success: false,
-        message: 'Code must be 6 characters',
-        error: 'INVALID_LENGTH',
+        message: validationError instanceof Error ? validationError.message : 'Invalid code format',
+        error: 'INVALID_FORMAT',
       };
     }
 
