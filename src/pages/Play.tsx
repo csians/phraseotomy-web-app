@@ -53,7 +53,7 @@ const Play = () => {
     // Fallback: Try to fetch session from API
     const fetchSession = async () => {
       try {
-        const response = await fetch('/api/session');
+        const response = await fetch("/api/session");
         const data = await response.json();
 
         if (data.hasSession && data.tenant && data.shop) {
@@ -63,10 +63,10 @@ const Play = () => {
         } else {
           // If no session, try to load tenant from database for testing
           // This allows the app to work outside of Shopify proxy
-          const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
-            .from('tenants')
-            .select('*')
-            .eq('is_active', true)
+          const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
+            .from("tenants")
+            .select("*")
+            .eq("is_active", true)
             .limit(1)
             .single();
 
@@ -84,13 +84,13 @@ const Play = () => {
           }
         }
       } catch (error) {
-        console.error('Error fetching session:', error);
+        console.error("Error fetching session:", error);
         // Try to load tenant from database as fallback
         try {
-          const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
-            .from('tenants')
-            .select('*')
-            .eq('is_active', true)
+          const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
+            .from("tenants")
+            .select("*")
+            .eq("is_active", true)
             .limit(1)
             .single();
 
@@ -107,7 +107,7 @@ const Play = () => {
             setShopDomain(dbTenant.shop_domain);
           }
         } catch (err) {
-          console.error('Error loading tenant:', err);
+          console.error("Error loading tenant:", err);
         }
       } finally {
         setLoading(false);
@@ -231,9 +231,9 @@ const Play = () => {
 
     if (!effectiveShopDomain) {
       toast({
-        title: 'Cannot Login',
-        description: 'Shop domain not available. Please access this app through your Shopify store.',
-        variant: 'destructive',
+        title: "Cannot Login",
+        description: "Shop domain not available. Please access this app through your Shopify store.",
+        variant: "destructive",
       });
       return;
     }
@@ -257,24 +257,24 @@ const Play = () => {
   //     return;
   //   }
 
-    const appBridge = getAppBridge();
-    
-    // Determine return URL based on context
-    const returnUrl = appBridge 
-      ? `https://${effectiveShopDomain}/apps/phraseotomy` // Inside Shopify proxy
-      : `${window.location.origin}/play`; // Direct access (testing/preview)
-    
-    const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
+  //   const appBridge = getAppBridge();
 
-    if (appBridge) {
-      // Running inside Shopify - use App Bridge for navigation
-      const redirect = Redirect.create(appBridge);
-      redirect.dispatch(Redirect.Action.REMOTE, loginUrl);
-    } else {
-      // Running outside Shopify (e.g. testing) - use standard redirect
-      window.location.href = loginUrl;
-    }
-  };
+  //   // Determine return URL based on context
+  //   const returnUrl = appBridge
+  //     ? `https://${effectiveShopDomain}/apps/phraseotomy` // Inside Shopify proxy
+  //     : `${window.location.origin}/play`; // Direct access (testing/preview)
+
+  //   const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
+
+  //   if (appBridge) {
+  //     // Running inside Shopify - use App Bridge for navigation
+  //     const redirect = Redirect.create(appBridge);
+  //     redirect.dispatch(Redirect.Action.REMOTE, loginUrl);
+  //   } else {
+  //     // Running outside Shopify (e.g. testing) - use standard redirect
+  //     window.location.href = loginUrl;
+  //   }
+  // };
 
   if (loading) {
     return (
