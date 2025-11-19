@@ -113,12 +113,13 @@ const Play = () => {
     // Fallback: Load tenant from database for direct access (not through proxy)
     const fetchTenant = async () => {
       try {
+        // Only select safe columns (exclude shopify_client_secret for security)
         const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
           .from("tenants")
-          .select("*")
+          .select("id, name, tenant_key, shop_domain, environment")
           .eq("is_active", true)
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (dbTenant) {
           const mappedTenant: TenantConfig = {
