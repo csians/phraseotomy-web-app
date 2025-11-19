@@ -180,12 +180,26 @@ const Play = () => {
     if (token) {
       const verifyToken = async () => {
         try {
-          const { verifySignedToken } = await import('@/lib/tokenAuth');
-          const payload = await verifySignedToken(token);
+          // Use secure edge function for token verification
+          const { data, error } = await supabase.functions.invoke('verify-login-token', {
+            body: { token, shopDomain: shopParam || undefined },
+          });
           
-          if (payload) {
-            console.log('✅ Token verified, shop:', payload.shop);
-            const verifiedShop = payload.shop;
+          if (error) {
+            console.error('Error verifying token:', error);
+            toast({
+              title: 'Verification Failed',
+              description: 'Could not verify authentication token. Please try logging in again.',
+              variant: 'destructive',
+              duration: 5000,
+            });
+            setLoading(false);
+            return;
+          }
+          
+          if (data?.valid && data?.shop) {
+            console.log('✅ Token verified, shop:', data.shop);
+            const verifiedShop = data.shop;
             setShopDomain(verifiedShop);
             
             // Clean up token from URL but keep shop parameter
