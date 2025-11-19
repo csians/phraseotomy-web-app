@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { isSupabaseConfigured } from '@/lib/supabaseClient';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import type { TenantConfig } from '@/lib/types';
-import { APP_VERSION } from '@/lib/types';
-import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from '@/lib/customerAccess';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { isSupabaseConfigured } from "@/lib/supabaseClient";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import type { TenantConfig } from "@/lib/types";
+import { APP_VERSION } from "@/lib/types";
+import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
 
 // Extend window to include embedded config and customer data
 declare global {
@@ -34,12 +34,88 @@ const Play = () => {
   const [sessions, setSessions] = useState<GameSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
-  const [lobbyCode, setLobbyCode] = useState('');
-  const [guestName, setGuestName] = useState('');
-  const [redemptionCode, setRedemptionCode] = useState('');
+  const [lobbyCode, setLobbyCode] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [redemptionCode, setRedemptionCode] = useState("");
+
+  // useEffect(() => {
+  //   // Check for embedded config from proxy (primary method)
+  //   if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
+  //     setTenant(window.__PHRASEOTOMY_CONFIG__);
+  //     setShopDomain(window.__PHRASEOTOMY_SHOP__);
+  //     setCustomer(window.__PHRASEOTOMY_CUSTOMER__ || null);
+  //     setLoading(false);
+  //     return;
+  //   }
+
+  //   // Fallback: Try to fetch session from API
+  //   const fetchSession = async () => {
+  //     try {
+  //       const response = await fetch('/api/session');
+  //       const data = await response.json();
+
+  //       if (data.hasSession && data.tenant && data.shop) {
+  //         setTenant(data.tenant);
+  //         setShopDomain(data.shop);
+  //         setCustomer(data.customer || null);
+  //       } else {
+  //         // If no session, try to load tenant from database for testing
+  //         // This allows the app to work outside of Shopify proxy
+  //         const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
+  //           .from('tenants')
+  //           .select('*')
+  //           .eq('is_active', true)
+  //           .limit(1)
+  //           .single();
+
+  //         if (dbTenant) {
+  //           const mappedTenant: TenantConfig = {
+  //             id: dbTenant.id,
+  //             name: dbTenant.name,
+  //             tenant_key: dbTenant.tenant_key,
+  //             shop_domain: dbTenant.shop_domain,
+  //             environment: dbTenant.environment,
+  //             verified: true,
+  //           };
+  //           setTenant(mappedTenant);
+  //           setShopDomain(dbTenant.shop_domain);
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.error('Error fetching session:', error);
+  //       // Try to load tenant from database as fallback
+  //       try {
+  //         const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
+  //           .from('tenants')
+  //           .select('*')
+  //           .eq('is_active', true)
+  //           .limit(1)
+  //           .single();
+
+  //         if (dbTenant) {
+  //           const mappedTenant: TenantConfig = {
+  //             id: dbTenant.id,
+  //             name: dbTenant.name,
+  //             tenant_key: dbTenant.tenant_key,
+  //             shop_domain: dbTenant.shop_domain,
+  //             environment: dbTenant.environment,
+  //             verified: true,
+  //           };
+  //           setTenant(mappedTenant);
+  //           setShopDomain(dbTenant.shop_domain);
+  //         }
+  //       } catch (err) {
+  //         console.error('Error loading tenant:', err);
+  //       }
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
+
+  //   fetchSession();
+  // }, []);
 
   useEffect(() => {
-    // Check for embedded config from proxy (primary method)
     if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
       setTenant(window.__PHRASEOTOMY_CONFIG__);
       setShopDomain(window.__PHRASEOTOMY_SHOP__);
@@ -48,71 +124,37 @@ const Play = () => {
       return;
     }
 
-    // Fallback: Try to fetch session from API
-    const fetchSession = async () => {
+    const loadTenantFromSupabase = async () => {
       try {
-        const response = await fetch('/api/session');
-        const data = await response.json();
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: dbTenant, error } = await supabase
+          .from("tenants")
+          .select("*")
+          .eq("is_active", true)
+          .limit(1)
+          .single();
 
-        if (data.hasSession && data.tenant && data.shop) {
-          setTenant(data.tenant);
-          setShopDomain(data.shop);
-          setCustomer(data.customer || null);
-        } else {
-          // If no session, try to load tenant from database for testing
-          // This allows the app to work outside of Shopify proxy
-          const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
-            .from('tenants')
-            .select('*')
-            .eq('is_active', true)
-            .limit(1)
-            .single();
-          
-          if (dbTenant) {
-            const mappedTenant: TenantConfig = {
-              id: dbTenant.id,
-              name: dbTenant.name,
-              tenant_key: dbTenant.tenant_key,
-              shop_domain: dbTenant.shop_domain,
-              environment: dbTenant.environment,
-              verified: true,
-            };
-            setTenant(mappedTenant);
-            setShopDomain(dbTenant.shop_domain);
-          }
+        if (error) throw error;
+
+        if (dbTenant) {
+          setTenant({
+            id: dbTenant.id,
+            name: dbTenant.name,
+            tenant_key: dbTenant.tenant_key,
+            shop_domain: dbTenant.shop_domain,
+            environment: dbTenant.environment,
+            verified: true,
+          });
+          setShopDomain(dbTenant.shop_domain);
         }
-      } catch (error) {
-        console.error('Error fetching session:', error);
-        // Try to load tenant from database as fallback
-        try {
-          const { data: dbTenant } = await (await import('@/integrations/supabase/client')).supabase
-            .from('tenants')
-            .select('*')
-            .eq('is_active', true)
-            .limit(1)
-            .single();
-          
-          if (dbTenant) {
-            const mappedTenant: TenantConfig = {
-              id: dbTenant.id,
-              name: dbTenant.name,
-              tenant_key: dbTenant.tenant_key,
-              shop_domain: dbTenant.shop_domain,
-              environment: dbTenant.environment,
-              verified: true,
-            };
-            setTenant(mappedTenant);
-            setShopDomain(dbTenant.shop_domain);
-          }
-        } catch (err) {
-          console.error('Error loading tenant:', err);
-        }
+      } catch (err) {
+        console.error("Failed to load tenant fallback:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSession();
+    loadTenantFromSupabase();
   }, []);
 
   // Load customer data when logged in
@@ -128,7 +170,7 @@ const Play = () => {
           setLicenses(customerLicenses);
           setSessions(customerSessions);
         } catch (error) {
-          console.error('Error loading customer data:', error);
+          console.error("Error loading customer data:", error);
         } finally {
           setDataLoading(false);
         }
@@ -141,55 +183,74 @@ const Play = () => {
   const handleJoinGame = () => {
     if (!lobbyCode.trim()) {
       toast({
-        title: 'Missing Lobby Code',
-        description: 'Please enter a lobby code to join a game.',
-        variant: 'destructive',
+        title: "Missing Lobby Code",
+        description: "Please enter a lobby code to join a game.",
+        variant: "destructive",
       });
       return;
     }
     if (!customer && !guestName.trim()) {
       toast({
-        title: 'Missing Name',
-        description: 'Please enter your name to join as a guest.',
-        variant: 'destructive',
+        title: "Missing Name",
+        description: "Please enter your name to join as a guest.",
+        variant: "destructive",
       });
       return;
     }
     toast({
-      title: 'Coming Soon',
-      description: 'Game lobby joining will be available soon.',
+      title: "Coming Soon",
+      description: "Game lobby joining will be available soon.",
     });
   };
 
   const handleHostGame = () => {
-    navigate('/create-lobby', { 
-      state: { customer, shopDomain, tenant } 
+    navigate("/create-lobby", {
+      state: { customer, shopDomain, tenant },
     });
   };
 
   const handleRedeemCode = () => {
     if (!redemptionCode.trim()) {
       toast({
-        title: 'Missing Code',
-        description: 'Please enter a 6-digit code.',
-        variant: 'destructive',
+        title: "Missing Code",
+        description: "Please enter a 6-digit code.",
+        variant: "destructive",
       });
       return;
     }
     toast({
-      title: 'Coming Soon',
-      description: 'Code redemption will be available soon.',
+      title: "Coming Soon",
+      description: "Code redemption will be available soon.",
     });
   };
 
+  // const handleLogin = () => {
+  //   const effectiveShopDomain = shopDomain || tenant?.shop_domain;
+
+  //   if (!effectiveShopDomain) {
+  //     toast({
+  //       title: 'Cannot Login',
+  //       description: 'Shop domain not available. Please access this app through your Shopify store.',
+  //       variant: 'destructive',
+  //     });
+  //     return;
+  //   }
+
+  //   const returnUrl = window.location.href;
+  //   const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
+
+  //   // Direct redirect - works in App Proxy context and standalone
+  //   window.location.href = loginUrl;
+  // };
+
   const handleLogin = () => {
     const effectiveShopDomain = shopDomain || tenant?.shop_domain;
-    
+
     if (!effectiveShopDomain) {
       toast({
-        title: 'Cannot Login',
-        description: 'Shop domain not available. Please access this app through your Shopify store.',
-        variant: 'destructive',
+        title: "Cannot Login",
+        description: "Shop domain not available. Please access this app through your Shopify store.",
+        variant: "destructive",
       });
       return;
     }
@@ -197,8 +258,8 @@ const Play = () => {
     const returnUrl = window.location.href;
     const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
 
-    // Direct redirect - works in App Proxy context and standalone
-    window.location.href = loginUrl;
+    // use redirect helper so Shopify iframe allows it
+    window.location.href = `/redirect.html?to=${encodeURIComponent(loginUrl)}`;
   };
 
   if (loading) {
@@ -212,14 +273,17 @@ const Play = () => {
     );
   }
 
-  const appEnv = import.meta.env.VITE_APP_ENV || 'development';
+  const appEnv = import.meta.env.VITE_APP_ENV || "development";
   const hasActiveLicenses = licenses.length > 0;
-  const allPacks = Array.from(new Set(licenses.flatMap(l => l.packs_unlocked)));
-  const earliestExpiry = licenses.reduce((earliest, license) => {
-    if (!license.expires_at) return earliest;
-    const expiryDate = new Date(license.expires_at);
-    return !earliest || expiryDate < earliest ? expiryDate : earliest;
-  }, null as Date | null);
+  const allPacks = Array.from(new Set(licenses.flatMap((l) => l.packs_unlocked)));
+  const earliestExpiry = licenses.reduce(
+    (earliest, license) => {
+      if (!license.expires_at) return earliest;
+      const expiryDate = new Date(license.expires_at);
+      return !earliest || expiryDate < earliest ? expiryDate : earliest;
+    },
+    null as Date | null,
+  );
 
   return (
     <div className="min-h-screen bg-game-black flex flex-col items-center justify-between px-4 py-8">
@@ -228,12 +292,8 @@ const Play = () => {
         <div className="w-20 h-20 mx-auto mb-4 bg-game-yellow rounded-2xl flex items-center justify-center shadow-lg">
           <span className="text-5xl font-black text-game-black">P</span>
         </div>
-        <h1 className="text-4xl font-black text-white mb-2 tracking-wider">
-          PHRASEOTOMY
-        </h1>
-        <p className="text-sm text-game-yellow uppercase tracking-widest font-semibold">
-          The Party Game
-        </p>
+        <h1 className="text-4xl font-black text-white mb-2 tracking-wider">PHRASEOTOMY</h1>
+        <p className="text-sm text-game-yellow uppercase tracking-widest font-semibold">The Party Game</p>
       </div>
 
       {/* Main Content */}
@@ -245,12 +305,10 @@ const Play = () => {
             <Card className="bg-card border-game-gray">
               <CardHeader>
                 <CardTitle className="text-xl">I bought the game</CardTitle>
-                <CardDescription>
-                  Bought Phraseotomy? Log in to redeem your code and host games.
-                </CardDescription>
+                <CardDescription>Bought Phraseotomy? Log in to redeem your code and host games.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button 
+                <Button
                   onClick={handleLogin}
                   className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold"
                   size="lg"
@@ -264,9 +322,7 @@ const Play = () => {
             <Card className="bg-card border-game-gray">
               <CardHeader>
                 <CardTitle className="text-xl">I'm joining a game</CardTitle>
-                <CardDescription>
-                  Joining a party? Enter the lobby code your host gave you.
-                </CardDescription>
+                <CardDescription>Joining a party? Enter the lobby code your host gave you.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -286,11 +342,7 @@ const Play = () => {
                     onChange={(e) => setGuestName(e.target.value)}
                   />
                 </div>
-                <Button 
-                  onClick={handleJoinGame}
-                  className="w-full"
-                  size="lg"
-                >
+                <Button onClick={handleJoinGame} className="w-full" size="lg">
                   Join Game
                 </Button>
               </CardContent>
@@ -301,9 +353,7 @@ const Play = () => {
           <>
             {/* Welcome message */}
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-white">
-                Welcome, {customer.name || customer.email}!
-              </h2>
+              <h2 className="text-2xl font-bold text-white">Welcome, {customer.name || customer.email}!</h2>
             </div>
 
             {/* Access Status Card */}
@@ -322,7 +372,7 @@ const Play = () => {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Access:</span>
                       <span className="text-game-yellow font-semibold">
-                        Active {earliestExpiry ? `until ${earliestExpiry.toLocaleDateString()}` : ''}
+                        Active {earliestExpiry ? `until ${earliestExpiry.toLocaleDateString()}` : ""}
                       </span>
                     </div>
                     {allPacks.length > 0 && (
@@ -330,9 +380,9 @@ const Play = () => {
                         <p className="text-xs text-muted-foreground mb-2">Packs unlocked:</p>
                         <div className="flex flex-wrap gap-1.5">
                           {allPacks.map((pack) => (
-                            <Badge 
+                            <Badge
                               key={pack}
-                              variant="secondary" 
+                              variant="secondary"
                               className="bg-game-yellow/20 text-game-yellow border-game-yellow/30"
                             >
                               {pack}
@@ -344,9 +394,7 @@ const Play = () => {
                   </>
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-muted-foreground mb-2">
-                      You don't have any active packs yet.
-                    </p>
+                    <p className="text-muted-foreground mb-2">You don't have any active packs yet.</p>
                     <p className="text-sm text-muted-foreground">
                       Redeem a code from your Phraseotomy game to unlock themes and host games.
                     </p>
@@ -356,7 +404,7 @@ const Play = () => {
                 {/* Redeem Code Section */}
                 <div className="pt-4 border-t border-border space-y-3">
                   <label className="text-sm font-medium">
-                    {hasActiveLicenses ? 'Redeem another code' : 'Redeem a code'}
+                    {hasActiveLicenses ? "Redeem another code" : "Redeem a code"}
                   </label>
                   <div className="flex gap-2">
                     <Input
@@ -365,10 +413,7 @@ const Play = () => {
                       onChange={(e) => setRedemptionCode(e.target.value.toUpperCase())}
                       maxLength={6}
                     />
-                    <Button 
-                      onClick={handleRedeemCode}
-                      disabled={redemptionCode.length !== 6}
-                    >
+                    <Button onClick={handleRedeemCode} disabled={redemptionCode.length !== 6}>
                       Redeem
                     </Button>
                   </div>
@@ -381,19 +426,17 @@ const Play = () => {
               <CardHeader>
                 <CardTitle className="text-lg">Host New Game</CardTitle>
                 <CardDescription>
-                  {hasActiveLicenses 
-                    ? 'Start a new game session and invite friends'
-                    : 'Redeem a code to host games'}
+                  {hasActiveLicenses ? "Start a new game session and invite friends" : "Redeem a code to host games"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button 
+                <Button
                   onClick={handleHostGame}
                   disabled={!hasActiveLicenses}
                   className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                   size="lg"
                 >
-                  {hasActiveLicenses ? 'Host New Game' : 'Unlock with Code First'}
+                  {hasActiveLicenses ? "Host New Game" : "Unlock with Code First"}
                 </Button>
               </CardContent>
             </Card>
@@ -412,17 +455,13 @@ const Play = () => {
                 ) : sessions.length > 0 ? (
                   <div className="space-y-3">
                     {sessions.map((session) => (
-                      <div 
+                      <div
                         key={session.id}
                         className="flex items-center justify-between p-4 bg-game-gray/30 rounded-lg border border-game-yellow/20"
                       >
                         <div>
-                          <p className="font-mono text-lg text-game-yellow font-bold">
-                            {session.lobby_code}
-                          </p>
-                          <p className="text-xs text-muted-foreground capitalize">
-                            {session.status}
-                          </p>
+                          <p className="font-mono text-lg text-game-yellow font-bold">{session.lobby_code}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{session.status}</p>
                         </div>
                         <Button variant="outline" size="sm">
                           Rejoin
@@ -454,11 +493,7 @@ const Play = () => {
                     maxLength={6}
                   />
                 </div>
-                <Button 
-                  onClick={handleJoinGame}
-                  className="w-full"
-                  size="lg"
-                >
+                <Button onClick={handleJoinGame} className="w-full" size="lg">
                   Join Game
                 </Button>
               </CardContent>
@@ -477,7 +512,7 @@ const Play = () => {
             </div>
             <div className="flex justify-between">
               <span className="font-semibold">Backend:</span>
-              <span>{isSupabaseConfigured() ? 'Connected' : 'Not Configured'}</span>
+              <span>{isSupabaseConfigured() ? "Connected" : "Not Configured"}</span>
             </div>
             {tenant && (
               <>
@@ -487,7 +522,7 @@ const Play = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="font-semibold">Shop:</span>
-                  <span>{shopDomain || 'Unknown'}</span>
+                  <span>{shopDomain || "Unknown"}</span>
                 </div>
               </>
             )}
