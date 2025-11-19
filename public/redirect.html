@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecting…</title>
+  </head>
+  <body>
+    <script>
+      const to = new URLSearchParams(window.location.search).get('to');
+      if (to) {
+        if (window.top) window.top.location.href = to;
+        else window.location.href = to;
+      } else {
+        document.body.textContent = 'Missing "to" parameter.';
+      }
+    </script>
+  </body>
+</html>
