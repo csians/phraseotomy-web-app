@@ -12,19 +12,38 @@ interface TokenPayload {
   exp: number;
 }
 
-function verifySignedToken(token: string): TokenPayload | false {
+async function verifySignedToken(token: string): Promise<TokenPayload | false> {
   try {
     const [payloadB64, sig] = token.split('.');
     if (!payloadB64 || !sig) return false;
     
-    // Verify signature
-    const expectedHash = btoa(payloadB64 + APP_SECRET)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+    // Verify signature using HMAC-SHA256
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(APP_SECRET);
+    const msgData = encoder.encode(payloadB64);
     
-    // In production, use timing-safe compare
-    if (sig !== expectedHash) return false;
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+    
+    // Decode signature from base64url
+    const sigBytes = Uint8Array.from(
+      atob(sig.replace(/-/g, '+').replace(/_/g, '/')),
+      c => c.charCodeAt(0)
+    );
+    
+    const isValid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      sigBytes,
+      msgData
+    );
+    
+    if (!isValid) return false;
     
     // Decode payload
     const payloadStr = atob(
