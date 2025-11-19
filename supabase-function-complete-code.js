@@ -276,6 +276,13 @@ Deno.serve(async (req) => {
     // Check if we should redirect back to app domain instead of loading the app here
     const redirectTo = queryParams.get('redirect_to');
     
+    // Debug logging
+    console.log('=== REDIRECT CHECK ===');
+    console.log('redirectTo:', redirectTo);
+    console.log('customerData:', !!customerData);
+    console.log('customerId:', customerId);
+    console.log('Will redirect?', !!(redirectTo && (customerData || customerId)));
+    
     // Redirect if we have redirect_to parameter AND (customer data OR customer_id from URL)
     // This ensures redirect works even if customer data fetch fails
     if (redirectTo && (customerData || customerId)) {
@@ -347,6 +354,17 @@ Deno.serve(async (req) => {
       } catch (urlError) {
         console.error('Error creating redirect URL:', urlError);
         // Fall through to normal app loading if redirect URL is invalid
+      }
+    } else {
+      // Log why redirect didn't happen
+      console.log('=== NO REDIRECT - REASON ===');
+      console.log('redirectTo exists?', !!redirectTo);
+      console.log('customerData exists?', !!customerData);
+      console.log('customerId exists?', !!customerId);
+      if (!redirectTo) {
+        console.log('❌ No redirect_to parameter found');
+      } else if (!customerData && !customerId) {
+        console.log('❌ No customer data or customer_id found');
       }
     }
 
