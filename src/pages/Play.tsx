@@ -13,8 +13,31 @@ import { APP_VERSION } from "@/lib/types";
 import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
 import { getAppBridge } from "@/lib/appBridge";
 import { lobbyCodeSchema, playerNameSchema, redemptionCodeSchema, validateInput } from "@/lib/validation";
+import { supabase } from "@/integrations/supabase/client";
 
 // Extend window to include embedded config and customer data
+
+/**
+ * Generate and store a session token for authenticated customer
+ */
+async function generateAndStoreSessionToken(customerId: string, shopDomain: string): Promise<void> {
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-session-token', {
+      body: { customerId, shopDomain },
+    });
+
+    if (error) {
+      console.error('Error generating session token:', error);
+      return;
+    }
+
+    if (data?.sessionToken) {
+      localStorage.setItem('phraseotomy_session_token', data.sessionToken);
+    }
+  } catch (error) {
+    console.error('Error calling generate-session-token:', error);
+  }
+}
 
 const Play = () => {
   const navigate = useNavigate();
@@ -106,7 +129,14 @@ const Play = () => {
     if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
       setTenant(window.__PHRASEOTOMY_CONFIG__);
       setShopDomain(window.__PHRASEOTOMY_SHOP__);
-      setCustomer(window.__PHRASEOTOMY_CUSTOMER__ || null);
+      const customerData = window.__PHRASEOTOMY_CUSTOMER__ || null;
+      setCustomer(customerData);
+      
+      // Generate session token if customer is logged in
+      if (customerData) {
+        generateAndStoreSessionToken(customerData.id, window.__PHRASEOTOMY_SHOP__);
+      }
+      
       setLoading(false);
       return;
     }

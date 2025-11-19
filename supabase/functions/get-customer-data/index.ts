@@ -5,9 +5,58 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const APP_SECRET = Deno.env.get('APP_SIGNING_SECRET')!;
+
+/**
+ * Verify a signed session token
+ */
+async function verifySessionToken(token: string): Promise<{
+  customer_id: string;
+  shop: string;
+  exp: number;
+} | null> {
+  try {
+    const [payloadB64, signature] = token.split('.');
+    if (!payloadB64 || !signature) return null;
+
+    // Verify signature
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(APP_SECRET);
+    const msgData = encoder.encode(payloadB64);
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    const signatureBytes = Uint8Array.from(
+      atob(signature.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - signature.length % 4) % 4)),
+      c => c.charCodeAt(0)
+    );
+
+    const isValid = await crypto.subtle.verify('HMAC', key, signatureBytes, msgData);
+    if (!isValid) return null;
+
+    // Decode and validate payload
+    const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - payloadB64.length % 4) % 4)));
+
+    // Check expiration
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp < now) return null;
+
+    return payload;
+  } catch (error) {
+    console.error('Token verification error:', error);
+    return null;
+  }
+}
+
 /**
  * Edge function to fetch customer data (licenses, sessions) with proper authorization
- * Validates the request using Shopify customer session data
+ * Requires a valid session token for authentication
  */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -15,14 +64,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { customerId, shopDomain } = await req.json();
+    const { sessionToken } = await req.json();
 
-    if (!customerId || !shopDomain) {
+    // Validate session token
+    if (!sessionToken) {
       return new Response(
-        JSON.stringify({ error: 'Missing customerId or shopDomain' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Missing session token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const payload = await verifySessionToken(sessionToken);
+    if (!payload) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired session token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Extract validated customer ID and shop domain from token
+    const { customer_id: customerId, shop: shopDomain } = payload;
+
 
     // Initialize Supabase client with service role key
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
