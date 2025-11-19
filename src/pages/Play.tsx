@@ -55,7 +55,6 @@ const Play = () => {
       try {
         const response = await fetch("/api/session");
         const data = await response.json();
-
         if (data.hasSession && data.tenant && data.shop) {
           setTenant(data.tenant);
           setShopDomain(data.shop);
@@ -127,6 +126,7 @@ const Play = () => {
             getCustomerLicenses(customer.id, shopDomain),
             getCustomerSessions(customer.id, shopDomain),
           ]);
+
           setLicenses(customerLicenses);
           setSessions(customerSessions);
         } catch (error) {
@@ -149,6 +149,7 @@ const Play = () => {
       });
       return;
     }
+
     if (!customer && !guestName.trim()) {
       toast({
         title: "Missing Name",
@@ -157,6 +158,7 @@ const Play = () => {
       });
       return;
     }
+
     toast({
       title: "Coming Soon",
       description: "Game lobby joining will be available soon.",
@@ -178,6 +180,7 @@ const Play = () => {
       });
       return;
     }
+
     toast({
       title: "Coming Soon",
       description: "Code redemption will be available soon.",
@@ -186,7 +189,6 @@ const Play = () => {
 
   const handleLogin = () => {
     const effectiveShopDomain = shopDomain || tenant?.shop_domain;
-
     if (!effectiveShopDomain) {
       toast({
         title: "Cannot Login",
@@ -196,8 +198,16 @@ const Play = () => {
       return;
     }
 
-    const returnUrl = window.location.href;
-    console.log("returnUrl", returnUrl);
+    // Get the current full URL - this should be the app proxy URL
+    // Use the complete URL including protocol, host, pathname, and search params
+    const currentUrl = new URL(window.location.href);
+
+    // Remove any existing query parameters that might interfere
+    // Keep only the pathname and construct a clean return URL
+    const returnUrl = `${currentUrl.protocol}//${currentUrl.host}${currentUrl.pathname}`;
+
+    // Construct login URL with return_url parameter
+    // Shopify will redirect back to this URL after successful login
     const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
 
     // Direct redirect - works in App Proxy context and standalone
