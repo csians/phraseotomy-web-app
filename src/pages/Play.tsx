@@ -624,7 +624,13 @@ const Play = () => {
 
   // Check for Shopify login success/failure parameters in URL
   useEffect(() => {
+    console.log("🔍 Checking for login status in URL...");
+    console.log("📍 Current URL:", window.location.href);
+    console.log("📍 Current pathname:", window.location.pathname);
+    console.log("📍 Current search:", window.location.search);
+
     const urlParams = new URLSearchParams(window.location.search);
+    console.log("📋 URL Params string:", urlParams.toString());
 
     // Common Shopify login redirect parameters
     const loginStatus = urlParams.get("login");
@@ -636,6 +642,14 @@ const Play = () => {
     const checkoutToken = urlParams.get("checkout_token");
     const state = urlParams.get("state");
 
+    console.log("🔑 Extracted parameters:", {
+      loginStatus,
+      error,
+      errorCode,
+      customerAccount,
+      checkoutToken,
+    });
+
     // Collect all parameters for logging
     const allParams: Record<string, string> = {};
     urlParams.forEach((value, key) => {
@@ -646,7 +660,10 @@ const Play = () => {
     let status: "success" | "failed" | "unknown" = "unknown";
 
     // Check for success indicators
-    if (loginStatus === "success" || customerAccount || checkoutToken) {
+    // Shopify may send various success indicators, or we may have our own login=success parameter
+    const hasSuccessIndicator = loginStatus === "success" || customerAccount || checkoutToken;
+
+    if (hasSuccessIndicator) {
       status = "success";
       console.log("✅ Shopify login successful (from URL parameter)", {
         loginStatus,
@@ -657,12 +674,11 @@ const Play = () => {
         timestamp: new Date().toISOString(),
       });
 
-      // Ensure success parameter is in URL
-      if (loginStatus !== "success") {
-        urlParams.set("login", "success");
-        const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
-        window.history.replaceState({}, document.title, newUrl);
-      }
+      // Always ensure success parameter is in URL
+      urlParams.set("login", "success");
+      const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+      window.history.replaceState({}, document.title, newUrl);
+      console.log("✅ Updated URL with success parameter:", newUrl);
 
       // Show success toast
       toast({
@@ -699,7 +715,11 @@ const Play = () => {
         status,
         params: allParams,
       });
+    } else {
+      console.log("ℹ️ No URL parameters found");
     }
+
+    console.log("✅ Login status check completed. Status:", status);
   }, [toast]);
 
   useEffect(() => {
