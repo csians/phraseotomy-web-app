@@ -257,7 +257,8 @@ const Play = () => {
       return;
     }
 
-    const returnUrl = window.location.href;
+    // Construct the return URL to point back to the app proxy path
+    const returnUrl = `https://${effectiveShopDomain}/apps/phraseotomy`;
     const loginUrl = `https://${effectiveShopDomain}/account/login?return_url=${encodeURIComponent(returnUrl)}`;
 
     const appBridge = getAppBridge();
