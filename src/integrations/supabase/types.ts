@@ -71,6 +71,120 @@ export type Database = {
           },
         ]
       }
+      game_audio: {
+        Row: {
+          audio_url: string
+          created_at: string | null
+          id: string
+          player_id: string
+          round_number: number
+          session_id: string
+          transcript: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          audio_url: string
+          created_at?: string | null
+          id?: string
+          player_id: string
+          round_number: number
+          session_id: string
+          transcript?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          audio_url?: string
+          created_at?: string | null
+          id?: string
+          player_id?: string
+          round_number?: number
+          session_id?: string
+          transcript?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_game_audio_session"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_players: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          player_id: string
+          session_id: string
+          turn_order: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          player_id: string
+          session_id: string
+          turn_order: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          player_id?: string
+          session_id?: string
+          turn_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_game_players_session"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_rounds: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          round_number: number
+          session_id: string
+          started_at: string | null
+          storyteller_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          round_number: number
+          session_id: string
+          started_at?: string | null
+          storyteller_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          round_number?: number
+          session_id?: string
+          started_at?: string | null
+          storyteller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_game_rounds_session"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       game_sessions: {
         Row: {
           created_at: string

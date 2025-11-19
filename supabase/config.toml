@@ -10,3 +10,6 @@ verify_jwt = false
 
 [functions.shopify-proxy-entry]
 verify_jwt = false
+
+[functions.upload-audio]
+verify_jwt = false
