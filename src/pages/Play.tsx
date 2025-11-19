@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { isSupabaseConfigured } from '@/lib/supabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ declare global {
 }
 
 const Play = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
@@ -114,9 +116,8 @@ const Play = () => {
   };
 
   const handleHostGame = () => {
-    toast({
-      title: 'Coming Soon',
-      description: 'Game hosting will be available soon.',
+    navigate('/create-lobby', { 
+      state: { customer, shopDomain, tenant } 
     });
   };
 
