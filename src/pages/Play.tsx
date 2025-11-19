@@ -291,7 +291,16 @@ const Play = () => {
     console.log("Login URL:", loginUrl);
 
     // Open login URL in a new tab/window
-    window.open(loginUrl, "_blank");
+    const newWindow = window.open(loginUrl, "_blank", "noopener,noreferrer");
+
+    // Check if popup was blocked
+    if (!newWindow || newWindow.closed || typeof newWindow.closed === "undefined") {
+      toast({
+        title: "Popup Blocked",
+        description: "Please allow popups for this site to open the login page in a new tab.",
+        variant: "destructive",
+      });
+    }
 
     console.log("hiiii");
   };
