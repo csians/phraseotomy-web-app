@@ -130,15 +130,37 @@ Deno.serve(async (req) => {
 
     console.log('HMAC verified successfully for tenant:', tenant.tenant_key);
 
+    // Extract customer data from Shopify proxy parameters
+    const customerId = queryParams.get('logged_in_customer_id') || null;
+    const customerEmail = queryParams.get('customer_email') || null;
+    const customerFirstName = queryParams.get('customer_first_name') || null;
+    const customerLastName = queryParams.get('customer_last_name') || null;
+    
+    const customerData = customerId ? {
+      id: customerId,
+      email: customerEmail,
+      firstName: customerFirstName,
+      lastName: customerLastName,
+      name: [customerFirstName, customerLastName].filter(Boolean).join(' ') || null
+    } : null;
+
+    console.log('Customer data:', customerData ? `Logged in: ${customerId}` : 'Not logged in');
+
     // Return HTML that loads the React app with embedded tenant data
-    // Shopify App Proxy requires application/liquid or text/html without charset
+    const headers = new Headers({
+      'Content-Type': 'text/html',
+    });
+
+    // Set customer data in cookie if available
+    if (customerData) {
+      headers.append('Set-Cookie', `phraseotomy_customer=${encodeURIComponent(JSON.stringify(customerData))}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=3600`);
+    }
+
     return new Response(
-      generateAppHtml(tenant, shop),
+      generateAppHtml(tenant, shop, customerData),
       {
         status: 200,
-        headers: { 
-          'Content-Type': 'text/html',
-        },
+        headers,
       }
     );
   } catch (error) {
@@ -157,7 +179,7 @@ Deno.serve(async (req) => {
 /**
  * Generate HTML that loads the React app with embedded tenant configuration
  */
-function generateAppHtml(tenant: any, shop: string): string {
+function generateAppHtml(tenant: any, shop: string, customer: any = null): string {
   // Sanitize tenant data for embedding
   const tenantConfig = {
     id: tenant.id,
@@ -181,6 +203,7 @@ function generateAppHtml(tenant: any, shop: string): string {
       // Embed tenant configuration for the React app
       window.__PHRASEOTOMY_CONFIG__ = ${JSON.stringify(tenantConfig)};
       window.__PHRASEOTOMY_SHOP__ = ${JSON.stringify(shop)};
+      window.__PHRASEOTOMY_CUSTOMER__ = ${JSON.stringify(customer)};
     </script>
     <script type="module" crossorigin src="${baseUrl}/assets/index.js"></script>
     <link rel="stylesheet" crossorigin href="${baseUrl}/assets/index.css">
