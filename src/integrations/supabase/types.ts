@@ -324,6 +324,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -335,6 +356,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      verify_tenant_for_proxy: {
+        Args: { shop_domain_param: string }
+        Returns: {
+          environment: Database["public"]["Enums"]["tenant_environment"]
+          shop_domain: string
+          tenant_id: string
+          tenant_name: string
+        }[]
       }
     }
     Enums: {
