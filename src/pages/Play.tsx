@@ -212,6 +212,13 @@ const Play = () => {
             
             // Load tenant for verified shop (token indicates customer logged in)
             await loadTenantForShop(verifiedShop, true);
+            
+            // Redirect to create lobby after successful login
+            toast({
+              title: "Login Successful",
+              description: "Welcome! Let's create your game lobby.",
+            });
+            navigate('/create-lobby');
           } else {
             console.warn('⚠️ Invalid or expired token');
             

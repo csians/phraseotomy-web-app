@@ -207,6 +207,27 @@ export default function CreateLobby() {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-2xl mx-auto space-y-6 py-8">
+        {/* Customer Profile Header */}
+        {customer && (
+          <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xl font-bold">
+                  {customer.firstName?.[0] || customer.name?.[0] || customer.email?.[0] || '?'}
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">
+                    {customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email}
+                  </h2>
+                  {customer.email && (
+                    <p className="text-sm text-muted-foreground">{customer.email}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold">Create New Lobby</h1>
           <p className="text-muted-foreground">
