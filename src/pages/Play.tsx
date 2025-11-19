@@ -201,12 +201,127 @@ const Play = () => {
             console.log('✅ Token verified, shop:', data.shop);
             const verifiedShop = data.shop;
             
-            // Redirect through the Shopify app proxy to get customer data
-            // The proxy will inject customer, shop, and tenant data
-            const proxyUrl = `https://${verifiedShop}/apps/phraseotomy`;
-            console.log('Redirecting to proxy URL:', proxyUrl);
-            window.location.href = proxyUrl;
-            return; // Stop execution as we're redirecting
+            // Load tenant data for the verified shop
+            await loadTenantForShop(verifiedShop, true);
+            
+            // Try to get customer data from multiple sources
+            let customerData = null;
+            
+            // 1. Check cookies (set by Shopify proxy if accessed through it)
+            try {
+              const customerCookie = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('phraseotomy_customer='));
+              
+              if (customerCookie) {
+                const customerDataStr = decodeURIComponent(customerCookie.split('=')[1]);
+                customerData = JSON.parse(customerDataStr);
+                console.log('✅ Found customer data in cookie:', customerData);
+              }
+            } catch (cookieError) {
+              console.log('No customer data in cookie');
+            }
+            
+            // 2. Check URL parameters for customer ID (can be passed as customer_id or logged_in_customer_id)
+            const customerIdFromUrl = urlParams.get('customer_id') || urlParams.get('logged_in_customer_id');
+            
+            // If we have customer_id but no customer data, redirect to Shopify app proxy
+            // The proxy will extract customer data and redirect back to our app
+            if (!customerData && customerIdFromUrl) {
+              console.log('✅ Found customer ID in URL, redirecting to Shopify app proxy to get customer data...');
+              
+              // Get the current app URL (localhost or staging domain)
+              const currentOrigin = window.location.origin;
+              const redirectTo = `${currentOrigin}/play`;
+              
+              const proxyUrl = `https://${verifiedShop}/apps/phraseotomy?shop=${encodeURIComponent(verifiedShop)}&r=${encodeURIComponent(token)}&customer_id=${encodeURIComponent(customerIdFromUrl)}&redirect_to=${encodeURIComponent(redirectTo)}`;
+              console.log('Redirecting to app proxy URL:', proxyUrl);
+              console.log('Will redirect back to:', redirectTo);
+              window.location.href = proxyUrl;
+              return; // Stop execution as we're redirecting
+            } else if (!customerData) {
+              // 3. Check URL parameters (from redirect back from proxy or Shopify redirect)
+              const customerId = urlParams.get('customer_id') || urlParams.get('logged_in_customer_id');
+              const customerEmail = urlParams.get('customer_email');
+              const customerFirstName = urlParams.get('customer_first_name');
+              const customerLastName = urlParams.get('customer_last_name');
+              const customerImageUrl = urlParams.get('customer_image_url');
+              const loggedIn = urlParams.get('logged_in') === 'true';
+              
+              if (customerId && loggedIn) {
+                customerData = {
+                  id: customerId,
+                  email: customerEmail,
+                  firstName: customerFirstName,
+                  lastName: customerLastName,
+                  name: [customerFirstName, customerLastName].filter(Boolean).join(' ') || customerEmail || null,
+                  imageUrl: customerImageUrl || null,
+                };
+                console.log('✅ Found customer data in URL parameters (from redirect):', customerData);
+              }
+            }
+            
+            // If we have customer data, set it and prepare for redirect
+            if (customerData) {
+              setCustomer(customerData);
+              
+              // Generate session token if customer is logged in
+              generateAndStoreSessionToken(customerData.id, verifiedShop);
+              
+              // Clean up URL by removing token and customer parameters
+              const newUrl = new URL(window.location.href);
+              newUrl.searchParams.delete('r');
+              newUrl.searchParams.delete('customer_id');
+              newUrl.searchParams.delete('logged_in_customer_id');
+              newUrl.searchParams.delete('customer_email');
+              newUrl.searchParams.delete('customer_first_name');
+              newUrl.searchParams.delete('customer_last_name');
+              window.history.replaceState({}, '', newUrl.toString());
+              
+              // Set a flag to indicate we just logged in (for auto-redirect)
+              setLoginStatusFromUrl({
+                status: 'success',
+                params: { r: token, just_logged_in: 'true' },
+              });
+              
+              setLoading(false);
+              // Auto-redirect will happen in the useEffect below
+              return;
+            }
+            
+            // If no customer data found, token is still valid - user is authenticated
+            // Try to redirect to CreateLobby anyway - it will handle missing customer data
+            console.log('✅ Token verified, but no customer data available yet');
+            console.log('⚠️ Customer data should be available when accessing through Shopify app proxy');
+            
+            // Clean up URL by removing token parameter
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.delete('r');
+            window.history.replaceState({}, '', newUrl.toString());
+            
+            // Even without customer data, redirect to CreateLobby
+            // CreateLobby will show appropriate message if customer data is missing
+            if (tenant) {
+              setTimeout(() => {
+                console.log('🔄 Redirecting to CreateLobby (customer data may be limited)');
+                navigate("/create-lobby", {
+                  state: { 
+                    customer: null, // No customer data yet
+                    shopDomain: verifiedShop, 
+                    tenant: tenant 
+                  },
+                  replace: true,
+                });
+              }, 500);
+            } else {
+              toast({
+                title: 'Login Successful',
+                description: 'You have been authenticated. Please continue using the app.',
+                duration: 3000,
+              });
+            }
+            
+            setLoading(false);
           } else {
             console.warn('⚠️ Invalid or expired token');
             
@@ -309,16 +424,23 @@ const Play = () => {
     }
   }, [loading, customer, shopDomain]);
 
-  // Auto-redirect to CreateLobby when customer is logged in AND has redeemed codes
+  // Auto-redirect to CreateLobby when customer is logged in
   useEffect(() => {
+    // Check if customer just logged in (from URL params, token, or fresh customer data)
+    const urlParams = new URLSearchParams(window.location.search);
+    const justLoggedIn = 
+      loginStatusFromUrl?.status === 'success' || 
+      urlParams.get('logged_in_customer_id') !== null ||
+      urlParams.get('customer_account') !== null ||
+      urlParams.get('r') !== null; // Token in URL means just logged in
+
     // Only redirect if:
     // 1. Initial loading is complete
-    // 2. Customer data loading is complete
-    // 3. Customer is logged in (has customer data from Shopify)
-    // 4. Customer has active licenses (redeemed codes)
-    // 5. We have shop domain and tenant info
-    // 6. We're on the /play route (not already on create-lobby)
-    if (!loading && !dataLoading && customer && shopDomain && tenant && licenses.length > 0) {
+    // 2. Customer data loading is complete (or not needed if we have customer from embedded config)
+    // 3. We have shop domain and tenant info
+    // 4. We're on the /play route (not already on create-lobby)
+    // 5. Either: (a) customer just logged in, OR (b) customer has customer data AND active licenses
+    if (!loading && !dataLoading && shopDomain && tenant) {
       const currentPath = window.location.pathname;
       const isOnPlayPage = currentPath === '/play' || currentPath === '/apps/phraseotomy' || currentPath === '/';
       
@@ -327,28 +449,26 @@ const Play = () => {
         return;
       }
 
-      // Check if customer just logged in (from URL params or fresh customer data)
-      const urlParams = new URLSearchParams(window.location.search);
-      const justLoggedIn = 
-        loginStatusFromUrl?.status === 'success' || 
-        urlParams.get('logged_in_customer_id') !== null ||
-        urlParams.get('customer_account') !== null;
+      // Redirect if customer just logged in OR (customer has data AND licenses)
+      const shouldRedirect = justLoggedIn || (customer && licenses.length > 0);
 
-      // Small delay to ensure all data is loaded and UI is ready
-      const redirectTimer = setTimeout(() => {
-        console.log("🔄 Auto-redirecting logged-in customer with redeemed codes to CreateLobby", {
-          customer: customer.email || customer.id,
-          shopDomain,
-          licensesCount: licenses.length,
-          justLoggedIn,
-        });
-        navigate("/create-lobby", {
-          state: { customer, shopDomain, tenant },
-          replace: true,
-        });
-      }, 1000); // Delay to let user see they're logged in and have access
+      if (shouldRedirect) {
+        // Small delay to ensure all data is loaded and UI is ready
+        const redirectTimer = setTimeout(() => {
+          console.log("🔄 Auto-redirecting logged-in customer to CreateLobby", {
+            customer: customer?.email || customer?.id || 'no customer data',
+            shopDomain,
+            licensesCount: licenses.length,
+            justLoggedIn,
+          });
+          navigate("/create-lobby", {
+            state: { customer: customer || null, shopDomain, tenant },
+            replace: true,
+          });
+        }, justLoggedIn ? 500 : 1000); // Faster redirect if just logged in
 
-      return () => clearTimeout(redirectTimer);
+        return () => clearTimeout(redirectTimer);
+      }
     }
   }, [loading, dataLoading, customer, shopDomain, tenant, licenses, navigate, loginStatusFromUrl]);
 

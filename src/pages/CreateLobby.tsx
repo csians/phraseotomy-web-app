@@ -212,9 +212,17 @@ export default function CreateLobby() {
           <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xl font-bold">
-                  {customer.firstName?.[0] || customer.name?.[0] || customer.email?.[0] || '?'}
-                </div>
+                {customer.imageUrl ? (
+                  <img 
+                    src={customer.imageUrl} 
+                    alt={customer.name || customer.email || 'Customer'} 
+                    className="w-16 h-16 rounded-full object-cover border-2 border-primary"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xl font-bold">
+                    {customer.firstName?.[0] || customer.name?.[0] || customer.email?.[0] || '?'}
+                  </div>
+                )}
                 <div>
                   <h2 className="text-xl font-semibold">
                     {customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email}

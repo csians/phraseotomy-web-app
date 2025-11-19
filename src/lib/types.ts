@@ -24,6 +24,7 @@ export interface ShopifyCustomer {
   firstName: string | null;
   lastName: string | null;
   name: string | null;
+  imageUrl?: string | null;
 }
 
 export const APP_VERSION = 'v0.1.0-dev';

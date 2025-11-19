@@ -1,0 +1,65 @@
+{% assign forward_to = 'http://localhost:8080/play/' %}
+
+<div id="app-redirect-container">
+  <!-- Visible link updated by JS -->
+  <a id="back-to-app-link" href="{{ forward_to }}">Back To App</a>
+</div>
+
+<script>
+  (function () {
+    const forwardTo = '{{ forward_to }}';
+    const shop = '{{ shop.domain }}';
+
+    // Build base target (already includes shop in the proxy URL)
+    const target = new URL(forwardTo);
+
+    // If JS can read the query param r, include it
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const r = params.get('r');
+      const customerId = "{{ customer.id }}";
+      
+      if (r) {
+        target.searchParams.set('r', r);
+      }
+      
+      // Always include customer_id if customer is logged in
+      if (customerId && customerId !== '') {
+        target.searchParams.set('customer_id', customerId);
+      }
+      
+      // Include redirect_to parameter so proxy knows where to redirect back
+      // This should match the forward_to URL
+      target.searchParams.set('redirect_to', forwardTo);
+      
+    } catch (e) {
+      console.error('Error building redirect URL:', e);
+    }
+
+    // Update the link href and optionally show as button
+    const a = document.getElementById('back-to-app-link');
+    if (a) {
+      a.href = target.toString();
+      
+      // (Optional) show as a button:
+      a.style.display = 'inline-block';
+      a.style.padding = '8px 12px';
+      a.style.background = '#000';
+      a.style.color = '#fff';
+      a.style.textDecoration = 'none';
+      a.style.borderRadius = '4px';
+      
+      console.log('Redirect URL:', target.toString());
+    }
+  })();
+</script>
+
+<noscript>
+  <!--
+    No-JS fallback: cannot include r because Liquid cannot read arbitrary query params.
+    Redirect without r (only through proxy)
+  -->
+  <meta http-equiv="refresh" content="0; url={{ forward_to }}">
+  <div>JavaScript is disabled. <a href="{{ forward_to }}">Click here to continue to the app</a>.</div>
+</noscript>
+

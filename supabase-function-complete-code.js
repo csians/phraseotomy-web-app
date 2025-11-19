@@ -1,15 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 /**
  * Verify Shopify HMAC signature for app proxy requests
  */
-async function verifyShopifyHmac(
-  queryParams: URLSearchParams,
-  clientSecret: string
-): Promise<boolean> {
+async function verifyShopifyHmac(queryParams, clientSecret) {
   const signature = queryParams.get('signature');
   if (!signature) {
     return false;
@@ -54,7 +51,9 @@ Deno.serve(async (req) => {
   console.log('Proxy request received:', { 
     shop, 
     hasSignature: !!queryParams.get('signature'), 
-    hasCustomer: !!queryParams.get('logged_in_customer_id') 
+    hasCustomer: !!queryParams.get('logged_in_customer_id'),
+    hasToken: !!queryParams.get('r'),
+    hasRedirectTo: !!queryParams.get('redirect_to')
   });
 
   // CORS headers for browser requests
@@ -214,7 +213,7 @@ Deno.serve(async (req) => {
     let customerFirstName = queryParams.get('customer_first_name') || null;
     let customerLastName = queryParams.get('customer_last_name') || null;
     
-    let customerImageUrl: string | null = null;
+    let customerImageUrl = null;
     
     // If we have customer ID (from proxy params or query params), fetch full customer data from Shopify Admin API
     if (customerId) {
@@ -388,7 +387,7 @@ Deno.serve(async (req) => {
 /**
  * Generate HTML that loads the React app with embedded tenant configuration
  */
-function generateAppHtml(tenant: any, shop: string, customer: any = null): string {
+function generateAppHtml(tenant, shop, customer = null) {
   // Sanitize tenant data for embedding
   const tenantConfig = {
     id: tenant.id,
@@ -428,7 +427,7 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null): strin
 /**
  * Generate error HTML page
  */
-function generateErrorHtml(title: string, message: string): string {
+function generateErrorHtml(title, message) {
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -479,3 +478,4 @@ function generateErrorHtml(title: string, message: string): string {
   </body>
 </html>`;
 }
+
