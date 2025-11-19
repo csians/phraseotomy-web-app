@@ -19,3 +19,9 @@ verify_jwt = false
 
 [functions.verify-login-token]
 verify_jwt = false
+
+[functions.generate-session-token]
+verify_jwt = false
+
+[functions.get-customer-data]
+verify_jwt = false
