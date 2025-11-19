@@ -20,8 +20,7 @@ export interface RedemptionResult {
 export async function redeemCode(
   code: string,
   customerId: string,
-  shopDomain: string,
-  tenantId: string
+  shopDomain: string
 ): Promise<RedemptionResult> {
   try {
     // Validate and normalize the code

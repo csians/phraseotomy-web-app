@@ -5,7 +5,7 @@
  * Should be called when the app receives a token in the URL.
  */
 
-const APP_SECRET = Deno.env.get('APP_SIGNING_SECRET') || 'change-this-secret';
+const APP_SECRET = Deno.env.get('APP_SIGNING_SECRET')!;
 
 interface TokenPayload {
   shop: string;
