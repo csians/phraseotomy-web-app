@@ -116,239 +116,66 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if we have a token parameter (from app-login redirect)
-    const returnToken = queryParams.get('r') || null;
-    let isTokenValid = false;
-    
-    if (returnToken) {
-      // Verify token if present
-      try {
-        const APP_SECRET = Deno.env.get('APP_SIGNING_SECRET');
-        if (APP_SECRET) {
-          const [payloadB64, sig] = returnToken.split('.');
-          if (payloadB64 && sig) {
-            const encoder = new TextEncoder();
-            const keyData = encoder.encode(APP_SECRET);
-            const msgData = encoder.encode(payloadB64);
-            
-            const key = await crypto.subtle.importKey(
-              'raw',
-              keyData,
-              { name: 'HMAC', hash: 'SHA-256' },
-              false,
-              ['sign']
-            );
-            
-            const expectedSig = await crypto.subtle.sign('HMAC', key, msgData);
-            const expectedSigB64 = btoa(String.fromCharCode(...new Uint8Array(expectedSig)))
-              .replace(/\+/g, '-')
-              .replace(/\//g, '_')
-              .replace(/=/g, '');
+    // Fetch client secret separately for HMAC verification
+    const { data: secretData, error: secretError } = await supabase
+      .from('tenants')
+      .select('shopify_client_secret')
+      .eq('shop_domain', shop)
+      .single();
 
-            if (sig === expectedSigB64) {
-              const payloadStr = atob(
-                payloadB64
-                  .replace(/-/g, '+')
-                  .replace(/_/g, '/')
-              );
-              const payload = JSON.parse(payloadStr);
-              
-              // Check expiration and shop match
-              if (payload.exp && Math.floor(Date.now() / 1000) <= payload.exp && payload.shop === shop) {
-                isTokenValid = true;
-                console.log('Token verified successfully for shop:', shop);
-              }
-            }
-          }
+    if (secretError || !secretData) {
+      console.error('Error fetching tenant credentials');
+      return new Response(
+        generateErrorHtml('Configuration Error', 'Unable to verify request authenticity.'),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'text/html' },
         }
-      } catch (error) {
-        console.error('Error verifying token:', error);
-      }
-    }
-    
-    // If token is not valid, verify HMAC signature (standard Shopify proxy flow)
-    if (!isTokenValid) {
-      const { data: secretData, error: secretError } = await supabase
-        .from('tenants')
-        .select('shopify_client_secret')
-        .eq('shop_domain', shop)
-        .single();
-
-      if (secretError || !secretData) {
-        console.error('Error fetching tenant credentials');
-        return new Response(
-          generateErrorHtml('Configuration Error', 'Unable to verify request authenticity.'),
-          {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'text/html' },
-          }
-        );
-      }
-
-      // Verify HMAC signature
-      const isValidSignature = await verifyShopifyHmac(
-        queryParams,
-        secretData.shopify_client_secret
       );
-
-      if (!isValidSignature) {
-        console.log('Invalid HMAC signature for shop:', shop);
-        return new Response(
-          generateErrorHtml(
-            'Authentication Failed',
-            'HMAC signature verification failed. Please check your Shopify Client Secret in the tenant configuration.'
-          ),
-          {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'text/html' },
-          }
-        );
-      }
-
-      console.log('HMAC verified successfully for tenant:', tenant.tenant_key);
     }
 
-    // Extract customer data from Shopify proxy parameters or query parameters
-    let customerId = queryParams.get('logged_in_customer_id') || queryParams.get('customer_id') || null;
-    let customerEmail = queryParams.get('customer_email') || null;
-    let customerFirstName = queryParams.get('customer_first_name') || null;
-    let customerLastName = queryParams.get('customer_last_name') || null;
-    
-    let customerImageUrl: string | null = null;
-    
-    // If we have customer ID (from proxy params or query params), fetch full customer data from Shopify Admin API
-    if (customerId) {
-      try {
-        const { data: secretData } = await supabase
-          .from('tenants')
-          .select('shopify_admin_access_token, shopify_client_secret')
-          .eq('shop_domain', shop)
-          .single();
-        
-        const accessToken = secretData?.shopify_admin_access_token || secretData?.shopify_client_secret;
-        
-        if (accessToken) {
-          const shopName = shop.replace('.myshopify.com', '');
-          const customerUrl = `https://${shopName}.myshopify.com/admin/api/2024-01/customers/${customerId}.json`;
-          
-          const customerResponse = await fetch(customerUrl, {
-            method: 'GET',
-            headers: {
-              'X-Shopify-Access-Token': accessToken,
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (customerResponse.ok) {
-            const customerDataFromShopify = await customerResponse.json();
-            const shopifyCustomer = customerDataFromShopify.customer;
-            
-            // Use data from Shopify API (more complete than query params)
-            customerEmail = shopifyCustomer?.email || customerEmail;
-            customerFirstName = shopifyCustomer?.first_name || customerFirstName;
-            customerLastName = shopifyCustomer?.last_name || customerLastName;
-            customerImageUrl = shopifyCustomer?.image_url || null;
-            
-            console.log('✅ Fetched full customer data from Shopify Admin API');
-          } else {
-            console.warn('⚠️ Could not fetch customer data from Shopify Admin API, using query parameters');
-          }
+    // Verify HMAC signature
+    const isValidSignature = await verifyShopifyHmac(
+      queryParams,
+      secretData.shopify_client_secret
+    );
+
+    if (!isValidSignature) {
+      console.log('Invalid HMAC signature for shop:', shop);
+      return new Response(
+        generateErrorHtml(
+          'Authentication Failed',
+          'HMAC signature verification failed. Please check your Shopify Client Secret in the tenant configuration.'
+        ),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'text/html' },
         }
-      } catch (error) {
-        console.error('Error fetching customer data from Shopify:', error);
-        // Continue with query parameter data if available
-      }
+      );
     }
+
+    console.log('HMAC verified successfully for tenant:', tenant.tenant_key);
+
+    // Extract customer data from Shopify proxy parameters
+    const customerId = queryParams.get('logged_in_customer_id') || null;
+    const customerEmail = queryParams.get('customer_email') || null;
+    const customerFirstName = queryParams.get('customer_first_name') || null;
+    const customerLastName = queryParams.get('customer_last_name') || null;
+    
+    // Extract token from URL if present (from app-login redirect)
+    const returnToken = queryParams.get('r') || null;
     
     const customerData = customerId ? {
       id: customerId,
       email: customerEmail,
       firstName: customerFirstName,
       lastName: customerLastName,
-      name: [customerFirstName, customerLastName].filter(Boolean).join(' ') || customerEmail || null,
-      imageUrl: customerImageUrl
+      name: [customerFirstName, customerLastName].filter(Boolean).join(' ') || null
     } : null;
 
     console.log('Customer data:', customerData ? `Logged in: ${customerId}` : 'Not logged in');
     if (returnToken) {
       console.log('Return token present in request');
-    }
-
-    // Check if we should redirect back to app domain instead of loading the app here
-    const redirectTo = queryParams.get('redirect_to');
-    
-    // Redirect if we have redirect_to parameter AND (customer data OR customer_id from URL)
-    // This ensures redirect works even if customer data fetch fails
-    if (redirectTo && (customerData || customerId)) {
-      // Redirect back to app domain with customer data in URL parameters
-      console.log('Redirecting back to app domain:', redirectTo);
-      console.log('Has customer data:', !!customerData);
-      console.log('Has customer ID:', !!customerId);
-      
-      try {
-        const redirectUrl = new URL(redirectTo);
-        
-        // Use customer data if available, otherwise use customer_id from URL
-        if (customerData) {
-          redirectUrl.searchParams.set('customer_id', customerData.id);
-          if (customerData.email) redirectUrl.searchParams.set('customer_email', customerData.email);
-          if (customerData.firstName) redirectUrl.searchParams.set('customer_first_name', customerData.firstName);
-          if (customerData.lastName) redirectUrl.searchParams.set('customer_last_name', customerData.lastName);
-          if (customerData.imageUrl) redirectUrl.searchParams.set('customer_image_url', customerData.imageUrl);
-        } else if (customerId) {
-          // Fallback: use customer_id from URL if customer data fetch failed
-          redirectUrl.searchParams.set('customer_id', customerId);
-          if (customerEmail) redirectUrl.searchParams.set('customer_email', customerEmail);
-          if (customerFirstName) redirectUrl.searchParams.set('customer_first_name', customerFirstName);
-          if (customerLastName) redirectUrl.searchParams.set('customer_last_name', customerLastName);
-        }
-        
-        redirectUrl.searchParams.set('logged_in', 'true');
-        
-        // Check if redirect is to localhost (HTTP) or production (HTTPS)
-        const isLocalhost = redirectUrl.hostname === 'localhost' || redirectUrl.hostname === '127.0.0.1';
-        const cookieSecure = isLocalhost ? '' : '; Secure';
-        
-        // Also set cookie for the redirect domain
-        const headers = new Headers({
-          'Location': redirectUrl.toString(),
-          'Content-Type': 'text/html',
-          ...corsHeaders, // Add CORS headers for cross-origin redirect
-        });
-        
-        // Set customer data in cookie if available (will be set on the redirect domain)
-        if (customerData) {
-          // For localhost, we can't use Secure flag (requires HTTPS)
-          headers.append('Set-Cookie', `phraseotomy_customer=${encodeURIComponent(JSON.stringify(customerData))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600${cookieSecure}`);
-        }
-        
-        console.log('Redirect URL:', redirectUrl.toString());
-        console.log('Customer data being passed:', customerData ? { id: customerData.id, email: customerData.email } : { id: customerId });
-        
-        return new Response(
-          `<!DOCTYPE html>
-<html>
-<head>
-  <meta http-equiv="refresh" content="0; url=${redirectUrl.toString()}" />
-  <title>Redirecting...</title>
-</head>
-<body>
-  <p>Redirecting to app...</p>
-  <script>
-    console.log('Redirecting to:', ${JSON.stringify(redirectUrl.toString())});
-    window.location.href = ${JSON.stringify(redirectUrl.toString())};
-  </script>
-</body>
-</html>`,
-          {
-            status: 302,
-            headers,
-          }
-        );
-      } catch (urlError) {
-        console.error('Error creating redirect URL:', urlError);
-        // Fall through to normal app loading if redirect URL is invalid
-      }
     }
 
     // Return HTML that loads the React app with embedded tenant data
