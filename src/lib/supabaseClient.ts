@@ -1,28 +1,32 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-// Get environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+import { createClient } from '@supabase/supabase-js';
 
 // Check if Supabase is properly configured
 export function isSupabaseConfigured(): boolean {
-  return !!(supabaseUrl && supabaseAnonKey && 
-            supabaseUrl.trim() !== '' && supabaseAnonKey.trim() !== '');
+  return !!(
+    import.meta.env.VITE_SUPABASE_URL &&
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY &&
+    import.meta.env.VITE_SUPABASE_URL.trim() !== '' &&
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY.trim() !== ''
+  );
 }
 
-// Create Supabase client only if configured, otherwise null
-let supabaseInstance: SupabaseClient | null = null;
-
-if (isSupabaseConfigured()) {
-  supabaseInstance = createClient(supabaseUrl!, supabaseAnonKey!);
-}
-
-// Export the client (may be null if not configured)
-export const supabase = supabaseInstance;
+// Create single Supabase client instance
+export const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL!,
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY!,
+  {
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      storageKey: 'phraseotomy-auth',
+    },
+  }
+);
 
 // Helper to get client and throw error if not configured
-function getClient(): SupabaseClient {
-  if (!supabase) {
+function getClient() {
+  if (!isSupabaseConfigured()) {
     throw new Error(
       'Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in your .env file.'
     );
