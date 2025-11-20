@@ -172,12 +172,13 @@ const Codes = () => {
     setLoading(true);
 
     try {
-      // If a customer is selected, assign the code
+      // If a customer is selected, assign the code (creates license, updates metafield & code status)
       if (selectedCustomer) {
-        const { data, error } = await supabase.functions.invoke('update-customer-metafield', {
+        const { data, error } = await supabase.functions.invoke('assign-code-to-customer', {
           body: {
             customerId: selectedCustomer.id,
             customerEmail: selectedCustomer.email,
+            customerName: selectedCustomer.name,
             code: editingCode.code,
             shopDomain: tenant.shop_domain,
           },
@@ -186,33 +187,30 @@ const Codes = () => {
         if (error || !data?.success) {
           throw new Error(data?.error || 'Failed to assign code to customer');
         }
-      }
 
-      // Update the code status using edge function (bypasses RLS)
-      const { data: updateData, error: updateError } = await supabase.functions.invoke('update-license-code', {
-        body: {
-          codeId: editingCode.id,
-          status: formData.status,
-          shopDomain: tenant.shop_domain,
-        },
-      });
-
-      if (updateError || !updateData?.success) {
         toast({
-          title: "Error updating code",
-          description: updateData?.error || updateError?.message || 'Failed to update code',
-          variant: "destructive",
+          title: "Code assigned",
+          description: `Code assigned to ${selectedCustomer.name} successfully`,
         });
-        setLoading(false);
-        return;
-      }
+      } else {
+        // Just update the code status (no customer assignment)
+        const { data: updateData, error: updateError } = await supabase.functions.invoke('update-license-code', {
+          body: {
+            codeId: editingCode.id,
+            status: formData.status,
+            shopDomain: tenant.shop_domain,
+          },
+        });
 
-      toast({
-        title: "Code updated",
-        description: selectedCustomer 
-          ? `Code assigned to ${selectedCustomer.name} and status updated`
-          : "Code status updated successfully",
-      });
+        if (updateError || !updateData?.success) {
+          throw new Error(updateData?.error || 'Failed to update code status');
+        }
+
+        toast({
+          title: "Code updated",
+          description: "Code status updated successfully",
+        });
+      }
 
       setEditingCode(null);
       setSelectedCustomer(null);
