@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      customer_audio: {
+        Row: {
+          audio_url: string
+          created_at: string | null
+          customer_id: string
+          filename: string | null
+          id: string
+          shop_domain: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          audio_url: string
+          created_at?: string | null
+          customer_id: string
+          filename?: string | null
+          id?: string
+          shop_domain: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          audio_url?: string
+          created_at?: string | null
+          customer_id?: string
+          filename?: string | null
+          id?: string
+          shop_domain?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_audio_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_licenses: {
         Row: {
           activated_at: string
