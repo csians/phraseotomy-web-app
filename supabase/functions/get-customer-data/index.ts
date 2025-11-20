@@ -151,13 +151,28 @@ Deno.serve(async (req) => {
       };
     }
 
-    // Fetch customer licenses for this customer and shop
+    // Fetch customer licenses for this customer and shop with license code details
     const { data: licenses, error: licensesError } = await supabase
       .from('customer_licenses')
-      .select('*')
+      .select(`
+        *,
+        license_codes!inner (
+          code,
+          packs_unlocked,
+          expires_at
+        )
+      `)
       .eq('customer_id', customerId)
       .eq('shop_domain', shopDomain)
       .eq('status', 'active');
+    
+    // Transform the data to include packs_unlocked at the license level
+    const transformedLicenses = licenses?.map((license: any) => ({
+      ...license,
+      code: license.license_codes?.code,
+      packs_unlocked: license.license_codes?.packs_unlocked || [],
+      expires_at: license.license_codes?.expires_at || license.expires_at,
+    })) || [];
 
     if (licensesError) {
       console.error('Error fetching licenses:', licensesError);
@@ -184,10 +199,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    console.log('✅ Customer details fetched from Shopify:', customerDetails);
+    console.log('✅ Customer licenses:', transformedLicenses);
+
     return new Response(
       JSON.stringify({
         customer: customerDetails,
-        licenses: licenses || [],
+        licenses: transformedLicenses,
         sessions: sessions || [],
         tenantId: tenant.id,
       }),
