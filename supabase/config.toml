@@ -32,6 +32,9 @@ verify_jwt = false
 [functions.list-license-codes]
 verify_jwt = false
 
+[functions.search-shopify-customers]
+verify_jwt = false
+
 [functions.get-customer-metafields]
 verify_jwt = false
 
