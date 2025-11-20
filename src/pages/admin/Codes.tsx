@@ -45,14 +45,18 @@ const Codes = () => {
 
   // Load codes when tenant is available
   useEffect(() => {
-    if (tenant?.id) {
-      loadCodes(tenant.id);
+    if (tenant?.shop_domain) {
+      loadCodes();
     }
-  }, [tenant?.id]);
+  }, [tenant?.shop_domain]);
 
-  const loadCodes = async (tenant_id: string) => {
-    if (!tenant?.shop_domain) return;
+  const loadCodes = async () => {
+    if (!tenant?.shop_domain) {
+      console.error('Cannot load codes: tenant or shop_domain missing');
+      return;
+    }
 
+    console.log('Loading codes for shop:', tenant.shop_domain);
     setLoading(true);
     
     try {
@@ -60,7 +64,10 @@ const Codes = () => {
         body: { shop_domain: tenant.shop_domain },
       });
 
+      console.log('List codes response:', { data, error });
+
       if (error || !data?.success) {
+        console.error('Error loading codes:', error || data?.error);
         toast({
           title: "Error loading codes",
           description: error?.message || data?.error || 'Failed to load codes',
@@ -70,8 +77,10 @@ const Codes = () => {
         return;
       }
 
+      console.log('Codes loaded successfully:', data.codes);
       setCodes(data.codes || []);
     } catch (error) {
+      console.error('Exception loading codes:', error);
       toast({
         title: "Error loading codes",
         description: error instanceof Error ? error.message : 'Failed to load codes',
@@ -128,7 +137,7 @@ const Codes = () => {
 
       setIsAddDialogOpen(false);
       setFormData({ code: "", packs: "", status: "unused" });
-      await loadCodes(tenant.id);
+      await loadCodes();
       setLoading(false);
     } catch (error) {
       toast({
@@ -174,7 +183,7 @@ const Codes = () => {
 
     setEditingCode(null);
     setFormData({ code: "", packs: "", status: "unused" });
-    if (tenant?.id) loadCodes(tenant.id);
+    if (tenant?.shop_domain) loadCodes();
   };
 
   const openEditDialog = (code: LicenseCode) => {
