@@ -465,6 +465,84 @@ const Play = () => {
     }
   }, [toast, shopDomain]);
 
+  // Restore session from localStorage if exists
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get("r");
+    const customerId = urlParams.get("customer_id");
+    
+    // Only attempt session restoration if there's no active login flow
+    if (!token && !customerId && !customer) {
+      const sessionToken = localStorage.getItem('phraseotomy_session_token');
+      
+      if (sessionToken) {
+        console.log('🔄 Attempting to restore session from localStorage...');
+        
+        const restoreSession = async () => {
+          try {
+            const { data: customerData, error: customerError } = await supabase.functions.invoke('get-customer-data', {
+              body: { sessionToken },
+            });
+
+            if (!customerError && customerData) {
+              console.log('✅ Session restored successfully:', {
+                customer: customerData.customer,
+                licenses: customerData.licenses || [],
+                sessions: customerData.sessions || [],
+                shopDomain: customerData.shopDomain,
+              });
+
+              // Decode session token to get customer_id
+              try {
+                const [payloadB64] = sessionToken.split('.');
+                if (payloadB64) {
+                  const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+                  
+                  // Check if token is expired
+                  if (payload.exp && payload.exp * 1000 < Date.now()) {
+                    console.warn('⚠️ Session token expired, clearing...');
+                    localStorage.removeItem('phraseotomy_session_token');
+                    return;
+                  }
+                  
+                  // Set customer state
+                  const customerObj: ShopifyCustomer = {
+                    id: payload.customer_id,
+                    email: customerData.customer?.email || null,
+                    firstName: customerData.customer?.first_name || null,
+                    lastName: customerData.customer?.last_name || null,
+                    name: customerData.customer?.name || null,
+                  };
+                  setCustomer(customerObj);
+
+                  // Set shop domain from payload
+                  if (payload.shop) {
+                    setShopDomain(payload.shop);
+                  }
+
+                  // Set licenses and sessions
+                  setLicenses(customerData.licenses || []);
+                  setSessions(customerData.sessions || []);
+                }
+              } catch (decodeError) {
+                console.error('Error decoding session token:', decodeError);
+                localStorage.removeItem('phraseotomy_session_token');
+              }
+            } else {
+              console.warn('⚠️ Invalid session token, clearing...', customerError);
+              localStorage.removeItem('phraseotomy_session_token');
+            }
+          } catch (error) {
+            console.error('Error restoring session:', error);
+            localStorage.removeItem('phraseotomy_session_token');
+          }
+        };
+        
+        restoreSession();
+      }
+    }
+  }, []); // Run once on mount
+
   // Load customer data when logged in
   useEffect(() => {
     if (!loading && customer && shopDomain) {
