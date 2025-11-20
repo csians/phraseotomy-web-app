@@ -287,6 +287,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          access_token: string | null
           created_at: string
           environment: Database["public"]["Enums"]["tenant_environment"]
           id: string
@@ -299,6 +300,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access_token?: string | null
           created_at?: string
           environment?: Database["public"]["Enums"]["tenant_environment"]
           id?: string
@@ -311,6 +313,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access_token?: string | null
           created_at?: string
           environment?: Database["public"]["Enums"]["tenant_environment"]
           id?: string
