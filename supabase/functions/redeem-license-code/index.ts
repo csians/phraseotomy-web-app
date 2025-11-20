@@ -132,11 +132,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update license code status to used and mark as redeemed
+    // Update license code status to active (redeemed) and mark as redeemed
     const { error: updateError } = await supabaseAdmin
       .from('license_codes')
       .update({
-        status: 'used',
+        status: 'active',
         redeemed_by: customerId,
         redeemed_at: new Date().toISOString(),
       })
