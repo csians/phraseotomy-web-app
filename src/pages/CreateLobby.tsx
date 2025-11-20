@@ -131,6 +131,7 @@ export default function CreateLobby() {
           host_customer_id: customer.id,
           host_customer_name: customer.name || customer.email,
           shop_domain: shopDomain,
+          tenant_id: tenant.id,
           packs_used: selectedPacks,
           status: 'waiting',
         })
