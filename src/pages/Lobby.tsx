@@ -56,23 +56,23 @@ export default function Lobby() {
 
       // Get customer ID from session storage
       const sessionData = sessionStorage.getItem('customerData');
-      let customerId = null;
+      let currentCustomerId = null;
       
       if (sessionData) {
         try {
           const parsed = JSON.parse(sessionData);
-          customerId = parsed.customer_id || parsed.id;
-          console.log('Customer ID for audio fetch:', customerId);
+          currentCustomerId = parsed.customer_id || parsed.id;
+          console.log('Current customer ID:', currentCustomerId);
         } catch (e) {
           console.error('Error parsing customer data:', e);
         }
       }
 
-      console.log('Fetching lobby data for session:', sessionId, 'customerId:', customerId);
+      console.log('Fetching lobby data for session:', sessionId);
 
       // Call edge function to fetch lobby data with service role permissions
       const { data, error } = await supabase.functions.invoke('get-lobby-data', {
-        body: { sessionId, customerId }
+        body: { sessionId, customerId: currentCustomerId }
       });
 
       if (error) {
@@ -94,8 +94,15 @@ export default function Lobby() {
 
       setSession(data.session);
       setPlayers(data.players || []);
-      setAudioFiles(data.audioFiles || []);
-      console.log('Audio files set:', data.audioFiles);
+      
+      // Only set audio files if current user is the host
+      if (currentCustomerId && data.session.host_customer_id === currentCustomerId) {
+        setAudioFiles(data.audioFiles || []);
+        console.log('Host audio files loaded:', data.audioFiles?.length || 0);
+      } else {
+        setAudioFiles([]);
+        console.log('Not host - audio files hidden');
+      }
 
     } catch (error) {
       console.error('Error fetching lobby data:', error);
@@ -141,6 +148,20 @@ export default function Lobby() {
         <p className="text-muted-foreground">Lobby not found</p>
       </div>
     );
+  }
+
+  // Check if current user is the host
+  const sessionData = sessionStorage.getItem('customerData');
+  let isHost = false;
+  
+  if (sessionData) {
+    try {
+      const parsed = JSON.parse(sessionData);
+      const currentCustomerId = parsed.customer_id || parsed.id;
+      isHost = session.host_customer_id === currentCustomerId;
+    } catch (e) {
+      console.error('Error checking host status:', e);
+    }
   }
 
   return (
@@ -198,55 +219,57 @@ export default function Lobby() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Music className="mr-2 h-5 w-5" />
-              Select Audio
-            </CardTitle>
-            <CardDescription>
-              Choose an audio file for this game
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {audioFiles.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No audio files uploaded yet. Upload audio from the Play page.
-              </p>
-            ) : (
-              <RadioGroup value={selectedAudio} onValueChange={setSelectedAudio}>
-                <div className="space-y-2">
-                  {audioFiles.map((audio) => (
-                    <div
-                      key={audio.id}
-                      className="flex items-center space-x-2 p-3 rounded-md border"
-                    >
-                      <RadioGroupItem value={audio.id} id={audio.id} />
-                      <Label htmlFor={audio.id} className="flex-1 cursor-pointer">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{audio.filename}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(audio.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </RadioGroup>
-            )}
+        {isHost && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Music className="mr-2 h-5 w-5" />
+                Select Audio
+              </CardTitle>
+              <CardDescription>
+                Choose an audio file for this game
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {audioFiles.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No audio files uploaded yet. Upload audio from the Play page.
+                </p>
+              ) : (
+                <RadioGroup value={selectedAudio} onValueChange={setSelectedAudio}>
+                  <div className="space-y-2">
+                    {audioFiles.map((audio) => (
+                      <div
+                        key={audio.id}
+                        className="flex items-center space-x-2 p-3 rounded-md border"
+                      >
+                        <RadioGroupItem value={audio.id} id={audio.id} />
+                        <Label htmlFor={audio.id} className="flex-1 cursor-pointer">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{audio.filename}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(audio.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </RadioGroup>
+              )}
 
-            {audioFiles.length > 0 && (
-              <Button
-                onClick={handleStartGame}
-                className="w-full mt-4"
-                disabled={!selectedAudio}
-              >
-                Start Game
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+              {audioFiles.length > 0 && (
+                <Button
+                  onClick={handleStartGame}
+                  className="w-full mt-4"
+                  disabled={!selectedAudio}
+                >
+                  Start Game
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

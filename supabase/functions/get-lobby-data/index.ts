@@ -63,18 +63,20 @@ Deno.serve(async (req) => {
     // Fetch customer's audio files if customerId is provided
     let audioData = [];
     if (customerId) {
+      console.log('Fetching audio for customer:', customerId);
+      
       const { data, error: audioError } = await supabase
         .from('customer_audio')
         .select('*')
-        .eq('customer_id', customerId)
+        .eq('customer_id', customerId.toString())
         .order('created_at', { ascending: false });
 
       if (audioError) {
         console.error('Audio fetch error:', audioError);
-        throw audioError;
+      } else {
+        audioData = data || [];
+        console.log('Audio files found:', audioData.length);
       }
-      
-      audioData = data || [];
     }
 
     return new Response(
