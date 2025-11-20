@@ -14,6 +14,7 @@ import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type Ga
 import { getAppBridge } from "@/lib/appBridge";
 import { lobbyCodeSchema, playerNameSchema, redemptionCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
+import { redeemCode } from "@/lib/redemption";
 
 // Extend window to include embedded config and customer data
 
@@ -52,6 +53,7 @@ const Play = () => {
   const [lobbyCode, setLobbyCode] = useState("");
   const [guestName, setGuestName] = useState("");
   const [redemptionCode, setRedemptionCode] = useState("");
+  const [isRedeeming, setIsRedeeming] = useState(false);
 
   const [loginStatusFromUrl, setLoginStatusFromUrl] = useState<{
     status: "success" | "failed" | "unknown";
@@ -595,20 +597,67 @@ const Play = () => {
   };
 
   const handleRedeemCode = async () => {
-    try {
-      const validatedCode = validateInput(redemptionCodeSchema, redemptionCode);
-      console.log("Redeeming code:", validatedCode);
-      // TODO: Implement redeem code logic
+    if (!customer || !shopDomain) {
       toast({
-        title: "Coming Soon",
-        description: "Code redemption will be available soon.",
-      });
-    } catch (error) {
-      toast({
-        title: "Invalid Code",
-        description: error instanceof Error ? error.message : "Please enter a valid code",
+        title: "Error",
+        description: "Please log in to redeem a code.",
         variant: "destructive",
       });
+      return;
+    }
+
+    if (redemptionCode.length !== 6) {
+      toast({
+        title: "Invalid Code",
+        description: "Please enter a 6-character code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsRedeeming(true);
+    try {
+      const result = await redeemCode(redemptionCode, customer.id, shopDomain);
+      
+      if (result.success) {
+        toast({
+          title: "Success!",
+          description: result.message,
+        });
+        
+        // Clear the input
+        setRedemptionCode("");
+        
+        // Refresh customer data to show updated licenses
+        setDataLoading(true);
+        try {
+          const [customerLicenses, customerSessions] = await Promise.all([
+            getCustomerLicenses(customer.id, shopDomain),
+            getCustomerSessions(customer.id, shopDomain),
+          ]);
+          setLicenses(customerLicenses);
+          setSessions(customerSessions);
+        } catch (error) {
+          console.error("Error refreshing customer data:", error);
+        } finally {
+          setDataLoading(false);
+        }
+      } else {
+        toast({
+          title: "Redemption Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error redeeming code:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRedeeming(false);
     }
   };
 
@@ -808,8 +857,8 @@ const Play = () => {
                       }
                       maxLength={6}
                     />
-                    <Button onClick={handleRedeemCode} disabled={redemptionCode.length !== 6}>
-                      Redeem
+                    <Button onClick={handleRedeemCode} disabled={redemptionCode.length !== 6 || isRedeeming}>
+                      {isRedeeming ? "Redeeming..." : "Redeem"}
                     </Button>
                   </div>
                 </div>
