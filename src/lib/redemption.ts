@@ -32,17 +32,34 @@ async function verifyCodeInMetafields(
       return false;
     }
 
-    // Check if any metafield contains the redemption code
+    // Look for the phraseotomy.license_codes metafield
     const metafields = data.metafields as Array<{
       namespace: string;
       key: string;
       value: string;
+      type: string;
     }>;
 
-    return metafields.some((mf) => 
-      mf.key.toLowerCase().includes('redeem') && 
-      mf.value.toUpperCase() === code.toUpperCase()
+    const licenseMetafield = metafields.find(
+      (mf) => mf.namespace === 'phraseotomy' && mf.key === 'license_codes'
     );
+
+    if (!licenseMetafield) {
+      console.log('No license_codes metafield found for customer');
+      return false;
+    }
+
+    // Parse the JSON array of license codes
+    try {
+      const codes = JSON.parse(licenseMetafield.value) as string[];
+      const normalizedCode = code.toUpperCase().trim();
+      
+      // Check if the entered code exists in the customer's assigned codes
+      return codes.some((c) => c.toUpperCase().trim() === normalizedCode);
+    } catch (parseError) {
+      console.error('Error parsing license codes metafield:', parseError);
+      return false;
+    }
   } catch (error) {
     console.error('Error verifying metafields:', error);
     return false;
