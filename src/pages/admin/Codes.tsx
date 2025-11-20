@@ -167,40 +167,76 @@ const Codes = () => {
   };
 
   const handleEditCode = async () => {
-    if (!editingCode) return;
+    if (!editingCode || !tenant) return;
 
-    const updates: Partial<LicenseCode> = {
-      status: formData.status,
-    };
+    setLoading(true);
 
-    // If status is being changed to unused, clear redemption data
-    if (formData.status === "unused") {
-      updates.redeemed_by = null;
-      updates.redeemed_at = null;
-    }
+    try {
+      // If a customer is selected, assign the code
+      if (selectedCustomer) {
+        const { data, error } = await supabase.functions.invoke('update-customer-metafield', {
+          body: {
+            customerId: selectedCustomer.id,
+            customerEmail: selectedCustomer.email,
+            code: editingCode.code,
+            shopDomain: tenant.shop_domain,
+          },
+        });
 
-    const { error } = await supabase
-      .from("license_codes")
-      .update(updates)
-      .eq("id", editingCode.id);
+        if (error) {
+          throw error;
+        }
+      }
 
-    if (error) {
+      // Update the code status
+      const updates: Partial<LicenseCode> = {
+        status: formData.status,
+      };
+
+      // If status is being changed to unused, clear redemption data
+      if (formData.status === "unused") {
+        updates.redeemed_by = null;
+        updates.redeemed_at = null;
+      }
+
+      const { error: updateError } = await supabase
+        .from("license_codes")
+        .update(updates)
+        .eq("id", editingCode.id);
+
+      if (updateError) {
+        toast({
+          title: "Error updating code",
+          description: updateError.message,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      toast({
+        title: "Code updated",
+        description: selectedCustomer 
+          ? `Code assigned to ${selectedCustomer.name} and status updated`
+          : "Code status updated successfully",
+      });
+
+      setEditingCode(null);
+      setSelectedCustomer(null);
+      setCustomerSearchQuery("");
+      setSearchedCustomers([]);
+      setFormData({ code: "", packs: "", status: "unused" });
+      await loadCodes();
+    } catch (error) {
+      console.error('Error updating code:', error);
       toast({
         title: "Error updating code",
-        description: error.message,
+        description: error instanceof Error ? error.message : "Failed to update code",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    toast({
-      title: "Code updated",
-      description: "Code has been updated successfully",
-    });
-
-    setEditingCode(null);
-    setFormData({ code: "", packs: "", status: "unused" });
-    if (tenant?.shop_domain) loadCodes();
   };
 
   const openEditDialog = (code: LicenseCode) => {
@@ -210,6 +246,9 @@ const Codes = () => {
       packs: code.packs_unlocked.join(", "),
       status: code.status as "unused" | "active" | "expired" | "void",
     });
+    setSelectedCustomer(null);
+    setCustomerSearchQuery("");
+    setSearchedCustomers([]);
   };
 
   const searchCustomers = async (query: string) => {
@@ -475,10 +514,10 @@ const Codes = () => {
 
         {/* Edit Dialog */}
         <Dialog open={!!editingCode} onOpenChange={() => setEditingCode(null)}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Edit Code: {editingCode?.code}</DialogTitle>
-              <DialogDescription>Update code status or detach from customer</DialogDescription>
+              <DialogDescription>Update code status or assign to a customer</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -500,6 +539,75 @@ const Codes = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label>Assign to Customer (Optional)</Label>
+                <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerSearchOpen}
+                      className="w-full justify-between"
+                    >
+                      {selectedCustomer
+                        ? `${selectedCustomer.name} (${selectedCustomer.email})`
+                        : "Search by email or name..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[460px] p-0 bg-popover z-50" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Type email or name..." 
+                        value={customerSearchQuery}
+                        onValueChange={setCustomerSearchQuery}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {searchingCustomers ? "Searching..." : customerSearchQuery.length < 2 ? "Type at least 2 characters" : "No customers found"}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {searchedCustomers.map((customer) => {
+                            const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'No name';
+                            return (
+                              <CommandItem
+                                key={customer.id}
+                                value={customer.id}
+                                onSelect={() => {
+                                  setSelectedCustomer({
+                                    id: customer.id,
+                                    email: customer.email,
+                                    name,
+                                  });
+                                  setCustomerSearchOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{name}</span>
+                                  <span className="text-sm text-muted-foreground">{customer.email}</span>
+                                </div>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {selectedCustomer && (
+                  <p className="text-sm text-muted-foreground">
+                    Will assign code to: {selectedCustomer.name}
+                  </p>
+                )}
+              </div>
+
               {editingCode?.redeemed_by && (
                 <div className="p-3 bg-muted rounded-md">
                   <p className="text-sm text-muted-foreground">
@@ -512,10 +620,19 @@ const Codes = () => {
               )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditingCode(null)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setEditingCode(null)}
+                disabled={loading}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleEditCode}>Save Changes</Button>
+              <Button 
+                onClick={handleEditCode}
+                disabled={loading}
+              >
+                {loading ? "Saving..." : "Save Changes"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
