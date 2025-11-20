@@ -70,7 +70,7 @@ const Codes = () => {
   };
 
   const handleAddCode = async () => {
-    if (!tenant?.id) {
+    if (!tenant?.shop_domain) {
       toast({
         title: "Error",
         description: "Tenant not found",
@@ -87,19 +87,24 @@ const Codes = () => {
       const packsList = formData.packs.split(',').map(p => p.trim()).filter(Boolean);
       const validatedPacks = validateInput(packsArraySchema, packsList);
 
-      const { error } = await supabase.from("license_codes").insert({
-        tenant_id: tenant.id,
-        code: validatedCode,
-        packs_unlocked: validatedPacks,
-        status: "unused",
+      setLoading(true);
+
+      // Use edge function to create code (bypasses RLS with service role)
+      const { data, error } = await supabase.functions.invoke('create-license-code', {
+        body: {
+          code: validatedCode,
+          packs_unlocked: validatedPacks,
+          shop_domain: tenant.shop_domain,
+        },
       });
 
-      if (error) {
+      if (error || !data?.success) {
         toast({
           title: "Error creating code",
-          description: error.message,
+          description: error?.message || data?.error || 'Failed to create license code',
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
 
@@ -110,13 +115,15 @@ const Codes = () => {
 
       setIsAddDialogOpen(false);
       setFormData({ code: "", packs: "", status: "unused" });
-      loadCodes(tenant.id);
+      await loadCodes(tenant.id);
+      setLoading(false);
     } catch (error) {
       toast({
         title: "Validation Error",
         description: error instanceof Error ? error.message : "Invalid input",
         variant: "destructive",
       });
+      setLoading(false);
     }
   };
 
