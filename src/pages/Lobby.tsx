@@ -53,18 +53,41 @@ export default function Lobby() {
 
   const fetchCustomerAudio = async () => {
     try {
-      // Get customer ID from session storage
-      const sessionData = sessionStorage.getItem('customerData');
+      // Get customer ID from session storage (stored when customer logs in)
+      const customerDataStr = sessionStorage.getItem('customerData');
       
-      if (!sessionData) {
-        console.log('No customer data in session storage');
+      if (!customerDataStr) {
+        console.log('No customer data in session storage, checking localStorage');
+        
+        // Try to get from the Play page data
+        const playDataStr = localStorage.getItem('phraseotomy_customer_data');
+        if (!playDataStr) {
+          console.log('No customer data found');
+          return;
+        }
+        
+        const playData = JSON.parse(playDataStr);
+        const currentCustomerId = playData.customer_id || playData.id;
+        console.log('Fetching audio for customer (from localStorage):', currentCustomerId);
+        
+        const { data, error } = await supabase.functions.invoke('get-customer-audio', {
+          body: { customerId: currentCustomerId }
+        });
+
+        if (error) {
+          console.error('Error fetching customer audio:', error);
+          return;
+        }
+
+        console.log('Audio files received:', data?.audioFiles?.length || 0);
+        setAudioFiles(data?.audioFiles || []);
         return;
       }
 
-      const parsed = JSON.parse(sessionData);
+      const parsed = JSON.parse(customerDataStr);
       const currentCustomerId = parsed.customer_id || parsed.id;
       
-      console.log('Fetching audio for customer:', currentCustomerId);
+      console.log('Fetching audio for customer (from sessionStorage):', currentCustomerId);
 
       const { data, error } = await supabase.functions.invoke('get-customer-audio', {
         body: { customerId: currentCustomerId }
@@ -161,17 +184,36 @@ export default function Lobby() {
   }
 
   // Check if current user is the host
-  const sessionData = sessionStorage.getItem('customerData');
   let isHost = false;
+  let currentCustomerId = null;
   
-  if (sessionData) {
+  // Try sessionStorage first
+  const sessionDataStr = sessionStorage.getItem('customerData');
+  if (sessionDataStr) {
     try {
-      const parsed = JSON.parse(sessionData);
-      const currentCustomerId = parsed.customer_id || parsed.id;
-      isHost = session.host_customer_id === currentCustomerId;
+      const parsed = JSON.parse(sessionDataStr);
+      currentCustomerId = parsed.customer_id || parsed.id;
     } catch (e) {
-      console.error('Error checking host status:', e);
+      console.error('Error parsing session customer data:', e);
     }
+  }
+  
+  // Fallback to localStorage
+  if (!currentCustomerId) {
+    const localDataStr = localStorage.getItem('phraseotomy_customer_data');
+    if (localDataStr) {
+      try {
+        const parsed = JSON.parse(localDataStr);
+        currentCustomerId = parsed.customer_id || parsed.id;
+      } catch (e) {
+        console.error('Error parsing local customer data:', e);
+      }
+    }
+  }
+  
+  if (currentCustomerId && session) {
+    isHost = session.host_customer_id === currentCustomerId.toString();
+    console.log('Host check:', { currentCustomerId, hostCustomerId: session.host_customer_id, isHost });
   }
 
   return (
