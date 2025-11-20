@@ -87,18 +87,7 @@ export async function redeemCode(
       };
     }
 
-    // First, verify the code exists in Shopify customer metafields
-    const isValidInShopify = await verifyCodeInMetafields(normalizedCode, customerId, shopDomain);
-    
-    if (!isValidInShopify) {
-      return {
-        success: false,
-        message: 'Code not found in your account. Please contact support.',
-        error: 'CODE_NOT_IN_METAFIELDS',
-      };
-    }
-
-    // Use edge function to redeem code (bypasses RLS with service role)
+    // Call edge function to redeem code (it validates code exists and is unused)
     const { data, error } = await supabase.functions.invoke('redeem-license-code', {
       body: {
         code: normalizedCode,
