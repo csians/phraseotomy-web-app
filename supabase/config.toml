@@ -25,3 +25,12 @@ verify_jwt = false
 
 [functions.get-customer-data]
 verify_jwt = false
+
+[functions.create-license-code]
+verify_jwt = false
+
+[functions.get-customer-metafields]
+verify_jwt = false
+
+[functions.update-customer-metafield]
+verify_jwt = false
