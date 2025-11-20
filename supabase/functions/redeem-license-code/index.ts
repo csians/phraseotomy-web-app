@@ -140,12 +140,21 @@ Deno.serve(async (req) => {
         redeemed_by: customerId,
         redeemed_at: new Date().toISOString(),
       })
-      .eq('id', licenseCode.id)
-      .is('redeemed_by', null); // Extra safety: only update if not already redeemed
+      .eq('id', licenseCode.id);
 
     if (updateError) {
       console.error('❌ Error updating license code:', updateError);
-      // Don't fail the redemption, but log the error
+      // Roll back the customer license if we can't update the code
+      await supabaseAdmin
+        .from('customer_licenses')
+        .delete()
+        .eq('customer_id', customerId)
+        .eq('license_code_id', licenseCode.id);
+      
+      return new Response(
+        JSON.stringify({ success: false, error: 'REDEMPTION_ERROR', message: 'Error completing redemption. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('✅ Code redeemed successfully');
