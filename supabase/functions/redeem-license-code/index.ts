@@ -70,9 +70,17 @@ Deno.serve(async (req) => {
     }
 
     // Check if code is already used
-    if (licenseCode.status !== 'unused' && licenseCode.status !== 'active') {
+    if (licenseCode.status !== 'unused') {
       return new Response(
-        JSON.stringify({ success: false, error: 'CODE_USED', message: 'This code has already been used or is expired.' }),
+        JSON.stringify({ success: false, error: 'CODE_USED', message: 'This code has already been used.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Double-check that code hasn't been redeemed
+    if (licenseCode.redeemed_by) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'CODE_USED', message: 'This code has already been redeemed by another customer.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -124,15 +132,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update license code status to active and mark as redeemed
+    // Update license code status to used and mark as redeemed
     const { error: updateError } = await supabaseAdmin
       .from('license_codes')
       .update({
-        status: 'active',
+        status: 'used',
         redeemed_by: customerId,
         redeemed_at: new Date().toISOString(),
       })
-      .eq('id', licenseCode.id);
+      .eq('id', licenseCode.id)
+      .is('redeemed_by', null); // Extra safety: only update if not already redeemed
 
     if (updateError) {
       console.error('❌ Error updating license code:', updateError);
