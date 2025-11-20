@@ -56,7 +56,19 @@ export default function Lobby() {
 
       // Get customer ID from session storage
       const sessionData = sessionStorage.getItem('customerData');
-      const customerId = sessionData ? JSON.parse(sessionData).customer_id : null;
+      let customerId = null;
+      
+      if (sessionData) {
+        try {
+          const parsed = JSON.parse(sessionData);
+          customerId = parsed.customer_id || parsed.id;
+          console.log('Customer ID for audio fetch:', customerId);
+        } catch (e) {
+          console.error('Error parsing customer data:', e);
+        }
+      }
+
+      console.log('Fetching lobby data for session:', sessionId, 'customerId:', customerId);
 
       // Call edge function to fetch lobby data with service role permissions
       const { data, error } = await supabase.functions.invoke('get-lobby-data', {
@@ -67,6 +79,8 @@ export default function Lobby() {
         console.error('Lobby data fetch error:', error);
         throw error;
       }
+
+      console.log('Lobby data received:', data);
 
       if (!data?.session) {
         toast({
@@ -81,6 +95,7 @@ export default function Lobby() {
       setSession(data.session);
       setPlayers(data.players || []);
       setAudioFiles(data.audioFiles || []);
+      console.log('Audio files set:', data.audioFiles);
 
     } catch (error) {
       console.error('Error fetching lobby data:', error);
