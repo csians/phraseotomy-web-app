@@ -51,22 +51,35 @@ const Codes = () => {
   }, [tenant?.id]);
 
   const loadCodes = async (tenant_id: string) => {
-    const { data, error } = await supabase
-      .from("license_codes")
-      .select("*")
-      .eq("tenant_id", tenant_id)
-      .order("created_at", { ascending: false });
+    if (!tenant?.shop_domain) return;
 
-    if (error) {
+    setLoading(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('list-license-codes', {
+        body: { shop_domain: tenant.shop_domain },
+      });
+
+      if (error || !data?.success) {
+        toast({
+          title: "Error loading codes",
+          description: error?.message || data?.error || 'Failed to load codes',
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      setCodes(data.codes || []);
+    } catch (error) {
       toast({
         title: "Error loading codes",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Failed to load codes',
         variant: "destructive",
       });
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    setCodes(data || []);
   };
 
   const handleAddCode = async () => {

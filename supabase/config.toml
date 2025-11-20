@@ -29,6 +29,9 @@ verify_jwt = false
 [functions.create-license-code]
 verify_jwt = false
 
+[functions.list-license-codes]
+verify_jwt = false
+
 [functions.get-customer-metafields]
 verify_jwt = false
 
