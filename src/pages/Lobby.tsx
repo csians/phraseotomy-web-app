@@ -54,19 +54,21 @@ export default function Lobby() {
     try {
       setLoading(true);
 
-      // Fetch session details
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('game_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .maybeSingle();
+      // Get customer ID from session storage
+      const sessionData = sessionStorage.getItem('customerData');
+      const customerId = sessionData ? JSON.parse(sessionData).customer_id : null;
 
-      if (sessionError) {
-        console.error('Session fetch error:', sessionError);
-        throw sessionError;
+      // Call edge function to fetch lobby data with service role permissions
+      const { data, error } = await supabase.functions.invoke('get-lobby-data', {
+        body: { sessionId, customerId }
+      });
+
+      if (error) {
+        console.error('Lobby data fetch error:', error);
+        throw error;
       }
-      
-      if (!sessionData) {
+
+      if (!data?.session) {
         toast({
           title: "Session not found",
           description: "This game session doesn't exist or you don't have access to it",
@@ -76,28 +78,9 @@ export default function Lobby() {
         return;
       }
 
-      setSession(sessionData);
-
-      // Fetch players in this session
-      const { data: playersData, error: playersError } = await supabase
-        .from('game_players')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('turn_order');
-
-      if (playersError) throw playersError;
-      setPlayers(playersData || []);
-
-      // Fetch customer's audio files
-      const customerId = sessionData.host_customer_id;
-      const { data: audioData, error: audioError } = await supabase
-        .from('customer_audio')
-        .select('*')
-        .eq('customer_id', customerId)
-        .order('created_at', { ascending: false });
-
-      if (audioError) throw audioError;
-      setAudioFiles(audioData || []);
+      setSession(data.session);
+      setPlayers(data.players || []);
+      setAudioFiles(data.audioFiles || []);
 
     } catch (error) {
       console.error('Error fetching lobby data:', error);
