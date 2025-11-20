@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Pencil, Check, ChevronsUpDown } from "lucide-react";
@@ -33,13 +34,21 @@ const Codes = () => {
   // Form state for add/edit
   const [formData, setFormData] = useState<{
     code: string;
-    packs: string;
+    packs: string[];
     status: "unused" | "active" | "expired" | "void";
   }>({
     code: "",
-    packs: "",
+    packs: [],
     status: "unused",
   });
+
+  // Available packs that can be selected
+  const AVAILABLE_PACKS = [
+    { id: 'base', name: 'Base Pack', description: 'Core game cards' },
+    { id: 'expansion1', name: 'Expansion 1', description: 'Additional themed cards' },
+    { id: 'expansion2', name: 'Expansion 2', description: 'More variety' },
+    { id: 'premium', name: 'Premium Pack', description: 'Exclusive content' },
+  ];
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assigningCode, setAssigningCode] = useState<LicenseCode | null>(null);
@@ -122,9 +131,8 @@ const Codes = () => {
       // Validate code format
       const validatedCode = validateInput(redemptionCodeSchema, formData.code);
       
-      // Parse and validate packs
-      const packsList = formData.packs.split(',').map(p => p.trim()).filter(Boolean);
-      const validatedPacks = validateInput(packsArraySchema, packsList);
+      // Validate packs
+      const validatedPacks = validateInput(packsArraySchema, formData.packs);
 
       setLoading(true);
 
@@ -153,7 +161,7 @@ const Codes = () => {
       });
 
       setIsAddDialogOpen(false);
-      setFormData({ code: "", packs: "", status: "unused" });
+      setFormData({ code: "", packs: [], status: "unused" });
       await loadCodes();
       setLoading(false);
     } catch (error) {
@@ -216,7 +224,7 @@ const Codes = () => {
       setSelectedCustomer(null);
       setCustomerSearchQuery("");
       setSearchedCustomers([]);
-      setFormData({ code: "", packs: "", status: "unused" });
+      setFormData({ code: "", packs: [], status: "unused" });
       await loadCodes();
     } catch (error) {
       console.error('Error updating code:', error);
@@ -234,7 +242,7 @@ const Codes = () => {
     setEditingCode(code);
     setFormData({
       code: code.code,
-      packs: code.packs_unlocked.join(", "),
+      packs: code.packs_unlocked,
       status: code.status as "unused" | "active" | "expired" | "void",
     });
     setSelectedCustomer(null);
@@ -414,14 +422,35 @@ const Codes = () => {
                     }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="packs">Packs Unlocked (comma-separated)</Label>
-                  <Input
-                    id="packs"
-                    placeholder="Core, Horror, Sci-Fi"
-                    value={formData.packs}
-                    onChange={(e) => setFormData({ ...formData, packs: e.target.value })}
-                  />
+                <div className="space-y-3">
+                  <Label>Select Packs to Unlock</Label>
+                  <div className="space-y-2">
+                    {AVAILABLE_PACKS.map((pack) => (
+                      <div key={pack.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+                        <Checkbox
+                          id={`pack-${pack.id}`}
+                          checked={formData.packs.includes(pack.id)}
+                          onCheckedChange={(checked) => {
+                            setFormData({
+                              ...formData,
+                              packs: checked
+                                ? [...formData.packs, pack.id]
+                                : formData.packs.filter((p) => p !== pack.id),
+                            });
+                          }}
+                        />
+                        <div className="flex-1">
+                          <Label htmlFor={`pack-${pack.id}`} className="cursor-pointer font-medium">
+                            {pack.name}
+                          </Label>
+                          <p className="text-sm text-muted-foreground">{pack.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {formData.packs.length === 0 && (
+                    <p className="text-sm text-destructive">Please select at least one pack</p>
+                  )}
                 </div>
               </div>
               <DialogFooter>
