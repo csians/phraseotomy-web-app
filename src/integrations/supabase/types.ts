@@ -360,6 +360,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_is_in_session: {
+        Args: { _session_id: string; _user_id: string }
+        Returns: boolean
+      }
       verify_tenant_for_proxy: {
         Args: { shop_domain_param: string }
         Returns: {
