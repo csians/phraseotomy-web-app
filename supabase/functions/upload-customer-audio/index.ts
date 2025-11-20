@@ -84,12 +84,14 @@ serve(async (req) => {
     const audioUrl = urlData.publicUrl;
 
     // Insert metadata into customer_audio table
+    console.log('Inserting audio record with customer_id:', customerId, 'Type:', typeof customerId);
+    
     const { data: audioRecord, error: dbError } = await supabase
       .from('customer_audio')
       .insert({
-        customer_id: customerId,
-        shop_domain: shopDomain,
-        tenant_id: tenantId,
+        customer_id: customerId.toString(),
+        shop_domain: shopDomain.toString(),
+        tenant_id: tenantId.toString(),
         audio_url: audioUrl,
         filename: audio.name,
       })
@@ -99,10 +101,12 @@ serve(async (req) => {
     if (dbError) {
       console.error('Database error:', dbError);
       return new Response(
-        JSON.stringify({ error: 'Failed to save audio metadata' }),
+        JSON.stringify({ error: 'Failed to save audio metadata', details: dbError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('Audio record created:', audioRecord.id, 'for customer:', audioRecord.customer_id);
 
     return new Response(
       JSON.stringify({
