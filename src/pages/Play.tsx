@@ -462,27 +462,61 @@ const Play = () => {
       // If shopDomain is already set (from previous render), use it
       loadTenantForShop(shopDomain, false);
     } else {
-      // No shop available, try to load any tenant
+      // Try to auto-detect tenant by app domain or fallback to first active tenant
       const fetchTenant = async () => {
         try {
-          const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
-            .from("tenants")
-            .select("id, name, tenant_key, shop_domain, environment")
-            .eq("is_active", true)
-            .limit(1)
-            .maybeSingle();
+          // Import auto-detect function
+          const { autoDetectTenant } = await import("@/lib/tenants");
+          const detectedTenant = autoDetectTenant(urlParams);
+          
+          if (detectedTenant && detectedTenant.shopDomain) {
+            // Load the detected tenant from database
+            const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
+              .from("tenants")
+              .select("id, name, tenant_key, shop_domain, environment")
+              .eq("shop_domain", detectedTenant.shopDomain)
+              .eq("is_active", true)
+              .maybeSingle();
 
-          if (dbTenant) {
-            const mappedTenant: TenantConfig = {
-              id: dbTenant.id,
-              name: dbTenant.name,
-              tenant_key: dbTenant.tenant_key,
-              shop_domain: dbTenant.shop_domain,
-              environment: dbTenant.environment,
-              verified: true,
-            };
-            setTenant(mappedTenant);
-            setShopDomain(dbTenant.shop_domain);
+            if (dbTenant) {
+              const mappedTenant: TenantConfig = {
+                id: dbTenant.id,
+                name: dbTenant.name,
+                tenant_key: dbTenant.tenant_key,
+                shop_domain: dbTenant.shop_domain,
+                environment: dbTenant.environment,
+                verified: true,
+              };
+              setTenant(mappedTenant);
+              setShopDomain(dbTenant.shop_domain);
+              console.log('✅ Tenant auto-detected and loaded:', {
+                detectionMethod: detectedTenant.appDomains ? 'app domain' : 'shop parameter',
+                hostname: window.location.hostname,
+                tenant: mappedTenant,
+              });
+            }
+          } else {
+            // Fallback: load first active tenant
+            console.log('ℹ️ No tenant auto-detected, loading first active tenant as fallback');
+            const { data: dbTenant } = await (await import("@/integrations/supabase/client")).supabase
+              .from("tenants")
+              .select("id, name, tenant_key, shop_domain, environment")
+              .eq("is_active", true)
+              .limit(1)
+              .maybeSingle();
+
+            if (dbTenant) {
+              const mappedTenant: TenantConfig = {
+                id: dbTenant.id,
+                name: dbTenant.name,
+                tenant_key: dbTenant.tenant_key,
+                shop_domain: dbTenant.shop_domain,
+                environment: dbTenant.environment,
+                verified: true,
+              };
+              setTenant(mappedTenant);
+              setShopDomain(dbTenant.shop_domain);
+            }
           }
         } catch (error) {
           console.error("Error loading tenant:", error);

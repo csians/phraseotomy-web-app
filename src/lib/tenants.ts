@@ -3,6 +3,7 @@ export interface TenantConfig {
   shopDomain: string;
   displayName: string;
   themeColor?: string;
+  appDomains?: string[]; // Custom app domains for this tenant
 }
 
 // Tenant configurations for different Shopify stores
@@ -12,12 +13,14 @@ const tenants: TenantConfig[] = [
     shopDomain: 'testing-cs-store.myshopify.com',
     displayName: 'Phraseotomy Staging',
     themeColor: '#FCD34D',
+    appDomains: ['phraseotomy.ourstagingserver.com', 'localhost'],
   },
   {
     id: 'prod',
-    shopDomain: 'phraseotomy.myshopify.com',
+    shopDomain: 'qxqtbf-21.myshopify.com',
     displayName: 'Phraseotomy',
     themeColor: '#FBBF24',
+    appDomains: ['app.phraseotomy.com'],
   },
 ];
 
@@ -41,6 +44,62 @@ export function getTenantConfig(shopDomain: string): TenantConfig | null {
  */
 export function getAllTenants(): TenantConfig[] {
   return [...tenants];
+}
+
+/**
+ * Get tenant configuration based on current app domain
+ * @param hostname - The current hostname (e.g., "app.phraseotomy.com")
+ * @returns Tenant configuration or null if not found
+ */
+export function getTenantByAppDomain(hostname: string): TenantConfig | null {
+  const normalizedHostname = hostname.toLowerCase().trim();
+  const tenant = tenants.find(
+    (t) => t.appDomains?.some(domain => normalizedHostname.includes(domain))
+  );
+  
+  return tenant || null;
+}
+
+/**
+ * Auto-detect tenant based on current environment
+ * Checks app domain first, then falls back to shop parameter
+ * @param searchParams - URLSearchParams object for shop parameter fallback
+ * @returns Tenant configuration or null if not found
+ */
+export function autoDetectTenant(searchParams?: URLSearchParams | string): TenantConfig | null {
+  // First try to detect by app domain
+  const hostname = window.location.hostname;
+  const tenantByDomain = getTenantByAppDomain(hostname);
+  
+  if (tenantByDomain) {
+    console.log('🎯 Tenant detected by app domain:', {
+      hostname,
+      tenant: tenantByDomain.id,
+      shopDomain: tenantByDomain.shopDomain
+    });
+    return tenantByDomain;
+  }
+  
+  // Fallback to shop parameter
+  if (searchParams) {
+    const params = typeof searchParams === 'string' 
+      ? new URLSearchParams(searchParams) 
+      : searchParams;
+    const shop = params.get('shop');
+    
+    if (shop) {
+      const tenantByShop = getTenantConfig(shop);
+      if (tenantByShop) {
+        console.log('🎯 Tenant detected by shop parameter:', {
+          shop,
+          tenant: tenantByShop.id
+        });
+        return tenantByShop;
+      }
+    }
+  }
+  
+  return null;
 }
 
 /**
