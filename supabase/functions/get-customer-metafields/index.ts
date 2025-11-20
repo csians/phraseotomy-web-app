@@ -102,10 +102,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Note: You'll need to store Shopify Admin API access token in tenant config
-    // For now, we'll use a placeholder - you need to implement OAuth flow
-    // or use a service account token
-    const accessToken = tenant.shopify_admin_access_token || tenant.shopify_client_secret;
+    // Use the access_token from tenant configuration
+    const accessToken = tenant.access_token;
 
     if (!accessToken) {
       return new Response(
