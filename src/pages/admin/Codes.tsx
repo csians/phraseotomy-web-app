@@ -9,10 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Check, ChevronsUpDown } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { redemptionCodeSchema, packsArraySchema, validateInput } from "@/lib/validation";
+import { cn } from "@/lib/utils";
 
 type LicenseCode = Tables<"license_codes">;
 
@@ -40,8 +43,22 @@ const Codes = () => {
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assigningCode, setAssigningCode] = useState<LicenseCode | null>(null);
-  const [customerIdInput, setCustomerIdInput] = useState("");
-  const [customerEmailInput, setCustomerEmailInput] = useState("");
+  
+  // Customer search state
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [searchedCustomers, setSearchedCustomers] = useState<Array<{
+    id: string;
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+  }>>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<{
+    id: string;
+    email: string;
+    name: string;
+  } | null>(null);
+  const [searchingCustomers, setSearchingCustomers] = useState(false);
 
   // Load codes when tenant is available
   useEffect(() => {
@@ -195,11 +212,56 @@ const Codes = () => {
     });
   };
 
+  const searchCustomers = async (query: string) => {
+    if (!tenant?.shop_domain || query.length < 2) {
+      setSearchedCustomers([]);
+      return;
+    }
+
+    setSearchingCustomers(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('search-shopify-customers', {
+        body: {
+          query,
+          shop_domain: tenant.shop_domain,
+        },
+      });
+
+      if (error || !data?.success) {
+        console.error('Error searching customers:', error || data?.error);
+        setSearchedCustomers([]);
+        return;
+      }
+
+      setSearchedCustomers(data.customers || []);
+    } catch (error) {
+      console.error('Error searching customers:', error);
+      setSearchedCustomers([]);
+    } finally {
+      setSearchingCustomers(false);
+    }
+  };
+
+  // Debounce customer search
+  useEffect(() => {
+    if (customerSearchQuery.length < 2) {
+      setSearchedCustomers([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      searchCustomers(customerSearchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [customerSearchQuery, tenant?.shop_domain]);
+
   const handleAssignCode = async () => {
-    if (!assigningCode || !customerIdInput || !tenant) {
+    if (!assigningCode || !selectedCustomer || !tenant) {
       toast({
         title: "Error",
-        description: "Please provide customer ID",
+        description: "Please select a customer",
         variant: "destructive",
       });
       return;
@@ -210,8 +272,8 @@ const Codes = () => {
     try {
       const { data, error } = await supabase.functions.invoke('update-customer-metafield', {
         body: {
-          customerId: customerIdInput.trim(),
-          customerEmail: customerEmailInput.trim(),
+          customerId: selectedCustomer.id,
+          customerEmail: selectedCustomer.email,
           code: assigningCode.code,
           shopDomain: tenant.shop_domain,
         },
@@ -228,8 +290,9 @@ const Codes = () => {
 
       setAssignDialogOpen(false);
       setAssigningCode(null);
-      setCustomerIdInput("");
-      setCustomerEmailInput("");
+      setSelectedCustomer(null);
+      setCustomerSearchQuery("");
+      setSearchedCustomers([]);
     } catch (error) {
       console.error('Error assigning code:', error);
       toast({
@@ -244,8 +307,9 @@ const Codes = () => {
 
   const openAssignDialog = (code: LicenseCode) => {
     setAssigningCode(code);
-    setCustomerIdInput("");
-    setCustomerEmailInput("");
+    setSelectedCustomer(null);
+    setCustomerSearchQuery("");
+    setSearchedCustomers([]);
     setAssignDialogOpen(true);
   };
 
@@ -458,46 +522,94 @@ const Codes = () => {
 
         {/* Assign Code Dialog */}
         <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Assign Code to Customer</DialogTitle>
               <DialogDescription>
                 Assign code "{assigningCode?.code}" to a customer's Shopify metafields
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="customer-id">Customer ID *</Label>
-                <Input
-                  id="customer-id"
-                  placeholder="e.g., 9305249448029"
-                  value={customerIdInput}
-                  onChange={(e) => setCustomerIdInput(e.target.value)}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Find this in Shopify Admin → Customers → Customer Details
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="customer-email">Customer Email (optional)</Label>
-                <Input
-                  id="customer-email"
-                  type="email"
-                  placeholder="customer@example.com"
-                  value={customerEmailInput}
-                  onChange={(e) => setCustomerEmailInput(e.target.value)}
-                />
+                <Label>Search Customer</Label>
+                <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerSearchOpen}
+                      className="w-full justify-between"
+                    >
+                      {selectedCustomer
+                        ? `${selectedCustomer.name} (${selectedCustomer.email})`
+                        : "Search by email or name..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[460px] p-0 bg-popover z-50" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Type email or name..." 
+                        value={customerSearchQuery}
+                        onValueChange={setCustomerSearchQuery}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {searchingCustomers ? "Searching..." : customerSearchQuery.length < 2 ? "Type at least 2 characters" : "No customers found"}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {searchedCustomers.map((customer) => {
+                            const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'No name';
+                            return (
+                              <CommandItem
+                                key={customer.id}
+                                value={customer.id}
+                                onSelect={() => {
+                                  setSelectedCustomer({
+                                    id: customer.id,
+                                    email: customer.email,
+                                    name,
+                                  });
+                                  setCustomerSearchOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{name}</span>
+                                  <span className="text-sm text-muted-foreground">{customer.email}</span>
+                                </div>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {selectedCustomer && (
+                  <p className="text-sm text-muted-foreground">
+                    Customer ID: {selectedCustomer.id}
+                  </p>
+                )}
               </div>
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
+              <Button 
+                variant="outline" 
                 onClick={() => setAssignDialogOpen(false)}
                 disabled={loading}
               >
                 Cancel
               </Button>
-              <Button onClick={handleAssignCode} disabled={loading || !customerIdInput}>
+              <Button 
+                onClick={handleAssignCode}
+                disabled={!selectedCustomer || loading}
+              >
                 {loading ? "Assigning..." : "Assign Code"}
               </Button>
             </DialogFooter>
