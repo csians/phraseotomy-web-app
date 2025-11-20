@@ -183,31 +183,24 @@ const Codes = () => {
           },
         });
 
-        if (error) {
-          throw error;
+        if (error || !data?.success) {
+          throw new Error(data?.error || 'Failed to assign code to customer');
         }
       }
 
-      // Update the code status
-      const updates: Partial<LicenseCode> = {
-        status: formData.status,
-      };
+      // Update the code status using edge function (bypasses RLS)
+      const { data: updateData, error: updateError } = await supabase.functions.invoke('update-license-code', {
+        body: {
+          codeId: editingCode.id,
+          status: formData.status,
+          shopDomain: tenant.shop_domain,
+        },
+      });
 
-      // If status is being changed to unused, clear redemption data
-      if (formData.status === "unused") {
-        updates.redeemed_by = null;
-        updates.redeemed_at = null;
-      }
-
-      const { error: updateError } = await supabase
-        .from("license_codes")
-        .update(updates)
-        .eq("id", editingCode.id);
-
-      if (updateError) {
+      if (updateError || !updateData?.success) {
         toast({
           title: "Error updating code",
-          description: updateError.message,
+          description: updateData?.error || updateError?.message || 'Failed to update code',
           variant: "destructive",
         });
         setLoading(false);
