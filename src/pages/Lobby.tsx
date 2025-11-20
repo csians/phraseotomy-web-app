@@ -59,9 +59,23 @@ export default function Lobby() {
         .from('game_sessions')
         .select('*')
         .eq('id', sessionId)
-        .single();
+        .maybeSingle();
 
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        console.error('Session fetch error:', sessionError);
+        throw sessionError;
+      }
+      
+      if (!sessionData) {
+        toast({
+          title: "Session not found",
+          description: "This game session doesn't exist or you don't have access to it",
+          variant: "destructive",
+        });
+        navigate("/play");
+        return;
+      }
+
       setSession(sessionData);
 
       // Fetch players in this session
