@@ -1,0 +1,124 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const formData = await req.formData();
+    const audio = formData.get('audio');
+    const customerId = formData.get('customer_id');
+    const shopDomain = formData.get('shop_domain');
+    const tenantId = formData.get('tenant_id');
+
+    if (!audio || !(audio instanceof File)) {
+      return new Response(
+        JSON.stringify({ error: 'No audio file provided' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!customerId || !shopDomain || !tenantId) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate file size (10MB max)
+    if (audio.size > 10 * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({ error: 'File size exceeds 10MB limit' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate file type
+    const allowedTypes = ['audio/webm', 'audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/ogg'];
+    if (!allowedTypes.includes(audio.type)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid file type. Allowed: webm, wav, mp3, ogg' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const fileExtension = audio.name.split('.').pop() || 'webm';
+    const filename = `customer_${customerId}_${timestamp}.${fileExtension}`;
+    const filePath = `${shopDomain}/${customerId}/${filename}`;
+
+    // Upload to Supabase Storage
+    const arrayBuffer = await audio.arrayBuffer();
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('audio_uploads')
+      .upload(filePath, arrayBuffer, {
+        contentType: audio.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to upload audio file' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('audio_uploads')
+      .getPublicUrl(filePath);
+
+    const audioUrl = urlData.publicUrl;
+
+    // Insert metadata into customer_audio table
+    const { data: audioRecord, error: dbError } = await supabase
+      .from('customer_audio')
+      .insert({
+        customer_id: customerId,
+        shop_domain: shopDomain,
+        tenant_id: tenantId,
+        audio_url: audioUrl,
+        filename: audio.name,
+      })
+      .select()
+      .single();
+
+    if (dbError) {
+      console.error('Database error:', dbError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to save audio metadata' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        audio_url: audioUrl,
+        audio_id: audioRecord.id,
+        message: 'Audio uploaded successfully',
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

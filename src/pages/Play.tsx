@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { CustomerAudioUpload } from "@/components/CustomerAudioUpload";
 import type { TenantConfig, ShopifyCustomer } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
 import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
@@ -901,25 +902,42 @@ const Play = () => {
               </CardContent>
             </Card>
 
-            {/* Host New Game */}
-            <Card className="bg-card border-game-gray">
-              <CardHeader>
-                <CardTitle className="text-lg">Host New Game</CardTitle>
-                <CardDescription>
-                  {hasActiveLicenses ? "Start a new game session and invite friends" : "Redeem a code to host games"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  onClick={handleHostGame}
-                  disabled={!hasActiveLicenses}
-                  className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                  size="lg"
-                >
-                  {hasActiveLicenses ? "Host New Game" : "Unlock with Code First"}
-                </Button>
-              </CardContent>
-            </Card>
+            {/* Host New Game & Audio Upload */}
+            {hasActiveLicenses && (
+              <div className="space-y-4">
+                <Card className="bg-card border-game-gray">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Host New Game</CardTitle>
+                    <CardDescription>
+                      Start a new game session and invite friends
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      onClick={handleHostGame}
+                      className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold"
+                      size="lg"
+                    >
+                      Host New Game
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {tenant && (
+                  <CustomerAudioUpload
+                    customerId={customer!.id}
+                    shopDomain={shopDomain}
+                    tenantId={tenant.id}
+                    onUploadComplete={() => {
+                      toast({
+                        title: "Success",
+                        description: "Audio uploaded successfully!",
+                      });
+                    }}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Your Games */}
             <Card className="bg-card border-game-gray">
@@ -943,7 +961,11 @@ const Play = () => {
                           <p className="font-mono text-lg text-game-yellow font-bold">{session.lobby_code}</p>
                           <p className="text-xs text-muted-foreground capitalize">{session.status}</p>
                         </div>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => navigate(`/lobby/${session.id}`)}
+                        >
                           Rejoin
                         </Button>
                       </div>
