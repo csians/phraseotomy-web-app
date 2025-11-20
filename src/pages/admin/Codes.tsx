@@ -13,7 +13,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Pencil, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Check, ChevronsUpDown, Trash2 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { redemptionCodeSchema, packsArraySchema, validateInput } from "@/lib/validation";
 import { cn } from "@/lib/utils";
@@ -351,6 +351,55 @@ const Codes = () => {
     setAssignDialogOpen(true);
   };
 
+  const handleDeleteCode = async (code: LicenseCode) => {
+    if (!tenant?.shop_domain) {
+      toast({
+        title: "Error",
+        description: "Tenant not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const confirmed = confirm(
+      `Are you sure you want to delete code "${code.code}"?\n\nThis will:\n- Delete the code permanently\n- Revoke access for any customers who redeemed it\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-license-code', {
+        body: {
+          codeId: code.id,
+          shopDomain: tenant.shop_domain,
+        },
+      });
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || 'Failed to delete code');
+      }
+
+      toast({
+        title: "Code deleted",
+        description: data.message || "Code deleted and customer access revoked",
+      });
+
+      // Reload codes
+      await loadCodes();
+    } catch (error) {
+      console.error('Error deleting code:', error);
+      toast({
+        title: "Error deleting code",
+        description: error instanceof Error ? error.message : "Failed to delete code",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "—";
     return new Date(dateString).toLocaleString();
@@ -516,13 +565,23 @@ const Codes = () => {
                           : "—"}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(code)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(code)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteCode(code)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
