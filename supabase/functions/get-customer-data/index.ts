@@ -91,10 +91,10 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch tenant to get tenant_id
+    // Fetch tenant to get tenant_id and access token
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('id')
+      .select('id, access_token, shop_domain')
       .eq('shop_domain', shopDomain)
       .eq('is_active', true)
       .single();
@@ -104,6 +104,51 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Tenant not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Fetch customer details from Shopify Admin API
+    let customerDetails = null;
+    if (tenant.access_token) {
+      try {
+        const shopifyResponse = await fetch(
+          `https://${shopDomain}/admin/api/2024-01/customers/${customerId}.json`,
+          {
+            headers: {
+              'X-Shopify-Access-Token': tenant.access_token,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (shopifyResponse.ok) {
+          const shopifyData = await shopifyResponse.json();
+          customerDetails = {
+            id: customerId,
+            email: shopifyData.customer?.email || null,
+            name: shopifyData.customer?.first_name && shopifyData.customer?.last_name 
+              ? `${shopifyData.customer.first_name} ${shopifyData.customer.last_name}`
+              : shopifyData.customer?.first_name || shopifyData.customer?.last_name || null,
+            first_name: shopifyData.customer?.first_name || null,
+            last_name: shopifyData.customer?.last_name || null,
+          };
+          console.log('✅ Customer details fetched from Shopify:', customerDetails);
+        } else {
+          console.warn('⚠️ Failed to fetch customer from Shopify:', shopifyResponse.status, await shopifyResponse.text());
+        }
+      } catch (error) {
+        console.error('Error fetching customer from Shopify:', error);
+      }
+    }
+
+    // Fallback if Shopify API call failed
+    if (!customerDetails) {
+      customerDetails = {
+        id: customerId,
+        email: null,
+        name: null,
+        first_name: null,
+        last_name: null,
+      };
     }
 
     // Fetch customer licenses for this customer and shop
@@ -141,6 +186,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        customer: customerDetails,
         licenses: licenses || [],
         sessions: sessions || [],
         tenantId: tenant.id,

@@ -328,18 +328,19 @@ const Play = () => {
                     console.log('📦 Full Customer Data Retrieved:', {
                       customer_id: customerIdParam,
                       shop: verifiedShop,
+                      customer: customerData.customer,
                       licenses: customerData.licenses || [],
                       sessions: customerData.sessions || [],
                       tenantId: customerData.tenantId,
                     });
 
-                    // Set customer state (basic customer object)
+                    // Set customer state with data from Shopify
                     const customerObj: ShopifyCustomer = {
                       id: customerIdParam,
-                      email: null, // Will be available from Shopify if needed
-                      firstName: null,
-                      lastName: null,
-                      name: null,
+                      email: customerData.customer?.email || null,
+                      firstName: customerData.customer?.first_name || null,
+                      lastName: customerData.customer?.last_name || null,
+                      name: customerData.customer?.name || null,
                     };
                     setCustomer(customerObj);
 
