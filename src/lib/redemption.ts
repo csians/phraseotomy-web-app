@@ -15,6 +15,41 @@ export interface RedemptionResult {
 }
 
 /**
+ * Verify code against Shopify customer metafields
+ */
+async function verifyCodeInMetafields(
+  code: string,
+  customerId: string,
+  shopDomain: string
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke('get-customer-metafields', {
+      body: { customerId, shopDomain },
+    });
+
+    if (error || !data?.metafields) {
+      console.error('Error fetching customer metafields:', error);
+      return false;
+    }
+
+    // Check if any metafield contains the redemption code
+    const metafields = data.metafields as Array<{
+      namespace: string;
+      key: string;
+      value: string;
+    }>;
+
+    return metafields.some((mf) => 
+      mf.key.toLowerCase().includes('redeem') && 
+      mf.value.toUpperCase() === code.toUpperCase()
+    );
+  } catch (error) {
+    console.error('Error verifying metafields:', error);
+    return false;
+  }
+}
+
+/**
  * Redeem a license code for a customer
  */
 export async function redeemCode(
@@ -32,6 +67,17 @@ export async function redeemCode(
         success: false,
         message: validationError instanceof Error ? validationError.message : 'Invalid code format',
         error: 'INVALID_FORMAT',
+      };
+    }
+
+    // First, verify the code exists in Shopify customer metafields
+    const isValidInShopify = await verifyCodeInMetafields(normalizedCode, customerId, shopDomain);
+    
+    if (!isValidInShopify) {
+      return {
+        success: false,
+        message: 'Code not found in your account. Please contact support.',
+        error: 'CODE_NOT_IN_METAFIELDS',
       };
     }
 
