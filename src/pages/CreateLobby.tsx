@@ -124,21 +124,21 @@ export default function CreateLobby() {
     try {
       const lobbyCode = generateLobbyCode();
       
-      const { data, error } = await supabase
-        .from('game_sessions')
-        .insert({
-          lobby_code: lobbyCode,
-          host_customer_id: customer.id,
-          host_customer_name: customer.name || customer.email,
-          shop_domain: shopDomain,
-          tenant_id: tenant.id,
-          packs_used: selectedPacks,
-          status: 'waiting',
-        })
-        .select()
-        .single();
+      // Use edge function to create session (bypasses RLS with service role)
+      const { data, error } = await supabase.functions.invoke('create-game-session', {
+        body: {
+          lobbyCode,
+          hostCustomerId: customer.id,
+          hostCustomerName: customer.name || customer.email,
+          shopDomain,
+          tenantId: tenant.id,
+          packsUsed: selectedPacks,
+        },
+      });
 
-      if (error) throw error;
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || 'Failed to create lobby');
+      }
 
       toast({
         title: 'Lobby Created!',
@@ -146,12 +146,12 @@ export default function CreateLobby() {
       });
 
       // Redirect back to play page with lobby info
-      navigate('/play', { state: { newLobby: data } });
+      navigate('/play', { state: { newLobby: data.session } });
     } catch (error) {
       console.error('Error creating lobby:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create lobby. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to create lobby. Please try again.',
         variant: 'destructive',
       });
     } finally {
