@@ -48,31 +48,50 @@ export default function Lobby() {
     }
 
     fetchLobbyData();
+    fetchCustomerAudio();
   }, [sessionId]);
+
+  const fetchCustomerAudio = async () => {
+    try {
+      // Get customer ID from session storage
+      const sessionData = sessionStorage.getItem('customerData');
+      
+      if (!sessionData) {
+        console.log('No customer data in session storage');
+        return;
+      }
+
+      const parsed = JSON.parse(sessionData);
+      const currentCustomerId = parsed.customer_id || parsed.id;
+      
+      console.log('Fetching audio for customer:', currentCustomerId);
+
+      const { data, error } = await supabase.functions.invoke('get-customer-audio', {
+        body: { customerId: currentCustomerId }
+      });
+
+      if (error) {
+        console.error('Error fetching customer audio:', error);
+        return;
+      }
+
+      console.log('Audio files received:', data?.audioFiles?.length || 0);
+      setAudioFiles(data?.audioFiles || []);
+
+    } catch (error) {
+      console.error('Error in fetchCustomerAudio:', error);
+    }
+  };
 
   const fetchLobbyData = async () => {
     try {
       setLoading(true);
 
-      // Get customer ID from session storage
-      const sessionData = sessionStorage.getItem('customerData');
-      let currentCustomerId = null;
-      
-      if (sessionData) {
-        try {
-          const parsed = JSON.parse(sessionData);
-          currentCustomerId = parsed.customer_id || parsed.id;
-          console.log('Current customer ID:', currentCustomerId);
-        } catch (e) {
-          console.error('Error parsing customer data:', e);
-        }
-      }
-
       console.log('Fetching lobby data for session:', sessionId);
 
       // Call edge function to fetch lobby data with service role permissions
       const { data, error } = await supabase.functions.invoke('get-lobby-data', {
-        body: { sessionId, customerId: currentCustomerId }
+        body: { sessionId, customerId: null }
       });
 
       if (error) {
@@ -94,15 +113,6 @@ export default function Lobby() {
 
       setSession(data.session);
       setPlayers(data.players || []);
-      
-      // Only set audio files if current user is the host
-      if (currentCustomerId && data.session.host_customer_id === currentCustomerId) {
-        setAudioFiles(data.audioFiles || []);
-        console.log('Host audio files loaded:', data.audioFiles?.length || 0);
-      } else {
-        setAudioFiles([]);
-        console.log('Not host - audio files hidden');
-      }
 
     } catch (error) {
       console.error('Error fetching lobby data:', error);
