@@ -300,8 +300,6 @@ const Play = () => {
               }
             } catch (error) {
               console.error('Error loading tenant:', error);
-            } finally {
-              setLoading(false);
             }
             
             // Handle customer_id from URL (after Shopify login)
@@ -316,6 +314,7 @@ const Play = () => {
 
                 if (sessionError) {
                   console.error('Error generating session token:', sessionError);
+                  setLoading(false);
                 } else if (sessionData?.sessionToken) {
                   localStorage.setItem('phraseotomy_session_token', sessionData.sessionToken);
                   console.log('✅ Session token generated and stored');
@@ -354,83 +353,18 @@ const Play = () => {
                   } else {
                     console.warn('⚠️ Could not fetch customer data:', customerError);
                   }
+                  
+                  // Set loading to false after customer data is processed
+                  setLoading(false);
                 }
               } catch (error) {
                 console.error('Error processing customer data:', error);
+                setLoading(false);
               }
-            }
-            
-            // Redirect through the Shopify app proxy to get customer data
-            // The proxy will inject customer, shop, and tenant data
-            const appEnv = import.meta.env.VITE_APP_ENV || "development";
-            
-            if (appEnv === "development") {
-              // Local development: Continue without redirect
-              // Customer data will be available when user logs in through Shopify
-              // The existing useEffect will detect customer data from window.__PHRASEOTOMY_CUSTOMER__
-              console.log('ℹ️ Local development: Continuing without redirect');
-              
-              // Summary of current state
-              console.log('📊 Current State Summary:', {
-                tokenVerified: true,
-                shop: verifiedShop,
-                tenantLoaded: !!loadedTenantId,
-                tenantId: loadedTenantId,
-                hasSessionToken: !!localStorage.getItem('phraseotomy_session_token'),
-                hasCustomerId: !!customerIdParam,
-                hasCustomerData: !!customer,
-                nextStep: customerIdParam 
-                  ? 'Customer data processing completed' 
-                  : 'Customer data will be available after Shopify login or when window.__PHRASEOTOMY_CUSTOMER__ is set',
-              });
-              
-              // Set up a periodic check for customer data (only if customer_id not in URL)
-              // This is a fallback in case customer data comes from window.__PHRASEOTOMY_CUSTOMER__
-              if (!customerIdParam) {
-                let checkCount = 0;
-                const maxChecks = 15; // 15 checks * 2 seconds = 30 seconds
-                const customerDataCheck = setInterval(() => {
-                  checkCount++;
-                  const customerData = window.__PHRASEOTOMY_CUSTOMER__;
-                  const newSessionToken = localStorage.getItem('phraseotomy_session_token');
-                  
-                  if (customerData) {
-                    console.log('✅ Customer data detected from window!', {
-                      id: customerData.id,
-                      email: customerData.email,
-                      name: customerData.name,
-                    });
-                    clearInterval(customerDataCheck);
-                  } else if (newSessionToken && newSessionToken !== sessionToken) {
-                    console.log('✅ New session token detected! Fetching customer data...');
-                    // Fetch customer data with new session token
-                    supabase.functions.invoke('get-customer-data', {
-                      body: { sessionToken: newSessionToken },
-                    }).then(({ data: customerData, error }) => {
-                      if (!error && customerData) {
-                        console.log('📦 Customer Data Retrieved:', {
-                          licenses: customerData.licenses || [],
-                          sessions: customerData.sessions || [],
-                          tenantId: customerData.tenantId,
-                        });
-                      }
-                    });
-                    clearInterval(customerDataCheck);
-                  } else if (checkCount >= maxChecks) {
-                    console.log('ℹ️ Customer data check completed. No customer data detected yet.');
-                    clearInterval(customerDataCheck);
-                  }
-                }, 2000);
-              }
-              
-              // Don't redirect, continue with loaded tenant
             } else {
-              // Production: redirect through Shopify app proxy to get customer data
-              const proxyUrl = `https://${verifiedShop}/apps/phraseotomy/play?r=${encodeURIComponent(token)}`;
-              console.log('🔄 Redirecting to proxy URL to get customer data:', proxyUrl);
-              console.log('ℹ️ If customer is logged in, customer data will be available after redirect');
-              window.location.href = proxyUrl;
-              return; // Stop execution as we're redirecting
+              // No customer_id in URL, set loading to false
+              console.log('ℹ️ No customer_id in URL - user not logged in or will be available via proxy');
+              setLoading(false);
             }
           } else {
             console.warn('⚠️ Invalid or expired token');
