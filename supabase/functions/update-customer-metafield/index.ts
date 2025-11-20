@@ -37,6 +37,8 @@ async function updateShopifyCustomerMetafield(
     },
   });
 
+  console.log("getResponse", getResponse)
+
   if (!getResponse.ok) {
     throw new Error(`Failed to fetch customer metafields: ${getResponse.status}`);
   }
