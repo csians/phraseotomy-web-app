@@ -13,7 +13,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Pencil, Check, ChevronsUpDown, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Check, ChevronsUpDown, Trash2, RefreshCw } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { redemptionCodeSchema, packsArraySchema, validateInput } from "@/lib/validation";
 import { cn } from "@/lib/utils";
@@ -446,13 +446,22 @@ const Codes = () => {
             </div>
           </div>
 
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Code
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={loadCodes}
+              disabled={loading}
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+              Refresh
+            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Code
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New License Code</DialogTitle>
@@ -510,6 +519,7 @@ const Codes = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card>
