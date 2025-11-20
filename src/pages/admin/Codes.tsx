@@ -38,6 +38,11 @@ const Codes = () => {
     status: "unused",
   });
 
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assigningCode, setAssigningCode] = useState<LicenseCode | null>(null);
+  const [customerIdInput, setCustomerIdInput] = useState("");
+  const [customerEmailInput, setCustomerEmailInput] = useState("");
+
   // Load codes when tenant is available
   useEffect(() => {
     if (tenant?.id) {
@@ -161,6 +166,60 @@ const Codes = () => {
     });
   };
 
+  const handleAssignCode = async () => {
+    if (!assigningCode || !customerIdInput || !tenant) {
+      toast({
+        title: "Error",
+        description: "Please provide customer ID",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('update-customer-metafield', {
+        body: {
+          customerId: customerIdInput.trim(),
+          customerEmail: customerEmailInput.trim(),
+          code: assigningCode.code,
+          shopDomain: tenant.shop_domain,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Code assigned",
+        description: data.message || `Code ${assigningCode.code} assigned to customer`,
+      });
+
+      setAssignDialogOpen(false);
+      setAssigningCode(null);
+      setCustomerIdInput("");
+      setCustomerEmailInput("");
+    } catch (error) {
+      console.error('Error assigning code:', error);
+      toast({
+        title: "Error assigning code",
+        description: error instanceof Error ? error.message : "Failed to assign code",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openAssignDialog = (code: LicenseCode) => {
+    setAssigningCode(code);
+    setCustomerIdInput("");
+    setCustomerEmailInput("");
+    setAssignDialogOpen(true);
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "—";
     return new Date(dateString).toLocaleString();
@@ -268,13 +327,13 @@ const Codes = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Redeemed By</TableHead>
-                    <TableHead>Redeemed At</TableHead>
-                    <TableHead>Expires At</TableHead>
-                    <TableHead>Packs Unlocked</TableHead>
-                    <TableHead>Actions</TableHead>
+              <TableHead>Code</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Redeemed By</TableHead>
+              <TableHead>Redeemed At</TableHead>
+              <TableHead>Expires At</TableHead>
+              <TableHead>Packs Unlocked</TableHead>
+              <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -364,6 +423,54 @@ const Codes = () => {
                 Cancel
               </Button>
               <Button onClick={handleEditCode}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign Code Dialog */}
+        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assign Code to Customer</DialogTitle>
+              <DialogDescription>
+                Assign code "{assigningCode?.code}" to a customer's Shopify metafields
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="customer-id">Customer ID *</Label>
+                <Input
+                  id="customer-id"
+                  placeholder="e.g., 9305249448029"
+                  value={customerIdInput}
+                  onChange={(e) => setCustomerIdInput(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Find this in Shopify Admin → Customers → Customer Details
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customer-email">Customer Email (optional)</Label>
+                <Input
+                  id="customer-email"
+                  type="email"
+                  placeholder="customer@example.com"
+                  value={customerEmailInput}
+                  onChange={(e) => setCustomerEmailInput(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setAssignDialogOpen(false)}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAssignCode} disabled={loading || !customerIdInput}>
+                {loading ? "Assigning..." : "Assign Code"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
