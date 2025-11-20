@@ -607,48 +607,6 @@ const Play = () => {
     }
   }, [loading, customer, shopDomain]);
 
-  // Auto-redirect to CreateLobby when customer is logged in AND has redeemed codes
-  useEffect(() => {
-    // Only redirect if:
-    // 1. Initial loading is complete
-    // 2. Customer data loading is complete
-    // 3. Customer is logged in (has customer data from Shopify)
-    // 4. Customer has active licenses (redeemed codes)
-    // 5. We have shop domain and tenant info
-    // 6. We're on the /play route (not already on create-lobby)
-    if (!loading && !dataLoading && customer && shopDomain && tenant && licenses.length > 0) {
-      const currentPath = window.location.pathname;
-      const isOnPlayPage = currentPath === '/play' || currentPath === '/apps/phraseotomy' || currentPath === '/';
-      
-      if (!isOnPlayPage) {
-        // Already on a different page, don't redirect
-        return;
-      }
-
-      // Check if customer just logged in (from URL params or fresh customer data)
-      const urlParams = new URLSearchParams(window.location.search);
-      const justLoggedIn = 
-        loginStatusFromUrl?.status === 'success' || 
-        urlParams.get('logged_in_customer_id') !== null ||
-        urlParams.get('customer_account') !== null;
-
-      // Small delay to ensure all data is loaded and UI is ready
-      const redirectTimer = setTimeout(() => {
-        console.log("🔄 Auto-redirecting logged-in customer with redeemed codes to CreateLobby", {
-          customer: customer.email || customer.id,
-          shopDomain,
-          licensesCount: licenses.length,
-          justLoggedIn,
-        });
-        navigate("/create-lobby", {
-          state: { customer, shopDomain, tenant },
-          replace: true,
-        });
-      }, 1000); // Delay to let user see they're logged in and have access
-
-      return () => clearTimeout(redirectTimer);
-    }
-  }, [loading, dataLoading, customer, shopDomain, tenant, licenses, navigate, loginStatusFromUrl]);
 
   const handleJoinGame = () => {
     try {
