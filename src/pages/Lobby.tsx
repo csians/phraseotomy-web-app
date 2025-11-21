@@ -19,6 +19,7 @@ interface AudioFile {
   filename: string;
   audio_url: string;
   created_at: string;
+  customer_id: string;
 }
 
 interface GameSession {
@@ -156,33 +157,54 @@ export default function Lobby() {
   let isHost = false;
   let currentCustomerId = null;
 
-  // Try sessionStorage first
-  const sessionDataStr = sessionStorage.getItem("customerData");
-  if (sessionDataStr) {
-    try {
-      const parsed = JSON.parse(sessionDataStr);
-      currentCustomerId = parsed.customer_id || parsed.id;
-    } catch (e) {
-      console.error("Error parsing session customer data:", e);
+  // Try multiple storage keys
+  const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
+  
+  for (const key of storageKeys) {
+    // Try sessionStorage
+    let dataStr = sessionStorage.getItem(key);
+    if (dataStr) {
+      try {
+        const parsed = JSON.parse(dataStr);
+        currentCustomerId = parsed.customer_id || parsed.id || parsed.customerId;
+        if (currentCustomerId) {
+          console.log(`Found customer ID in sessionStorage[${key}]:`, currentCustomerId);
+          break;
+        }
+      } catch (e) {
+        console.error(`Error parsing sessionStorage[${key}]:`, e);
+      }
+    }
+    
+    // Try localStorage
+    if (!currentCustomerId) {
+      dataStr = localStorage.getItem(key);
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(dataStr);
+          currentCustomerId = parsed.customer_id || parsed.id || parsed.customerId;
+          if (currentCustomerId) {
+            console.log(`Found customer ID in localStorage[${key}]:`, currentCustomerId);
+            break;
+          }
+        } catch (e) {
+          console.error(`Error parsing localStorage[${key}]:`, e);
+        }
+      }
     }
   }
 
-  // Fallback to localStorage
-  if (!currentCustomerId) {
-    const localDataStr = localStorage.getItem("phraseotomy_customer_data");
-    if (localDataStr) {
-      try {
-        const parsed = JSON.parse(localDataStr);
-        currentCustomerId = parsed.customer_id || parsed.id;
-      } catch (e) {
-        console.error("Error parsing local customer data:", e);
-      }
-    }
+  // If we have audio files, we can infer the customer ID from them
+  if (!currentCustomerId && audioFiles.length > 0) {
+    currentCustomerId = audioFiles[0].customer_id;
+    console.log("Inferred customer ID from audio files:", currentCustomerId);
   }
 
   if (currentCustomerId && session) {
     isHost = session.host_customer_id === currentCustomerId.toString();
     console.log("Host check:", { currentCustomerId, hostCustomerId: session.host_customer_id, isHost });
+  } else {
+    console.warn("Could not determine if user is host", { currentCustomerId, session: !!session });
   }
 
   return (
