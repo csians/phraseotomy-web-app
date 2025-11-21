@@ -43,18 +43,18 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Check if lobby exists and is accepting players (waiting or active)
+    // Check if lobby exists and is waiting for players (not started yet)
     const { data: session, error: sessionError } = await supabase
       .from("game_sessions")
       .select("*")
       .eq("lobby_code", lobbyCode.toUpperCase())
-      .in("status", ["waiting", "active"])
+      .eq("status", "waiting")
       .single();
 
     if (sessionError || !session) {
       console.error("Lobby not found or not accepting players:", sessionError);
       return new Response(
-        JSON.stringify({ error: "Lobby not found or has ended. Please check the lobby code." }),
+        JSON.stringify({ error: "Game has already started or lobby not found. You can only join games that haven't started yet." }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
