@@ -155,11 +155,14 @@ export default function Lobby() {
 
   // Check if current user is the host
   let isHost = false;
+  console.log("ishost", isHost);
   let currentCustomerId = null;
+
+  console.log("currentCustomerId", currentCustomerId);
 
   // Try multiple storage keys
   const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
-  
+
   for (const key of storageKeys) {
     // Try sessionStorage
     let dataStr = sessionStorage.getItem(key);
@@ -175,7 +178,7 @@ export default function Lobby() {
         console.error(`Error parsing sessionStorage[${key}]:`, e);
       }
     }
-    
+
     // Try localStorage
     if (!currentCustomerId) {
       dataStr = localStorage.getItem(key);
@@ -201,7 +204,9 @@ export default function Lobby() {
   }
 
   if (currentCustomerId && session) {
+    console.log("hello");
     isHost = session.host_customer_id === currentCustomerId.toString();
+    console.log("hiiiii");
     console.log("Host check:", { currentCustomerId, hostCustomerId: session.host_customer_id, isHost });
   } else {
     console.warn("Could not determine if user is host", { currentCustomerId, session: !!session });
