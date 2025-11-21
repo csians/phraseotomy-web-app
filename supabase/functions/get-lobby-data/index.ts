@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       throw playersError;
     }
 
-    // Fetch customer's audio files if customerId is provided
+    // Fetch customer's audio files if customerId is provided (for host to select)
     let audioData = [];
     if (customerId) {
       console.log('Fetching audio for customer ID:', customerId, 'Type:', typeof customerId);
@@ -86,6 +86,28 @@ Deno.serve(async (req) => {
       }
     } else {
       console.log('No customer ID provided for audio fetch');
+    }
+
+    // If game is active and has selected audio, fetch that audio for all players
+    let selectedAudioData = null;
+    if (sessionData.status === 'active' && sessionData.selected_audio_id) {
+      console.log('Fetching selected audio for all players:', sessionData.selected_audio_id);
+      const { data: selectedAudio, error: selectedAudioError } = await supabase
+        .from('customer_audio')
+        .select('*')
+        .eq('id', sessionData.selected_audio_id)
+        .maybeSingle();
+
+      if (selectedAudioError) {
+        console.error('Selected audio fetch error:', selectedAudioError);
+      } else if (selectedAudio) {
+        selectedAudioData = selectedAudio;
+        console.log('Selected audio found:', selectedAudio);
+        // Add selected audio to audioData if not already present
+        if (!audioData.find(a => a.id === selectedAudio.id)) {
+          audioData.push(selectedAudio);
+        }
+      }
     }
 
     return new Response(
