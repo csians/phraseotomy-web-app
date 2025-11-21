@@ -52,6 +52,56 @@ export default function Lobby() {
     fetchLobbyData();
   }, [sessionId]);
 
+  // Helper function to get current customer ID
+  const getCurrentCustomerId = () => {
+    console.log("=== Checking for customer ID ===");
+    
+    // Check URL parameters first (in case customer_id is in URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlCustomerId = urlParams.get('customer_id');
+    if (urlCustomerId) {
+      console.log("Found customer ID in URL:", urlCustomerId);
+      return urlCustomerId;
+    }
+
+    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
+
+    for (const key of storageKeys) {
+      // Try sessionStorage
+      let dataStr = sessionStorage.getItem(key);
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(dataStr);
+          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
+          if (customerId) {
+            console.log(`Found customer ID in sessionStorage[${key}]:`, customerId);
+            return String(customerId);
+          }
+        } catch (e) {
+          console.error(`Error parsing sessionStorage[${key}]:`, e);
+        }
+      }
+
+      // Try localStorage
+      dataStr = localStorage.getItem(key);
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(dataStr);
+          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
+          if (customerId) {
+            console.log(`Found customer ID in localStorage[${key}]:`, customerId);
+            return String(customerId);
+          }
+        } catch (e) {
+          console.error(`Error parsing localStorage[${key}]:`, e);
+        }
+      }
+    }
+
+    console.log("No customer ID found in storage or URL");
+    return null;
+  };
+
   const fetchCustomerAudio = async (customerId: string) => {
     try {
       console.log("customer id ", customerId);
@@ -78,10 +128,14 @@ export default function Lobby() {
       setLoading(true);
 
       console.log("Fetching lobby data for session:", sessionId);
+      
+      // Get current customer ID to pass to edge function
+      const currentCustomerId = getCurrentCustomerId();
+      console.log("Current customer ID for audio fetch:", currentCustomerId);
 
       // Call edge function to fetch lobby data with service role permissions
       const { data, error } = await supabase.functions.invoke("get-lobby-data", {
-        body: { sessionId, customerId: null },
+        body: { sessionId, customerId: currentCustomerId },
       });
 
       if (error) {
@@ -104,18 +158,9 @@ export default function Lobby() {
       setSession(data.session);
       setPlayers(data.players || []);
       
-      // Determine if current user is the host before fetching audio
-      const currentCustomerId = getCurrentCustomerId();
-      const isCurrentUserHost = currentCustomerId && data.session.host_customer_id === currentCustomerId.toString();
-      
-      // Only fetch audio files if current user is the host
-      if (isCurrentUserHost && data?.session?.host_customer_id) {
-        console.log("Current user is host, fetching audio:", data.session.host_customer_id);
-        await fetchCustomerAudio(data.session.host_customer_id);
-      } else {
-        console.log("Current user is not host, skipping audio fetch");
-        setAudioFiles([]);
-      }
+      // Set audio files from the response (edge function fetches them if user is host)
+      setAudioFiles(data.audioFiles || []);
+      console.log("Audio files from response:", data.audioFiles?.length || 0);
     } catch (error) {
       console.error("Error fetching lobby data:", error);
       toast({
@@ -193,56 +238,6 @@ export default function Lobby() {
       </div>
     );
   }
-
-  // Helper function to get current customer ID
-  const getCurrentCustomerId = () => {
-    console.log("=== Checking for customer ID ===");
-    
-    // Check URL parameters first (in case customer_id is in URL)
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlCustomerId = urlParams.get('customer_id');
-    if (urlCustomerId) {
-      console.log("Found customer ID in URL:", urlCustomerId);
-      return urlCustomerId;
-    }
-
-    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
-
-    for (const key of storageKeys) {
-      // Try sessionStorage
-      let dataStr = sessionStorage.getItem(key);
-      if (dataStr) {
-        try {
-          const parsed = JSON.parse(dataStr);
-          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
-          if (customerId) {
-            console.log(`Found customer ID in sessionStorage[${key}]:`, customerId);
-            return String(customerId);
-          }
-        } catch (e) {
-          console.error(`Error parsing sessionStorage[${key}]:`, e);
-        }
-      }
-
-      // Try localStorage
-      dataStr = localStorage.getItem(key);
-      if (dataStr) {
-        try {
-          const parsed = JSON.parse(dataStr);
-          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
-          if (customerId) {
-            console.log(`Found customer ID in localStorage[${key}]:`, customerId);
-            return String(customerId);
-          }
-        } catch (e) {
-          console.error(`Error parsing localStorage[${key}]:`, e);
-        }
-      }
-    }
-
-    console.log("No customer ID found in storage or URL");
-    return null;
-  };
 
   // Check if current user is the host
   const currentCustomerId = getCurrentCustomerId();
