@@ -235,6 +235,7 @@ export type Database = {
           id: string
           lobby_code: string
           packs_used: string[]
+          selected_audio_id: string | null
           shop_domain: string
           started_at: string | null
           status: string
@@ -249,6 +250,7 @@ export type Database = {
           id?: string
           lobby_code: string
           packs_used?: string[]
+          selected_audio_id?: string | null
           shop_domain: string
           started_at?: string | null
           status?: string
@@ -263,6 +265,7 @@ export type Database = {
           id?: string
           lobby_code?: string
           packs_used?: string[]
+          selected_audio_id?: string | null
           shop_domain?: string
           started_at?: string | null
           status?: string
@@ -270,6 +273,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "game_sessions_selected_audio_id_fkey"
+            columns: ["selected_audio_id"]
+            isOneToOne: false
+            referencedRelation: "customer_audio"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "game_sessions_tenant_id_fkey"
             columns: ["tenant_id"]
