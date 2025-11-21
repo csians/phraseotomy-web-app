@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getAppBridge } from "@/lib/appBridge";
 import { Redirect } from "@shopify/app-bridge/actions";
+import { DebugInfo } from "@/components/DebugInfo";
 import type { TenantConfig } from "@/lib/types";
 
 /**
@@ -374,6 +375,13 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
+        <DebugInfo 
+          tenant={tenant}
+          shopDomain={shopDomain}
+          customer={null}
+          backendConnected={true}
+        />
+
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
