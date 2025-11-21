@@ -104,12 +104,17 @@ export default function Lobby() {
       setSession(data.session);
       setPlayers(data.players || []);
       
-      // Always fetch audio files if we have a host customer ID
-      if (data?.session?.host_customer_id) {
-        console.log("Fetching audio for host:", data.session.host_customer_id);
+      // Determine if current user is the host before fetching audio
+      const currentCustomerId = getCurrentCustomerId();
+      const isCurrentUserHost = currentCustomerId && data.session.host_customer_id === currentCustomerId.toString();
+      
+      // Only fetch audio files if current user is the host
+      if (isCurrentUserHost && data?.session?.host_customer_id) {
+        console.log("Current user is host, fetching audio:", data.session.host_customer_id);
         await fetchCustomerAudio(data.session.host_customer_id);
       } else {
-        console.warn("No host_customer_id found in session data");
+        console.log("Current user is not host, skipping audio fetch");
+        setAudioFiles([]);
       }
     } catch (error) {
       console.error("Error fetching lobby data:", error);
@@ -189,64 +194,55 @@ export default function Lobby() {
     );
   }
 
-  // Check if current user is the host
-  let isHost = false;
-  console.log("ishost", isHost);
-  let currentCustomerId = null;
+  // Helper function to get current customer ID
+  const getCurrentCustomerId = () => {
+    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
 
-  console.log("currentCustomerId", currentCustomerId);
-
-  // Try multiple storage keys
-  const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
-
-  for (const key of storageKeys) {
-    // Try sessionStorage
-    let dataStr = sessionStorage.getItem(key);
-    if (dataStr) {
-      try {
-        const parsed = JSON.parse(dataStr);
-        currentCustomerId = parsed.customer_id || parsed.id || parsed.customerId;
-        if (currentCustomerId) {
-          console.log(`Found customer ID in sessionStorage[${key}]:`, currentCustomerId);
-          break;
+    for (const key of storageKeys) {
+      // Try sessionStorage
+      let dataStr = sessionStorage.getItem(key);
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(dataStr);
+          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
+          if (customerId) {
+            console.log(`Found customer ID in sessionStorage[${key}]:`, customerId);
+            return customerId;
+          }
+        } catch (e) {
+          console.error(`Error parsing sessionStorage[${key}]:`, e);
         }
-      } catch (e) {
-        console.error(`Error parsing sessionStorage[${key}]:`, e);
       }
-    }
 
-    // Try localStorage
-    if (!currentCustomerId) {
+      // Try localStorage
       dataStr = localStorage.getItem(key);
       if (dataStr) {
         try {
           const parsed = JSON.parse(dataStr);
-          currentCustomerId = parsed.customer_id || parsed.id || parsed.customerId;
-          if (currentCustomerId) {
-            console.log(`Found customer ID in localStorage[${key}]:`, currentCustomerId);
-            break;
+          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
+          if (customerId) {
+            console.log(`Found customer ID in localStorage[${key}]:`, customerId);
+            return customerId;
           }
         } catch (e) {
           console.error(`Error parsing localStorage[${key}]:`, e);
         }
       }
     }
-  }
 
-  // If we have audio files, we can infer the customer ID from them
-  if (!currentCustomerId && audioFiles.length > 0) {
-    currentCustomerId = audioFiles[0].customer_id;
-    console.log("Inferred customer ID from audio files:", currentCustomerId);
-  }
+    return null;
+  };
 
-  if (currentCustomerId && session) {
-    console.log("hello");
-    isHost = session.host_customer_id === currentCustomerId.toString();
-    console.log("hiiiii");
-    console.log("Host check:", { currentCustomerId, hostCustomerId: session.host_customer_id, isHost });
-  } else {
-    console.warn("Could not determine if user is host", { currentCustomerId, session: !!session });
-  }
+  // Check if current user is the host
+  const currentCustomerId = getCurrentCustomerId();
+  const isHost = currentCustomerId && session ? session.host_customer_id === currentCustomerId.toString() : false;
+  
+  console.log("Host check:", { 
+    currentCustomerId, 
+    hostCustomerId: session?.host_customer_id, 
+    isHost,
+    hasAudioFiles: audioFiles.length > 0
+  });
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -277,6 +273,9 @@ export default function Lobby() {
               <Users className="mr-2 h-5 w-5" />
               Players ({players.length})
             </CardTitle>
+            <CardDescription>
+              {isHost ? "You are the host" : "You are a player in this lobby"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {players.length === 0 ? (
@@ -285,7 +284,12 @@ export default function Lobby() {
               <ul className="space-y-2">
                 {players.map((player) => (
                   <li key={player.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                    <span className="font-medium">{player.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{player.name}</span>
+                      {player.player_id === session.host_customer_id && (
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Host</span>
+                      )}
+                    </div>
                     <span className="text-sm text-muted-foreground">Turn {player.turn_order}</span>
                   </li>
                 ))}
@@ -293,6 +297,20 @@ export default function Lobby() {
             )}
           </CardContent>
         </Card>
+
+        {!isHost && session.status === "waiting" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Waiting for Host</CardTitle>
+              <CardDescription>The host will select audio and start the game</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Please wait while the host prepares the game...
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {isHost && session.status === "waiting" && (
           <Card>
