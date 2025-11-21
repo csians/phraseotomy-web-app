@@ -52,6 +52,7 @@ export default function Lobby() {
 
   const fetchCustomerAudio = async (customerId: string) => {
     try {
+      console.log("customer id ", customerId);
       console.log("Fetching audio for customer:", customerId);
 
       const { data, error } = await supabase.functions.invoke("get-customer-audio", {
@@ -102,7 +103,8 @@ export default function Lobby() {
       setPlayers(data.players || []);
 
       // Fetch customer audio using the host's customer ID from the session
-      if (data.session.host_customer_id) {
+      if (data?.session?.host_customer_id) {
+        console.log("fetching......");
         await fetchCustomerAudio(data.session.host_customer_id);
       }
     } catch (error) {
