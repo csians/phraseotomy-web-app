@@ -53,56 +53,56 @@ export default function Lobby() {
 
   const fetchCustomerAudio = async () => {
     try {
+      consolr.log("hiiii");
       // Get customer ID from session storage (stored when customer logs in)
-      const customerDataStr = sessionStorage.getItem('customerData');
-      
+      const customerDataStr = sessionStorage.getItem("customerData");
+
       if (!customerDataStr) {
-        console.log('No customer data in session storage, checking localStorage');
-        
+        console.log("No customer data in session storage, checking localStorage");
+
         // Try to get from the Play page data
-        const playDataStr = localStorage.getItem('phraseotomy_customer_data');
+        const playDataStr = localStorage.getItem("phraseotomy_customer_data");
         if (!playDataStr) {
-          console.log('No customer data found');
+          console.log("No customer data found");
           return;
         }
-        
+
         const playData = JSON.parse(playDataStr);
         const currentCustomerId = playData.customer_id || playData.id;
-        console.log('Fetching audio for customer (from localStorage):', currentCustomerId);
-        
-        const { data, error } = await supabase.functions.invoke('get-customer-audio', {
-          body: { customerId: currentCustomerId }
+        console.log("Fetching audio for customer (from localStorage):", currentCustomerId);
+
+        const { data, error } = await supabase.functions.invoke("get-customer-audio", {
+          body: { customerId: currentCustomerId },
         });
 
         if (error) {
-          console.error('Error fetching customer audio:', error);
+          console.error("Error fetching customer audio:", error);
           return;
         }
 
-        console.log('Audio files received:', data?.audioFiles?.length || 0);
+        console.log("Audio files received:", data?.audioFiles?.length || 0);
         setAudioFiles(data?.audioFiles || []);
         return;
       }
 
       const parsed = JSON.parse(customerDataStr);
       const currentCustomerId = parsed.customer_id || parsed.id;
-      
-      console.log('Fetching audio for customer (from sessionStorage):', currentCustomerId);
 
-      const { data, error } = await supabase.functions.invoke('get-customer-audio', {
-        body: { customerId: currentCustomerId }
+      console.log("Fetching audio for customer (from sessionStorage):", currentCustomerId);
+
+      const { data, error } = await supabase.functions.invoke("get-customer-audio", {
+        body: { customerId: currentCustomerId },
       });
 
       if (error) {
-        console.error('Error fetching customer audio:', error);
+        console.error("Error fetching customer audio:", error);
         return;
       }
 
-      console.log('Audio files received:', data?.audioFiles?.length || 0);
+      console.log("Audio files received:", data?.audioFiles?.length || 0);
       setAudioFiles(data?.audioFiles || []);
-
     } catch (error) {
-      console.error('Error in fetchCustomerAudio:', error);
+      console.error("Error in fetchCustomerAudio:", error);
     }
   };
 
@@ -110,19 +110,19 @@ export default function Lobby() {
     try {
       setLoading(true);
 
-      console.log('Fetching lobby data for session:', sessionId);
+      console.log("Fetching lobby data for session:", sessionId);
 
       // Call edge function to fetch lobby data with service role permissions
-      const { data, error } = await supabase.functions.invoke('get-lobby-data', {
-        body: { sessionId, customerId: null }
+      const { data, error } = await supabase.functions.invoke("get-lobby-data", {
+        body: { sessionId, customerId: null },
       });
 
       if (error) {
-        console.error('Lobby data fetch error:', error);
+        console.error("Lobby data fetch error:", error);
         throw error;
       }
 
-      console.log('Lobby data received:', data);
+      console.log("Lobby data received:", data);
 
       if (!data?.session) {
         toast({
@@ -136,9 +136,8 @@ export default function Lobby() {
 
       setSession(data.session);
       setPlayers(data.players || []);
-
     } catch (error) {
-      console.error('Error fetching lobby data:', error);
+      console.error("Error fetching lobby data:", error);
       toast({
         title: "Error",
         description: "Failed to load lobby details",
@@ -186,44 +185,40 @@ export default function Lobby() {
   // Check if current user is the host
   let isHost = false;
   let currentCustomerId = null;
-  
+
   // Try sessionStorage first
-  const sessionDataStr = sessionStorage.getItem('customerData');
+  const sessionDataStr = sessionStorage.getItem("customerData");
   if (sessionDataStr) {
     try {
       const parsed = JSON.parse(sessionDataStr);
       currentCustomerId = parsed.customer_id || parsed.id;
     } catch (e) {
-      console.error('Error parsing session customer data:', e);
+      console.error("Error parsing session customer data:", e);
     }
   }
-  
+
   // Fallback to localStorage
   if (!currentCustomerId) {
-    const localDataStr = localStorage.getItem('phraseotomy_customer_data');
+    const localDataStr = localStorage.getItem("phraseotomy_customer_data");
     if (localDataStr) {
       try {
         const parsed = JSON.parse(localDataStr);
         currentCustomerId = parsed.customer_id || parsed.id;
       } catch (e) {
-        console.error('Error parsing local customer data:', e);
+        console.error("Error parsing local customer data:", e);
       }
     }
   }
-  
+
   if (currentCustomerId && session) {
     isHost = session.host_customer_id === currentCustomerId.toString();
-    console.log('Host check:', { currentCustomerId, hostCustomerId: session.host_customer_id, isHost });
+    console.log("Host check:", { currentCustomerId, hostCustomerId: session.host_customer_id, isHost });
   }
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/play")}
-          className="mb-4"
-        >
+        <Button variant="ghost" onClick={() => navigate("/play")} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Play
         </Button>
@@ -232,13 +227,13 @@ export default function Lobby() {
           <CardHeader>
             <CardTitle>Lobby: {session.lobby_code}</CardTitle>
             <CardDescription>
-              Host: {session.host_customer_name || 'Unknown'} • Status: {session.status}
+              Host: {session.host_customer_name || "Unknown"} • Status: {session.status}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Packs:</p>
-              <p className="text-sm">{session.packs_used.join(', ') || 'None'}</p>
+              <p className="text-sm">{session.packs_used.join(", ") || "None"}</p>
             </div>
           </CardContent>
         </Card>
@@ -256,14 +251,9 @@ export default function Lobby() {
             ) : (
               <ul className="space-y-2">
                 {players.map((player) => (
-                  <li
-                    key={player.id}
-                    className="flex items-center justify-between p-2 rounded-md bg-muted/50"
-                  >
+                  <li key={player.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
                     <span className="font-medium">{player.name}</span>
-                    <span className="text-sm text-muted-foreground">
-                      Turn {player.turn_order}
-                    </span>
+                    <span className="text-sm text-muted-foreground">Turn {player.turn_order}</span>
                   </li>
                 ))}
               </ul>
@@ -278,9 +268,7 @@ export default function Lobby() {
                 <Music className="mr-2 h-5 w-5" />
                 Select Audio
               </CardTitle>
-              <CardDescription>
-                Choose an audio file for this game
-              </CardDescription>
+              <CardDescription>Choose an audio file for this game</CardDescription>
             </CardHeader>
             <CardContent>
               {audioFiles.length === 0 ? (
@@ -291,10 +279,7 @@ export default function Lobby() {
                 <RadioGroup value={selectedAudio} onValueChange={setSelectedAudio}>
                   <div className="space-y-2">
                     {audioFiles.map((audio) => (
-                      <div
-                        key={audio.id}
-                        className="flex items-center space-x-2 p-3 rounded-md border"
-                      >
+                      <div key={audio.id} className="flex items-center space-x-2 p-3 rounded-md border">
                         <RadioGroupItem value={audio.id} id={audio.id} />
                         <Label htmlFor={audio.id} className="flex-1 cursor-pointer">
                           <div className="flex flex-col">
@@ -311,11 +296,7 @@ export default function Lobby() {
               )}
 
               {audioFiles.length > 0 && (
-                <Button
-                  onClick={handleStartGame}
-                  className="w-full mt-4"
-                  disabled={!selectedAudio}
-                >
+                <Button onClick={handleStartGame} className="w-full mt-4" disabled={!selectedAudio}>
                   Start Game
                 </Button>
               )}
