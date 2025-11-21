@@ -119,7 +119,7 @@ export default function Lobby() {
     }
   };
 
-  const handleStartGame = () => {
+  const handleStartGame = async () => {
     if (!selectedAudio) {
       toast({
         title: "Select Audio",
@@ -129,12 +129,42 @@ export default function Lobby() {
       return;
     }
 
-    toast({
-      title: "Game Starting",
-      description: "Starting the game with selected audio...",
-    });
+    try {
+      // Update game session with selected audio and start the game
+      const { error } = await supabase
+        .from("game_sessions")
+        .update({
+          selected_audio_id: selectedAudio,
+          status: "active",
+          started_at: new Date().toISOString(),
+        })
+        .eq("id", sessionId);
 
-    // TODO: Implement game start logic
+      if (error) {
+        console.error("Error starting game:", error);
+        toast({
+          title: "Error",
+          description: "Failed to start the game. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Game Started!",
+        description: "The game has been started with the selected audio.",
+      });
+
+      // Refresh lobby data to show updated status
+      await fetchLobbyData();
+    } catch (error) {
+      console.error("Error in handleStartGame:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
