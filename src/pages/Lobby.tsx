@@ -196,6 +196,16 @@ export default function Lobby() {
 
   // Helper function to get current customer ID
   const getCurrentCustomerId = () => {
+    console.log("=== Checking for customer ID ===");
+    
+    // Check URL parameters first (in case customer_id is in URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlCustomerId = urlParams.get('customer_id');
+    if (urlCustomerId) {
+      console.log("Found customer ID in URL:", urlCustomerId);
+      return urlCustomerId;
+    }
+
     const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
 
     for (const key of storageKeys) {
@@ -207,7 +217,7 @@ export default function Lobby() {
           const customerId = parsed.customer_id || parsed.id || parsed.customerId;
           if (customerId) {
             console.log(`Found customer ID in sessionStorage[${key}]:`, customerId);
-            return customerId;
+            return String(customerId);
           }
         } catch (e) {
           console.error(`Error parsing sessionStorage[${key}]:`, e);
@@ -222,7 +232,7 @@ export default function Lobby() {
           const customerId = parsed.customer_id || parsed.id || parsed.customerId;
           if (customerId) {
             console.log(`Found customer ID in localStorage[${key}]:`, customerId);
-            return customerId;
+            return String(customerId);
           }
         } catch (e) {
           console.error(`Error parsing localStorage[${key}]:`, e);
@@ -230,12 +240,13 @@ export default function Lobby() {
       }
     }
 
+    console.log("No customer ID found in storage or URL");
     return null;
   };
 
   // Check if current user is the host
   const currentCustomerId = getCurrentCustomerId();
-  const isHost = currentCustomerId && session ? session.host_customer_id === currentCustomerId.toString() : false;
+  const isHost = currentCustomerId && session ? String(session.host_customer_id) === String(currentCustomerId) : false;
   
   console.log("Host check:", { 
     currentCustomerId, 
