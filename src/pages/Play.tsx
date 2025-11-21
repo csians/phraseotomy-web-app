@@ -57,7 +57,7 @@ const Play = () => {
       
       if (!sessionToken || !storedCustomerData) {
         console.log('⚠️ No session found, redirecting to login');
-        navigate('/login');
+        navigate('/login', { replace: true });
         return;
       }
 
@@ -71,7 +71,7 @@ const Play = () => {
           console.warn('⚠️ Invalid session, clearing and redirecting to login');
           localStorage.removeItem('phraseotomy_session_token');
           localStorage.removeItem('customerData');
-          navigate('/login');
+          navigate('/login', { replace: true });
           return;
         }
 
@@ -85,7 +85,7 @@ const Play = () => {
             console.warn('⚠️ Session token expired, redirecting to login');
             localStorage.removeItem('phraseotomy_session_token');
             localStorage.removeItem('customerData');
-            navigate('/login');
+            navigate('/login', { replace: true });
             return;
           }
 
@@ -129,7 +129,7 @@ const Play = () => {
         console.error('Error restoring session:', error);
         localStorage.removeItem('phraseotomy_session_token');
         localStorage.removeItem('customerData');
-        navigate('/login');
+        navigate('/login', { replace: true });
         return;
       }
 

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +39,9 @@ const Login = () => {
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lobbyCode, setLobbyCode] = useState("");
+  const [playerName, setPlayerName] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     // Check for embedded config from proxy (primary method)
@@ -61,7 +66,7 @@ const Login = () => {
         
         // Generate session token
         generateAndStoreSessionToken(customerData.id, window.__PHRASEOTOMY_SHOP__).then(() => {
-          navigate('/play');
+          navigate('/play/host');
         });
       }
       
@@ -195,7 +200,7 @@ const Login = () => {
                     }));
 
                     // Clean up URL parameters and redirect to play page
-                    navigate('/play', { replace: true });
+                    navigate('/play/host', { replace: true });
                   }
                   
                   setLoading(false);
@@ -297,6 +302,59 @@ const Login = () => {
     }
   };
 
+  const handleJoinGame = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!lobbyCode.trim() || !playerName.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter both lobby code and your name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsJoining(true);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/join-lobby`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            lobby_code: lobbyCode.toUpperCase(),
+            player_name: playerName,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to join lobby");
+      }
+
+      const data = await response.json();
+      
+      toast({
+        title: "Success!",
+        description: "Joined the lobby successfully",
+      });
+      navigate(`/lobby/${data.session_id}`);
+    } catch (error: any) {
+      console.error("Error joining lobby:", error);
+      toast({
+        title: "Failed to Join",
+        description: error.message || "Could not join the lobby",
+        variant: "destructive",
+      });
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center p-4">
@@ -315,31 +373,74 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Phraseotomy
-          </CardTitle>
-          <CardDescription>
-            Welcome! Please log in to access your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button 
-            onClick={handleLogin}
-            className="w-full"
-            size="lg"
-          >
-            Log in to Phraseotomy
-          </Button>
-          
-          {tenant && (
-            <p className="text-xs text-center text-muted-foreground">
-              Connected to {tenant.name}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-md space-y-6">
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Phraseotomy
+            </CardTitle>
+            <CardDescription>
+              Welcome! Log in to host games
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button 
+              onClick={handleLogin}
+              className="w-full"
+              size="lg"
+            >
+              Log in with Shopify
+            </Button>
+            
+            {tenant && (
+              <p className="text-xs text-center text-muted-foreground">
+                Connected to {tenant.name}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl text-center">Join a Game</CardTitle>
+            <CardDescription className="text-center">
+              Enter the lobby code to join
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleJoinGame} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="lobbyCode">Lobby Code</Label>
+                <Input
+                  id="lobbyCode"
+                  placeholder="Enter 6-digit code"
+                  value={lobbyCode}
+                  onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
+                  maxLength={6}
+                  className="text-center text-lg tracking-widest font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="playerName">Your Name</Label>
+                <Input
+                  id="playerName"
+                  placeholder="Enter your name"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={isJoining || !lobbyCode.trim() || !playerName.trim()}
+              >
+                {isJoining ? "Joining..." : "Join Game"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
