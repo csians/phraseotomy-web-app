@@ -48,50 +48,14 @@ export default function Lobby() {
     }
 
     fetchLobbyData();
-    fetchCustomerAudio();
   }, [sessionId]);
 
-  const fetchCustomerAudio = async () => {
+  const fetchCustomerAudio = async (customerId: string) => {
     try {
-      consolr.log("hiiii");
-      // Get customer ID from session storage (stored when customer logs in)
-      const customerDataStr = sessionStorage.getItem("customerData");
-
-      if (!customerDataStr) {
-        console.log("No customer data in session storage, checking localStorage");
-
-        // Try to get from the Play page data
-        const playDataStr = localStorage.getItem("phraseotomy_customer_data");
-        if (!playDataStr) {
-          console.log("No customer data found");
-          return;
-        }
-
-        const playData = JSON.parse(playDataStr);
-        const currentCustomerId = playData.customer_id || playData.id;
-        console.log("Fetching audio for customer (from localStorage):", currentCustomerId);
-
-        const { data, error } = await supabase.functions.invoke("get-customer-audio", {
-          body: { customerId: currentCustomerId },
-        });
-
-        if (error) {
-          console.error("Error fetching customer audio:", error);
-          return;
-        }
-
-        console.log("Audio files received:", data?.audioFiles?.length || 0);
-        setAudioFiles(data?.audioFiles || []);
-        return;
-      }
-
-      const parsed = JSON.parse(customerDataStr);
-      const currentCustomerId = parsed.customer_id || parsed.id;
-
-      console.log("Fetching audio for customer (from sessionStorage):", currentCustomerId);
+      console.log("Fetching audio for customer:", customerId);
 
       const { data, error } = await supabase.functions.invoke("get-customer-audio", {
-        body: { customerId: currentCustomerId },
+        body: { customerId: customerId.toString() },
       });
 
       if (error) {
@@ -136,6 +100,11 @@ export default function Lobby() {
 
       setSession(data.session);
       setPlayers(data.players || []);
+
+      // Fetch customer audio using the host's customer ID from the session
+      if (data.session.host_customer_id) {
+        await fetchCustomerAudio(data.session.host_customer_id);
+      }
     } catch (error) {
       console.error("Error fetching lobby data:", error);
       toast({
