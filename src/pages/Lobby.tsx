@@ -4,8 +4,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Music, Users } from "lucide-react";
+import { ArrowLeft, Music, Users, XCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Player {
   id: string;
@@ -42,10 +53,11 @@ export default function Lobby() {
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
   const [selectedAudio, setSelectedAudio] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [isEndingLobby, setIsEndingLobby] = useState(false);
 
   useEffect(() => {
     if (!sessionId) {
-      navigate("/play");
+      navigate("/play/host");
       return;
     }
 
@@ -145,7 +157,7 @@ export default function Lobby() {
           description: "This game session doesn't exist or you don't have access to it",
           variant: "destructive",
         });
-        navigate("/play");
+        navigate("/play/host");
         return;
       }
 
@@ -217,6 +229,57 @@ export default function Lobby() {
     }
   };
 
+  const handleEndLobby = async () => {
+    if (!session || !currentCustomerId) {
+      return;
+    }
+
+    setIsEndingLobby(true);
+
+    try {
+      console.log("Ending lobby:", sessionId);
+
+      const { data, error } = await supabase.functions.invoke("end-lobby", {
+        body: {
+          sessionId,
+          hostCustomerId: currentCustomerId,
+        },
+      });
+
+      if (error) {
+        console.error("Error ending lobby:", error);
+        toast({
+          title: "Error",
+          description: "Failed to end the lobby. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("Lobby ended successfully:", data);
+      toast({
+        title: "Lobby Ended",
+        description: "The lobby has been closed and deleted.",
+      });
+
+      // Navigate back to play page
+      navigate("/play/host");
+    } catch (error) {
+      console.error("Error in handleEndLobby:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEndingLobby(false);
+    }
+  };
+
+  // Check if current user is the host
+  const currentCustomerId = getCurrentCustomerId();
+  const isHost = currentCustomerId && session ? String(session.host_customer_id) === String(currentCustomerId) : false;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -233,10 +296,6 @@ export default function Lobby() {
     );
   }
 
-  // Check if current user is the host
-  const currentCustomerId = getCurrentCustomerId();
-  const isHost = currentCustomerId && session ? String(session.host_customer_id) === String(currentCustomerId) : false;
-  
   console.log("Host check:", { 
     currentCustomerId, 
     hostCustomerId: session?.host_customer_id, 
@@ -247,10 +306,37 @@ export default function Lobby() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
-        <Button variant="ghost" onClick={() => navigate("/play")} className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Play
-        </Button>
+        <div className="flex items-center justify-between mb-4">
+          <Button variant="ghost" onClick={() => navigate("/play/host")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Play
+          </Button>
+
+          {isHost && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={isEndingLobby}>
+                  <XCircle className="mr-2 h-4 w-4" />
+                  {isEndingLobby ? "Ending..." : "End Lobby"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>End Lobby?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will close the lobby and remove all players. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleEndLobby} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    End Lobby
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
 
         <Card>
           <CardHeader>

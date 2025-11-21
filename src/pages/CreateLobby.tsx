@@ -170,7 +170,7 @@ export default function CreateLobby() {
             <CardDescription>Please log in to create a lobby</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => navigate('/play')} className="w-full">
+            <Button onClick={() => navigate('/play/host')} className="w-full">
               Go to Login
             </Button>
           </CardContent>
@@ -195,7 +195,7 @@ export default function CreateLobby() {
               Each Phraseotomy game comes with a redemption code. Enter your code to unlock game packs and start hosting games.
             </p>
             <Button 
-              onClick={() => navigate('/play')} 
+              onClick={() => navigate('/play/host')} 
               className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold"
             >
               Go to Redeem Code
@@ -316,7 +316,7 @@ export default function CreateLobby() {
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                onClick={() => navigate('/play')}
+                onClick={() => navigate('/play/host')}
                 className="flex-1"
               >
                 Cancel
@@ -344,7 +344,7 @@ export default function CreateLobby() {
                 title: 'Ready to play!',
                 description: 'Audio uploaded. Redirecting to play page...',
               });
-              setTimeout(() => navigate('/play'), 2000);
+              setTimeout(() => navigate('/play/host'), 2000);
             }}
           />
         )}
