@@ -62,7 +62,75 @@ export default function Lobby() {
     }
 
     fetchLobbyData();
-  }, [sessionId]);
+
+    // Set up real-time subscription for lobby updates
+    const channel = supabase
+      .channel(`lobby-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'game_sessions',
+          filter: `id=eq.${sessionId}`
+        },
+        (payload) => {
+          console.log('Game session changed:', payload);
+          
+          // If the session was deleted, redirect to homepage
+          if (payload.eventType === 'DELETE') {
+            toast({
+              title: "Lobby Ended",
+              description: "The host has ended this lobby",
+            });
+            navigate('/login');
+            return;
+          }
+          
+          // If session was updated, refresh the data
+          if (payload.eventType === 'UPDATE') {
+            setSession(payload.new as GameSession);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'game_players',
+          filter: `session_id=eq.${sessionId}`
+        },
+        (payload) => {
+          console.log('New player joined:', payload);
+          // Add the new player to the list
+          setPlayers(prev => [...prev, payload.new as Player]);
+          toast({
+            title: "Player Joined",
+            description: `${(payload.new as Player).name} joined the lobby`,
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'game_players',
+          filter: `session_id=eq.${sessionId}`
+        },
+        (payload) => {
+          console.log('Player left:', payload);
+          // Remove the player from the list
+          setPlayers(prev => prev.filter(p => p.id !== (payload.old as Player).id));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId, navigate, toast]);
 
   // Helper function to get current customer ID
   const getCurrentCustomerId = () => {
