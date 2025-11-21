@@ -103,11 +103,13 @@ export default function Lobby() {
 
       setSession(data.session);
       setPlayers(data.players || []);
-
-      // Fetch customer audio using the host's customer ID from the session
+      
+      // Always fetch audio files if we have a host customer ID
       if (data?.session?.host_customer_id) {
-        console.log("fetching......");
+        console.log("Fetching audio for host:", data.session.host_customer_id);
         await fetchCustomerAudio(data.session.host_customer_id);
+      } else {
+        console.warn("No host_customer_id found in session data");
       }
     } catch (error) {
       console.error("Error fetching lobby data:", error);
@@ -346,7 +348,11 @@ export default function Lobby() {
             </CardHeader>
             <CardContent>
               {(() => {
+                console.log("Looking for audio ID:", session.selected_audio_id);
+                console.log("Available audio files:", audioFiles);
                 const selectedAudioFile = audioFiles.find(a => a.id === session.selected_audio_id);
+                console.log("Found audio file:", selectedAudioFile);
+                
                 return selectedAudioFile ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
@@ -358,13 +364,25 @@ export default function Lobby() {
                       </div>
                       <Music className="h-5 w-5 text-primary" />
                     </div>
-                    <audio controls className="w-full mt-2">
+                    <audio controls className="w-full mt-2" preload="metadata">
                       <source src={selectedAudioFile.audio_url} type="audio/mpeg" />
+                      <source src={selectedAudioFile.audio_url} type="audio/mp3" />
                       Your browser does not support the audio element.
                     </audio>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Audio URL: {selectedAudioFile.audio_url.substring(0, 50)}...
+                    </p>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Loading audio details...</p>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Loading audio details...</p>
+                    <p className="text-xs text-muted-foreground">
+                      Selected audio ID: {session.selected_audio_id}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Available audio count: {audioFiles.length}
+                    </p>
+                  </div>
                 );
               })()}
             </CardContent>
