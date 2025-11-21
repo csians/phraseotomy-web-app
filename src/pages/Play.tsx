@@ -609,19 +609,60 @@ const Play = () => {
   }, [loading, customer, shopDomain]);
 
 
-  const handleJoinGame = () => {
+  const handleJoinGame = async () => {
     try {
+      // Validate lobby code
       const validatedLobbyCode = validateInput(lobbyCodeSchema, lobbyCode);
-      const validatedGuestName = customer ? null : validateInput(playerNameSchema, guestName);
       
-      toast({
-        title: "Coming Soon",
-        description: "Game lobby joining will be available soon.",
+      // Determine player ID and name
+      let playerId: string;
+      let playerName: string;
+      
+      if (customer) {
+        // Logged-in customer
+        playerId = customer.id;
+        playerName = customer.name || customer.email || "Customer";
+      } else {
+        // Guest player - validate name
+        const validatedGuestName = validateInput(playerNameSchema, guestName);
+        
+        // Generate a unique guest ID
+        playerId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        playerName = validatedGuestName;
+      }
+
+      // Call join-lobby edge function
+      const { data, error } = await supabase.functions.invoke("join-lobby", {
+        body: {
+          lobbyCode: validatedLobbyCode,
+          playerName,
+          playerId,
+        },
       });
+
+      if (error) {
+        toast({
+          title: "Failed to Join",
+          description: error.message || "Could not join the lobby",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data?.session) {
+        toast({
+          title: "Joined Lobby!",
+          description: `You've joined lobby ${validatedLobbyCode}`,
+        });
+        
+        // Navigate to lobby page
+        navigate(`/lobby/${data.session.id}`);
+      }
     } catch (error) {
+      console.error("Error joining game:", error);
       toast({
         title: "Invalid Input",
-        description: error instanceof Error ? error.message : "Please check your input",
+        description: error instanceof Error ? error.message : "Please check your lobby code and name",
         variant: "destructive",
       });
     }
