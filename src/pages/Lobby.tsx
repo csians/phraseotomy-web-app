@@ -29,6 +29,8 @@ interface GameSession {
   host_customer_name: string;
   status: string;
   packs_used: string[];
+  selected_audio_id: string | null;
+  started_at: string | null;
 }
 
 export default function Lobby() {
@@ -290,7 +292,7 @@ export default function Lobby() {
           </CardContent>
         </Card>
 
-        {isHost && (
+        {isHost && session.status === "waiting" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -329,6 +331,42 @@ export default function Lobby() {
                   Start Game
                 </Button>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {session.status === "active" && session.selected_audio_id && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Music className="mr-2 h-5 w-5" />
+                Selected Audio
+              </CardTitle>
+              <CardDescription>Audio file for this game</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const selectedAudioFile = audioFiles.find(a => a.id === session.selected_audio_id);
+                return selectedAudioFile ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                      <div className="flex-1">
+                        <p className="font-medium">{selectedAudioFile.filename}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Selected on {new Date(session.started_at || '').toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Music className="h-5 w-5 text-primary" />
+                    </div>
+                    <audio controls className="w-full mt-2">
+                      <source src={selectedAudioFile.audio_url} type="audio/mpeg" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Loading audio details...</p>
+                );
+              })()}
             </CardContent>
           </Card>
         )}
