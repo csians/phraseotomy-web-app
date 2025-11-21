@@ -130,26 +130,43 @@ export default function Lobby() {
     }
 
     try {
+      console.log("Starting game with audio:", selectedAudio);
+      console.log("Session ID:", sessionId);
+
       // Update game session with selected audio and start the game
-      const { error } = await supabase
+      const { data, error, status, statusText } = await supabase
         .from("game_sessions")
         .update({
           selected_audio_id: selectedAudio,
           status: "active",
           started_at: new Date().toISOString(),
         })
-        .eq("id", sessionId);
+        .eq("id", sessionId)
+        .select();
+
+      console.log("Update response:", { data, error, status, statusText });
 
       if (error) {
         console.error("Error starting game:", error);
         toast({
           title: "Error",
-          description: "Failed to start the game. Please try again.",
+          description: `Failed to start the game: ${error.message}`,
           variant: "destructive",
         });
         return;
       }
 
+      if (!data || data.length === 0) {
+        console.warn("Update succeeded but no data returned - might be RLS issue");
+        toast({
+          title: "Warning",
+          description: "Game may not have started. Please check your permissions.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("Game started successfully:", data);
       toast({
         title: "Game Started!",
         description: "The game has been started with the selected audio.",
