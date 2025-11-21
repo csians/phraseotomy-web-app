@@ -145,6 +145,16 @@ const Play = () => {
           lastName: customerData.lastName,
         });
         
+        // Store customer data in localStorage for access across pages
+        localStorage.setItem('customerData', JSON.stringify({
+          customer_id: customerData.id,
+          id: customerData.id,
+          email: customerData.email,
+          name: customerData.name,
+          first_name: customerData.firstName,
+          last_name: customerData.lastName,
+        }));
+        
         // Generate session token if customer is logged in
         generateAndStoreSessionToken(customerData.id, window.__PHRASEOTOMY_SHOP__).then(() => {
           // After session token is generated, fetch and log full customer data
@@ -346,6 +356,16 @@ const Play = () => {
                       name: customerData.customer?.name || null,
                     };
                     setCustomer(customerObj);
+                    
+                    // Store customer data in localStorage for access across pages
+                    localStorage.setItem('customerData', JSON.stringify({
+                      customer_id: customerIdParam,
+                      id: customerIdParam,
+                      email: customerData.customer?.email || null,
+                      name: customerData.customer?.name || null,
+                      first_name: customerData.customer?.first_name || null,
+                      last_name: customerData.customer?.last_name || null,
+                    }));
 
                     // Set licenses and sessions
                     setLicenses(customerData.licenses || []);
