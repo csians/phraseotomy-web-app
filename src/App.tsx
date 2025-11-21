@@ -3,7 +3,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import Play from "./pages/Play";
+import Login from "./pages/Login";
 import CreateLobby from "./pages/CreateLobby";
 import Lobby from "./pages/Lobby";
 import NotFound from "./pages/NotFound";
@@ -12,6 +14,35 @@ import Codes from "./pages/admin/Codes";
 
 const queryClient = new QueryClient();
 
+const RootRedirect = () => {
+  const [shouldRedirectToAdmin, setShouldRedirectToAdmin] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    // Check if accessed from Shopify admin (has 'host' parameter)
+    const urlParams = new URLSearchParams(window.location.search);
+    const hostParam = urlParams.get('host');
+    const shopParam = urlParams.get('shop');
+    
+    // If host parameter exists, it's from Shopify admin/embedded app
+    if (hostParam || shopParam) {
+      console.log('Accessed from Shopify admin, redirecting to /admin');
+      setShouldRedirectToAdmin(true);
+    } else {
+      console.log('Accessed from normal browser, redirecting to /login');
+      setShouldRedirectToAdmin(false);
+    }
+    
+    setIsChecking(false);
+  }, []);
+
+  if (isChecking) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  return <Navigate to={shouldRedirectToAdmin ? "/admin" : "/login"} replace />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -19,7 +50,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/admin" replace />} />
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/play" element={<Play />} />
           <Route path="/apps/phraseotomy" element={<Play />} />
           <Route path="/create-lobby" element={<CreateLobby />} />
