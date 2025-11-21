@@ -54,34 +54,23 @@ export default function Lobby() {
 
   // Helper function to get current customer ID
   const getCurrentCustomerId = () => {
-    console.log("=== Checking for customer ID ===");
-    
     // Check URL parameters first (in case customer_id is in URL)
     const urlParams = new URLSearchParams(window.location.search);
     const urlCustomerId = urlParams.get('customer_id');
     if (urlCustomerId) {
-      console.log("Found customer ID in URL:", urlCustomerId);
       return urlCustomerId;
     }
 
     const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
 
-    // Log all storage contents for debugging
-    console.log("=== Storage contents ===");
-    console.log("sessionStorage keys:", Object.keys(sessionStorage));
-    console.log("localStorage keys:", Object.keys(localStorage));
-
     for (const key of storageKeys) {
       // Try sessionStorage
       let dataStr = sessionStorage.getItem(key);
-      console.log(`sessionStorage[${key}]:`, dataStr);
       if (dataStr) {
         try {
           const parsed = JSON.parse(dataStr);
-          console.log(`Parsed sessionStorage[${key}]:`, parsed);
           const customerId = parsed.customer_id || parsed.id || parsed.customerId;
           if (customerId) {
-            console.log(`Found customer ID in sessionStorage[${key}]:`, customerId);
             return String(customerId);
           }
         } catch (e) {
@@ -91,14 +80,11 @@ export default function Lobby() {
 
       // Try localStorage
       dataStr = localStorage.getItem(key);
-      console.log(`localStorage[${key}]:`, dataStr);
       if (dataStr) {
         try {
           const parsed = JSON.parse(dataStr);
-          console.log(`Parsed localStorage[${key}]:`, parsed);
           const customerId = parsed.customer_id || parsed.id || parsed.customerId;
           if (customerId) {
-            console.log(`Found customer ID in localStorage[${key}]:`, customerId);
             return String(customerId);
           }
         } catch (e) {
@@ -107,8 +93,6 @@ export default function Lobby() {
       }
     }
 
-    console.log("No customer ID found in storage or URL");
-    console.log("=== End storage check ===");
     return null;
   };
 
