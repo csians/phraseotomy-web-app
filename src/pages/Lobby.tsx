@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Music, Users } from "lucide-react";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Player {
   id: string;
@@ -247,23 +246,23 @@ export default function Lobby() {
                   No audio files uploaded yet. Upload audio from the Play page.
                 </p>
               ) : (
-                <RadioGroup value={selectedAudio} onValueChange={setSelectedAudio}>
-                  <div className="space-y-2">
+                <Select value={selectedAudio} onValueChange={setSelectedAudio}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select an audio file" />
+                  </SelectTrigger>
+                  <SelectContent>
                     {audioFiles.map((audio) => (
-                      <div key={audio.id} className="flex items-center space-x-2 p-3 rounded-md border">
-                        <RadioGroupItem value={audio.id} id={audio.id} />
-                        <Label htmlFor={audio.id} className="flex-1 cursor-pointer">
-                          <div className="flex flex-col">
-                            <span className="font-medium">{audio.filename}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(audio.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </Label>
-                      </div>
+                      <SelectItem key={audio.id} value={audio.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{audio.filename}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(audio.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </SelectItem>
                     ))}
-                  </div>
-                </RadioGroup>
+                  </SelectContent>
+                </Select>
               )}
 
               {audioFiles.length > 0 && (
