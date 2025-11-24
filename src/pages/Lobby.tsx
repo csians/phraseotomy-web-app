@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,7 @@ export default function Lobby() {
   const [selectedAudio, setSelectedAudio] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [isEndingLobby, setIsEndingLobby] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     if (!sessionId) {
@@ -89,7 +90,24 @@ export default function Lobby() {
           
           // If session was updated, refresh the data
           if (payload.eventType === 'UPDATE') {
-            setSession(payload.new as GameSession);
+            const updatedSession = payload.new as GameSession;
+            setSession(updatedSession);
+            
+            // Auto-play audio when game starts
+            if (updatedSession.status === 'active' && updatedSession.selected_audio_id) {
+              console.log('Game started - attempting to play audio');
+              setTimeout(() => {
+                if (audioRef.current) {
+                  audioRef.current.play().catch(err => {
+                    console.error('Error auto-playing audio:', err);
+                    toast({
+                      title: "Audio Playback",
+                      description: "Please click the audio to start playback",
+                    });
+                  });
+                }
+              }, 500);
+            }
           }
         }
       )
@@ -555,14 +573,23 @@ export default function Lobby() {
                       </div>
                       <Music className="h-5 w-5 text-primary" />
                     </div>
-                    <audio controls className="w-full mt-2" preload="metadata">
-                      <source src={selectedAudioFile.audio_url} type="audio/mpeg" />
-                      <source src={selectedAudioFile.audio_url} type="audio/mp3" />
-                      Your browser does not support the audio element.
-                    </audio>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Audio URL: {selectedAudioFile.audio_url.substring(0, 50)}...
-                    </p>
+                    <div className="relative w-full mt-2 p-4 bg-primary/10 rounded-lg">
+                      <audio 
+                        ref={audioRef}
+                        className="w-full" 
+                        preload="auto"
+                        onPlay={() => console.log('Audio playing')}
+                        onError={(e) => console.error('Audio error:', e)}
+                      >
+                        <source src={selectedAudioFile.audio_url} type="audio/mpeg" />
+                        <source src={selectedAudioFile.audio_url} type="audio/mp3" />
+                        Your browser does not support the audio element.
+                      </audio>
+                      <div className="flex items-center justify-center">
+                        <Music className="h-6 w-6 text-primary animate-pulse mr-2" />
+                        <p className="text-sm font-medium">Audio will play automatically</p>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-2">
