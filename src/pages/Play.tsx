@@ -51,6 +51,17 @@ const Play = () => {
         }
       }
 
+      // Check if accessed from Shopify embedded app (has host parameter)
+      const urlParams = new URLSearchParams(window.location.search);
+      const hostParam = urlParams.get('host');
+      const shopParam = urlParams.get('shop');
+      
+      if (hostParam && shopParam) {
+        console.log('🔗 Embedded app detected, redirecting to login with shop context');
+        navigate(`/login?shop=${shopParam}&host=${hostParam}`, { replace: true });
+        return;
+      }
+
       // Try to restore session from localStorage
       const sessionToken = localStorage.getItem('phraseotomy_session_token');
       const storedCustomerData = localStorage.getItem('customerData');
