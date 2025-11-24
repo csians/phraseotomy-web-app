@@ -32,7 +32,39 @@ const Play = () => {
   // Initialize from localStorage and verify session
   useEffect(() => {
     const initializeSession = async () => {
-      // Check for embedded config from proxy (primary method)
+      const urlParams = new URLSearchParams(window.location.search);
+      
+      // Check for iframe config from URL parameters (passed from App Proxy iframe)
+      const configParam = urlParams.get('config');
+      const shopParam = urlParams.get('shop');
+      const customerParam = urlParams.get('customer');
+      
+      if (configParam && shopParam) {
+        try {
+          const tenantConfig = JSON.parse(configParam);
+          const customerData = customerParam ? JSON.parse(customerParam) : null;
+          
+          console.log('🎯 Config loaded from URL params (iframe mode)');
+          setTenant(tenantConfig);
+          setShopDomain(shopParam);
+          
+          if (customerData) {
+            console.log('👤 Customer Data from iframe params:', {
+              id: customerData.id,
+              email: customerData.email,
+              name: customerData.name,
+            });
+            setCustomer(customerData);
+          }
+          
+          setLoading(false);
+          return;
+        } catch (error) {
+          console.error('Error parsing URL config:', error);
+        }
+      }
+      
+      // Check for embedded config from proxy window globals (fallback method)
       if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
         setTenant(window.__PHRASEOTOMY_CONFIG__);
         setShopDomain(window.__PHRASEOTOMY_SHOP__);
@@ -52,9 +84,7 @@ const Play = () => {
       }
 
       // Check if accessed from Shopify embedded app (has host parameter)
-      const urlParams = new URLSearchParams(window.location.search);
       const hostParam = urlParams.get('host');
-      const shopParam = urlParams.get('shop');
       
       if (hostParam && shopParam) {
         console.log('🔗 Embedded app detected, redirecting to login with shop context');
