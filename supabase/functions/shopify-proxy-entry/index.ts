@@ -159,6 +159,20 @@ Deno.serve(async (req) => {
     // Extract customer ID from Shopify proxy parameters
     const customerId = queryParams.get('logged_in_customer_id') || null;
     
+    // If no customer is logged in, redirect to Shopify login
+    if (!customerId) {
+      console.log('No customer logged in, redirecting to Shopify login');
+      const loginUrl = `https://${shop}/account/login?return_url=/apps/phraseotomy`;
+      
+      return new Response(
+        generateLoginRedirectHtml(loginUrl, shop),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/liquid' },
+        }
+      );
+    }
+    
     let customerData = null;
     
     if (customerId && secretData.access_token) {
@@ -248,6 +262,73 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+/**
+ * Generate login redirect HTML for unauthenticated users
+ */
+function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
+  return `<style nonce="${crypto.randomUUID()}">
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a0a;
+    color: #fbbf24;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .login-prompt {
+    text-align: center;
+    max-width: 400px;
+    padding: 40px;
+  }
+  .logo {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    background: #fbbf24;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    font-weight: 900;
+    color: #0a0a0a;
+  }
+  h1 {
+    font-size: 32px;
+    margin: 0 0 16px 0;
+    font-weight: 800;
+  }
+  p {
+    font-size: 16px;
+    margin: 0 0 32px 0;
+    opacity: 0.8;
+  }
+  .login-btn {
+    display: inline-block;
+    padding: 16px 32px;
+    background: #fbbf24;
+    color: #0a0a0a;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 16px;
+    transition: transform 0.2s;
+  }
+  .login-btn:hover {
+    transform: scale(1.05);
+  }
+</style>
+<div class="login-prompt">
+  <div class="logo">P</div>
+  <h1>PHRASEOTOMY</h1>
+  <p>Please log in to your account to access the game</p>
+  <a href="${loginUrl}" class="login-btn">Log In</a>
+</div>`;
+}
 
 /**
  * Generate HTML that embeds the React app from custom domain
