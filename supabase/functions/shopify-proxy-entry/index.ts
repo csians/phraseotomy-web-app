@@ -181,24 +181,10 @@ Deno.serve(async (req) => {
     // Generate nonce for CSP
     const nonce = crypto.randomUUID();
     
-    // Return HTML fragment for Shopify App Proxy with proper CSP
+    // Return HTML that breaks out of Shopify's sandbox and redirects to full app
     const headers = new Headers({
       'Content-Type': 'text/html; charset=utf-8',
-      'Content-Security-Policy': [
-        "default-src 'self'",
-        `script-src 'self' 'nonce-${nonce}' https:`,
-        `style-src 'self' 'nonce-${nonce}' https:`,
-        "img-src 'self' data: https:",
-        "connect-src 'self' https:",
-        "frame-src https:",
-        "frame-ancestors https://admin.shopify.com https://*.myshopify.com"
-      ].join('; ')
     });
-
-    // Set customer data in cookie if available
-    if (customerData) {
-      headers.append('Set-Cookie', `phraseotomy_customer=${encodeURIComponent(JSON.stringify(customerData))}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=3600`);
-    }
 
     // Pass token and customer data to app
     return new Response(
@@ -225,8 +211,8 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Generate HTML that loads the React app in an iframe
- * Returns minimal HTML for Shopify App Proxy injection with CSP-compliant nonce
+ * Generate HTML that redirects to the full app, breaking out of Shopify's sandbox
+ * Shopify App Proxy wraps responses in restrictive sandboxed iframes, so we redirect instead
  */
 function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce: string): string {
   // Sanitize tenant data for embedding
@@ -242,41 +228,77 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
   // Get the app deployment URL from environment variable
   const baseUrl = Deno.env.get('APP_DEPLOYMENT_URL') || 'https://phraseo-shop-connect.lovable.app';
 
-  // Encode configuration as URL parameters for the iframe
+  // Encode configuration as URL parameters
   const configParams = new URLSearchParams({
     config: JSON.stringify(tenantConfig),
     shop: shop,
     customer: customer ? JSON.stringify(customer) : ''
   });
 
-  const iframeUrl = `${baseUrl}/play/host?${configParams.toString()}`;
+  const appUrl = `${baseUrl}/play/host?${configParams.toString()}`;
 
-  // Return CSP-compliant HTML with nonce and no inline styles
-  return `<style nonce="${nonce}">
-  .phraseotomy-container {
-    width: 100%;
-    min-height: 600px;
-    height: 100vh;
-    margin: 0;
-    padding: 0;
-    position: relative;
-  }
-  .phraseotomy-iframe {
-    width: 100%;
-    height: 100%;
-    min-height: 600px;
-    border: none;
-    display: block;
-  }
-</style>
-<div class="phraseotomy-container">
-  <iframe 
-    class="phraseotomy-iframe"
-    src="${iframeUrl}"
-    allow="camera; microphone; autoplay"
-    title="Phraseotomy - ${tenant.name}"
-  ></iframe>
-</div>`;
+  // Return HTML that breaks out of sandbox and redirects
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Loading Phraseotomy...</title>
+  <style nonce="${nonce}">
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f9fafb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .loader {
+      text-align: center;
+    }
+    .spinner {
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #3b82f6;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .message {
+      color: #6b7280;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="loader">
+    <div class="spinner"></div>
+    <div class="message">Redirecting to Phraseotomy...</div>
+  </div>
+  <script nonce="${nonce}">
+    // Break out of iframe sandbox by redirecting top window
+    (function() {
+      try {
+        // Try to redirect the top window
+        if (window.top) {
+          window.top.location.href = "${appUrl}";
+        } else {
+          window.location.href = "${appUrl}";
+        }
+      } catch (e) {
+        // Fallback if top access is blocked
+        window.location.href = "${appUrl}";
+      }
+    })();
+  </script>
+</body>
+</html>`;
 }
 
 /**
