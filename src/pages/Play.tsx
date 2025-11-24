@@ -44,6 +44,16 @@ const Play = () => {
             name: window.__PHRASEOTOMY_CUSTOMER__.name,
           });
           setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
+          
+          // Store customer data in localStorage for Lobby page
+          localStorage.setItem('customerData', JSON.stringify({
+            customer_id: window.__PHRASEOTOMY_CUSTOMER__.id,
+            id: window.__PHRASEOTOMY_CUSTOMER__.id,
+            email: window.__PHRASEOTOMY_CUSTOMER__.email,
+            name: window.__PHRASEOTOMY_CUSTOMER__.name,
+            first_name: window.__PHRASEOTOMY_CUSTOMER__.firstName,
+            last_name: window.__PHRASEOTOMY_CUSTOMER__.lastName,
+          }));
         }
         
         setLoading(false);
@@ -73,6 +83,16 @@ const Play = () => {
               name: customerData.name,
             });
             setCustomer(customerData);
+            
+            // Store customer data in localStorage for Lobby page
+            localStorage.setItem('customerData', JSON.stringify({
+              customer_id: customerData.id,
+              id: customerData.id,
+              email: customerData.email,
+              name: customerData.name,
+              first_name: customerData.firstName,
+              last_name: customerData.lastName,
+            }));
           }
           
           setLoading(false);
