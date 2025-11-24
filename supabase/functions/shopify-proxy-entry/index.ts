@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Generate HTML that loads the React app with embedded tenant configuration
+ * Generate HTML that loads the React app in an iframe to bypass CSP restrictions
  */
 function generateAppHtml(tenant: any, shop: string, customer: any = null): string {
   // Sanitize tenant data for embedding
@@ -227,9 +227,16 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null): strin
   };
 
   // Get the app deployment URL from environment variable
-  // This should be your Vercel/Netlify deployment URL where the React app is hosted
-  // Format: https://your-app.vercel.app or https://your-app.netlify.app
-  const baseUrl = Deno.env.get('APP_DEPLOYMENT_URL') || 'https://phraseotomy-web-app.vercel.app';
+  const baseUrl = Deno.env.get('APP_DEPLOYMENT_URL') || 'https://phraseo-shop-connect.lovable.app';
+
+  // Encode configuration as URL parameters for the iframe
+  const configParams = new URLSearchParams({
+    config: JSON.stringify(tenantConfig),
+    shop: shop,
+    customer: customer ? JSON.stringify(customer) : ''
+  });
+
+  const iframeUrl = `${baseUrl}/play/host?${configParams.toString()}`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -237,17 +244,32 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null): strin
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Phraseotomy - ${tenant.name}</title>
-    <script>
-      // Embed tenant configuration for the React app
-      window.__PHRASEOTOMY_CONFIG__ = ${JSON.stringify(tenantConfig)};
-      window.__PHRASEOTOMY_SHOP__ = ${JSON.stringify(shop)};
-      window.__PHRASEOTOMY_CUSTOMER__ = ${JSON.stringify(customer)};
-    </script>
-    <script type="module" crossorigin src="${baseUrl}/assets/index.js"></script>
-    <link rel="stylesheet" crossorigin href="${baseUrl}/assets/index.css">
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      #app-iframe {
+        width: 100%;
+        height: 100vh;
+        border: none;
+        display: block;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <iframe 
+      id="app-iframe"
+      src="${iframeUrl}"
+      allow="camera; microphone; autoplay"
+      sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+    ></iframe>
   </body>
 </html>`;
 }
