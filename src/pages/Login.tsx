@@ -318,32 +318,31 @@ const Login = () => {
     setIsJoining(true);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/join-lobby`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            lobby_code: lobbyCode.toUpperCase(),
-            player_name: playerName,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to join lobby");
+      // Generate or retrieve guest player ID
+      let guestPlayerId = localStorage.getItem('guest_player_id');
+      if (!guestPlayerId) {
+        guestPlayerId = crypto.randomUUID();
+        localStorage.setItem('guest_player_id', guestPlayerId);
       }
 
-      const data = await response.json();
+      const { data, error } = await supabase.functions.invoke('join-lobby', {
+        body: {
+          lobbyCode: lobbyCode.toUpperCase(),
+          playerName: playerName.trim(),
+          playerId: guestPlayerId,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || "Failed to join lobby");
+      }
       
       toast({
         title: "Success!",
         description: "Joined the lobby successfully",
       });
-      navigate(`/lobby/${data.session_id}`);
+      
+      navigate(`/lobby/${data.session.id}`);
     } catch (error: any) {
       console.error("Error joining lobby:", error);
       toast({
