@@ -573,10 +573,12 @@ export default function Lobby() {
                       </div>
                       <Music className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="relative w-full mt-2 p-4 bg-primary/10 rounded-lg">
+                    
+                    {isHost ? (
                       <audio 
                         ref={audioRef}
-                        className="w-full" 
+                        controls 
+                        className="w-full mt-2" 
                         preload="auto"
                         onPlay={() => console.log('Audio playing')}
                         onError={(e) => console.error('Audio error:', e)}
@@ -585,11 +587,25 @@ export default function Lobby() {
                         <source src={selectedAudioFile.audio_url} type="audio/mp3" />
                         Your browser does not support the audio element.
                       </audio>
-                      <div className="flex items-center justify-center">
-                        <Music className="h-6 w-6 text-primary animate-pulse mr-2" />
-                        <p className="text-sm font-medium">Audio will play automatically</p>
+                    ) : (
+                      <div className="relative w-full mt-2">
+                        <audio 
+                          ref={audioRef}
+                          className="w-full hidden" 
+                          preload="auto"
+                          onPlay={() => console.log('Audio playing')}
+                          onError={(e) => console.error('Audio error:', e)}
+                        >
+                          <source src={selectedAudioFile.audio_url} type="audio/mpeg" />
+                          <source src={selectedAudioFile.audio_url} type="audio/mp3" />
+                          Your browser does not support the audio element.
+                        </audio>
+                        <div className="flex items-center justify-center p-4 bg-primary/10 rounded-lg">
+                          <Music className="h-6 w-6 text-primary animate-pulse mr-2" />
+                          <p className="text-sm font-medium">Audio will play automatically</p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-2">
