@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Generate HTML that embeds the React app in an iframe on Shopify domain
+ * Generate HTML that embeds the React app and hides Shopify theme elements
  */
 function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce: string): string {
   // Sanitize tenant data for embedding
@@ -236,17 +236,51 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
 
   const appUrl = `${baseUrl}/play/host?${configParams.toString()}`;
 
-  // Return simple iframe embed without sandbox restrictions
+  // Return full-page embed with theme elements hidden
   return `<style nonce="${nonce}">
+  /* Hide Shopify theme header and footer */
+  header,
+  .header,
+  .site-header,
+  footer,
+  .footer,
+  .site-footer,
+  .shopify-section-header,
+  .shopify-section-footer,
+  [data-section-type="header"],
+  [data-section-type="footer"] {
+    display: none !important;
+  }
+  
+  /* Make main content full viewport */
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+  
+  main,
+  .main-content,
+  #MainContent {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  
+  /* Full-page app container */
   .phraseotomy-wrapper {
-    width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
     height: 100vh;
-    min-height: 600px;
     margin: 0;
     padding: 0;
-    border: 0;
-    overflow: hidden;
+    z-index: 9999;
+    background: #ffffff;
   }
+  
   .phraseotomy-frame {
     width: 100%;
     height: 100%;
@@ -261,7 +295,24 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
     allow="camera; microphone; autoplay; fullscreen"
     title="Phraseotomy"
   ></iframe>
-</div>`;
+</div>
+<script nonce="${nonce}">
+  // Hide any remaining theme elements
+  document.addEventListener('DOMContentLoaded', function() {
+    // Remove breadcrumbs and other common theme elements
+    var selectors = [
+      '.breadcrumbs',
+      '.announcement-bar',
+      '.utility-bar'
+    ];
+    selectors.forEach(function(selector) {
+      var elements = document.querySelectorAll(selector);
+      elements.forEach(function(el) {
+        el.style.display = 'none';
+      });
+    });
+  });
+</script>`;
 }
 
 /**
