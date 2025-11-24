@@ -32,9 +32,27 @@ const Play = () => {
   // Initialize from localStorage and verify session
   useEffect(() => {
     const initializeSession = async () => {
+      // Check for embedded config from proxy (primary method)
+      if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
+        setTenant(window.__PHRASEOTOMY_CONFIG__);
+        setShopDomain(window.__PHRASEOTOMY_SHOP__);
+        
+        if (window.__PHRASEOTOMY_CUSTOMER__) {
+          console.log('👤 Customer Data from proxy:', {
+            id: window.__PHRASEOTOMY_CUSTOMER__.id,
+            email: window.__PHRASEOTOMY_CUSTOMER__.email,
+            name: window.__PHRASEOTOMY_CUSTOMER__.name,
+          });
+          setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
+        }
+        
+        setLoading(false);
+        return;
+      }
+
       const urlParams = new URLSearchParams(window.location.search);
       
-      // Check for iframe config from URL parameters (passed from App Proxy iframe)
+      // Check for iframe config from URL parameters (fallback method)
       const configParam = urlParams.get('config');
       const shopParam = urlParams.get('shop');
       const customerParam = urlParams.get('customer');
@@ -61,25 +79,6 @@ const Play = () => {
           return;
         } catch (error) {
           console.error('Error parsing URL config:', error);
-        }
-      }
-      
-      // Check for embedded config from proxy window globals (fallback method)
-      if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
-        setTenant(window.__PHRASEOTOMY_CONFIG__);
-        setShopDomain(window.__PHRASEOTOMY_SHOP__);
-        const customerData = window.__PHRASEOTOMY_CUSTOMER__ || null;
-        
-        if (customerData) {
-          console.log('👤 Customer Data from Proxy:', {
-            id: customerData.id,
-            email: customerData.email,
-            name: customerData.name,
-          });
-          
-          setCustomer(customerData);
-          setLoading(false);
-          return;
         }
       }
 

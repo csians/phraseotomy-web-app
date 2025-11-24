@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Generate HTML that embeds the React app and hides Shopify theme elements
+ * Generate HTML that loads the React app directly (no iframe)
  */
 function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce: string): string {
   // Sanitize tenant data for embedding
@@ -227,16 +227,7 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
   // Get the app deployment URL from environment variable
   const baseUrl = Deno.env.get('APP_DEPLOYMENT_URL') || 'https://phraseo-shop-connect.lovable.app';
 
-  // Encode configuration as URL parameters
-  const configParams = new URLSearchParams({
-    config: JSON.stringify(tenantConfig),
-    shop: shop,
-    customer: customer ? JSON.stringify(customer) : ''
-  });
-
-  const appUrl = `${baseUrl}/play/host?${configParams.toString()}`;
-
-  // Return full-page embed with theme elements hidden
+  // Return direct React app embed
   return `<style nonce="${nonce}">
   /* Hide Shopify theme header and footer */
   header,
@@ -252,7 +243,7 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
     display: none !important;
   }
   
-  /* Make main content full viewport */
+  /* Make body full viewport */
   body {
     margin: 0 !important;
     padding: 0 !important;
@@ -269,7 +260,7 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
   }
   
   /* Full-page app container */
-  .phraseotomy-wrapper {
+  #phraseotomy-root {
     position: fixed;
     top: 0;
     left: 0;
@@ -278,41 +269,18 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
     margin: 0;
     padding: 0;
     z-index: 9999;
-    background: #ffffff;
-  }
-  
-  .phraseotomy-frame {
-    width: 100%;
-    height: 100%;
-    border: none;
-    display: block;
+    background: #0a0a0a;
   }
 </style>
-<div class="phraseotomy-wrapper">
-  <iframe 
-    class="phraseotomy-frame"
-    src="${appUrl}"
-    allow="camera; microphone; autoplay; fullscreen"
-    title="Phraseotomy"
-  ></iframe>
-</div>
 <script nonce="${nonce}">
-  // Hide any remaining theme elements
-  document.addEventListener('DOMContentLoaded', function() {
-    // Remove breadcrumbs and other common theme elements
-    var selectors = [
-      '.breadcrumbs',
-      '.announcement-bar',
-      '.utility-bar'
-    ];
-    selectors.forEach(function(selector) {
-      var elements = document.querySelectorAll(selector);
-      elements.forEach(function(el) {
-        el.style.display = 'none';
-      });
-    });
-  });
-</script>`;
+  // Embed tenant configuration for the React app
+  window.__PHRASEOTOMY_CONFIG__ = ${JSON.stringify(tenantConfig)};
+  window.__PHRASEOTOMY_SHOP__ = ${JSON.stringify(shop)};
+  window.__PHRASEOTOMY_CUSTOMER__ = ${JSON.stringify(customer)};
+</script>
+<div id="phraseotomy-root"></div>
+<link rel="stylesheet" crossorigin href="${baseUrl}/assets/index.css">
+<script type="module" crossorigin nonce="${nonce}" src="${baseUrl}/assets/index.js"></script>`;
 }
 
 /**
