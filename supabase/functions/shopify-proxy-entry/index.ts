@@ -178,9 +178,9 @@ Deno.serve(async (req) => {
       console.log('Return token present in request');
     }
 
-    // Return HTML that loads the React app with embedded tenant data
+    // Return HTML fragment for Shopify App Proxy
     const headers = new Headers({
-      'Content-Type': 'text/html',
+      'Content-Type': 'text/html; charset=utf-8',
     });
 
     // Set customer data in cookie if available
@@ -213,7 +213,8 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Generate HTML that loads the React app in an iframe to bypass CSP restrictions
+ * Generate HTML that loads the React app in an iframe
+ * Returns minimal HTML for Shopify App Proxy injection
  */
 function generateAppHtml(tenant: any, shop: string, customer: any = null): string {
   // Sanitize tenant data for embedding
@@ -238,40 +239,33 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null): strin
 
   const iframeUrl = `${baseUrl}/play/host?${configParams.toString()}`;
 
-  return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Phraseotomy - ${tenant.name}</title>
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      html, body {
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-      }
-      #app-iframe {
-        width: 100%;
-        height: 100vh;
-        border: none;
-        display: block;
-      }
-    </style>
-  </head>
-  <body>
-    <iframe 
-      id="app-iframe"
-      src="${iframeUrl}"
-      allow="camera; microphone; autoplay"
-      sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
-    ></iframe>
-  </body>
-</html>`;
+  // Return minimal HTML that Shopify can inject
+  return `<style>
+  .phraseotomy-container {
+    width: 100%;
+    min-height: 600px;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    position: relative;
+  }
+  .phraseotomy-iframe {
+    width: 100%;
+    height: 100%;
+    min-height: 600px;
+    border: none;
+    display: block;
+  }
+</style>
+<div class="phraseotomy-container">
+  <iframe 
+    class="phraseotomy-iframe"
+    src="${iframeUrl}"
+    allow="camera; microphone; autoplay"
+    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+    title="Phraseotomy - ${tenant.name}"
+  ></iframe>
+</div>`;
 }
 
 /**
