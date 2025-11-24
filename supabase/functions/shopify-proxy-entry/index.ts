@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Generate HTML that loads the React app directly (no iframe)
+ * Generate HTML that redirects to full app (Shopify CSP blocks external scripts)
  */
 function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce: string): string {
   // Sanitize tenant data for embedding
@@ -227,60 +227,74 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
   // Get the app deployment URL from environment variable
   const baseUrl = Deno.env.get('APP_DEPLOYMENT_URL') || 'https://phraseo-shop-connect.lovable.app';
 
-  // Return direct React app embed
-  return `<style nonce="${nonce}">
-  /* Hide Shopify theme header and footer */
-  header,
-  .header,
-  .site-header,
-  footer,
-  .footer,
-  .site-footer,
-  .shopify-section-header,
-  .shopify-section-footer,
-  [data-section-type="header"],
-  [data-section-type="footer"] {
-    display: none !important;
-  }
-  
-  /* Make body full viewport */
-  body {
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-  }
-  
-  main,
-  .main-content,
-  #MainContent {
-    margin: 0 !important;
-    padding: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-  }
-  
-  /* Full-page app container */
-  #phraseotomy-root {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    margin: 0;
-    padding: 0;
-    z-index: 9999;
-    background: #0a0a0a;
-  }
-</style>
-<script nonce="${nonce}">
-  // Embed tenant configuration for the React app
-  window.__PHRASEOTOMY_CONFIG__ = ${JSON.stringify(tenantConfig)};
-  window.__PHRASEOTOMY_SHOP__ = ${JSON.stringify(shop)};
-  window.__PHRASEOTOMY_CUSTOMER__ = ${JSON.stringify(customer)};
-</script>
-<div id="phraseotomy-root"></div>
-<link rel="stylesheet" crossorigin href="${baseUrl}/assets/index.css">
-<script type="module" crossorigin nonce="${nonce}" src="${baseUrl}/assets/index.js"></script>`;
+  // Encode configuration as URL parameters
+  const configParams = new URLSearchParams({
+    config: JSON.stringify(tenantConfig),
+    shop: shop,
+    customer: customer ? JSON.stringify(customer) : '',
+    embedded: 'true'
+  });
+
+  const appUrl = `${baseUrl}/play/host?${configParams.toString()}`;
+
+  // Meta refresh redirect (works even with strict CSP)
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0;url=${appUrl}">
+  <title>Loading Phraseotomy...</title>
+  <style nonce="${nonce}">
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a0a0a;
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .loader {
+      text-align: center;
+    }
+    .spinner {
+      border: 3px solid #1a1a1a;
+      border-top: 3px solid #fbbf24;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .text {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .subtext {
+      font-size: 14px;
+      opacity: 0.7;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="loader">
+    <div class="spinner"></div>
+    <div class="text">PHRASEOTOMY</div>
+    <div class="subtext">Loading your game...</div>
+  </div>
+  <noscript>
+    <p>Redirecting to <a href="${appUrl}" style="color: #fbbf24;">Phraseotomy</a>...</p>
+  </noscript>
+</body>
+</html>`;
 }
 
 /**
