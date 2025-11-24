@@ -203,9 +203,12 @@ export default function Lobby() {
 
       console.log("Fetching lobby data for session:", sessionId);
       
-      // Get current customer ID to pass to edge function
+      // Get current customer ID or guest player ID
       const currentCustomerId = getCurrentCustomerId();
-      console.log("Current customer ID for audio fetch:", currentCustomerId);
+      const guestPlayerId = localStorage.getItem('guest_player_id');
+      const currentPlayerId = currentCustomerId || guestPlayerId;
+      
+      console.log("Current player ID:", currentPlayerId);
 
       // Call edge function to fetch lobby data with service role permissions
       const { data, error } = await supabase.functions.invoke("get-lobby-data", {
@@ -225,7 +228,22 @@ export default function Lobby() {
           description: "This game session doesn't exist or you don't have access to it",
           variant: "destructive",
         });
-        navigate("/play/host");
+        navigate("/login");
+        return;
+      }
+
+      // Verify that the current user is actually in the players list
+      const isPlayerInSession = data.players?.some(
+        (player: Player) => player.player_id === currentPlayerId
+      );
+
+      if (!currentPlayerId || !isPlayerInSession) {
+        toast({
+          title: "Access Denied",
+          description: "You must join with a lobby code and name to access this lobby",
+          variant: "destructive",
+        });
+        navigate("/login");
         return;
       }
 
@@ -242,6 +260,7 @@ export default function Lobby() {
         description: "Failed to load lobby details",
         variant: "destructive",
       });
+      navigate("/login");
     } finally {
       setLoading(false);
     }
