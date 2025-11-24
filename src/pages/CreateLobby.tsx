@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getCustomerLicenses } from '@/lib/customerAccess';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AudioUpload } from '@/components/AudioUpload';
+
 
 const ALL_PACKS = [
   { id: 'base', name: 'Base Pack', description: 'Core game cards' },
@@ -28,7 +28,6 @@ export default function CreateLobby() {
   const [isCreating, setIsCreating] = useState(false);
   const [availablePacks, setAvailablePacks] = useState<string[]>(['base']); // Default to base pack
   const [loadingPacks, setLoadingPacks] = useState(true);
-  const [createdSessionId, setCreatedSessionId] = useState<string | null>(null);
 
   // Get customer and shop info from location state or window
   const customer = location.state?.customer || window.__PHRASEOTOMY_CUSTOMER__;
@@ -143,12 +142,14 @@ export default function CreateLobby() {
       }
 
       const newSession = data.session;
-      setCreatedSessionId(newSession.id);
 
       toast({
         title: 'Lobby Created!',
-        description: `Lobby Code: ${lobbyCode}. Now upload your audio.`,
+        description: `Lobby Code: ${lobbyCode}. Redirecting to lobby...`,
       });
+
+      // Redirect to lobby page
+      setTimeout(() => navigate(`/lobby/${newSession.id}`), 1000);
     } catch (error) {
       console.error('Error creating lobby:', error);
       toast({
@@ -323,7 +324,7 @@ export default function CreateLobby() {
               </Button>
               <Button
                 onClick={handleCreateLobby}
-                disabled={isCreating || selectedPacks.length === 0 || createdSessionId !== null}
+                disabled={isCreating || selectedPacks.length === 0}
                 className="flex-1 bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 size="lg"
               >
@@ -332,22 +333,6 @@ export default function CreateLobby() {
             </div>
           </CardContent>
         </Card>
-
-        {createdSessionId && customer && (
-          <AudioUpload
-            sessionId={createdSessionId}
-            playerId={customer.id}
-            roundNumber={1}
-            onUploadComplete={(url) => {
-              console.log('Audio uploaded:', url);
-              toast({
-                title: 'Ready to play!',
-                description: 'Audio uploaded. Redirecting to play page...',
-              });
-              setTimeout(() => navigate('/play/host'), 2000);
-            }}
-          />
-        )}
 
         <Card className="bg-muted/50">
           <CardContent className="pt-6">
