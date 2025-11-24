@@ -49,3 +49,6 @@ verify_jwt = false
 
 [functions.assign-code-to-customer]
 verify_jwt = false
+
+[functions.get-customer-licenses-sessions]
+verify_jwt = false

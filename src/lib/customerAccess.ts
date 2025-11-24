@@ -18,67 +18,44 @@ export interface GameSession {
   packs_used: string[];
 }
 
-/**
- * Get or retrieve a session token from localStorage
- * Session tokens are stored after Shopify authentication
- */
-function getSessionToken(): string | null {
-  return localStorage.getItem('phraseotomy_session_token');
-}
-
-/**
- * Fetch customer data from authenticated edge function
- */
-async function fetchCustomerData(sessionToken: string): Promise<{
-  licenses: CustomerLicense[];
-  sessions: GameSession[];
-} | null> {
-  try {
-    const { data, error } = await supabase.functions.invoke('get-customer-data', {
-      body: { sessionToken },
-    });
-
-    if (error) {
-      console.error('Error fetching customer data:', error);
-      return null;
-    }
-
-    return {
-      licenses: data.licenses || [],
-      sessions: data.sessions || [],
-    };
-  } catch (error) {
-    console.error('Error calling get-customer-data function:', error);
-    return null;
-  }
-}
-
 export async function getCustomerLicenses(
   customerId: string,
   shopDomain: string
 ): Promise<CustomerLicense[]> {
-  const sessionToken = getSessionToken();
-  
-  if (!sessionToken) {
-    console.error('No session token available');
+  try {
+    const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
+      body: { customerId, shopDomain },
+    });
+
+    if (error) {
+      console.error('Error fetching customer licenses:', error);
+      return [];
+    }
+
+    return data?.licenses || [];
+  } catch (error) {
+    console.error('Error calling get-customer-licenses-sessions function:', error);
     return [];
   }
-
-  const data = await fetchCustomerData(sessionToken);
-  return data?.licenses || [];
 }
 
 export async function getCustomerSessions(
   customerId: string,
   shopDomain: string
 ): Promise<GameSession[]> {
-  const sessionToken = getSessionToken();
-  
-  if (!sessionToken) {
-    console.error('No session token available');
+  try {
+    const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
+      body: { customerId, shopDomain },
+    });
+
+    if (error) {
+      console.error('Error fetching customer sessions:', error);
+      return [];
+    }
+
+    return data?.sessions || [];
+  } catch (error) {
+    console.error('Error calling get-customer-licenses-sessions function:', error);
     return [];
   }
-
-  const data = await fetchCustomerData(sessionToken);
-  return data?.sessions || [];
 }
