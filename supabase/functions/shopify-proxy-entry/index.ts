@@ -116,10 +116,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch client secret separately for HMAC verification
+    // Fetch client secret and access token separately for HMAC verification and API calls
     const { data: secretData, error: secretError } = await supabase
       .from('tenants')
-      .select('shopify_client_secret')
+      .select('shopify_client_secret, access_token')
       .eq('shop_domain', shop)
       .single();
 
@@ -156,27 +156,66 @@ Deno.serve(async (req) => {
 
     console.log('HMAC verified successfully for tenant:', tenant.tenant_key);
 
-    // Extract customer data from Shopify proxy parameters
+    // Extract customer ID from Shopify proxy parameters
     const customerId = queryParams.get('logged_in_customer_id') || null;
-    const customerEmail = queryParams.get('customer_email') || null;
-    const customerFirstName = queryParams.get('customer_first_name') || null;
-    const customerLastName = queryParams.get('customer_last_name') || null;
     
-    // Extract token from URL if present (from app-login redirect)
-    const returnToken = queryParams.get('r') || null;
+    let customerData = null;
     
-    const customerData = customerId ? {
-      id: customerId,
-      email: customerEmail,
-      firstName: customerFirstName,
-      lastName: customerLastName,
-      name: [customerFirstName, customerLastName].filter(Boolean).join(' ') || null
-    } : null;
+    if (customerId && secretData.access_token) {
+      // Fetch full customer data from Shopify API
+      try {
+        const shopifyResponse = await fetch(
+          `https://${shop}/admin/api/2024-01/customers/${customerId}.json`,
+          {
+            headers: {
+              'X-Shopify-Access-Token': secretData.access_token,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (shopifyResponse.ok) {
+          const shopifyData = await shopifyResponse.json();
+          const customer = shopifyData.customer;
+          
+          customerData = {
+            id: customerId,
+            email: customer.email || null,
+            firstName: customer.first_name || null,
+            lastName: customer.last_name || null,
+            name: [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.email || null
+          };
+          
+          console.log('✅ Customer data fetched from Shopify:', {
+            id: customerData.id,
+            email: customerData.email,
+            name: customerData.name
+          });
+        } else {
+          console.warn('Failed to fetch customer from Shopify:', shopifyResponse.status);
+          // Fallback to just ID
+          customerData = {
+            id: customerId,
+            email: null,
+            firstName: null,
+            lastName: null,
+            name: null
+          };
+        }
+      } catch (error) {
+        console.error('Error fetching customer from Shopify:', error);
+        // Fallback to just ID
+        customerData = {
+          id: customerId,
+          email: null,
+          firstName: null,
+          lastName: null,
+          name: null
+        };
+      }
+    }
 
     console.log('Customer data:', customerData ? `Logged in: ${customerId}` : 'Not logged in');
-    if (returnToken) {
-      console.log('Return token present in request');
-    }
 
     // Generate nonce for CSP
     const nonce = crypto.randomUUID();
