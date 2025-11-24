@@ -181,9 +181,9 @@ Deno.serve(async (req) => {
     // Generate nonce for CSP
     const nonce = crypto.randomUUID();
     
-    // Return HTML that breaks out of Shopify's sandbox and redirects to full app
+    // Return HTML with application/liquid content type so Shopify renders it
     const headers = new Headers({
-      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Type': 'application/liquid',
     });
 
     // Pass token and customer data to app
