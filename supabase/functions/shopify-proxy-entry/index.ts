@@ -211,8 +211,7 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Generate HTML that redirects to the full app, breaking out of Shopify's sandbox
- * Shopify App Proxy wraps responses in restrictive sandboxed iframes, so we redirect instead
+ * Generate HTML that embeds the React app in an iframe on Shopify domain
  */
 function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce: string): string {
   // Sanitize tenant data for embedding
@@ -237,68 +236,32 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
 
   const appUrl = `${baseUrl}/play/host?${configParams.toString()}`;
 
-  // Return HTML that breaks out of sandbox and redirects
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Loading Phraseotomy...</title>
-  <style nonce="${nonce}">
-    body {
-      margin: 0;
-      padding: 20px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f9fafb;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-    }
-    .loader {
-      text-align: center;
-    }
-    .spinner {
-      border: 3px solid #f3f4f6;
-      border-top: 3px solid #3b82f6;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 16px;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .message {
-      color: #6b7280;
-      font-size: 14px;
-    }
-  </style>
-</head>
-<body>
-  <div class="loader">
-    <div class="spinner"></div>
-    <div class="message">Redirecting to Phraseotomy...</div>
-  </div>
-  <script nonce="${nonce}">
-    // Break out of iframe sandbox by redirecting top window
-    (function() {
-      try {
-        // Try to redirect the top window
-        if (window.top) {
-          window.top.location.href = "${appUrl}";
-        } else {
-          window.location.href = "${appUrl}";
-        }
-      } catch (e) {
-        // Fallback if top access is blocked
-        window.location.href = "${appUrl}";
-      }
-    })();
-  </script>
-</body>
-</html>`;
+  // Return simple iframe embed without sandbox restrictions
+  return `<style nonce="${nonce}">
+  .phraseotomy-wrapper {
+    width: 100%;
+    height: 100vh;
+    min-height: 600px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+  }
+  .phraseotomy-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+</style>
+<div class="phraseotomy-wrapper">
+  <iframe 
+    class="phraseotomy-frame"
+    src="${appUrl}"
+    allow="camera; microphone; autoplay; fullscreen"
+    title="Phraseotomy"
+  ></iframe>
+</div>`;
 }
 
 /**
