@@ -178,9 +178,21 @@ Deno.serve(async (req) => {
       console.log('Return token present in request');
     }
 
-    // Return HTML fragment for Shopify App Proxy
+    // Generate nonce for CSP
+    const nonce = crypto.randomUUID();
+    
+    // Return HTML fragment for Shopify App Proxy with proper CSP
     const headers = new Headers({
       'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy': [
+        "default-src 'self'",
+        `script-src 'self' 'nonce-${nonce}' https:`,
+        `style-src 'self' 'nonce-${nonce}' https:`,
+        "img-src 'self' data: https:",
+        "connect-src 'self' https:",
+        "frame-src https:",
+        "frame-ancestors https://admin.shopify.com https://*.myshopify.com"
+      ].join('; ')
     });
 
     // Set customer data in cookie if available
@@ -190,7 +202,7 @@ Deno.serve(async (req) => {
 
     // Pass token and customer data to app
     return new Response(
-      generateAppHtml(tenant, shop, customerData),
+      generateAppHtml(tenant, shop, customerData, nonce),
       {
         status: 200,
         headers,
@@ -214,9 +226,9 @@ Deno.serve(async (req) => {
 
 /**
  * Generate HTML that loads the React app in an iframe
- * Returns minimal HTML for Shopify App Proxy injection
+ * Returns minimal HTML for Shopify App Proxy injection with CSP-compliant nonce
  */
-function generateAppHtml(tenant: any, shop: string, customer: any = null): string {
+function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce: string): string {
   // Sanitize tenant data for embedding
   const tenantConfig = {
     id: tenant.id,
@@ -239,8 +251,8 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null): strin
 
   const iframeUrl = `${baseUrl}/play/host?${configParams.toString()}`;
 
-  // Return minimal HTML that Shopify can inject
-  return `<style>
+  // Return CSP-compliant HTML with nonce and no inline styles
+  return `<style nonce="${nonce}">
   .phraseotomy-container {
     width: 100%;
     min-height: 600px;
@@ -262,7 +274,6 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null): strin
     class="phraseotomy-iframe"
     src="${iframeUrl}"
     allow="camera; microphone; autoplay"
-    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
     title="Phraseotomy - ${tenant.name}"
   ></iframe>
 </div>`;
