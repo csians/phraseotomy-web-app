@@ -272,18 +272,8 @@ export default function Lobby() {
         return;
       }
 
-      // Verify that the current user is actually in the players list
-      const isPlayerInSession = data.players?.some((player: Player) => player.player_id === currentPlayerId);
-
-      if (!currentPlayerId || !isPlayerInSession) {
-        toast({
-          title: "Access Denied",
-          description: "You must join with a lobby code and name to access this lobby",
-          variant: "destructive",
-        });
-        navigate("/login");
-        return;
-      }
+      // For page refreshes, we don't need to re-validate player membership
+      // The real-time subscriptions will handle session updates
 
       setSession(data.session);
       setPlayers(data.players || []);
