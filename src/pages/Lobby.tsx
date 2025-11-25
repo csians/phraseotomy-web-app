@@ -571,31 +571,7 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Audio Recording for Host */}
-        {isHost && session.status === "waiting" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Music className="mr-2 h-5 w-5" />
-                Record Audio
-              </CardTitle>
-              <CardDescription>Record audio for the game</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <LobbyAudioRecording
-                sessionId={sessionId!}
-                customerId={currentCustomerId || ""}
-                shopDomain={session.shop_domain}
-                tenantId={session.tenant_id}
-                hasRecording={false}
-                onRecordingComplete={handleRecordingComplete}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Theme Selection for Host */}
-        {isHost && session.status === "waiting" && themes.length > 0 && (
+         {isHost && session.status === "active" && themes.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle>Select Theme</CardTitle>
@@ -625,7 +601,7 @@ export default function Lobby() {
         )}
 
         {/* Display 5 Elements when theme is selected */}
-        {isHost && session.status === "waiting" && selectedTheme && (
+        {isHost && session.status === "active" && selectedTheme && (
           <Card>
             <CardHeader>
               <CardTitle>Theme Elements</CardTitle>
@@ -636,6 +612,32 @@ export default function Lobby() {
             </CardContent>
           </Card>
         )}
+
+        {/* Audio Recording for Host */}
+        {isHost && session.status === "active" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Music className="mr-2 h-5 w-5" />
+                Record Audio
+              </CardTitle>
+              <CardDescription>Record audio for the game</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LobbyAudioRecording
+                sessionId={sessionId!}
+                customerId={currentCustomerId || ""}
+                shopDomain={session.shop_domain}
+                tenantId={session.tenant_id}
+                hasRecording={false}
+                onRecordingComplete={handleRecordingComplete}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Theme Selection for Host */}
+       
       </div>
     </div>
   );
