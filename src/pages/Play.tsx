@@ -14,6 +14,7 @@ import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type Ga
 import { lobbyCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
 import { redeemCode } from "@/lib/redemption";
+import { getAllUrlParams } from "@/lib/urlUtils";
 
 const Play = () => {
   const navigate = useNavigate();
@@ -92,7 +93,7 @@ const Play = () => {
         return;
       }
 
-      const urlParams = new URLSearchParams(window.location.search);
+      const urlParams = getAllUrlParams();
       
       // Check for iframe config from URL parameters (fallback method)
       const configParam = urlParams.get('config');
