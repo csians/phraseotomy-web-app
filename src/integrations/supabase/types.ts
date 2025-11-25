@@ -696,6 +696,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_player_score: {
+        Args: { p_player_id: string; p_points: number }
+        Returns: undefined
+      }
       user_is_in_session: {
         Args: { _session_id: string; _user_id: string }
         Returns: boolean
