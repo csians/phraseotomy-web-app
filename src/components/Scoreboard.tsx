@@ -52,8 +52,10 @@ export function Scoreboard({ players, currentRound, totalRounds, currentStorytel
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-primary">{player.score}</p>
-                <p className="text-xs text-muted-foreground">points</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-3xl font-bold text-primary">{player.score}</p>
+                  <p className="text-sm text-muted-foreground">pts</p>
+                </div>
               </div>
             </div>
           ))}
