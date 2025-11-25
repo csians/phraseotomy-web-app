@@ -2,7 +2,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { useTenant } from "@/hooks/useTenant";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Key } from "lucide-react";
+import { Key, Package } from "lucide-react";
 
 const AdminHome = () => {
   const [searchParams] = useSearchParams();
@@ -43,6 +43,23 @@ const AdminHome = () => {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Game Packs
+              </CardTitle>
+              <CardDescription>
+                Manage game packs and content
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to={`/admin/packs?shop=${shop}`}>
+                <Button className="w-full">Manage Packs</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

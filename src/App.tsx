@@ -11,6 +11,7 @@ import Lobby from "./pages/Lobby";
 import NotFound from "./pages/NotFound";
 import AdminHome from "./pages/admin/AdminHome";
 import Codes from "./pages/admin/Codes";
+import Packs from "./pages/admin/Packs";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ const App = () => (
           <Route path="/create-lobby" element={<CreateLobby />} />
           <Route path="/lobby/:sessionId" element={<Lobby />} />
           <Route path="/admin" element={<AdminHome />} />
+          <Route path="/admin/packs" element={<Packs />} />
           <Route path="/admin/codes" element={<Codes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
