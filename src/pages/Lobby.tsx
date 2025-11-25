@@ -311,33 +311,14 @@ export default function Lobby() {
   };
 
   const handleStartGame = async () => {
-    if (!selectedTheme) {
-      toast({
-        title: "Select Theme",
-        description: "Please select a theme before starting the game",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!selectedAudio) {
-      toast({
-        title: "Record Audio",
-        description: "Please record audio before starting the game",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      console.log("Starting game with audio:", selectedAudio);
+      console.log("Starting game...");
       console.log("Session ID:", sessionId);
 
       // Call edge function to start the game with service role permissions
       const { data, error } = await supabase.functions.invoke("start-game", {
         body: {
           sessionId,
-          selectedAudioId: selectedAudio,
         },
       });
 
@@ -354,7 +335,7 @@ export default function Lobby() {
       console.log("Game started successfully:", data);
       toast({
         title: "Game Started!",
-        description: "The game has been started with the recorded audio.",
+        description: "Get ready to play!",
       });
 
       // Refresh lobby data to show updated status
@@ -571,18 +552,25 @@ export default function Lobby() {
           </CardContent>
         </Card>
 
-        {/* Theme selection removed - happens in-game */}
-
+        {/* Start Game button for host */}
         {isHost && session.status === "waiting" && (
-          <LobbyAudioRecording
-            sessionId={sessionId || ''}
-            customerId={currentCustomerId || ''}
-            shopDomain={session.shop_domain}
-            tenantId={session.tenant_id}
-            onRecordingComplete={handleRecordingComplete}
-            onStartGame={handleStartGame}
-            hasRecording={!!selectedAudio}
-          />
+          <Card>
+            <CardHeader>
+              <CardTitle>Ready to Start?</CardTitle>
+              <CardDescription>
+                Start the game when all players have joined
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={handleStartGame} 
+                className="w-full"
+                size="lg"
+              >
+                Start Game
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
         {session.status === "active" && session.selected_audio_id && (

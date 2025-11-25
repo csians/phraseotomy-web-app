@@ -15,9 +15,9 @@ Deno.serve(async (req) => {
 
     console.log("Starting game:", { sessionId, selectedAudioId });
 
-    if (!sessionId || !selectedAudioId) {
+    if (!sessionId) {
       return new Response(
-        JSON.stringify({ error: "Missing sessionId or selectedAudioId" }),
+        JSON.stringify({ error: "Missing sessionId" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -27,14 +27,20 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Update game session with selected audio and start the game
+    // Update game session to start the game
+    const updateData: any = {
+      status: "active",
+      started_at: new Date().toISOString(),
+    };
+
+    // Only update selected_audio_id if provided
+    if (selectedAudioId) {
+      updateData.selected_audio_id = selectedAudioId;
+    }
+
     const { data, error } = await supabase
       .from("game_sessions")
-      .update({
-        selected_audio_id: selectedAudioId,
-        status: "active",
-        started_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq("id", sessionId)
       .select()
       .single();
