@@ -659,7 +659,20 @@ const Codes = () => {
                           {code.status}
                         </span>
                       </TableCell>
-                      <TableCell>{code.redeemed_by || "—"}</TableCell>
+                      <TableCell>
+                        {code.redeemed_by ? (
+                          <a
+                            href={`https://${tenant.shop_domain}/admin/customers/${code.redeemed_by}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            {(code as any).customer_name || code.redeemed_by}
+                          </a>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
                       <TableCell>{formatDate(code.redeemed_at)}</TableCell>
                       <TableCell>{formatDate(code.expires_at)}</TableCell>
                       <TableCell>

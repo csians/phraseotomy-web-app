@@ -57,12 +57,22 @@ Deno.serve(async (req) => {
 
     console.log('Loading license codes for tenant:', tenant.id);
 
-    // List license codes using service role (bypasses RLS)
+    // List license codes with customer name from customer_licenses
     const { data: codes, error: codesError } = await supabase
       .from('license_codes')
-      .select('*')
+      .select(`
+        *,
+        customer_licenses!inner(customer_name, customer_email)
+      `)
       .eq('tenant_id', tenant.id)
       .order('created_at', { ascending: false });
+    
+    // Format the response to include customer_name at the top level
+    const formattedCodes = codes?.map(code => ({
+      ...code,
+      customer_name: code.customer_licenses?.[0]?.customer_name || null,
+      customer_email: code.customer_licenses?.[0]?.customer_email || null,
+    }));
 
     if (codesError) {
       console.error('Error loading license codes:', codesError);
@@ -75,10 +85,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('✅ License codes loaded:', codes?.length || 0);
+    console.log('✅ License codes loaded:', formattedCodes?.length || 0);
 
     return new Response(
-      JSON.stringify({ success: true, codes: codes || [] }),
+      JSON.stringify({ success: true, codes: formattedCodes || [] }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
