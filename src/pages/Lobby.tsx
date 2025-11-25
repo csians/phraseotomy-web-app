@@ -4,16 +4,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Music, Users, XCircle, Briefcase, Home, Plane, Bike, Wine, Rocket, Skull, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  Music,
+  Users,
+  XCircle,
+  Briefcase,
+  Home,
+  Plane,
+  Bike,
+  Wine,
+  Rocket,
+  Skull,
+  Sparkles,
+} from "lucide-react";
 import { LobbyAudioRecording } from "@/components/LobbyAudioRecording";
 import { getAllUrlParams } from "@/lib/urlUtils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import {
   AlertDialog,
@@ -89,71 +96,71 @@ export default function Lobby() {
     const channel = supabase
       .channel(`lobby-${sessionId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'game_sessions',
-          filter: `id=eq.${sessionId}`
+          event: "*",
+          schema: "public",
+          table: "game_sessions",
+          filter: `id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log('Game session changed:', payload);
-          
+          console.log("Game session changed:", payload);
+
           // If the session was deleted, redirect to homepage
-          if (payload.eventType === 'DELETE') {
+          if (payload.eventType === "DELETE") {
             toast({
               title: "Lobby Ended",
               description: "The host has ended this lobby",
             });
-            navigate('/login');
+            navigate("/login");
             return;
           }
-          
+
           // If session was updated, refresh the data
-          if (payload.eventType === 'UPDATE') {
+          if (payload.eventType === "UPDATE") {
             const updatedSession = payload.new as GameSession;
             setSession(updatedSession);
-            
+
             // Navigate to game page when game starts
-            if (updatedSession.status === 'active' && !isGameStarted) {
-              console.log('Game started - navigating to game page');
+            if (updatedSession.status === "active" && !isGameStarted) {
+              console.log("Game started - navigating to game page");
               setIsGameStarted(true);
               navigate(`/game/${sessionId}`);
             }
           }
-        }
+        },
       )
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'game_players',
-          filter: `session_id=eq.${sessionId}`
+          event: "INSERT",
+          schema: "public",
+          table: "game_players",
+          filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log('New player joined:', payload);
+          console.log("New player joined:", payload);
           // Add the new player to the list
-          setPlayers(prev => [...prev, payload.new as Player]);
+          setPlayers((prev) => [...prev, payload.new as Player]);
           toast({
             title: "Player Joined",
             description: `${(payload.new as Player).name} joined the lobby`,
           });
-        }
+        },
       )
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'game_players',
-          filter: `session_id=eq.${sessionId}`
+          event: "DELETE",
+          schema: "public",
+          table: "game_players",
+          filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log('Player left:', payload);
+          console.log("Player left:", payload);
           // Remove the player from the list
-          setPlayers(prev => prev.filter(p => p.id !== (payload.old as Player).id));
-        }
+          setPlayers((prev) => prev.filter((p) => p.id !== (payload.old as Player).id));
+        },
       )
       .subscribe();
 
@@ -166,7 +173,7 @@ export default function Lobby() {
   const getCurrentCustomerId = () => {
     // Check URL parameters first (in case customer_id is in URL)
     const urlParams = getAllUrlParams();
-    const urlCustomerId = urlParams.get('customer_id');
+    const urlCustomerId = urlParams.get("customer_id");
     if (urlCustomerId) {
       return urlCustomerId;
     }
@@ -232,12 +239,12 @@ export default function Lobby() {
       setLoading(true);
 
       console.log("Fetching lobby data for session:", sessionId);
-      
+
       // Get current customer ID or guest player ID
       const currentCustomerId = getCurrentCustomerId();
-      const guestPlayerId = localStorage.getItem('guest_player_id');
+      const guestPlayerId = localStorage.getItem("guest_player_id");
       const currentPlayerId = currentCustomerId || guestPlayerId;
-      
+
       console.log("Current player ID:", currentPlayerId);
 
       // Call edge function to fetch lobby data with service role permissions
@@ -263,9 +270,7 @@ export default function Lobby() {
       }
 
       // Verify that the current user is actually in the players list
-      const isPlayerInSession = data.players?.some(
-        (player: Player) => player.player_id === currentPlayerId
-      );
+      const isPlayerInSession = data.players?.some((player: Player) => player.player_id === currentPlayerId);
 
       if (!currentPlayerId || !isPlayerInSession) {
         toast({
@@ -279,7 +284,7 @@ export default function Lobby() {
 
       setSession(data.session);
       setPlayers(data.players || []);
-      
+
       // Set audio files from the response (edge function fetches them if user is host)
       setAudioFiles(data.audioFiles || []);
       console.log("Audio files from response:", data.audioFiles?.length || 0);
@@ -290,10 +295,7 @@ export default function Lobby() {
       }
 
       // Fetch themes
-      const { data: themesData, error: themesError } = await supabase
-        .from('themes')
-        .select('*')
-        .order('name');
+      const { data: themesData, error: themesError } = await supabase.from("themes").select("*").order("name");
 
       if (!themesError && themesData) {
         setThemes(themesData);
@@ -401,10 +403,10 @@ export default function Lobby() {
   const handleRecordingComplete = async (audioId: string) => {
     console.log("Recording complete, audio ID:", audioId);
     setSelectedAudio(audioId);
-    
+
     // Refresh audio files
     await fetchLobbyData();
-    
+
     toast({
       title: "Ready to Start",
       description: "Audio recorded successfully. You can now start the game.",
@@ -413,13 +415,10 @@ export default function Lobby() {
 
   const handleThemeChange = async (themeId: string) => {
     setSelectedTheme(themeId);
-    
+
     // Update session with selected theme
     try {
-      const { error } = await supabase
-        .from('game_sessions')
-        .update({ selected_theme_id: themeId })
-        .eq('id', sessionId);
+      const { error } = await supabase.from("game_sessions").update({ selected_theme_id: themeId }).eq("id", sessionId);
 
       if (error) {
         console.error("Error updating theme:", error);
@@ -465,11 +464,11 @@ export default function Lobby() {
     );
   }
 
-  console.log("Host check:", { 
-    currentCustomerId, 
-    hostCustomerId: session?.host_customer_id, 
+  console.log("Host check:", {
+    currentCustomerId,
+    hostCustomerId: session?.host_customer_id,
     isHost,
-    hasAudioFiles: audioFiles.length > 0
+    hasAudioFiles: audioFiles.length > 0,
   });
 
   return (
@@ -498,7 +497,10 @@ export default function Lobby() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleEndLobby} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  <AlertDialogAction
+                    onClick={handleEndLobby}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
                     End Lobby
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -528,9 +530,7 @@ export default function Lobby() {
               <Users className="mr-2 h-5 w-5" />
               Players ({players.length})
             </CardTitle>
-            <CardDescription>
-              {isHost ? "You are the host" : "You are a player in this lobby"}
-            </CardDescription>
+            <CardDescription>{isHost ? "You are the host" : "You are a player in this lobby"}</CardDescription>
           </CardHeader>
           <CardContent>
             {players.length === 0 ? (
@@ -558,23 +558,17 @@ export default function Lobby() {
           <Card>
             <CardHeader>
               <CardTitle>Ready to Start?</CardTitle>
-              <CardDescription>
-                Start the game when all players have joined
-              </CardDescription>
+              <CardDescription>Start the game when all players have joined</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button 
-                onClick={handleStartGame} 
-                className="w-full"
-                size="lg"
-              >
+              <Button onClick={handleStartGame} className="w-full" size="lg">
                 Start Game
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* /* {session.status === "active" && session.selected_audio_id && ( */ */}
+        {session.status === "active" && session.selected_audio_id && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -587,29 +581,29 @@ export default function Lobby() {
               {(() => {
                 console.log("Looking for audio ID:", session.selected_audio_id);
                 console.log("Available audio files:", audioFiles);
-                const selectedAudioFile = audioFiles.find(a => a.id === session.selected_audio_id);
+                const selectedAudioFile = audioFiles.find((a) => a.id === session.selected_audio_id);
                 console.log("Found audio file:", selectedAudioFile);
-                
+
                 return selectedAudioFile ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
                       <div className="flex-1">
                         <p className="font-medium">{selectedAudioFile.filename}</p>
                         <p className="text-xs text-muted-foreground">
-                          Selected on {new Date(session.started_at || '').toLocaleDateString()}
+                          Selected on {new Date(session.started_at || "").toLocaleDateString()}
                         </p>
                       </div>
                       <Music className="h-5 w-5 text-primary" />
                     </div>
-                    
+
                     {isHost ? (
-                      <audio 
+                      <audio
                         ref={audioRef}
-                        controls 
-                        className="w-full mt-2" 
+                        controls
+                        className="w-full mt-2"
                         preload="auto"
-                        onPlay={() => console.log('Audio playing')}
-                        onError={(e) => console.error('Audio error:', e)}
+                        onPlay={() => console.log("Audio playing")}
+                        onError={(e) => console.error("Audio error:", e)}
                       >
                         <source src={selectedAudioFile.audio_url} type="audio/mpeg" />
                         <source src={selectedAudioFile.audio_url} type="audio/mp3" />
@@ -617,12 +611,12 @@ export default function Lobby() {
                       </audio>
                     ) : (
                       <div className="relative w-full mt-2">
-                        <audio 
+                        <audio
                           ref={audioRef}
-                          className="w-full hidden" 
+                          className="w-full hidden"
                           preload="auto"
-                          onPlay={() => console.log('Audio playing')}
-                          onError={(e) => console.error('Audio error:', e)}
+                          onPlay={() => console.log("Audio playing")}
+                          onError={(e) => console.error("Audio error:", e)}
                         >
                           <source src={selectedAudioFile.audio_url} type="audio/mpeg" />
                           <source src={selectedAudioFile.audio_url} type="audio/mp3" />
@@ -638,18 +632,14 @@ export default function Lobby() {
                 ) : (
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">Loading audio details...</p>
-                    <p className="text-xs text-muted-foreground">
-                      Selected audio ID: {session.selected_audio_id}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Available audio count: {audioFiles.length}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Selected audio ID: {session.selected_audio_id}</p>
+                    <p className="text-xs text-muted-foreground">Available audio count: {audioFiles.length}</p>
                   </div>
                 );
               })()}
             </CardContent>
           </Card>
-        // )}
+        )}
       </div>
     </div>
   );
