@@ -295,6 +295,42 @@ export type Database = {
           },
         ]
       }
+      license_code_packs: {
+        Row: {
+          created_at: string
+          id: string
+          license_code_id: string
+          pack_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          license_code_id: string
+          pack_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          license_code_id?: string
+          pack_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_code_packs_license_code_id_fkey"
+            columns: ["license_code_id"]
+            isOneToOne: false
+            referencedRelation: "license_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_code_packs_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       license_codes: {
         Row: {
           code: string
@@ -335,6 +371,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "license_codes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packs: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packs_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
