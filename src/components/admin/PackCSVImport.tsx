@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, AlertCircle, Check, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import * as XLSX from 'xlsx';
 
 type CSVRow = {
   name: string;
@@ -32,24 +33,23 @@ export const PackCSVImport = ({ tenantId, onImportComplete }: PackCSVImportProps
   const [importing, setImporting] = useState(false);
   const { toast } = useToast();
 
-  const parseCSV = (text: string): CSVRow[] => {
-    const lines = text.trim().split("\n");
-    const headers = lines[0].toLowerCase().split(",").map(h => h.trim());
-    
-    const nameIdx = headers.indexOf("name");
-    const descIdx = headers.indexOf("description");
-
-    if (nameIdx === -1) {
-      throw new Error("CSV must have column: name");
+  const parseFile = (data: any[]): CSVRow[] => {
+    if (data.length === 0) {
+      throw new Error("File is empty");
     }
 
-    return lines.slice(1).map(line => {
-      const values = line.split(",").map(v => v.trim());
-      return {
-        name: values[nameIdx] || "",
-        description: values[descIdx] || "",
-      };
-    }).filter(row => row.name);
+    const headers = Object.keys(data[0]).map(h => h.toLowerCase().trim());
+    
+    const nameKey = headers.find(h => h === "name");
+
+    if (!nameKey) {
+      throw new Error("File must have a 'name' column");
+    }
+
+    return data.map(row => ({
+      name: String(row[nameKey] || "").trim(),
+      description: String(row.description || row.Description || "").trim(),
+    })).filter(row => row.name);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,16 +57,34 @@ export const PackCSVImport = ({ tenantId, onImportComplete }: PackCSVImportProps
     if (!file) return;
 
     try {
-      const text = await file.text();
-      const rows = parseCSV(text);
+      let rows: CSVRow[];
+      
+      if (file.name.endsWith('.csv')) {
+        const text = await file.text();
+        const lines = text.trim().split("\n");
+        const headers = lines[0].split(",").map(h => h.trim());
+        const data = lines.slice(1).map(line => {
+          const values = line.split(",").map(v => v.trim());
+          const obj: any = {};
+          headers.forEach((header, idx) => {
+            obj[header] = values[idx] || "";
+          });
+          return obj;
+        });
+        rows = parseFile(data);
+      } else {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer);
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(firstSheet);
+        rows = parseFile(data);
+      }
 
-      // Check for duplicates in upload
-      const names = rows.map(r => r.name);
+      const names = rows.map(r => r.name.toLowerCase());
       const duplicates = names.filter((name, idx) => names.indexOf(name) !== idx);
       
-      // Mark duplicates
       rows.forEach(row => {
-        row.isDuplicate = duplicates.includes(row.name);
+        row.isDuplicate = duplicates.includes(row.name.toLowerCase());
       });
 
       setPreview({
@@ -75,8 +93,8 @@ export const PackCSVImport = ({ tenantId, onImportComplete }: PackCSVImportProps
       });
     } catch (error) {
       toast({
-        title: "Error parsing CSV",
-        description: error instanceof Error ? error.message : "Invalid CSV format",
+        title: "Error parsing file",
+        description: error instanceof Error ? error.message : "Invalid file format",
         variant: "destructive",
       });
     }
@@ -138,7 +156,7 @@ export const PackCSVImport = ({ tenantId, onImportComplete }: PackCSVImportProps
           <div className="space-y-2">
             <Input
               type="file"
-              accept=".csv"
+              accept=".csv,.xlsx"
               onChange={handleFileUpload}
               disabled={importing}
             />
