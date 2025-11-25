@@ -571,61 +571,7 @@ export default function Lobby() {
           </CardContent>
         </Card>
 
-        {isHost && session.status === "waiting" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Sparkles className="mr-2 h-5 w-5" />
-                Select Theme
-              </CardTitle>
-              <CardDescription>Choose a theme for your story</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedTheme} onValueChange={handleThemeChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Choose a theme..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {themes.map((theme) => {
-                    const IconComponent = iconMap[theme.icon] || Sparkles;
-                    return (
-                      <SelectItem key={theme.id} value={theme.id}>
-                        <div className="flex items-center gap-2">
-                          <IconComponent className="h-4 w-4" />
-                          <span>{theme.name}</span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-              {selectedTheme && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  Theme selected: {themes.find(t => t.id === selectedTheme)?.name}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {!isHost && session.status === "waiting" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Waiting for Host</CardTitle>
-              <CardDescription>The host will select a theme, record audio and start the game</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Please wait while the host prepares the game...
-              </p>
-              {session.selected_theme_id && (
-                <p className="text-sm text-primary mt-2">
-                  Theme selected: {themes.find(t => t.id === session.selected_theme_id)?.name}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {/* Theme selection removed - happens in-game */}
 
         {isHost && session.status === "waiting" && (
           <LobbyAudioRecording

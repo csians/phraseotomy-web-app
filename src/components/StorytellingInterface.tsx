@@ -1,8 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, Square, Send, Lightbulb } from "lucide-react";
+import { Mic, Square, Send, Lightbulb, AlertCircle, Brain, Sparkles, Lightbulb as LightbulbIcon, Zap, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Element {
@@ -33,9 +34,14 @@ export function StorytellingInterface({
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [secretElement, setSecretElement] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const iconMap: Record<string, any> = {
+    Brain, Sparkles, Lightbulb: LightbulbIcon, Zap, Heart
+  };
 
   const MAX_RECORDING_TIME = 180; // 3 minutes in seconds
 
@@ -109,6 +115,15 @@ export function StorytellingInterface({
       return;
     }
 
+    if (!secretElement) {
+      toast({
+        title: "Select Secret Element",
+        description: "Please choose which element you're describing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsUploading(true);
     try {
       // Upload audio to storage
@@ -124,12 +139,13 @@ export function StorytellingInterface({
         .from("audio_uploads")
         .getPublicUrl(fileName);
 
-      // Update turn with recording URL
+      // Update turn with recording URL and secret element
       const { error: updateError } = await supabase
         .from("game_turns")
         .update({ 
           recording_url: publicUrl,
-          completed_at: new Date().toISOString()
+          completed_at: new Date().toISOString(),
+          selected_elements: [secretElement]
         })
         .eq("id", turnId);
 
@@ -173,23 +189,41 @@ export function StorytellingInterface({
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold mb-3">Your Elements</h3>
+              <h3 className="text-lg font-semibold mb-3">Step 1: Select Your Secret Element</h3>
+              <p className="text-sm text-muted-foreground mb-3">Choose ONE element to describe - others will guess which one</p>
               <div className="flex gap-3 flex-wrap justify-center">
-                {elements.map((element) => (
-                  <div
-                    key={element.id}
-                    className="flex items-center justify-center w-20 h-20 rounded-lg bg-muted border-2 border-border"
-                  >
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">{element.icon}</div>
-                      <p className="text-xs font-medium">{element.name}</p>
-                    </div>
-                  </div>
-                ))}
+                {elements.map((element) => {
+                  const IconComponent = iconMap[element.icon] || Brain;
+                  const isSelected = secretElement === element.id;
+                  return (
+                    <button
+                      key={element.id}
+                      onClick={() => setSecretElement(element.id)}
+                      disabled={recordedAudio !== null}
+                      className={`flex flex-col items-center justify-center w-24 h-24 rounded-lg transition-all ${
+                        isSelected 
+                          ? 'bg-primary text-primary-foreground ring-2 ring-primary' 
+                          : 'bg-muted border-2 border-border hover:bg-muted/80'
+                      } ${recordedAudio ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <IconComponent className="h-8 w-8 mb-1" />
+                      <p className="text-xs font-medium text-center">{element.name}</p>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div className="border-t border-border pt-6">
+              <h3 className="text-lg font-semibold mb-3">Step 2: Record Your Story</h3>
+              {!secretElement && (
+                <Alert className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Please select your secret element first
+                  </AlertDescription>
+                </Alert>
+              )}
               {!recordedAudio ? (
                 <div className="space-y-4">
                   {isRecording && (
@@ -207,6 +241,7 @@ export function StorytellingInterface({
                     size="lg"
                     variant={isRecording ? "destructive" : "default"}
                     className="w-full"
+                    disabled={!secretElement}
                   >
                     {isRecording ? (
                       <>
