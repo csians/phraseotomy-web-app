@@ -4,8 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Music, Users, XCircle, Trash2 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Music, Users, XCircle } from "lucide-react";
+import { LobbyAudioRecording } from "@/components/LobbyAudioRecording";
 
 import {
   AlertDialog,
@@ -290,8 +290,8 @@ export default function Lobby() {
   const handleStartGame = async () => {
     if (!selectedAudio) {
       toast({
-        title: "Select Audio",
-        description: "Please select an audio file before starting the game",
+        title: "Record Audio",
+        description: "Please record audio before starting the game",
         variant: "destructive",
       });
       return;
@@ -322,7 +322,7 @@ export default function Lobby() {
       console.log("Game started successfully:", data);
       toast({
         title: "Game Started!",
-        description: "The game has been started with the selected audio.",
+        description: "The game has been started with the recorded audio.",
       });
 
       // Refresh lobby data to show updated status
@@ -384,39 +384,17 @@ export default function Lobby() {
     }
   };
 
-  const handleDeleteAudio = async (audioId: string) => {
-    if (!currentCustomerId) return;
-
-    try {
-      const { error } = await supabase.functions.invoke("delete-customer-audio", {
-        body: {
-          audioId,
-          customerId: currentCustomerId,
-        },
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Audio deleted successfully",
-      });
-
-      // Refresh audio files
-      await fetchLobbyData();
-    } catch (error) {
-      console.error("Error deleting audio:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete audio",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleAudioUploadComplete = async () => {
-    // Refresh audio files after upload
+  const handleRecordingComplete = async (audioId: string) => {
+    console.log("Recording complete, audio ID:", audioId);
+    setSelectedAudio(audioId);
+    
+    // Refresh audio files
     await fetchLobbyData();
+    
+    toast({
+      title: "Ready to Start",
+      description: "Audio recorded successfully. You can now start the game.",
+    });
   };
 
   // Check if current user is the host
@@ -542,86 +520,15 @@ export default function Lobby() {
         )}
 
         {isHost && session.status === "waiting" && (
-          <>
-
-            {audioFiles.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Music className="mr-2 h-5 w-5" />
-                    Your Uploaded Audio
-                  </CardTitle>
-                  <CardDescription>Manage your audio files</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {audioFiles.map((audio) => (
-                      <div 
-                        key={audio.id} 
-                        className="flex items-center justify-between p-3 rounded-md bg-muted/50 hover:bg-muted transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{audio.filename}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(audio.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteAudio(audio.id)}
-                          className="ml-2 hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Music className="mr-2 h-5 w-5" />
-                  Select Audio
-                </CardTitle>
-                <CardDescription>Choose an audio file for this game</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {audioFiles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No audio files uploaded yet. Upload audio using the form above.
-                  </p>
-                ) : (
-                  <Select value={selectedAudio} onValueChange={setSelectedAudio}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select an audio file" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {audioFiles.map((audio) => (
-                        <SelectItem key={audio.id} value={audio.id}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{audio.filename}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(audio.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {audioFiles.length > 0 && (
-                  <Button onClick={handleStartGame} className="w-full mt-4" disabled={!selectedAudio}>
-                    Start Game
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </>
+          <LobbyAudioRecording
+            sessionId={sessionId || ''}
+            customerId={currentCustomerId || ''}
+            shopDomain={session.shop_domain}
+            tenantId={session.tenant_id}
+            onRecordingComplete={handleRecordingComplete}
+            onStartGame={handleStartGame}
+            hasRecording={!!selectedAudio}
+          />
         )}
 
         {session.status === "active" && session.selected_audio_id && (
