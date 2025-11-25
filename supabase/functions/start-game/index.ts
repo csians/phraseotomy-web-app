@@ -27,10 +27,28 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // Get the first player to be the storyteller
+    const { data: firstPlayer, error: playerError } = await supabase
+      .from("game_players")
+      .select("player_id")
+      .eq("session_id", sessionId)
+      .order("turn_order", { ascending: true })
+      .limit(1)
+      .single();
+
+    if (playerError || !firstPlayer) {
+      return new Response(
+        JSON.stringify({ error: "No players found in session" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Update game session to start the game
     const updateData: any = {
       status: "active",
       started_at: new Date().toISOString(),
+      current_storyteller_id: firstPlayer.player_id,
+      current_round: 1,
     };
 
     // Only update selected_audio_id if provided
