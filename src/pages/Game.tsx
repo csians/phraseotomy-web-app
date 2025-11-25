@@ -59,14 +59,20 @@ export default function Game() {
   const [currentPlayerId, setCurrentPlayerId] = useState<string>("");
 
   useEffect(() => {
+    console.log("Game component mounted, sessionId:", sessionId);
     if (!sessionId) {
+      console.log("No sessionId, redirecting to /play/host");
       navigate("/play/host");
       return;
     }
 
     initializeGame();
-    setupRealtimeSubscriptions();
-  }, [sessionId, navigate]);
+    const cleanup = setupRealtimeSubscriptions();
+    
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [sessionId]);
 
   const getCurrentPlayerId = () => {
     const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
@@ -88,13 +94,25 @@ export default function Game() {
     try {
       setLoading(true);
       const playerId = getCurrentPlayerId();
+      console.log("Current player ID:", playerId);
       setCurrentPlayerId(playerId);
 
+      console.log("Fetching game state for session:", sessionId);
       const { data, error } = await supabase.functions.invoke("get-game-state", {
         body: { sessionId },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error from get-game-state:", error);
+        throw error;
+      }
+
+      console.log("Game state received:", data);
+      console.log("Session:", data.session);
+      console.log("Players:", data.players);
+      console.log("Themes count:", data.themes?.length);
+      console.log("Current turn:", data.currentTurn);
+      console.log("Current storyteller:", data.session?.current_storyteller_id);
 
       setSession(data.session);
       setPlayers(data.players || []);
@@ -104,13 +122,23 @@ export default function Game() {
       setThemeElements(data.themeElements || []);
 
       // Determine game phase
+      let phase: "theme_selection" | "storytelling" | "guessing" | "scoring";
       if (!data.currentTurn) {
-        setGamePhase("theme_selection");
+        phase = "theme_selection";
+        console.log("No current turn - setting phase to theme_selection");
       } else if (!data.currentTurn.completed_at) {
-        setGamePhase("storytelling");
+        phase = "storytelling";
+        console.log("Turn exists but not completed - setting phase to storytelling");
       } else {
-        setGamePhase("guessing");
+        phase = "guessing";
+        console.log("Turn completed - setting phase to guessing");
       }
+      setGamePhase(phase);
+      
+      // Check if current player is storyteller
+      const isStoryteller = playerId === data.session?.current_storyteller_id;
+      console.log("Is current player storyteller?", isStoryteller);
+      console.log("Player ID:", playerId, "Storyteller ID:", data.session?.current_storyteller_id);
     } catch (error) {
       console.error("Error initializing game:", error);
       toast({
@@ -231,11 +259,16 @@ export default function Game() {
       {/* Game Content */}
       <div className="ml-96 p-4">
         {gamePhase === "theme_selection" && isStoryteller && (
-          <ThemeSelection
-            themes={themes}
-            onThemeSelect={handleThemeSelect}
-            playerName={currentPlayer?.name || "Player"}
-          />
+          <>
+            <div className="mb-4 text-sm text-muted-foreground">
+              Debug: Showing theme selection (Phase: {gamePhase}, IsStoryteller: {isStoryteller.toString()}, Themes: {themes.length})
+            </div>
+            <ThemeSelection
+              themes={themes}
+              onThemeSelect={handleThemeSelect}
+              playerName={currentPlayer?.name || "Player"}
+            />
+          </>
         )}
 
         {gamePhase === "theme_selection" && !isStoryteller && (
