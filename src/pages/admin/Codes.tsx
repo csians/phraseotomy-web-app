@@ -13,7 +13,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Pencil, Check, ChevronsUpDown, Trash2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Check, ChevronsUpDown, Trash2, RefreshCw, RotateCcw } from "lucide-react";
+import { CSVImport } from "@/components/admin/CSVImport";
+import { CodeExport } from "@/components/admin/CodeExport";
 import type { Tables } from "@/integrations/supabase/types";
 import { redemptionCodeSchema, packsArraySchema, validateInput } from "@/lib/validation";
 import { cn } from "@/lib/utils";
@@ -400,6 +402,54 @@ const Codes = () => {
     }
   };
 
+  const handleResetCode = async (code: LicenseCode) => {
+    if (!tenant?.shop_domain) {
+      toast({
+        title: "Error",
+        description: "Tenant not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const confirmed = confirm(
+      `Reset code "${code.code}"?\n\nThis will:\n- Mark code as unused\n- Remove customer assignment\n- Remove from customer's Shopify metafields\n\nThe code can be redeemed again.`
+    );
+
+    if (!confirmed) return;
+
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('reset-code-redemption', {
+        body: {
+          code_id: code.id,
+          shop_domain: tenant.shop_domain,
+        },
+      });
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || 'Failed to reset code');
+      }
+
+      toast({
+        title: "Code reset",
+        description: "Code has been reset and can be redeemed again",
+      });
+
+      await loadCodes();
+    } catch (error) {
+      console.error('Error resetting code:', error);
+      toast({
+        title: "Error resetting code",
+        description: error instanceof Error ? error.message : "Failed to reset code",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "—";
     return new Date(dateString).toLocaleString();
@@ -455,6 +505,8 @@ const Codes = () => {
               <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
               Refresh
             </Button>
+            <CodeExport codes={codes} />
+            <CSVImport shopDomain={tenant.shop_domain} onImportComplete={loadCodes} />
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
@@ -580,14 +632,26 @@ const Codes = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => openEditDialog(code)}
+                            title="Edit code"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
+                          {code.status === "active" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleResetCode(code)}
+                              title="Reset redemption"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteCode(code)}
                             className="text-destructive hover:text-destructive"
+                            title="Delete code"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
