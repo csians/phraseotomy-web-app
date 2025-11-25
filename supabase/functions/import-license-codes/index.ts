@@ -11,8 +11,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 type ImportCode = {
   code: string;
-  pack_name: string;
-  expiration_date: string;
+  pack_names: string[];
+  expiration_date?: string;
 };
 
 Deno.serve(async (req) => {
@@ -73,22 +73,82 @@ Deno.serve(async (req) => {
 
     console.log(`Import: ${codes.length} total, ${newCodes.length} new, ${duplicatesFound} duplicates`);
 
-    // Prepare inserts
-    const inserts = newCodes.map(code => ({
+    if (newCodes.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          imported: 0,
+          duplicates_found: duplicatesFound,
+          message: 'All codes already exist',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get or create packs
+    const allPackNames = [...new Set(newCodes.flatMap(c => c.pack_names))];
+    
+    // Fetch existing packs
+    const { data: existingPacks, error: packsError } = await supabase
+      .from('packs')
+      .select('id, name')
+      .eq('tenant_id', tenant.id)
+      .in('name', allPackNames);
+
+    if (packsError) {
+      console.error('Packs fetch error:', packsError);
+      throw packsError;
+    }
+
+    const existingPackNames = existingPacks?.map(p => p.name) || [];
+    const packsToCreate = allPackNames.filter(name => !existingPackNames.includes(name));
+
+    // Create missing packs
+    if (packsToCreate.length > 0) {
+      const { error: createPacksError } = await supabase
+        .from('packs')
+        .insert(packsToCreate.map(name => ({
+          tenant_id: tenant.id,
+          name,
+          description: null,
+        })));
+
+      if (createPacksError) {
+        console.error('Create packs error:', createPacksError);
+        throw createPacksError;
+      }
+    }
+
+    // Fetch all packs again to get IDs
+    const { data: allPacks, error: allPacksError } = await supabase
+      .from('packs')
+      .select('id, name')
+      .eq('tenant_id', tenant.id)
+      .in('name', allPackNames);
+
+    if (allPacksError) {
+      console.error('All packs fetch error:', allPacksError);
+      throw allPacksError;
+    }
+
+    const packNameToId = new Map(allPacks?.map(p => [p.name, p.id]) || []);
+
+    // Insert license codes
+    const codesToInsert = newCodes.map((code) => ({
       tenant_id: tenant.id,
-      code: code.code,
-      packs_unlocked: [code.pack_name], // Store pack name in array
-      status: 'unused',
+      code: code.code.toUpperCase(),
+      packs_unlocked: code.pack_names, // Keep for backward compatibility
       expires_at: code.expiration_date ? new Date(code.expiration_date).toISOString() : null,
+      status: 'unused',
     }));
 
-    // Batch insert
-    const { error: insertError } = await supabase
+    const { data: insertedCodes, error: insertError } = await supabase
       .from('license_codes')
-      .insert(inserts);
+      .insert(codesToInsert)
+      .select('id, code');
 
     if (insertError) {
-      console.error('Error inserting codes:', insertError);
+      console.error('Insert error:', insertError);
       return new Response(
         JSON.stringify({ error: insertError.message }),
         {
@@ -96,6 +156,43 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
+    }
+
+    // Create pack associations in junction table
+    const codeIdMap = new Map(insertedCodes?.map(c => [c.code, c.id]) || []);
+    const packAssociations: { license_code_id: string; pack_id: string }[] = [];
+
+    newCodes.forEach(code => {
+      const codeId = codeIdMap.get(code.code.toUpperCase());
+      if (codeId) {
+        code.pack_names.forEach(packName => {
+          const packId = packNameToId.get(packName);
+          if (packId) {
+            packAssociations.push({
+              license_code_id: codeId,
+              pack_id: packId,
+            });
+          }
+        });
+      }
+    });
+
+    // Insert pack associations
+    if (packAssociations.length > 0) {
+      const { error: assocError } = await supabase
+        .from('license_code_packs')
+        .insert(packAssociations);
+
+      if (assocError) {
+        console.error('Pack associations error:', assocError);
+        return new Response(
+          JSON.stringify({ error: assocError.message }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
     }
 
     console.log(`✅ Successfully imported ${newCodes.length} codes`);
