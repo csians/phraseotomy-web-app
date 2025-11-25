@@ -339,8 +339,8 @@ export default function Lobby() {
         description: "Get ready to play!",
       });
 
-      // Refresh lobby data to show updated status
-      await fetchLobbyData();
+      // Navigate directly to the game page
+      navigate(`/game/${sessionId}`);
     } catch (error) {
       console.error("Error in handleStartGame:", error);
       toast({
