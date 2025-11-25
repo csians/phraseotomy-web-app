@@ -251,7 +251,7 @@ export default function Game() {
           </div>
         )}
 
-        {gamePhase === "storytelling" && isStoryteller && currentTurn && (
+        {gamePhase === "storytelling" && currentTurn && (
           <StorytellingInterface
             theme={currentTurn.theme}
             elements={selectedElements}
@@ -259,20 +259,9 @@ export default function Game() {
             playerId={currentPlayerId}
             turnId={currentTurn.id}
             onStoryComplete={handleStoryComplete}
+            isStoryteller={isStoryteller}
+            storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
           />
-        )}
-
-        {gamePhase === "storytelling" && !isStoryteller && (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">
-                Storyteller is recording...
-              </h2>
-              <p className="text-muted-foreground">
-                Get ready to listen and guess!
-              </p>
-            </div>
-          </div>
         )}
 
         {gamePhase === "guessing" && !isStoryteller && currentTurn?.recording_url && (
