@@ -141,14 +141,14 @@ export const PackCSVImport = ({ tenantId, onImportComplete }: PackCSVImportProps
       <DialogTrigger asChild>
         <Button variant="outline">
           <Upload className="h-4 w-4 mr-2" />
-          Import CSV
+          Import CSV/XLSX
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Import Packs</DialogTitle>
           <DialogDescription>
-            Upload a CSV file with pack names and descriptions
+            Upload a CSV or XLSX file with pack names and descriptions
           </DialogDescription>
         </DialogHeader>
 

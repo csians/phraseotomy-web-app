@@ -171,14 +171,14 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
       <DialogTrigger asChild>
         <Button variant="outline">
           <Upload className="h-4 w-4 mr-2" />
-          Import CSV
+          Import CSV/XLSX
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Import License Codes</DialogTitle>
           <DialogDescription>
-            Upload a CSV file with license codes and pack assignments
+            Upload a CSV or XLSX file with license codes and pack assignments
           </DialogDescription>
         </DialogHeader>
 
