@@ -19,6 +19,8 @@ interface StorytellingInterfaceProps {
   playerId: string;
   turnId: string;
   onStoryComplete: () => void;
+  isStoryteller: boolean;
+  storytellerName: string;
 }
 
 export function StorytellingInterface({
@@ -28,6 +30,8 @@ export function StorytellingInterface({
   playerId,
   turnId,
   onStoryComplete,
+  isStoryteller,
+  storytellerName,
 }: StorytellingInterfaceProps) {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
@@ -181,7 +185,11 @@ export function StorytellingInterface({
         <Card>
           <CardHeader>
             <CardTitle className="text-center text-2xl">
-              <span className="text-primary">Tell your story</span> using these elements
+              {isStoryteller ? (
+                <span className="text-primary">Tell your story</span>
+              ) : (
+                <span className="text-primary">{storytellerName} is telling a story</span>
+              )}
             </CardTitle>
             <CardDescription className="text-center text-lg">
               Theme: {theme.name}
@@ -189,8 +197,14 @@ export function StorytellingInterface({
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold mb-3">Step 1: Select Your Secret Element</h3>
-              <p className="text-sm text-muted-foreground mb-3">Choose ONE element to describe - others will guess which one</p>
+              <h3 className="text-lg font-semibold mb-3">
+                {isStoryteller ? "Step 1: Select Your Secret Element" : "The 5 Elements"}
+              </h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                {isStoryteller 
+                  ? "Choose ONE element to describe - others will guess which one" 
+                  : "The storyteller will pick one of these elements and give a clue"}
+              </p>
               <div className="flex gap-3 flex-wrap justify-center">
                 {elements.map((element) => {
                   const IconComponent = iconMap[element.icon] || Brain;
@@ -198,13 +212,13 @@ export function StorytellingInterface({
                   return (
                     <button
                       key={element.id}
-                      onClick={() => setSecretElement(element.id)}
-                      disabled={recordedAudio !== null}
+                      onClick={() => isStoryteller && setSecretElement(element.id)}
+                      disabled={!isStoryteller || recordedAudio !== null}
                       className={`flex flex-col items-center justify-center w-24 h-24 rounded-lg transition-all ${
                         isSelected 
                           ? 'bg-primary text-primary-foreground ring-2 ring-primary' 
                           : 'bg-muted border-2 border-border hover:bg-muted/80'
-                      } ${recordedAudio ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      } ${(!isStoryteller || recordedAudio) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       <IconComponent className="h-8 w-8 mb-1" />
                       <p className="text-xs font-medium text-center">{element.name}</p>
@@ -215,66 +229,79 @@ export function StorytellingInterface({
             </div>
 
             <div className="border-t border-border pt-6">
-              <h3 className="text-lg font-semibold mb-3">Step 2: Record Your Story</h3>
-              {!secretElement && (
-                <Alert className="mb-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Please select your secret element first
-                  </AlertDescription>
-                </Alert>
-              )}
-              {!recordedAudio ? (
-                <div className="space-y-4">
-                  {isRecording && (
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-primary">
-                        {formatTime(recordingTime)}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Max: {formatTime(MAX_RECORDING_TIME)}
-                      </p>
+              <h3 className="text-lg font-semibold mb-3">
+                {isStoryteller ? "Step 2: Record Your Story" : "Waiting for Story"}
+              </h3>
+              {isStoryteller ? (
+                <>
+                  {!secretElement && (
+                    <Alert className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Please select your secret element first
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {!recordedAudio ? (
+                    <div className="space-y-4">
+                      {isRecording && (
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-primary">
+                            {formatTime(recordingTime)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Max: {formatTime(MAX_RECORDING_TIME)}
+                          </p>
+                        </div>
+                      )}
+                      <Button
+                        onClick={isRecording ? stopRecording : startRecording}
+                        size="lg"
+                        variant={isRecording ? "destructive" : "default"}
+                        className="w-full"
+                        disabled={!secretElement}
+                      >
+                        {isRecording ? (
+                          <>
+                            <Square className="mr-2 h-5 w-5" />
+                            Stop Recording
+                          </>
+                        ) : (
+                          <>
+                            <Mic className="mr-2 h-5 w-5" />
+                            Start Recording
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <audio controls src={URL.createObjectURL(recordedAudio)} className="w-full" />
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={() => setRecordedAudio(null)}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          Re-record
+                        </Button>
+                        <Button
+                          onClick={handleSubmitStory}
+                          disabled={isUploading}
+                          className="flex-1"
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          {isUploading ? "Submitting..." : "Submit Story"}
+                        </Button>
+                      </div>
                     </div>
                   )}
-                  <Button
-                    onClick={isRecording ? stopRecording : startRecording}
-                    size="lg"
-                    variant={isRecording ? "destructive" : "default"}
-                    className="w-full"
-                    disabled={!secretElement}
-                  >
-                    {isRecording ? (
-                      <>
-                        <Square className="mr-2 h-5 w-5" />
-                        Stop Recording
-                      </>
-                    ) : (
-                      <>
-                        <Mic className="mr-2 h-5 w-5" />
-                        Start Recording
-                      </>
-                    )}
-                  </Button>
-                </div>
+                </>
               ) : (
-                <div className="space-y-4">
-                  <audio controls src={URL.createObjectURL(recordedAudio)} className="w-full" />
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={() => setRecordedAudio(null)}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      Re-record
-                    </Button>
-                    <Button
-                      onClick={handleSubmitStory}
-                      disabled={isUploading}
-                      className="flex-1"
-                    >
-                      <Send className="mr-2 h-4 w-4" />
-                      {isUploading ? "Submitting..." : "Submit Story"}
-                    </Button>
+                <div className="text-center py-8">
+                  <div className="inline-flex items-center gap-2 text-muted-foreground">
+                    <Mic className="h-5 w-5 animate-pulse" />
+                    <p>The storyteller is recording their clue...</p>
                   </div>
                 </div>
               )}
@@ -284,7 +311,9 @@ export function StorytellingInterface({
               <div className="flex items-start gap-2">
                 <Lightbulb className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
-                  Craft a creative story using the elements above. Other players will listen and try to guess which elements you used!
+                  {isStoryteller 
+                    ? "Craft a creative story using the elements above. Other players will listen and try to guess which element you used!"
+                    : "Listen carefully when the storyteller records their clue, then you'll guess which element they described!"}
                 </p>
               </div>
             </div>
