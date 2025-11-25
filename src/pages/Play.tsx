@@ -489,7 +489,7 @@ const Play = () => {
             <CardDescription>
               {hasActiveLicenses 
                 ? "Start a new game session and invite friends"
-                : "Redeem a code above to unlock game packs and start hosting"}
+                : "You're in the right place! Redeem a code above to unlock game packs"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -502,9 +502,11 @@ const Play = () => {
               Host New Game
             </Button>
             {!hasActiveLicenses && (
-              <p className="text-xs text-muted-foreground text-center">
-                You need an active license to host games
-              </p>
+              <div className="bg-muted/50 border border-border rounded-lg p-3 text-center">
+                <p className="text-sm text-muted-foreground">
+                  👆 Enter a code above to get started
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
