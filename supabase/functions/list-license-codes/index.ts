@@ -57,22 +57,12 @@ Deno.serve(async (req) => {
 
     console.log('Loading license codes for tenant:', tenant.id);
 
-    // List license codes with customer name from customer_licenses (left join to include unused codes)
+    // List all license codes for the tenant
     const { data: codes, error: codesError } = await supabase
       .from('license_codes')
-      .select(`
-        *,
-        customer_licenses(customer_name, customer_email)
-      `)
+      .select('*')
       .eq('tenant_id', tenant.id)
       .order('created_at', { ascending: false });
-    
-    // Format the response to include customer_name at the top level
-    const formattedCodes = codes?.map(code => ({
-      ...code,
-      customer_name: code.customer_licenses?.[0]?.customer_name || null,
-      customer_email: code.customer_licenses?.[0]?.customer_email || null,
-    }));
 
     if (codesError) {
       console.error('Error loading license codes:', codesError);
@@ -84,6 +74,34 @@ Deno.serve(async (req) => {
         }
       );
     }
+
+    // Get customer emails for redeemed codes
+    const redeemedCustomerIds = codes
+      ?.filter(code => code.redeemed_by)
+      .map(code => code.redeemed_by) || [];
+
+    let customerEmails: Record<string, string> = {};
+
+    if (redeemedCustomerIds.length > 0) {
+      const { data: customers, error: customersError } = await supabase
+        .from('customers')
+        .select('customer_id, customer_email, customer_name')
+        .in('customer_id', redeemedCustomerIds);
+
+      if (!customersError && customers) {
+        customerEmails = customers.reduce((acc, customer) => {
+          acc[customer.customer_id] = customer.customer_email || customer.customer_name || customer.customer_id;
+          return acc;
+        }, {} as Record<string, string>);
+      }
+    }
+    
+    // Format the response to include customer_email
+    const formattedCodes = codes?.map(code => ({
+      ...code,
+      customer_email: code.redeemed_by ? customerEmails[code.redeemed_by] || null : null,
+      customer_name: code.redeemed_by ? customerEmails[code.redeemed_by] || null : null,
+    }));
 
     console.log('✅ License codes loaded:', formattedCodes?.length || 0);
 
