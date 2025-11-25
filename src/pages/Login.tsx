@@ -52,9 +52,9 @@ const Login = () => {
       setShopDomain(window.__PHRASEOTOMY_SHOP__);
       const customerData = window.__PHRASEOTOMY_CUSTOMER__ || null;
       
-      // If customer is already logged in, break out of iframe to standalone app
+      // If customer is already logged in, navigate to play page
       if (customerData) {
-        console.log('Customer already logged in, breaking out of iframe to standalone app');
+        console.log('Customer already logged in, redirecting to play page');
         
         // Store customer data
         localStorage.setItem('customerData', JSON.stringify({
@@ -66,17 +66,10 @@ const Login = () => {
           last_name: customerData.lastName,
         }));
         
-        // Generate session token and break out of iframe
+        // Generate session token and navigate (standalone mode)
         generateAndStoreSessionToken(customerData.id, window.__PHRASEOTOMY_SHOP__)
           .then(() => {
-            // Check if we're in an iframe
-            if (window.self !== window.top) {
-              // Break out of iframe to standalone app
-              window.top!.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
-            } else {
-              // Already standalone, just navigate
-              navigate('/play/host', { replace: true });
-            }
+            navigate('/play/host', { replace: true });
           })
           .finally(() => {
             setLoading(false);
@@ -213,12 +206,8 @@ const Login = () => {
                       last_name: customerData.customer?.last_name || null,
                     }));
 
-                    // Break out of iframe if embedded
-                    if (window.self !== window.top) {
-                      window.top!.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
-                    } else {
-                      navigate('/play/host', { replace: true });
-                    }
+                    // Navigate to play page (standalone mode)
+                    navigate('/play/host', { replace: true });
                   }
                   
                   setLoading(false);
