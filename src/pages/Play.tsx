@@ -29,6 +29,31 @@ const Play = () => {
   const [redemptionCode, setRedemptionCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
 
+  // Store customer in database on first login
+  const storeCustomerInDatabase = async (customerData: ShopifyCustomer, shopDomain: string, tenantId: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('store-customer', {
+        body: {
+          customer_id: customerData.id,
+          customer_email: customerData.email,
+          customer_name: customerData.name,
+          first_name: customerData.firstName,
+          last_name: customerData.lastName,
+          shop_domain: shopDomain,
+          tenant_id: tenantId,
+        },
+      });
+
+      if (error) {
+        console.error('Error storing customer:', error);
+      } else {
+        console.log('✅ Customer stored/verified in database');
+      }
+    } catch (error) {
+      console.error('Error calling store-customer:', error);
+    }
+  };
+
   // Initialize from localStorage and verify session
   useEffect(() => {
     const initializeSession = async () => {
@@ -54,6 +79,13 @@ const Play = () => {
             first_name: window.__PHRASEOTOMY_CUSTOMER__.firstName,
             last_name: window.__PHRASEOTOMY_CUSTOMER__.lastName,
           }));
+
+          // Store customer in database
+          storeCustomerInDatabase(
+            window.__PHRASEOTOMY_CUSTOMER__,
+            window.__PHRASEOTOMY_SHOP__,
+            window.__PHRASEOTOMY_CONFIG__.id
+          );
         }
         
         setLoading(false);
@@ -93,6 +125,9 @@ const Play = () => {
               first_name: customerData.firstName,
               last_name: customerData.lastName,
             }));
+
+            // Store customer in database
+            storeCustomerInDatabase(customerData, shopParam, tenantConfig.id);
           }
           
           setLoading(false);
@@ -169,19 +204,22 @@ const Play = () => {
               };
               setTenant(mappedTenant);
               setShopDomain(dbTenant.shop_domain);
+
+              // Set customer state
+              const parsedCustomerData = JSON.parse(storedCustomerData);
+              const customerObj: ShopifyCustomer = {
+                id: payload.customer_id,
+                email: parsedCustomerData.email || null,
+                firstName: parsedCustomerData.first_name || null,
+                lastName: parsedCustomerData.last_name || null,
+                name: parsedCustomerData.name || null,
+              };
+              setCustomer(customerObj);
+
+              // Store customer in database
+              storeCustomerInDatabase(customerObj, dbTenant.shop_domain, dbTenant.id);
             }
           }
-
-          // Set customer state
-          const parsedCustomerData = JSON.parse(storedCustomerData);
-          const customerObj: ShopifyCustomer = {
-            id: payload.customer_id,
-            email: parsedCustomerData.email || null,
-            firstName: parsedCustomerData.first_name || null,
-            lastName: parsedCustomerData.last_name || null,
-            name: parsedCustomerData.name || null,
-          };
-          setCustomer(customerObj);
 
           console.log('✅ Session restored successfully');
         }

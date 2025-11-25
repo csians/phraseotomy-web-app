@@ -112,6 +112,53 @@ export type Database = {
           },
         ]
       }
+      customers: {
+        Row: {
+          created_at: string
+          customer_email: string | null
+          customer_id: string
+          customer_name: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          shop_domain: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_email?: string | null
+          customer_id: string
+          customer_name?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          shop_domain: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string | null
+          customer_id?: string
+          customer_name?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          shop_domain?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       game_audio: {
         Row: {
           audio_url: string
