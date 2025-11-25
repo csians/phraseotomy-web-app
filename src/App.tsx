@@ -18,32 +18,38 @@ import Packs from "./pages/admin/Packs";
 const queryClient = new QueryClient();
 
 const RootRedirect = () => {
-  const [shouldRedirectToAdmin, setShouldRedirectToAdmin] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
+  const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if accessed from Shopify admin (has 'host' parameter)
+    // Check if accessed from Shopify admin (has 'host' parameter for embedded app)
     const urlParams = getAllUrlParams();
     const hostParam = urlParams.get('host');
-    const shopParam = urlParams.get('shop');
+    
+    // Check for embedded customer data from iframe
+    const customerData = window.__PHRASEOTOMY_CUSTOMER__;
     
     // If host parameter exists, it's from Shopify admin/embedded app
-    if (hostParam || shopParam) {
+    if (hostParam) {
       console.log('Accessed from Shopify admin, redirecting to /admin');
-      setShouldRedirectToAdmin(true);
-    } else {
+      setRedirectTarget('/admin');
+    } 
+    // If customer is authenticated via iframe, go to play page
+    else if (customerData) {
+      console.log('Customer authenticated, redirecting to /play/host');
+      setRedirectTarget('/play/host');
+    } 
+    // Otherwise, go to login
+    else {
       console.log('Accessed from normal browser, redirecting to /login');
-      setShouldRedirectToAdmin(false);
+      setRedirectTarget('/login');
     }
-    
-    setIsChecking(false);
   }, []);
 
-  if (isChecking) {
+  if (!redirectTarget) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  return <Navigate to={shouldRedirectToAdmin ? "/admin" : "/login"} replace />;
+  return <Navigate to={redirectTarget} replace />;
 };
 
 const App = () => (
