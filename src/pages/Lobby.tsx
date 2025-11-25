@@ -81,6 +81,7 @@ export default function Lobby() {
   const [selectedAudio, setSelectedAudio] = useState<string>("");
   const [themes, setThemes] = useState<Theme[]>([]);
   const [selectedTheme, setSelectedTheme] = useState<string>("");
+  const [selectedElementId, setSelectedElementId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [isEndingLobby, setIsEndingLobby] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -608,7 +609,11 @@ export default function Lobby() {
               <CardDescription>Choose 1 element from the 5 below</CardDescription>
             </CardHeader>
             <CardContent>
-              <ThemeElements themeId={selectedTheme} />
+              <ThemeElements 
+                themeId={selectedTheme} 
+                onElementSelect={setSelectedElementId}
+                selectedElementId={selectedElementId}
+              />
             </CardContent>
           </Card>
         )}
