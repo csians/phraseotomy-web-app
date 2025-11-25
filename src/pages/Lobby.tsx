@@ -21,6 +21,7 @@ import {
 import { LobbyAudioRecording } from "@/components/LobbyAudioRecording";
 import { getAllUrlParams } from "@/lib/urlUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ThemeElements } from "@/components/ThemeElements";
 
 import {
   AlertDialog,
@@ -570,75 +571,68 @@ export default function Lobby() {
           </Card>
         )}
 
-        {session.status === "active" && (
+        {/* Audio Recording for Host */}
+        {isHost && session.status === "waiting" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Music className="mr-2 h-5 w-5" />
-                Selected Audio
+                Record Audio
               </CardTitle>
-              <CardDescription>Audio file for this game</CardDescription>
+              <CardDescription>Record audio for the game</CardDescription>
             </CardHeader>
             <CardContent>
-              {(() => {
-                console.log("Looking for audio ID:", session.selected_audio_id);
-                console.log("Available audio files:", audioFiles);
-                const selectedAudioFile = audioFiles.find((a) => a.id === session.selected_audio_id);
-                console.log("Found audio file:", selectedAudioFile);
+              <LobbyAudioRecording
+                sessionId={sessionId!}
+                customerId={currentCustomerId || ""}
+                shopDomain={session.shop_domain}
+                tenantId={session.tenant_id}
+                hasRecording={false}
+                onRecordingComplete={handleRecordingComplete}
+              />
+            </CardContent>
+          </Card>
+        )}
 
-                return selectedAudioFile ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
-                      <div className="flex-1">
-                        <p className="font-medium">{selectedAudioFile.filename}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Selected on {new Date(session.started_at || "").toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Music className="h-5 w-5 text-primary" />
-                    </div>
-
-                    {isHost ? (
-                      <audio
-                        ref={audioRef}
-                        controls
-                        className="w-full mt-2"
-                        preload="auto"
-                        onPlay={() => console.log("Audio playing")}
-                        onError={(e) => console.error("Audio error:", e)}
-                      >
-                        <source src={selectedAudioFile.audio_url} type="audio/mpeg" />
-                        <source src={selectedAudioFile.audio_url} type="audio/mp3" />
-                        Your browser does not support the audio element.
-                      </audio>
-                    ) : (
-                      <div className="relative w-full mt-2">
-                        <audio
-                          ref={audioRef}
-                          className="w-full hidden"
-                          preload="auto"
-                          onPlay={() => console.log("Audio playing")}
-                          onError={(e) => console.error("Audio error:", e)}
-                        >
-                          <source src={selectedAudioFile.audio_url} type="audio/mpeg" />
-                          <source src={selectedAudioFile.audio_url} type="audio/mp3" />
-                          Your browser does not support the audio element.
-                        </audio>
-                        <div className="flex items-center justify-center p-4 bg-primary/10 rounded-lg">
-                          <Music className="h-6 w-6 text-primary animate-pulse mr-2" />
-                          <p className="text-sm font-medium">Audio will play automatically</p>
+        {/* Theme Selection for Host */}
+        {isHost && session.status === "waiting" && themes.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Select Theme</CardTitle>
+              <CardDescription>Choose a theme for the game</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Select value={selectedTheme} onValueChange={handleThemeChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a theme..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {themes.map((theme) => {
+                    const IconComponent = iconMap[theme.icon.toLowerCase()] || Sparkles;
+                    return (
+                      <SelectItem key={theme.id} value={theme.id}>
+                        <div className="flex items-center gap-2">
+                          <IconComponent className="h-4 w-4" />
+                          <span>{theme.name}</span>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">Loading audio details...</p>
-                    <p className="text-xs text-muted-foreground">Selected audio ID: {session.selected_audio_id}</p>
-                    <p className="text-xs text-muted-foreground">Available audio count: {audioFiles.length}</p>
-                  </div>
-                );
-              })()}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Display 5 Elements when theme is selected */}
+        {isHost && session.status === "waiting" && selectedTheme && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Theme Elements</CardTitle>
+              <CardDescription>5 elements from the selected theme</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ThemeElements themeId={selectedTheme} />
             </CardContent>
           </Card>
         )}
