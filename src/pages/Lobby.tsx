@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Music, Users, XCircle, Briefcase, Home, Plane, Bike, Wine, Rocket, Skull, Sparkles } from "lucide-react";
 import { LobbyAudioRecording } from "@/components/LobbyAudioRecording";
+import { getAllUrlParams } from "@/lib/urlUtils";
 import {
   Select,
   SelectContent,
@@ -164,7 +165,7 @@ export default function Lobby() {
   // Helper function to get current customer ID
   const getCurrentCustomerId = () => {
     // Check URL parameters first (in case customer_id is in URL)
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = getAllUrlParams();
     const urlCustomerId = urlParams.get('customer_id');
     if (urlCustomerId) {
       return urlCustomerId;

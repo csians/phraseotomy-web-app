@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { getAllUrlParams } from "@/lib/urlUtils";
 import Play from "./pages/Play";
 import Login from "./pages/Login";
 import CreateLobby from "./pages/CreateLobby";
@@ -22,7 +23,7 @@ const RootRedirect = () => {
 
   useEffect(() => {
     // Check if accessed from Shopify admin (has 'host' parameter)
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = getAllUrlParams();
     const hostParam = urlParams.get('host');
     const shopParam = urlParams.get('shop');
     

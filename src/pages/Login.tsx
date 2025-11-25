@@ -11,6 +11,7 @@ import { getAppBridge } from "@/lib/appBridge";
 import { Redirect } from "@shopify/app-bridge/actions";
 import { DebugInfo } from "@/components/DebugInfo";
 import type { TenantConfig } from "@/lib/types";
+import { getAllUrlParams } from "@/lib/urlUtils";
 
 /**
  * Generate and store a session token for authenticated customer
@@ -76,7 +77,7 @@ const Login = () => {
     }
 
     // Check for signed token in URL (from Shopify app-login page)
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = getAllUrlParams();
     const token = urlParams.get('r');
     const shopParam = urlParams.get('shop');
     const customerIdParam = urlParams.get('customer_id');
