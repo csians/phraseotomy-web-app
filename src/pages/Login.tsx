@@ -66,10 +66,15 @@ const Login = () => {
           last_name: customerData.lastName,
         }));
         
-        // Generate session token
-        generateAndStoreSessionToken(customerData.id, window.__PHRASEOTOMY_SHOP__).then(() => {
-          navigate('/play/host');
-        });
+        // Generate session token and navigate
+        generateAndStoreSessionToken(customerData.id, window.__PHRASEOTOMY_SHOP__)
+          .then(() => {
+            navigate('/play/host', { replace: true });
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+        return;
       }
       
       setLoading(false);
