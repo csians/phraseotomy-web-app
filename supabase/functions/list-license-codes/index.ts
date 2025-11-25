@@ -57,12 +57,12 @@ Deno.serve(async (req) => {
 
     console.log('Loading license codes for tenant:', tenant.id);
 
-    // List license codes with customer name from customer_licenses
+    // List license codes with customer name from customer_licenses (left join to include unused codes)
     const { data: codes, error: codesError } = await supabase
       .from('license_codes')
       .select(`
         *,
-        customer_licenses!inner(customer_name, customer_email)
+        customer_licenses(customer_name, customer_email)
       `)
       .eq('tenant_id', tenant.id)
       .order('created_at', { ascending: false });
