@@ -108,19 +108,22 @@ export const PackCSVImport = ({ tenantId, onImportComplete }: PackCSVImportProps
     try {
       const validRows = preview.rows.filter(r => !r.isDuplicate);
       
-      const { error } = await supabase.from("packs").insert(
-        validRows.map(row => ({
+      const { data, error } = await supabase.functions.invoke('import-packs', {
+        body: {
           tenant_id: tenantId,
-          name: row.name,
-          description: row.description || null,
-        }))
-      );
+          packs: validRows.map(row => ({
+            name: row.name,
+            description: row.description || null,
+          })),
+        },
+      });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast({
         title: "Import successful",
-        description: `Imported ${validRows.length} packs.`,
+        description: `Imported ${data.imported} packs${data.duplicates_found > 0 ? ` (${data.duplicates_found} duplicates skipped)` : ''}.`,
       });
 
       setIsOpen(false);
