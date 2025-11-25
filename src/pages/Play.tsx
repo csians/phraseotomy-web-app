@@ -482,29 +482,32 @@ const Play = () => {
           </CardContent>
         </Card>
 
-        {/* Host New Game & Audio Upload */}
-        {hasActiveLicenses && (
-          <div className="space-y-4">
-            <Card className="bg-card border-game-gray">
-              <CardHeader>
-                <CardTitle className="text-lg">Host New Game</CardTitle>
-                <CardDescription>
-                  Start a new game session and invite friends
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  onClick={handleHostGame}
-                  className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold"
-                  size="lg"
-                >
-                  Host New Game
-                </Button>
-              </CardContent>
-            </Card>
-
-          </div>
-        )}
+        {/* Host New Game */}
+        <Card className="bg-card border-game-gray">
+          <CardHeader>
+            <CardTitle className="text-lg">Host New Game</CardTitle>
+            <CardDescription>
+              {hasActiveLicenses 
+                ? "Start a new game session and invite friends"
+                : "Redeem a code above to unlock game packs and start hosting"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Button
+              onClick={handleHostGame}
+              disabled={!hasActiveLicenses}
+              className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+              size="lg"
+            >
+              Host New Game
+            </Button>
+            {!hasActiveLicenses && (
+              <p className="text-xs text-muted-foreground text-center">
+                You need an active license to host games
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Your Games */}
         <Card className="bg-card border-game-gray">
@@ -540,8 +543,7 @@ const Play = () => {
               </div>
             ) : (
               <div className="text-center py-6 text-muted-foreground">
-                <p className="mb-2">You don't have any active games yet.</p>
-                <p className="text-sm">Host a new game to get started!</p>
+                <p className="text-sm">No active games</p>
               </div>
             )}
           </CardContent>
