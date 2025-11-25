@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Music, Users, XCircle, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CustomerAudioUpload } from "@/components/CustomerAudioUpload";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -543,14 +543,6 @@ export default function Lobby() {
 
         {isHost && session.status === "waiting" && (
           <>
-            {currentCustomerId && (
-              <CustomerAudioUpload
-                customerId={currentCustomerId}
-                shopDomain={session.shop_domain}
-                tenantId={session.tenant_id}
-                onUploadComplete={handleAudioUploadComplete}
-              />
-            )}
 
             {audioFiles.length > 0 && (
               <Card>

@@ -116,7 +116,9 @@ export type Database = {
         Row: {
           audio_url: string
           created_at: string | null
+          duration_seconds: number | null
           id: string
+          mime_type: string | null
           player_id: string
           round_number: number
           session_id: string
@@ -126,7 +128,9 @@ export type Database = {
         Insert: {
           audio_url: string
           created_at?: string | null
+          duration_seconds?: number | null
           id?: string
+          mime_type?: string | null
           player_id: string
           round_number: number
           session_id: string
@@ -136,7 +140,9 @@ export type Database = {
         Update: {
           audio_url?: string
           created_at?: string | null
+          duration_seconds?: number | null
           id?: string
+          mime_type?: string | null
           player_id?: string
           round_number?: number
           session_id?: string
