@@ -74,6 +74,7 @@ export default function Lobby() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [session, setSession] = useState<GameSession | null>(null);
+  console.log("session", session);
   const [players, setPlayers] = useState<Player[]>([]);
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
   const [selectedAudio, setSelectedAudio] = useState<string>("");
