@@ -57,11 +57,12 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
       throw new Error("File is empty");
     }
 
-    const headers = Object.keys(data[0]).map(h => h.toLowerCase().trim());
+    const originalHeaders = Object.keys(data[0]);
+    const headerMap = new Map(originalHeaders.map(h => [h.toLowerCase().trim(), h]));
     
-    const codeKey = headers.find(h => h === "code");
-    const packKey = headers.find(h => h === "pack_name");
-    const expirationKey = headers.find(h => h === "expiration_date");
+    const codeKey = headerMap.get("code");
+    const packKey = headerMap.get("pack_name");
+    const expirationKey = headerMap.get("expiration_date");
 
     if (!codeKey || !packKey || !expirationKey) {
       throw new Error("File must have columns: code, pack_name, expiration_date");

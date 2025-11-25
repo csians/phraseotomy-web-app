@@ -38,9 +38,10 @@ export const PackCSVImport = ({ tenantId, onImportComplete }: PackCSVImportProps
       throw new Error("File is empty");
     }
 
-    const headers = Object.keys(data[0]).map(h => h.toLowerCase().trim());
+    const originalHeaders = Object.keys(data[0]);
+    const headerMap = new Map(originalHeaders.map(h => [h.toLowerCase().trim(), h]));
     
-    const nameKey = headers.find(h => h === "name");
+    const nameKey = headerMap.get("name");
 
     if (!nameKey) {
       throw new Error("File must have a 'name' column");
