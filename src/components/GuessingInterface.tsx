@@ -38,18 +38,15 @@ export function GuessingInterface({
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const toggleElement = (elementId: string) => {
-    setSelectedElements((prev) =>
-      prev.includes(elementId)
-        ? prev.filter((id) => id !== elementId)
-        : [...prev, elementId]
-    );
+    // Only allow selecting ONE element
+    setSelectedElements([elementId]);
   };
 
   const handleSubmitGuess = async () => {
     if (selectedElements.length === 0) {
       toast({
         title: "No Selection",
-        description: "Please select at least one element.",
+        description: "Please select one element.",
         variant: "destructive",
       });
       return;
@@ -57,11 +54,9 @@ export function GuessingInterface({
 
     setIsSubmitting(true);
     try {
-      // Calculate points (10 points per correct element)
-      const correctGuesses = selectedElements.filter((id) =>
-        correctElements.includes(id)
-      );
-      const pointsEarned = correctGuesses.length * 10;
+      // Check if guess is correct (only ONE correct element)
+      const isCorrect = selectedElements.length === 1 && selectedElements[0] === correctElements[0];
+      const pointsEarned = isCorrect ? 10 : 0;
 
       // Submit guess
       const { error: guessError } = await supabase.from("game_guesses").insert({
@@ -84,8 +79,9 @@ export function GuessingInterface({
       }
 
       toast({
-        title: `You earned ${pointsEarned} points!`,
-        description: `You guessed ${correctGuesses.length} out of ${correctElements.length} elements correctly.`,
+        title: isCorrect ? "🎉 Correct!" : "❌ Wrong Guess",
+        description: isCorrect ? `You earned ${pointsEarned} points!` : "Better luck next time!",
+        variant: isCorrect ? "default" : "destructive",
       });
 
       onGuessSubmit();
@@ -107,10 +103,10 @@ export function GuessingInterface({
         <Card>
           <CardHeader>
             <CardTitle className="text-center text-2xl">
-              Listen to <span className="text-primary">{storytellerName}'s</span> story
+              Guess the <span className="text-primary">Secret Element!</span>
             </CardTitle>
             <CardDescription className="text-center text-lg">
-              Theme: {theme.name} • Guess which elements they used
+              Theme: {theme.name} • Listen and guess which ONE element was described
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -126,7 +122,7 @@ export function GuessingInterface({
 
             <div>
               <h3 className="text-lg font-semibold mb-3">
-                Select the elements you heard (10 points each):
+                Which element was {storytellerName} describing? (10 points):
               </h3>
               <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
                 {availableElements.map((element) => (
