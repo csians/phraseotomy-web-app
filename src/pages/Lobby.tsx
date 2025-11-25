@@ -604,8 +604,8 @@ export default function Lobby() {
         {isHost && session.status === "active" && selectedTheme && (
           <Card>
             <CardHeader>
-              <CardTitle>Theme Elements</CardTitle>
-              <CardDescription>5 elements from the selected theme</CardDescription>
+              <CardTitle>Select Your Secret Element</CardTitle>
+              <CardDescription>Choose 1 element from the 5 below</CardDescription>
             </CardHeader>
             <CardContent>
               <ThemeElements themeId={selectedTheme} />
