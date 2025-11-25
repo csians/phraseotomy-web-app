@@ -44,13 +44,12 @@ const Codes = () => {
     status: "unused",
   });
 
-  // Available packs that can be selected
-  const AVAILABLE_PACKS = [
-    { id: 'base', name: 'Base Pack', description: 'Core game cards' },
-    { id: 'expansion1', name: 'Expansion 1', description: 'Additional themed cards' },
-    { id: 'expansion2', name: 'Expansion 2', description: 'More variety' },
-    { id: 'premium', name: 'Premium Pack', description: 'Exclusive content' },
-  ];
+  // Packs loaded from database
+  const [availablePacks, setAvailablePacks] = useState<Array<{
+    id: string;
+    name: string;
+    description: string | null;
+  }>>([]);
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assigningCode, setAssigningCode] = useState<LicenseCode | null>(null);
@@ -71,12 +70,13 @@ const Codes = () => {
   } | null>(null);
   const [searchingCustomers, setSearchingCustomers] = useState(false);
 
-  // Load codes when tenant is available
+  // Load codes and packs when tenant is available
   useEffect(() => {
-    if (tenant?.shop_domain) {
+    if (tenant?.id) {
       loadCodes();
+      loadPacks();
     }
-  }, [tenant?.shop_domain]);
+  }, [tenant?.id]);
 
   const loadCodes = async () => {
     if (!tenant?.shop_domain) {
@@ -116,6 +116,41 @@ const Codes = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPacks = async () => {
+    if (!tenant?.id) {
+      console.error('Cannot load packs: tenant missing');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('packs')
+        .select('id, name, description')
+        .eq('tenant_id', tenant.id)
+        .order('name');
+
+      if (error) {
+        console.error('Error loading packs:', error);
+        toast({
+          title: "Error loading packs",
+          description: 'Failed to load available packs',
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Packs loaded successfully:', data);
+      setAvailablePacks(data || []);
+    } catch (error) {
+      console.error('Exception loading packs:', error);
+      toast({
+        title: "Error loading packs",
+        description: error instanceof Error ? error.message : 'Failed to load packs',
+        variant: "destructive",
+      });
     }
   };
 
@@ -534,31 +569,37 @@ const Codes = () => {
                 </div>
                 <div className="space-y-3">
                   <Label>Select Packs to Unlock</Label>
-                  <div className="space-y-2">
-                    {AVAILABLE_PACKS.map((pack) => (
-                      <div key={pack.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors">
-                        <Checkbox
-                          id={`pack-${pack.id}`}
-                          checked={formData.packs.includes(pack.id)}
-                          onCheckedChange={(checked) => {
-                            setFormData({
-                              ...formData,
-                              packs: checked
-                                ? [...formData.packs, pack.id]
-                                : formData.packs.filter((p) => p !== pack.id),
-                            });
-                          }}
-                        />
-                        <div className="flex-1">
-                          <Label htmlFor={`pack-${pack.id}`} className="cursor-pointer font-medium">
-                            {pack.name}
-                          </Label>
-                          <p className="text-sm text-muted-foreground">{pack.description}</p>
+                  {availablePacks.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No packs available. Please create packs first in the Packs management page.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {availablePacks.map((pack) => (
+                        <div key={pack.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+                          <Checkbox
+                            id={`pack-${pack.id}`}
+                            checked={formData.packs.includes(pack.name)}
+                            onCheckedChange={(checked) => {
+                              setFormData({
+                                ...formData,
+                                packs: checked
+                                  ? [...formData.packs, pack.name]
+                                  : formData.packs.filter((p) => p !== pack.name),
+                              });
+                            }}
+                          />
+                          <div className="flex-1">
+                            <Label htmlFor={`pack-${pack.id}`} className="cursor-pointer font-medium">
+                              {pack.name}
+                            </Label>
+                            {pack.description && (
+                              <p className="text-sm text-muted-foreground">{pack.description}</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                  {formData.packs.length === 0 && (
+                      ))}
+                    </div>
+                  )}
+                  {formData.packs.length === 0 && availablePacks.length > 0 && (
                     <p className="text-sm text-destructive">Please select at least one pack</p>
                   )}
                 </div>
