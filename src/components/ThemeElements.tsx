@@ -11,9 +11,11 @@ interface Element {
 
 interface ThemeElementsProps {
   themeId: string;
+  onElementSelect?: (elementId: string) => void;
+  selectedElementId?: string;
 }
 
-export function ThemeElements({ themeId }: ThemeElementsProps) {
+export function ThemeElements({ themeId, onElementSelect, selectedElementId }: ThemeElementsProps) {
   const [elements, setElements] = useState<Element[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -61,17 +63,27 @@ export function ThemeElements({ themeId }: ThemeElementsProps) {
 
   return (
     <div className="grid grid-cols-5 gap-4">
-      {elements.map((element) => (
-        <div
-          key={element.id}
-          className="flex flex-col items-center gap-2 p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-        >
-          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Sparkles className="h-6 w-6 text-primary" />
+      {elements.map((element) => {
+        const isSelected = selectedElementId === element.id;
+        return (
+          <div
+            key={element.id}
+            onClick={() => onElementSelect?.(element.id)}
+            className={`flex flex-col items-center gap-2 p-4 rounded-lg cursor-pointer transition-all ${
+              isSelected 
+                ? 'bg-primary text-primary-foreground ring-2 ring-primary shadow-lg scale-105' 
+                : 'bg-muted/50 hover:bg-muted hover:scale-102'
+            }`}
+          >
+            <div className={`h-12 w-12 rounded-full flex items-center justify-center ${
+              isSelected ? 'bg-primary-foreground/20' : 'bg-primary/10'
+            }`}>
+              <Sparkles className={`h-6 w-6 ${isSelected ? 'text-primary-foreground' : 'text-primary'}`} />
+            </div>
+            <p className="text-xs font-medium text-center">{element.name}</p>
           </div>
-          <p className="text-xs font-medium text-center">{element.name}</p>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
