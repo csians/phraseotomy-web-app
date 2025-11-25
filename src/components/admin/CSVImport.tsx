@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 type CSVRow = {
   code: string;
-  pack_name: string;
+  pack_names: string[]; // Changed to array
   expiration_date: string;
   isDuplicate?: boolean;
   error?: string;
@@ -38,8 +38,8 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
     const csv = [
       "code,pack_name,expiration_date",
       "ABC123,base,2025-12-31",
-      "XYZ789,expansion1,2025-12-31",
-      "DEF456,premium,2026-01-15"
+      "XYZ789,base|expansion1,2025-12-31",
+      "DEF456,base|expansion1|premium,2026-01-15"
     ].join("\n");
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -65,12 +65,16 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
 
     return lines.slice(1).map(line => {
       const values = line.split(",").map(v => v.trim());
+      const packNamesRaw = values[packIdx] || "";
+      // Split by pipe for multiple packs
+      const packNames = packNamesRaw.split("|").map(p => p.trim()).filter(p => p);
+      
       return {
         code: values[codeIdx]?.toUpperCase() || "",
-        pack_name: values[packIdx] || "",
+        pack_names: packNames,
         expiration_date: values[expirationIdx] || "",
       };
-    }).filter(row => row.code && row.pack_name);
+    }).filter(row => row.code && row.pack_names.length > 0);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,13 +94,14 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
         row.isDuplicate = duplicates.includes(row.code);
       });
 
-      // Identify new packs
-      const packNames = [...new Set(rows.map(r => r.pack_name))];
+      // Identify new packs (flatten all pack arrays)
+      const allPackNames = rows.flatMap(r => r.pack_names);
+      const uniquePackNames = [...new Set(allPackNames)];
       
       setPreview({
         rows,
         duplicates: [...new Set(duplicates)],
-        newPacks: packNames,
+        newPacks: uniquePackNames,
       });
     } catch (error) {
       toast({
@@ -216,7 +221,7 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
                           )}
                         </TableCell>
                         <TableCell>{row.code}</TableCell>
-                        <TableCell>{row.pack_name}</TableCell>
+                        <TableCell>{row.pack_names.join(" | ")}</TableCell>
                         <TableCell>{row.expiration_date}</TableCell>
                       </TableRow>
                     ))}
