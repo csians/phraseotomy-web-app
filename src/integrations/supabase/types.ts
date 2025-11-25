@@ -159,6 +159,38 @@ export type Database = {
           },
         ]
       }
+      elements: {
+        Row: {
+          created_at: string
+          icon: string
+          id: string
+          name: string
+          theme_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          icon: string
+          id?: string
+          name: string
+          theme_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          icon?: string
+          id?: string
+          name?: string
+          theme_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "elements_theme_id_fkey"
+            columns: ["theme_id"]
+            isOneToOne: false
+            referencedRelation: "themes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       game_audio: {
         Row: {
           audio_url: string
@@ -206,12 +238,48 @@ export type Database = {
           },
         ]
       }
+      game_guesses: {
+        Row: {
+          created_at: string
+          guessed_elements: string[] | null
+          id: string
+          player_id: string
+          points_earned: number | null
+          turn_id: string
+        }
+        Insert: {
+          created_at?: string
+          guessed_elements?: string[] | null
+          id?: string
+          player_id: string
+          points_earned?: number | null
+          turn_id: string
+        }
+        Update: {
+          created_at?: string
+          guessed_elements?: string[] | null
+          id?: string
+          player_id?: string
+          points_earned?: number | null
+          turn_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_guesses_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "game_turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       game_players: {
         Row: {
           created_at: string | null
           id: string
           name: string
           player_id: string
+          score: number | null
           session_id: string
           turn_order: number
         }
@@ -220,6 +288,7 @@ export type Database = {
           id?: string
           name: string
           player_id: string
+          score?: number | null
           session_id: string
           turn_order: number
         }
@@ -228,6 +297,7 @@ export type Database = {
           id?: string
           name?: string
           player_id?: string
+          score?: number | null
           session_id?: string
           turn_order?: number
         }
@@ -282,6 +352,8 @@ export type Database = {
       game_sessions: {
         Row: {
           created_at: string
+          current_round: number | null
+          current_storyteller_id: string | null
           ended_at: string | null
           host_customer_id: string
           host_customer_name: string | null
@@ -289,14 +361,18 @@ export type Database = {
           lobby_code: string
           packs_used: string[]
           selected_audio_id: string | null
+          selected_theme_id: string | null
           shop_domain: string
           started_at: string | null
           status: string
           tenant_id: string
+          total_rounds: number | null
           updated_at: string
         }
         Insert: {
           created_at?: string
+          current_round?: number | null
+          current_storyteller_id?: string | null
           ended_at?: string | null
           host_customer_id: string
           host_customer_name?: string | null
@@ -304,14 +380,18 @@ export type Database = {
           lobby_code: string
           packs_used?: string[]
           selected_audio_id?: string | null
+          selected_theme_id?: string | null
           shop_domain: string
           started_at?: string | null
           status?: string
           tenant_id: string
+          total_rounds?: number | null
           updated_at?: string
         }
         Update: {
           created_at?: string
+          current_round?: number | null
+          current_storyteller_id?: string | null
           ended_at?: string | null
           host_customer_id?: string
           host_customer_name?: string | null
@@ -319,10 +399,12 @@ export type Database = {
           lobby_code?: string
           packs_used?: string[]
           selected_audio_id?: string | null
+          selected_theme_id?: string | null
           shop_domain?: string
           started_at?: string | null
           status?: string
           tenant_id?: string
+          total_rounds?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -334,10 +416,68 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "game_sessions_selected_theme_id_fkey"
+            columns: ["selected_theme_id"]
+            isOneToOne: false
+            referencedRelation: "themes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "game_sessions_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_turns: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          recording_url: string | null
+          round_number: number
+          selected_elements: string[] | null
+          session_id: string
+          storyteller_id: string
+          theme_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          recording_url?: string | null
+          round_number: number
+          selected_elements?: string[] | null
+          session_id: string
+          storyteller_id: string
+          theme_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          recording_url?: string | null
+          round_number?: number
+          selected_elements?: string[] | null
+          session_id?: string
+          storyteller_id?: string
+          theme_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_turns_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_turns_theme_id_fkey"
+            columns: ["theme_id"]
+            isOneToOne: false
+            referencedRelation: "themes"
             referencedColumns: ["id"]
           },
         ]
@@ -499,6 +639,27 @@ export type Database = {
           shopify_client_secret?: string
           tenant_key?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      themes: {
+        Row: {
+          created_at: string
+          icon: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          icon: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }

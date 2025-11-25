@@ -58,6 +58,7 @@ export default function Lobby() {
   const [loading, setLoading] = useState(true);
   const [isEndingLobby, setIsEndingLobby] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [isGameStarted, setIsGameStarted] = useState(false);
 
   useEffect(() => {
     if (!sessionId) {
@@ -96,20 +97,11 @@ export default function Lobby() {
             const updatedSession = payload.new as GameSession;
             setSession(updatedSession);
             
-            // Auto-play audio when game starts
-            if (updatedSession.status === 'active' && updatedSession.selected_audio_id) {
-              console.log('Game started - attempting to play audio');
-              setTimeout(() => {
-                if (audioRef.current) {
-                  audioRef.current.play().catch(err => {
-                    console.error('Error auto-playing audio:', err);
-                    toast({
-                      title: "Audio Playback",
-                      description: "Please click the audio to start playback",
-                    });
-                  });
-                }
-              }, 500);
+            // Navigate to game page when game starts
+            if (updatedSession.status === 'active' && !isGameStarted) {
+              console.log('Game started - navigating to game page');
+              setIsGameStarted(true);
+              navigate(`/game/${sessionId}`);
             }
           }
         }
