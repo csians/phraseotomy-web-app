@@ -355,6 +355,7 @@ export default function Lobby() {
   };
 
   const handleEndLobby = async () => {
+    const currentCustomerId = getCurrentCustomerId();
     if (!session || !currentCustomerId) {
       return;
     }
