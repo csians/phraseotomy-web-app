@@ -570,7 +570,7 @@ export default function Lobby() {
           </Card>
         )}
 
-        {session.status === "active" && session.selected_audio_id && (
+        {session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
