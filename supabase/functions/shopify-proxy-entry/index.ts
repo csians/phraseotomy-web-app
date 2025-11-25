@@ -347,14 +347,15 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
   // Use custom domain
   const baseUrl = 'https://phraseotomy.ourstagingserver.com';
 
-  // Encode configuration as URL parameters
+  // Encode configuration as URL parameters (before hash for HashRouter)
   const configParams = new URLSearchParams({
     config: JSON.stringify(tenantConfig),
     shop: shop,
     customer: customer ? JSON.stringify(customer) : ''
   });
 
-  const appUrl = `${baseUrl}/play/host?${configParams.toString()}`;
+  // For HashRouter, parameters must come before the hash
+  const appUrl = `${baseUrl}/?${configParams.toString()}#/play/host`;
 
   // Return iframe embed with custom domain
   return `<style nonce="${nonce}">
