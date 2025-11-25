@@ -22,6 +22,8 @@ Deno.serve(async (req) => {
     const sessionId = formData.get('session_id') as string;
     const playerId = formData.get('player_id') as string;
     const roundNumber = formData.get('round_number') as string;
+    const durationSeconds = formData.get('duration_seconds') as string;
+    const mimeType = formData.get('mime_type') as string;
 
     // Validate required fields
     if (!audioFile) {
@@ -148,6 +150,8 @@ Deno.serve(async (req) => {
         player_id: playerId,
         round_number: parseInt(roundNumber),
         audio_url: audioUrl,
+        duration_seconds: durationSeconds ? parseFloat(durationSeconds) : null,
+        mime_type: mimeType || 'audio/webm',
       })
       .select()
       .single();

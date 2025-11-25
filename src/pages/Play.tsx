@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CustomerAudioUpload } from "@/components/CustomerAudioUpload";
+
 import type { TenantConfig, ShopifyCustomer } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
 import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
@@ -503,19 +503,6 @@ const Play = () => {
               </CardContent>
             </Card>
 
-            {tenant && customer && (
-              <CustomerAudioUpload
-                customerId={customer.id}
-                shopDomain={shopDomain}
-                tenantId={tenant.id}
-                onUploadComplete={() => {
-                  toast({
-                    title: "Success",
-                    description: "Audio uploaded successfully!",
-                  });
-                }}
-              />
-            )}
           </div>
         )}
 
