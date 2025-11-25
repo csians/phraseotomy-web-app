@@ -4,8 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Music, Users, XCircle } from "lucide-react";
+import { ArrowLeft, Music, Users, XCircle, Briefcase, Home, Plane, Bike, Wine, Rocket, Skull, Sparkles } from "lucide-react";
 import { LobbyAudioRecording } from "@/components/LobbyAudioRecording";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import {
   AlertDialog,
@@ -42,9 +49,16 @@ interface GameSession {
   status: string;
   packs_used: string[];
   selected_audio_id: string | null;
+  selected_theme_id: string | null;
   started_at: string | null;
   shop_domain: string;
   tenant_id: string;
+}
+
+interface Theme {
+  id: string;
+  name: string;
+  icon: string;
 }
 
 export default function Lobby() {
@@ -55,6 +69,8 @@ export default function Lobby() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
   const [selectedAudio, setSelectedAudio] = useState<string>("");
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [selectedTheme, setSelectedTheme] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [isEndingLobby, setIsEndingLobby] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -266,6 +282,21 @@ export default function Lobby() {
       // Set audio files from the response (edge function fetches them if user is host)
       setAudioFiles(data.audioFiles || []);
       console.log("Audio files from response:", data.audioFiles?.length || 0);
+
+      // Set selected theme if it exists in session
+      if (data.session.selected_theme_id) {
+        setSelectedTheme(data.session.selected_theme_id);
+      }
+
+      // Fetch themes
+      const { data: themesData, error: themesError } = await supabase
+        .from('themes')
+        .select('*')
+        .order('name');
+
+      if (!themesError && themesData) {
+        setThemes(themesData);
+      }
     } catch (error) {
       console.error("Error fetching lobby data:", error);
       toast({
@@ -280,6 +311,15 @@ export default function Lobby() {
   };
 
   const handleStartGame = async () => {
+    if (!selectedTheme) {
+      toast({
+        title: "Select Theme",
+        description: "Please select a theme before starting the game",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!selectedAudio) {
       toast({
         title: "Record Audio",
@@ -387,6 +427,40 @@ export default function Lobby() {
       title: "Ready to Start",
       description: "Audio recorded successfully. You can now start the game.",
     });
+  };
+
+  const handleThemeChange = async (themeId: string) => {
+    setSelectedTheme(themeId);
+    
+    // Update session with selected theme
+    try {
+      const { error } = await supabase
+        .from('game_sessions')
+        .update({ selected_theme_id: themeId })
+        .eq('id', sessionId);
+
+      if (error) {
+        console.error("Error updating theme:", error);
+        toast({
+          title: "Error",
+          description: "Failed to save theme selection",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error in handleThemeChange:", error);
+    }
+  };
+
+  const iconMap: Record<string, any> = {
+    briefcase: Briefcase,
+    home: Home,
+    plane: Plane,
+    bike: Bike,
+    wine: Wine,
+    rocket: Rocket,
+    skull: Skull,
+    sparkles: Sparkles,
   };
 
   // Check if current user is the host
@@ -497,16 +571,58 @@ export default function Lobby() {
           </CardContent>
         </Card>
 
+        {isHost && session.status === "waiting" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Sparkles className="mr-2 h-5 w-5" />
+                Select Theme
+              </CardTitle>
+              <CardDescription>Choose a theme for your story</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Select value={selectedTheme} onValueChange={handleThemeChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a theme..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {themes.map((theme) => {
+                    const IconComponent = iconMap[theme.icon] || Sparkles;
+                    return (
+                      <SelectItem key={theme.id} value={theme.id}>
+                        <div className="flex items-center gap-2">
+                          <IconComponent className="h-4 w-4" />
+                          <span>{theme.name}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              {selectedTheme && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Theme selected: {themes.find(t => t.id === selectedTheme)?.name}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {!isHost && session.status === "waiting" && (
           <Card>
             <CardHeader>
               <CardTitle>Waiting for Host</CardTitle>
-              <CardDescription>The host will select audio and start the game</CardDescription>
+              <CardDescription>The host will select a theme, record audio and start the game</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
                 Please wait while the host prepares the game...
               </p>
+              {session.selected_theme_id && (
+                <p className="text-sm text-primary mt-2">
+                  Theme selected: {themes.find(t => t.id === session.selected_theme_id)?.name}
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
