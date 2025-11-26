@@ -82,6 +82,7 @@ export default function Lobby() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [selectedTheme, setSelectedTheme] = useState<string>("");
   const [selectedElementId, setSelectedElementId] = useState<string>("");
+  const [hasRecording, setHasRecording] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isEndingLobby, setIsEndingLobby] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -318,6 +319,22 @@ export default function Lobby() {
         setSelectedTheme(data.session.selected_theme_id);
       }
 
+      // Check if there's already a turn with secret element and recording
+      const { data: turnData } = await supabase
+        .from("game_turns")
+        .select("selected_elements, recording_url")
+        .eq("session_id", sessionId)
+        .maybeSingle();
+
+      if (turnData) {
+        if (turnData.selected_elements && turnData.selected_elements.length > 0) {
+          setSelectedElementId(turnData.selected_elements[0]);
+        }
+        if (turnData.recording_url) {
+          setHasRecording(true);
+        }
+      }
+
       // Fetch themes
       const { data: themesData, error: themesError } = await supabase.from("themes").select("*").order("name");
 
@@ -428,6 +445,7 @@ export default function Lobby() {
   const handleRecordingComplete = async (audioId: string) => {
     console.log("Recording complete, audio ID:", audioId);
     setSelectedAudio(audioId);
+    setHasRecording(true);
 
     // Refresh audio files
     await fetchLobbyData();
@@ -660,7 +678,7 @@ export default function Lobby() {
 
 
          {/* Theme Selection for Host - Step 1 */}
-        {isHost && themes.length > 0 && !selectedTheme && (
+        {isHost && themes.length > 0 && !selectedTheme && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle>Step 1: Select Theme</CardTitle>
@@ -690,7 +708,7 @@ export default function Lobby() {
         )}
 
         {/* Secret Element Selection for Host - Step 2 (only visible to host) */}
-        {isHost && selectedTheme && !selectedElementId && (
+        {isHost && selectedTheme && !selectedElementId && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle>Step 2: Select Your Secret Element</CardTitle>
@@ -707,7 +725,7 @@ export default function Lobby() {
         )}
 
         {/* Audio Recording for Host - Step 3 */}
-        {isHost && selectedTheme && selectedElementId && (
+        {isHost && selectedTheme && selectedElementId && !hasRecording && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -722,7 +740,7 @@ export default function Lobby() {
                 customerId={currentCustomerId || ""}
                 shopDomain={session.shop_domain}
                 tenantId={session.tenant_id}
-                hasRecording={false}
+                hasRecording={hasRecording}
                 onRecordingComplete={handleRecordingComplete}
               />
             </CardContent>
