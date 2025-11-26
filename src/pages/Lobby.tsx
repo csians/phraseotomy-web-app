@@ -438,7 +438,48 @@ export default function Lobby() {
     });
   };
 
-  // Theme selection removed - happens in Game phase only
+  const handleThemeChange = async (themeId: string) => {
+    setSelectedTheme(themeId);
+
+    // Get customer data from localStorage
+    const customerData = localStorage.getItem('customerData');
+    const customerId = customerData ? JSON.parse(customerData).customer_id : null;
+    const customerName = customerData ? JSON.parse(customerData).name : null;
+
+    // Update session with selected theme via edge function
+    try {
+      const { data, error } = await supabase.functions.invoke("update-session-theme", {
+        body: { 
+          sessionId, 
+          themeId,
+          customerId,
+          customerName 
+        },
+      });
+
+      if (error) {
+        console.error("Error updating theme:", error);
+        toast({
+          title: "Error",
+          description: "Failed to save theme selection",
+          variant: "destructive",
+        });
+      } else {
+        console.log("Theme saved successfully:", data);
+        toast({
+          title: "Theme Selected",
+          description: `Theme saved by ${customerName || 'Unknown'}`,
+        });
+      }
+    } catch (error) {
+      console.error("Error in handleThemeChange:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save theme selection",
+        variant: "destructive",
+      });
+    }
+  };
 
   const iconMap: Record<string, any> = {
     briefcase: Briefcase,
@@ -616,6 +657,34 @@ export default function Lobby() {
         )}
 
         {/* Theme Selection for Host */}
+        {isHost && themes.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Select Theme</CardTitle>
+              <CardDescription>Choose a theme for the game</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Select value={selectedTheme} onValueChange={handleThemeChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a theme..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {themes.map((theme) => {
+                    const IconComponent = iconMap[theme.icon.toLowerCase()] || Sparkles;
+                    return (
+                      <SelectItem key={theme.id} value={theme.id}>
+                        <div className="flex items-center gap-2">
+                          <IconComponent className="h-4 w-4" />
+                          <span>{theme.name}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
        
       </div>
     </div>
