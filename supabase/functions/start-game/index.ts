@@ -73,22 +73,36 @@ Deno.serve(async (req) => {
 
     console.log("Game started successfully:", data);
 
-    // Create the first turn for the storyteller
-    const { data: turn, error: turnError } = await supabase
+    // Check if turn already exists (from lobby setup)
+    const { data: existingTurn, error: checkError } = await supabase
       .from("game_turns")
-      .insert({
-        session_id: sessionId,
-        round_number: 1,
-        storyteller_id: firstPlayer.player_id,
-      })
-      .select()
-      .single();
+      .select("*")
+      .eq("session_id", sessionId)
+      .eq("round_number", 1)
+      .maybeSingle();
 
-    if (turnError) {
-      console.error("Error creating first turn:", turnError);
-      // Don't fail the game start if turn creation fails
-    } else {
-      console.log("First turn created:", turn);
+    let turn = existingTurn;
+
+    // Only create turn if it doesn't exist
+    if (!existingTurn && !checkError) {
+      const { data: newTurn, error: turnError } = await supabase
+        .from("game_turns")
+        .insert({
+          session_id: sessionId,
+          round_number: 1,
+          storyteller_id: firstPlayer.player_id,
+        })
+        .select()
+        .single();
+
+      if (turnError) {
+        console.error("Error creating first turn:", turnError);
+      } else {
+        console.log("First turn created:", newTurn);
+        turn = newTurn;
+      }
+    } else if (existingTurn) {
+      console.log("Turn already exists, using existing turn:", existingTurn);
     }
 
     return new Response(
