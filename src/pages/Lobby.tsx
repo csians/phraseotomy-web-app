@@ -332,7 +332,8 @@ export default function Lobby() {
           description: "This game session doesn't exist or you don't have access to it",
           variant: "destructive",
         });
-        navigate("/login");
+        // navigate("/login");
+        setLoading(false);
         return;
       }
 
@@ -368,14 +369,17 @@ export default function Lobby() {
       if (!themesError && themesData) {
         setThemes(themesData);
       }
-    } catch (error) {
+    } catch (errors: any) {
       console.error("Error fetching lobby data:", error);
+      const errorMessage = error?.message || "Failed to load lobby details";
+      const isNotFound = errorMessage.includes("not found") || errorMessage.includes("404");
+
       toast({
         title: "Error",
-        description: "Failed to load lobby details",
+        description: isNotFound,
         variant: "destructive",
       });
-      navigate("/login");
+      // navigate("/login");
     } finally {
       setLoading(false);
     }
@@ -736,7 +740,7 @@ export default function Lobby() {
     );
   }
 
-  if (!session) {
+  if (!session && !loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Lobby not found</p>

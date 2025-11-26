@@ -1,13 +1,13 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.83.0';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.83.0";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -19,13 +19,13 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Missing required fields',
+          error: "Missing required fields",
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    console.log('Creating game session:', {
+    console.log("Creating game session:", {
       lobbyCode,
       hostCustomerId,
       shopDomain,
@@ -35,27 +35,27 @@ Deno.serve(async (req) => {
 
     // Create Supabase client with service role (bypasses RLS)
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
     // Verify customer has active licenses
     const { data: licenses, error: licenseError } = await supabaseAdmin
-      .from('customer_licenses')
-      .select('*')
-      .eq('customer_id', hostCustomerId)
-      .eq('shop_domain', shopDomain)
-      .eq('tenant_id', tenantId)
-      .eq('status', 'active');
+      .from("customer_licenses")
+      .select("*")
+      .eq("customer_id", hostCustomerId)
+      .eq("shop_domain", shopDomain)
+      .eq("tenant_id", tenantId)
+      .eq("status", "active");
 
     if (licenseError) {
-      console.error('Error checking licenses:', licenseError);
+      console.error("Error checking licenses:", licenseError);
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Error verifying customer licenses',
+          error: "Error verifying customer licenses",
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -63,15 +63,15 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'No active licenses found for customer',
+          error: "No active licenses found for customer",
         }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     // Create game session
     const { data: session, error: sessionError } = await supabaseAdmin
-      .from('game_sessions')
+      .from("game_sessions")
       .insert({
         lobby_code: lobbyCode,
         host_customer_id: hostCustomerId,
@@ -79,71 +79,52 @@ Deno.serve(async (req) => {
         shop_domain: shopDomain,
         tenant_id: tenantId,
         packs_used: packsUsed,
-        status: 'waiting',
+        status: "waiting",
       })
       .select()
       .single();
 
     if (sessionError) {
-      console.error('Error creating game session:', sessionError);
+      console.error("Error creating game session:", sessionError);
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Failed to create game session',
+          error: "Failed to create game session",
           details: sessionError.message,
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    console.log('✅ Game session created successfully:', session.id);
+    console.log("✅ Game session created successfully:", session.id);
 
-    // Add the host as the first player in game_players (CRITICAL OPERATION)
-    const { error: playerError } = await supabaseAdmin
-      .from('game_players')
-      .insert({
-        session_id: session.id,
-        player_id: hostCustomerId,
-        name: hostCustomerName || 'Host',
-        turn_order: 1,
-      });
+    // Add the host as the first player in game_players
+    const { error: playerError } = await supabaseAdmin.from("game_players").insert({
+      session_id: session.id,
+      player_id: hostCustomerId,
+      name: hostCustomerName || "Host",
+      turn_order: 1,
+    });
 
     if (playerError) {
-      console.error('❌ CRITICAL: Failed to add host to game_players:', playerError);
-      
-      // Delete the session since we couldn't add the host as a player
-      await supabaseAdmin
-        .from('game_sessions')
-        .delete()
-        .eq('id', session.id);
-      
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Failed to add host to lobby. Please try again.',
-          details: playerError.message,
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("Error adding host to game_players:", playerError);
     }
-
-    console.log('✅ Host added to game_players successfully');
 
     return new Response(
       JSON.stringify({
         success: true,
         session,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error("Unexpected error:", error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : 'Unexpected error occurred',
+        error: error instanceof Error ? error.message : "Unexpected error occurred",
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
