@@ -336,7 +336,7 @@ export default function Game() {
             storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
             theme={currentTurn.theme}
             audioUrl={currentTurn.recording_url}
-            availableElements={themeElements}
+            availableElements={selectedElements}
             correctElements={currentTurn.selected_elements}
             turnId={currentTurn.id}
             playerId={currentPlayerId}
