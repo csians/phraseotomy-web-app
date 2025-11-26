@@ -197,6 +197,29 @@ export default function Lobby() {
           }
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "game_turns",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          console.log("Game turn changed:", payload);
+          
+          // Update secret element and recording status in real-time
+          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+            const turnData = payload.new as any;
+            if (turnData.secret_element) {
+              setSelectedElementId(turnData.secret_element);
+            }
+            if (turnData.recording_url) {
+              setHasRecording(true);
+            }
+          }
+        },
+      )
       .subscribe();
 
     return () => {
