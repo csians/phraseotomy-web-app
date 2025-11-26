@@ -192,7 +192,7 @@ export default function Lobby() {
         async (payload) => {
           console.log("Customer audio changed:", payload);
           const currentCustomerId = getCurrentCustomerId();
-          
+
           // Refresh audio files when new audio is uploaded or deleted
           if (currentCustomerId && (payload.eventType === "INSERT" || payload.eventType === "DELETE")) {
             await fetchCustomerAudio(currentCustomerId);
@@ -213,7 +213,7 @@ export default function Lobby() {
         },
         (payload) => {
           console.log("Game turn changed:", payload);
-          
+
           // Update secret element and recording status in real-time
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
             const turnData = payload.new as any;
@@ -478,13 +478,10 @@ export default function Lobby() {
       formData.append("sessionId", sessionId || "");
       formData.append("roundNumber", session?.current_round?.toString() || "1");
 
-      const response = await fetch(
-        `https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/upload-customer-audio`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+      const response = await fetch(`https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/upload-customer-audio`, {
+        method: "POST",
+        body: formData,
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -494,7 +491,7 @@ export default function Lobby() {
 
       const data = await response.json();
       console.log("data from lobby upload", data);
-      
+
       if (data.success && data.audio_id) {
         console.log("Recording complete, audio ID:", data.audio_id);
         setHasRecording(true);
@@ -522,20 +519,17 @@ export default function Lobby() {
 
     setIsSubmittingGuess(true);
     try {
-      const response = await fetch(
-        `https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/submit-guess`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            turnId: currentTurn.id,
-            playerId: currentCustomerId,
-            guess: guessInput.trim(),
-          }),
-        }
-      );
+      const response = await fetch(`https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/submit-guess`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          turnId: currentTurn.id,
+          playerId: currentCustomerId,
+          guess: guessInput.trim(),
+        }),
+      });
 
       const data = await response.json();
 
@@ -580,18 +574,18 @@ export default function Lobby() {
     setSelectedTheme(themeId);
 
     // Get customer data from localStorage
-    const customerData = localStorage.getItem('customerData');
+    const customerData = localStorage.getItem("customerData");
     const customerId = customerData ? JSON.parse(customerData).customer_id : null;
     const customerName = customerData ? JSON.parse(customerData).name : null;
 
     // Update session with selected theme via edge function
     try {
       const { data, error } = await supabase.functions.invoke("update-session-theme", {
-        body: { 
-          sessionId, 
+        body: {
+          sessionId,
           themeId,
           customerId,
-          customerName 
+          customerName,
         },
       });
 
@@ -623,16 +617,16 @@ export default function Lobby() {
     setSelectedElementId(elementId);
 
     // Get customer data from localStorage
-    const customerData = localStorage.getItem('customerData');
+    const customerData = localStorage.getItem("customerData");
     const customerId = customerData ? JSON.parse(customerData).customer_id : null;
 
     // Save secret element to database via edge function
     try {
       const { data, error } = await supabase.functions.invoke("save-lobby-secret", {
-        body: { 
-          sessionId, 
+        body: {
+          sessionId,
           secretElementId: elementId,
-          customerId
+          customerId,
         },
       });
 
@@ -674,7 +668,8 @@ export default function Lobby() {
   // Check if current user is the host and storyteller
   const currentCustomerId = getCurrentCustomerId();
   const isHost = currentCustomerId && session ? String(session.host_customer_id) === String(currentCustomerId) : false;
-  const isStoryteller = currentCustomerId && currentTurn ? String(currentTurn.storyteller_id) === String(currentCustomerId) : false;
+  const isStoryteller =
+    currentCustomerId && currentTurn ? String(currentTurn.storyteller_id) === String(currentCustomerId) : false;
 
   if (loading) {
     return (
@@ -782,7 +777,7 @@ export default function Lobby() {
         </Card>
 
         {/* Start Game button for host */}
-        {isHost && session.status === "waiting" && (
+        {isStoryteller && session.status === "waiting" && (
           <Card>
             <CardHeader>
               <CardTitle>Ready to Start?</CardTitle>
@@ -794,12 +789,10 @@ export default function Lobby() {
               </Button>
             </CardContent>
           </Card>
-         )}
+        )}
 
-
-
-         {/* Theme Selection for Host - Step 1 */}
-        {isHost && themes.length > 0 && !selectedTheme && session.status === "waiting" && (
+        {/* Theme Selection for Host - Step 1 */}
+        {isStoryteller && themes.length > 0 && !selectedTheme && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle>Step 1: Select Theme</CardTitle>
@@ -829,15 +822,15 @@ export default function Lobby() {
         )}
 
         {/* Secret Element Selection for Host - Step 2 (only visible to host) */}
-        {isHost && selectedTheme && !selectedElementId && session.status === "active" && (
+        {isStoryteller && selectedTheme && !selectedElementId && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle>Step 2: Select Your Secret Element</CardTitle>
               <CardDescription>Choose 1 secret element (only you can see this)</CardDescription>
             </CardHeader>
             <CardContent>
-              <ThemeElements 
-                themeId={selectedTheme} 
+              <ThemeElements
+                themeId={selectedTheme}
                 onElementSelect={handleSecretElementSelect}
                 selectedElementId={selectedElementId}
               />
@@ -846,7 +839,7 @@ export default function Lobby() {
         )}
 
         {/* Audio Recording for Host - Step 3 */}
-        {isHost && selectedTheme && selectedElementId && !hasRecording && session.status === "active" && (
+        {isStoryteller && selectedTheme && selectedElementId && !hasRecording && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -856,10 +849,7 @@ export default function Lobby() {
               <CardDescription>Record a clue about your secret element</CardDescription>
             </CardHeader>
             <CardContent>
-              <LobbyAudioRecording
-                onRecordingComplete={handleRecordingComplete}
-                isUploading={isUploading}
-              />
+              <LobbyAudioRecording onRecordingComplete={handleRecordingComplete} isUploading={isUploading} />
             </CardContent>
           </Card>
         )}
@@ -872,16 +862,10 @@ export default function Lobby() {
                 <Music className="w-5 h-5" />
                 Listen and Guess
               </CardTitle>
-              <CardDescription>
-                Listen to the audio clue and guess the secret element
-              </CardDescription>
+              <CardDescription>Listen to the audio clue and guess the secret element</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <audio
-                controls
-                src={currentTurn.recording_url}
-                className="w-full"
-              />
+              <audio controls src={currentTurn.recording_url} className="w-full" />
               <div className="flex gap-2">
                 <Input
                   type="text"
@@ -895,17 +879,13 @@ export default function Lobby() {
                   }}
                   disabled={isSubmittingGuess}
                 />
-                <Button
-                  onClick={handleSubmitGuess}
-                  disabled={!guessInput.trim() || isSubmittingGuess}
-                >
+                <Button onClick={handleSubmitGuess} disabled={!guessInput.trim() || isSubmittingGuess}>
                   {isSubmittingGuess ? "Submitting..." : "Submit Guess"}
                 </Button>
               </div>
             </CardContent>
           </Card>
         )}
-       
       </div>
     </div>
   );
