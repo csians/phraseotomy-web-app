@@ -110,11 +110,28 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Fetch current turn data (theme, secret element, recording)
+    let currentTurnData = null;
+    const { data: turnData, error: turnError } = await supabase
+      .from('game_turns')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('round_number', sessionData.current_round || 1)
+      .maybeSingle();
+
+    if (turnError) {
+      console.error('Turn fetch error:', turnError);
+    } else if (turnData) {
+      currentTurnData = turnData;
+      console.log('Current turn data found:', turnData);
+    }
+
     return new Response(
       JSON.stringify({
         session: sessionData,
         players: playersData || [],
         audioFiles: audioData,
+        currentTurn: currentTurnData,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
