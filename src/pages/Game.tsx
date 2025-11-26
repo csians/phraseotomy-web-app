@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useGameWebSocket } from "@/hooks/useGameWebSocket";
 import { Scoreboard } from "@/components/Scoreboard";
 import { ThemeSelection } from "@/components/ThemeSelection";
 import { StorytellingInterface } from "@/components/StorytellingInterface";
@@ -57,6 +58,59 @@ export default function Game() {
   const [themeElements, setThemeElements] = useState<Element[]>([]);
   const [gamePhase, setGamePhase] = useState<"theme_selection" | "storytelling" | "guessing" | "scoring">("theme_selection");
   const [currentPlayerId, setCurrentPlayerId] = useState<string>("");
+
+  // Get current player info for WebSocket
+  const getCurrentPlayerInfo = () => {
+    const playerId = getCurrentPlayerId();
+    const player = players.find(p => p.player_id === playerId);
+    return {
+      playerId,
+      playerName: player?.name || "Player"
+    };
+  };
+
+  // WebSocket for real-time updates
+  const { sendMessage: sendWebSocketMessage } = useGameWebSocket({
+    sessionId: sessionId || "",
+    playerId: currentPlayerId,
+    playerName: getCurrentPlayerInfo().playerName,
+    enabled: !!sessionId && !!currentPlayerId,
+    onMessage: (message) => {
+      console.log('🎮 Game WebSocket message:', message.type);
+      
+      switch (message.type) {
+        case "theme_selected":
+        case "elements_generated":
+        case "storyteller_ready":
+        case "recording_started":
+        case "recording_stopped":
+        case "story_submitted":
+        case "guess_submitted":
+        case "refresh_game_state":
+          // Refresh game state when receiving updates
+          toast({
+            title: "Game Updated",
+            description: "Receiving real-time updates...",
+          });
+          setTimeout(() => initializeGame(), 100);
+          break;
+          
+        case "player_joined":
+          toast({
+            title: "Player Joined",
+            description: `${message.playerName} joined the game`,
+          });
+          break;
+          
+        case "player_left":
+          toast({
+            title: "Player Left",
+            description: `${message.playerName} left the game`,
+          });
+          break;
+      }
+    },
+  });
 
   useEffect(() => {
     console.log("Game component mounted, sessionId:", sessionId);
@@ -234,6 +288,14 @@ export default function Game() {
 
       if (error) throw error;
 
+      // Send WebSocket message to notify other players
+      const theme = themes.find(t => t.id === themeId);
+      sendWebSocketMessage({
+        type: "theme_selected",
+        themeId,
+        themeName: theme?.name || "Unknown",
+      });
+
       toast({
         title: "Theme Selected!",
         description: "Now tell your story using the elements.",
@@ -335,6 +397,7 @@ export default function Game() {
             onStoryComplete={handleStoryComplete}
             isStoryteller={isStoryteller}
             storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
+            sendWebSocketMessage={sendWebSocketMessage}
           />
         )}
 
