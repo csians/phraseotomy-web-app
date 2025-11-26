@@ -408,7 +408,8 @@ export default function Lobby() {
         description: "Get ready to play!",
       });
 
-      // Real-time subscription will handle navigation when status becomes "active"
+      // Navigate directly to the game page
+      navigate(`/game/${sessionId}`);
     } catch (error) {
       console.error("Error in handleStartGame:", error);
       toast({
