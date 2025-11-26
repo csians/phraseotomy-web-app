@@ -43,11 +43,11 @@ Deno.serve(async (req) => {
     let turnData;
 
     if (existingTurn) {
-      // Update existing turn with secret element (stored in selected_elements array)
+      // Update existing turn with secret element
       const { data: updatedTurn, error: updateError } = await supabase
         .from("game_turns")
         .update({ 
-          selected_elements: [secretElementId],
+          secret_element: secretElementId,
           updated_at: new Date().toISOString()
         })
         .eq("id", existingTurn.id)
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
           round_number: session.current_round || 1,
           storyteller_id: customerId,
           theme_id: session.selected_theme_id,
-          selected_elements: [secretElementId],
+          secret_element: secretElementId,
         })
         .select()
         .single();
