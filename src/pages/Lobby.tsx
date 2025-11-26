@@ -615,8 +615,8 @@ export default function Lobby() {
     }
   };
 
-  const handleSecretElementSelect = async (elementId: string) => {
-    setSelectedElementId(elementId);
+  const handleSecretElementSelect = async (elementName: string) => {
+    setSelectedElementId(elementName);
 
     // Get customer data from localStorage
     const customerData = localStorage.getItem("customerData");
@@ -627,7 +627,7 @@ export default function Lobby() {
       const { data, error } = await supabase.functions.invoke("save-lobby-secret", {
         body: {
           sessionId,
-          secretElementId: elementId,
+          secretElementId: elementName, // Now passing element name directly
           customerId,
         },
       });
