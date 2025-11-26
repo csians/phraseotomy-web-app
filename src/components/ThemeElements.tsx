@@ -13,7 +13,7 @@ interface Element {
 
 interface ThemeElementsProps {
   themeId: string;
-  onElementSelect?: (elementId: string) => void;
+  onElementSelect?: (elementName: string) => void;
   selectedElementId?: string;
 }
 
@@ -85,11 +85,11 @@ export function ThemeElements({ themeId, onElementSelect, selectedElementId }: T
     <div className="space-y-6">
       <div className="grid grid-cols-5 gap-4">
         {elements.map((element) => {
-          const isSelected = selectedElementId === element.id;
+          const isSelected = selectedElementId === element.name;
           return (
             <div
               key={element.id}
-              onClick={() => onElementSelect?.(element.id)}
+              onClick={() => onElementSelect?.(element.name)}
               className={`flex flex-col items-center gap-2 p-4 rounded-lg cursor-pointer transition-all ${
                 isSelected 
                   ? 'bg-primary text-primary-foreground ring-2 ring-primary shadow-lg scale-105' 

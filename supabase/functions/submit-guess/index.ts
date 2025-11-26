@@ -70,16 +70,8 @@ Deno.serve(async (req) => {
     if (turnData.secret_element.startsWith("custom:")) {
       normalizedSecret = turnData.secret_element.substring(7).toLowerCase();
     } else {
-      // For UUID-based elements, fetch the element name
-      const { data: elementData } = await supabase
-        .from("elements")
-        .select("name")
-        .eq("id", turnData.secret_element)
-        .single();
-      
-      if (elementData) {
-        normalizedSecret = elementData.name.toLowerCase();
-      }
+      // Secret element is already the element name, not an ID
+      normalizedSecret = turnData.secret_element.toLowerCase();
     }
 
     const isCorrect = normalizedGuess === normalizedSecret && !alreadyAnswered;
