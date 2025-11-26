@@ -64,6 +64,7 @@ interface GameSession {
   shop_domain: string;
   tenant_id: string;
   current_round?: number;
+  current_storyteller_id?: string;
 }
 
 interface Theme {
@@ -668,8 +669,15 @@ export default function Lobby() {
   // Check if current user is the host and storyteller
   const currentCustomerId = getCurrentCustomerId();
   const isHost = currentCustomerId && session ? String(session.host_customer_id) === String(currentCustomerId) : false;
-  const isStoryteller =
-    currentCustomerId && currentTurn ? String(currentTurn.storyteller_id) === String(currentCustomerId) : false;
+  
+  // Determine storyteller - use currentTurn if available, otherwise use session.current_storyteller_id or first player
+  const effectiveStorytellerId = currentTurn?.storyteller_id 
+    || session?.current_storyteller_id 
+    || players.sort((a, b) => a.turn_order - b.turn_order)[0]?.player_id;
+  
+  const isStoryteller = currentCustomerId && effectiveStorytellerId 
+    ? String(effectiveStorytellerId) === String(currentCustomerId) 
+    : false;
 
   if (loading) {
     return (
