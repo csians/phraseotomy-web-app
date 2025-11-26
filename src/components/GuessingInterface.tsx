@@ -34,6 +34,16 @@ export function GuessingInterface({
   playerId,
   onGuessSubmit,
 }: GuessingInterfaceProps) {
+  console.log("storytellerName", storytellerName);
+  console.log("theme", theme);
+  console.log("audioUrl", audioUrl);
+  console.log("playerId", playerId);
+  console.log("availableElements", availableElements);
+  console.log("correctElements", correctElements);
+  console.log("sessionId", sessionId);
+  console.log("roundNumber", roundNumber);
+  console.log("onGuessSubmit", onGuessSubmit);
+
   const { toast } = useToast();
   const [selectedElements, setSelectedElements] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,7 +67,7 @@ export function GuessingInterface({
     setIsSubmitting(true);
     try {
       // Get the element name from the selected element
-      const selectedElement = availableElements.find(el => el.id === selectedElements[0]);
+      const selectedElement = availableElements.find((el) => el.id === selectedElements[0]);
       if (!selectedElement) {
         throw new Error("Selected element not found");
       }
@@ -109,13 +119,7 @@ export function GuessingInterface({
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="bg-muted/50 p-6 rounded-lg">
-              <audio
-                ref={audioRef}
-                controls
-                src={audioUrl}
-                className="w-full"
-                autoPlay
-              />
+              <audio ref={audioRef} controls src={audioUrl} className="w-full" autoPlay />
             </div>
 
             <div>
@@ -135,9 +139,7 @@ export function GuessingInterface({
                   >
                     <div className="text-2xl mb-2">{element.icon}</div>
                     <p className="text-xs font-medium text-center">{element.name}</p>
-                    {selectedElements.includes(element.id) && (
-                      <Check className="h-4 w-4 text-primary mt-1" />
-                    )}
+                    {selectedElements.includes(element.id) && <Check className="h-4 w-4 text-primary mt-1" />}
                   </button>
                 ))}
               </div>
