@@ -147,7 +147,8 @@ export default function Lobby() {
             if (updatedSession.status === "active" && !isGameStarted) {
               console.log("Game started - navigating to game page");
               setIsGameStarted(true);
-              navigate(`/game/${sessionId}`);
+              // navigate(`/game/${sessionId}`);
+              fetchLobbyData();
             }
           }
         },
@@ -403,13 +404,18 @@ export default function Lobby() {
       }
 
       console.log("Game started successfully:", data);
+      // Update session state immediately to show dashboard
+      if (data.session) {
+        setSession(data.session);
+      }
       toast({
         title: "Game Started!",
         description: "Get ready to play!",
       });
 
       // Navigate directly to the game page
-      navigate(`/game/${sessionId}`);
+      // navigate(`/game/${sessionId}`);
+      await fetchLobbyData();
     } catch (error) {
       console.error("Error in handleStartGame:", error);
       toast({
