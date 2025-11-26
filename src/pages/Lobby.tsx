@@ -473,9 +473,20 @@ export default function Lobby() {
     setIsUploading(true);
 
     try {
+      const currentCustomerId = getCurrentCustomerId();
+      if (!currentCustomerId) {
+        toast({
+          title: "Error",
+          description: "Unable to identify player. Please refresh the page.",
+          variant: "destructive",
+        });
+        setIsUploading(false);
+        return;
+      }
+
       const formData = new FormData();
       formData.append("audio", audioBlob);
-      formData.append("customer_id", currentCustomerId || "");
+      formData.append("customer_id", currentCustomerId);
       formData.append("shop_domain", session?.shop_domain || "");
       formData.append("tenant_id", session?.tenant_id || "");
       formData.append("session_id", sessionId || "");
@@ -522,6 +533,20 @@ export default function Lobby() {
 
     setIsSubmittingGuess(true);
     try {
+      const currentCustomerId = getCurrentCustomerId();
+      const guestPlayerId = localStorage.getItem("guest_player_id");
+      const currentPlayerId = currentCustomerId || guestPlayerId;
+
+      if (!currentPlayerId) {
+        toast({
+          title: "Error",
+          description: "Unable to identify player. Please refresh the page.",
+          variant: "destructive",
+        });
+        setIsSubmittingGuess(false);
+        return;
+      }
+
       const response = await fetch(`https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/submit-guess`, {
         method: "POST",
         headers: {
@@ -529,7 +554,7 @@ export default function Lobby() {
         },
         body: JSON.stringify({
           turnId: currentTurn.id,
-          playerId: currentCustomerId,
+          playerId: currentPlayerId,
           guess: guessInput.trim(),
         }),
       });
@@ -576,9 +601,18 @@ export default function Lobby() {
   const handleThemeChange = async (themeId: string) => {
     setSelectedTheme(themeId);
 
-    // Get customer data from localStorage
+    const customerId = getCurrentCustomerId();
+    if (!customerId) {
+      toast({
+        title: "Error",
+        description: "Unable to identify player. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get customer name from storage if available
     const customerData = localStorage.getItem("customerData");
-    const customerId = customerData ? JSON.parse(customerData).customer_id : null;
     const customerName = customerData ? JSON.parse(customerData).name : null;
 
     // Update session with selected theme via edge function
@@ -619,9 +653,15 @@ export default function Lobby() {
   const handleSecretElementSelect = async (elementName: string) => {
     setSelectedElementId(elementName);
 
-    // Get customer data from localStorage
-    const customerData = localStorage.getItem("customerData");
-    const customerId = customerData ? JSON.parse(customerData).customer_id : null;
+    const customerId = getCurrentCustomerId();
+    if (!customerId) {
+      toast({
+        title: "Error",
+        description: "Unable to identify player. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Save secret element to database via edge function
     try {
