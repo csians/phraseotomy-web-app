@@ -288,22 +288,34 @@ export default function Game() {
 
       if (error) throw error;
 
-      // Send WebSocket message to notify other players
+      // Wait for DB to commit before refreshing
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await initializeGame();
+      
+      // Send WebSocket message with elements to notify other players
       const theme = themes.find(t => t.id === themeId);
       sendWebSocketMessage({
         type: "theme_selected",
         themeId,
         themeName: theme?.name || "Unknown",
       });
+      
+      // After elements are loaded, broadcast them
+      const { data: turnData } = await supabase.functions.invoke("get-game-state", {
+        body: { sessionId },
+      });
+      
+      if (turnData?.selectedElements) {
+        sendWebSocketMessage({
+          type: "elements_generated",
+          elements: turnData.selectedElements,
+        });
+      }
 
       toast({
         title: "Theme Selected!",
         description: "Now tell your story using the elements.",
       });
-
-      // Wait a bit longer for DB to commit before refreshing
-      await new Promise(resolve => setTimeout(resolve, 300));
-      await initializeGame();
     } catch (error) {
       console.error("Error starting turn:", error);
       toast({
@@ -389,7 +401,7 @@ export default function Game() {
           </div>
         )}
 
-        {gamePhase === "storytelling" && currentTurn && (
+        {gamePhase === "storytelling" && isStoryteller && currentTurn && (
           <StorytellingInterface
             theme={currentTurn.theme}
             elements={selectedElements}
@@ -401,6 +413,44 @@ export default function Game() {
             storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
             sendWebSocketMessage={sendWebSocketMessage}
           />
+        )}
+
+        {gamePhase === "storytelling" && !isStoryteller && (
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="max-w-2xl w-full space-y-6">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-foreground mb-2">
+                  {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is telling a story
+                </h2>
+                <p className="text-muted-foreground">
+                  Watch the elements below - one of them is the secret!
+                </p>
+              </div>
+              
+              {selectedElements.length > 0 && (
+                <div className="bg-card border border-border rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-foreground mb-4">Elements in Play</h3>
+                  <div className="grid grid-cols-5 gap-4">
+                    {selectedElements.map((element) => (
+                      <div
+                        key={element.id}
+                        className="flex flex-col items-center p-4 bg-muted rounded-lg"
+                      >
+                        <span className="text-3xl mb-2">{element.icon}</span>
+                        <span className="text-sm text-center text-muted-foreground">
+                          {element.name}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="text-center text-sm text-muted-foreground">
+                Waiting for {players.find((p) => p.player_id === session.current_storyteller_id)?.name} to record their story...
+              </div>
+            </div>
+          </div>
         )}
 
         {gamePhase === "guessing" && !isStoryteller && currentTurn?.recording_url && (
