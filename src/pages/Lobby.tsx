@@ -342,18 +342,12 @@ export default function Lobby() {
         setSelectedTheme(data.session.selected_theme_id);
       }
 
-      // Check if there's already a turn with secret element and recording
-      const { data: turnData } = await supabase
-        .from("game_turns")
-        .select("secret_element, recording_url")
-        .eq("session_id", sessionId)
-        .maybeSingle();
-
-      if (turnData) {
-        if (turnData.secret_element) {
-          setSelectedElementId(turnData.secret_element);
+      // Check if there's already a turn with secret element and recording from currentTurn data
+      if (data.currentTurn) {
+        if (data.currentTurn.secret_element) {
+          setSelectedElementId(data.currentTurn.secret_element);
         }
-        if (turnData.recording_url) {
+        if (data.currentTurn.recording_url) {
           setHasRecording(true);
         }
       }
