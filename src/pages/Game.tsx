@@ -87,12 +87,12 @@ export default function Game() {
         case "story_submitted":
         case "guess_submitted":
         case "refresh_game_state":
-          // Refresh game state when receiving updates
+          // Refresh game state when receiving updates with longer delay for DB commit
           toast({
             title: "Game Updated",
             description: "Receiving real-time updates...",
           });
-          setTimeout(() => initializeGame(), 100);
+          setTimeout(() => initializeGame(), 500);
           break;
           
         case "player_joined":
@@ -301,6 +301,8 @@ export default function Game() {
         description: "Now tell your story using the elements.",
       });
 
+      // Wait a bit longer for DB to commit before refreshing
+      await new Promise(resolve => setTimeout(resolve, 300));
       await initializeGame();
     } catch (error) {
       console.error("Error starting turn:", error);
