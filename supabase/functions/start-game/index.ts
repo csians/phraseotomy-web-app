@@ -73,8 +73,26 @@ Deno.serve(async (req) => {
 
     console.log("Game started successfully:", data);
 
+    // Create the first turn for the storyteller
+    const { data: turn, error: turnError } = await supabase
+      .from("game_turns")
+      .insert({
+        session_id: sessionId,
+        round_number: 1,
+        storyteller_id: firstPlayer.player_id,
+      })
+      .select()
+      .single();
+
+    if (turnError) {
+      console.error("Error creating first turn:", turnError);
+      // Don't fail the game start if turn creation fails
+    } else {
+      console.log("First turn created:", turn);
+    }
+
     return new Response(
-      JSON.stringify({ session: data }),
+      JSON.stringify({ session: data, turn }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
