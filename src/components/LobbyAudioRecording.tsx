@@ -10,10 +10,7 @@ interface LobbyAudioRecordingProps {
   isUploading: boolean;
 }
 
-export const LobbyAudioRecording = ({
-  onRecordingComplete,
-  isUploading,
-}: LobbyAudioRecordingProps) => {
+export const LobbyAudioRecording = ({ onRecordingComplete, isUploading }: LobbyAudioRecordingProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob; duration: number; url: string } | null>(null);
@@ -219,7 +216,12 @@ export const LobbyAudioRecording = ({
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={handleDiscardRecording} variant="outline" className="flex-1" disabled={isSaving || isUploading}>
+                <Button
+                  onClick={handleDiscardRecording}
+                  variant="outline"
+                  className="flex-1"
+                  disabled={isSaving || isUploading}
+                >
                   Re-record
                 </Button>
                 <Button onClick={handleSaveRecording} className="flex-1" disabled={isSaving || isUploading}>
