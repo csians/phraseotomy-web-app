@@ -657,45 +657,7 @@ export default function Lobby() {
           </Card>
          )}
 
-        {/* Display 5 Elements when theme is selected */}
-        {isHost && session.status === "active" && selectedTheme && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Select Your Secret Element</CardTitle>
-              <CardDescription>Choose 1 element from the 5 below</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ThemeElements 
-                themeId={selectedTheme} 
-                onElementSelect={setSelectedElementId}
-                selectedElementId={selectedElementId}
-              />
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Audio Recording for Host */}
-        {isHost && session.status === "active" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Music className="mr-2 h-5 w-5" />
-                Record Audio
-              </CardTitle>
-              <CardDescription>Record audio for the game</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <LobbyAudioRecording
-                sessionId={sessionId!}
-                customerId={currentCustomerId || ""}
-                shopDomain={session.shop_domain}
-                tenantId={session.tenant_id}
-                hasRecording={false}
-                onRecordingComplete={handleRecordingComplete}
-              />
-            </CardContent>
-          </Card>
-        )}
 
          {/* Theme Selection for Host - Step 1 */}
         {isHost && themes.length > 0 && !selectedTheme && (
