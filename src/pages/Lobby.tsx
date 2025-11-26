@@ -474,10 +474,11 @@ export default function Lobby() {
     try {
       const formData = new FormData();
       formData.append("audio", audioBlob);
-      formData.append("customerId", currentCustomerId || "");
-      formData.append("shopDomain", session?.shop_domain || "");
-      formData.append("sessionId", sessionId || "");
-      formData.append("roundNumber", session?.current_round?.toString() || "1");
+      formData.append("customer_id", currentCustomerId || "");
+      formData.append("shop_domain", session?.shop_domain || "");
+      formData.append("tenant_id", session?.tenant_id || "");
+      formData.append("session_id", sessionId || "");
+      formData.append("round_number", session?.current_round?.toString() || "1");
 
       const response = await fetch(`https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/upload-customer-audio`, {
         method: "POST",
