@@ -158,20 +158,7 @@ Deno.serve(async (req) => {
               if (updateError) {
                 console.error("Error advancing to next round:", updateError);
               } else {
-                // Create new turn for next round
-                const { error: turnCreateError } = await supabase
-                  .from("game_turns")
-                  .insert({
-                    session_id: sessionId,
-                    round_number: nextRound,
-                    storyteller_id: nextStoryteller.player_id,
-                  });
-
-                if (turnCreateError) {
-                  console.error("Error creating turn for next round:", turnCreateError);
-                } else {
-                  console.log(`✅ Advanced to round ${nextRound}, storyteller: ${nextStoryteller.player_id}`);
-                }
+                console.log(`✅ Advanced to round ${nextRound}, storyteller: ${nextStoryteller.player_id}`);
               }
             }
           }
