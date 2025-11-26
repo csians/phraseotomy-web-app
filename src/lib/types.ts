@@ -27,12 +27,3 @@ export interface ShopifyCustomer {
 }
 
 export const APP_VERSION = 'v0.1.0-dev';
-
-// Extend the global Window interface to include Phraseotomy config
-declare global {
-  interface Window {
-    __PHRASEOTOMY_CONFIG__?: TenantConfig;
-    __PHRASEOTOMY_SHOP__?: string;
-    __PHRASEOTOMY_CUSTOMER__?: ShopifyCustomer | null;
-  }
-}

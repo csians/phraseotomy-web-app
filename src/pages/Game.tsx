@@ -159,10 +159,26 @@ export default function Game() {
         {
           event: '*',
           schema: 'public',
+          table: 'game_sessions',
+          filter: `id=eq.${sessionId}`
+        },
+        (payload) => {
+          console.log('Game session updated:', payload);
+          // Refresh game state when session changes (theme, round, etc.)
+          initializeGame();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
           table: 'game_turns',
           filter: `session_id=eq.${sessionId}`
         },
-        () => {
+        (payload) => {
+          console.log('Game turn updated:', payload);
+          // Refresh when turn is created or updated (elements, recording, etc.)
           initializeGame();
         }
       )
@@ -174,8 +190,26 @@ export default function Game() {
           table: 'game_players',
           filter: `session_id=eq.${sessionId}`
         },
-        () => {
+        (payload) => {
+          console.log('Player score updated:', payload);
+          // Refresh when player scores change
           initializeGame();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'game_guesses',
+        },
+        (payload) => {
+          console.log('New guess submitted:', payload);
+          // Show notification when someone guesses
+          toast({
+            title: "Player Guessed!",
+            description: "A player has submitted their guess",
+          });
         }
       )
       .subscribe();
