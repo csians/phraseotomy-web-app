@@ -408,8 +408,7 @@ export default function Lobby() {
         description: "Get ready to play!",
       });
 
-      // Navigate directly to the game page
-      navigate(`/game/${sessionId}`);
+      // Real-time subscription will handle navigation when status becomes "active"
     } catch (error) {
       console.error("Error in handleStartGame:", error);
       toast({
@@ -842,8 +841,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Theme Selection - Step 1 (Only for current storyteller) */}
-        {isStoryteller && themes.length > 0 && !selectedTheme && (
+        {/* Theme Selection - Step 1 (Only for current storyteller after game starts) */}
+        {isStoryteller && session.status === "active" && themes.length > 0 && !selectedTheme && (
           <Card>
             <CardHeader>
               <CardTitle>Step 1: Select Theme</CardTitle>
@@ -872,8 +871,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Secret Element Selection - Step 2 (Only for current storyteller) */}
-        {isStoryteller && selectedTheme && !selectedElementId && (
+        {/* Secret Element Selection - Step 2 (Only for current storyteller after game starts) */}
+        {isStoryteller && session.status === "active" && selectedTheme && !selectedElementId && (
           <Card>
             <CardHeader>
               <CardTitle>Step 2: Select Your Secret Element</CardTitle>
@@ -889,8 +888,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Audio Recording - Step 3 (Only for current storyteller) */}
-        {isStoryteller && selectedTheme && selectedElementId && !hasRecording && (
+        {/* Audio Recording - Step 3 (Only for current storyteller after game starts) */}
+        {isStoryteller && session.status === "active" && selectedTheme && selectedElementId && !hasRecording && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
