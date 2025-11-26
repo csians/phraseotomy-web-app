@@ -117,6 +117,78 @@ Deno.serve(async (req) => {
       if (completeError) {
         console.error("Error completing turn:", completeError);
       }
+
+      // Advance to next round
+      const { data: sessionData, error: sessionError } = await supabase
+        .from("game_sessions")
+        .select("current_round, total_rounds, id")
+        .eq("id", sessionId)
+        .single();
+
+      if (sessionError || !sessionData) {
+        console.error("Error fetching session for round advancement:", sessionError);
+      } else {
+        const nextRound = sessionData.current_round + 1;
+        
+        // Only advance if there are more rounds
+        if (nextRound <= sessionData.total_rounds) {
+          // Get next storyteller (next player in turn order)
+          const { data: allPlayers, error: playersError } = await supabase
+            .from("game_players")
+            .select("player_id, turn_order")
+            .eq("session_id", sessionId)
+            .order("turn_order", { ascending: true });
+
+          if (playersError || !allPlayers || allPlayers.length === 0) {
+            console.error("Error fetching players for round advancement:", playersError);
+          } else {
+            // Find the player with turn_order matching the next round
+            const nextStoryteller = allPlayers.find(p => p.turn_order === nextRound);
+            
+            if (nextStoryteller) {
+              // Update session to next round and storyteller
+              const { error: updateError } = await supabase
+                .from("game_sessions")
+                .update({
+                  current_round: nextRound,
+                  current_storyteller_id: nextStoryteller.player_id,
+                })
+                .eq("id", sessionId);
+
+              if (updateError) {
+                console.error("Error advancing to next round:", updateError);
+              } else {
+                // Create new turn for next round
+                const { error: turnCreateError } = await supabase
+                  .from("game_turns")
+                  .insert({
+                    session_id: sessionId,
+                    round_number: nextRound,
+                    storyteller_id: nextStoryteller.player_id,
+                  });
+
+                if (turnCreateError) {
+                  console.error("Error creating turn for next round:", turnCreateError);
+                } else {
+                  console.log(`✅ Advanced to round ${nextRound}, storyteller: ${nextStoryteller.player_id}`);
+                }
+              }
+            }
+          }
+        } else {
+          // Game complete - all rounds finished
+          const { error: endError } = await supabase
+            .from("game_sessions")
+            .update({ status: "completed", ended_at: new Date().toISOString() })
+            .eq("id", sessionId);
+
+          if (endError) {
+            console.error("Error ending game:", endError);
+          } else {
+            console.log("🎉 Game completed - all rounds finished");
+          }
+        }
+      }
     }
 
     return new Response(
