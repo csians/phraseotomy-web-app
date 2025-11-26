@@ -21,6 +21,7 @@ interface StorytellingInterfaceProps {
   onStoryComplete: () => void;
   isStoryteller: boolean;
   storytellerName: string;
+  sendWebSocketMessage?: (message: any) => void;
 }
 
 export function StorytellingInterface({
@@ -32,6 +33,7 @@ export function StorytellingInterface({
   onStoryComplete,
   isStoryteller,
   storytellerName,
+  sendWebSocketMessage,
 }: StorytellingInterfaceProps) {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
@@ -74,11 +76,21 @@ export function StorytellingInterface({
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         setRecordedAudio(blob);
         stream.getTracks().forEach((track) => track.stop());
+        
+        // Notify others recording stopped
+        sendWebSocketMessage?.({
+          type: "recording_stopped",
+        });
       };
 
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
+
+      // Notify others recording started
+      sendWebSocketMessage?.({
+        type: "recording_started",
+      });
 
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => {
@@ -160,6 +172,12 @@ export function StorytellingInterface({
 
       if (updateError) throw updateError;
 
+      // Notify others via WebSocket
+      sendWebSocketMessage?.({
+        type: "story_submitted",
+        audioUrl: publicUrl,
+      });
+
       toast({
         title: "Story Submitted!",
         description: "Other players can now guess your elements.",
@@ -217,7 +235,15 @@ export function StorytellingInterface({
                   return (
                     <button
                       key={element.id}
-                      onClick={() => isStoryteller && setSecretElement(element.id)}
+                      onClick={() => {
+                        if (isStoryteller) {
+                          setSecretElement(element.id);
+                          sendWebSocketMessage?.({
+                            type: "secret_element_selected",
+                            elementId: element.id,
+                          });
+                        }
+                      }}
                       disabled={!isStoryteller || recordedAudio !== null}
                       className={`flex flex-col items-center justify-center w-24 h-24 rounded-lg transition-all ${
                         isSelected 

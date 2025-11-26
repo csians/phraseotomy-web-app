@@ -58,3 +58,6 @@ verify_jwt = false
 
 [functions.get-game-state]
 verify_jwt = false
+
+[functions.game-websocket]
+verify_jwt = false
