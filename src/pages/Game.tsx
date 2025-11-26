@@ -163,9 +163,9 @@ export default function Game() {
           filter: `id=eq.${sessionId}`
         },
         (payload) => {
-          console.log('Game session updated:', payload);
+          console.log('🔄 Game session updated:', payload);
           // Refresh game state when session changes (theme, round, etc.)
-          initializeGame();
+          setTimeout(() => initializeGame(), 100);
         }
       )
       .on(
@@ -177,9 +177,9 @@ export default function Game() {
           filter: `session_id=eq.${sessionId}`
         },
         (payload) => {
-          console.log('Game turn updated:', payload);
+          console.log('🎯 Game turn updated:', payload);
           // Refresh when turn is created or updated (elements, recording, etc.)
-          initializeGame();
+          setTimeout(() => initializeGame(), 100);
         }
       )
       .on(
@@ -191,9 +191,9 @@ export default function Game() {
           filter: `session_id=eq.${sessionId}`
         },
         (payload) => {
-          console.log('Player score updated:', payload);
+          console.log('📊 Player score updated:', payload);
           // Refresh when player scores change
-          initializeGame();
+          setTimeout(() => initializeGame(), 100);
         }
       )
       .on(
@@ -204,17 +204,24 @@ export default function Game() {
           table: 'game_guesses',
         },
         (payload) => {
-          console.log('New guess submitted:', payload);
+          console.log('💡 New guess submitted:', payload);
           // Show notification when someone guesses
           toast({
             title: "Player Guessed!",
             description: "A player has submitted their guess",
           });
+          setTimeout(() => initializeGame(), 100);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to real-time updates');
+        }
+      });
 
     return () => {
+      console.log('🔌 Unsubscribing from real-time updates');
       supabase.removeChannel(channel);
     };
   };

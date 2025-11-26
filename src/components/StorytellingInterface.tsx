@@ -303,11 +303,14 @@ export function StorytellingInterface({
                   )}
                 </>
               ) : (
-                <div className="text-center py-8">
+                <div className="text-center py-8 space-y-4">
                   <div className="inline-flex items-center gap-2 text-muted-foreground">
                     <Mic className="h-5 w-5 animate-pulse" />
-                    <p>The storyteller is recording their clue...</p>
+                    <p className="text-lg">Waiting for {storytellerName} to record...</p>
                   </div>
+                  <p className="text-sm text-muted-foreground">
+                    The storyteller is choosing their secret element and will record a clue
+                  </p>
                 </div>
               )}
             </div>
