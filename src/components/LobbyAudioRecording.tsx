@@ -127,6 +127,8 @@ export const LobbyAudioRecording = ({
       formData.append('customer_id', customerId);
       formData.append('shop_domain', shopDomain);
       formData.append('tenant_id', tenantId);
+      formData.append('session_id', sessionId);
+      formData.append('round_number', '1');
       formData.append('duration_seconds', recordedAudio.duration.toFixed(2));
       formData.append('mime_type', 'audio/webm');
 
