@@ -43,7 +43,42 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Check if lobby exists and is waiting for players (not started yet)
+    // First check if player is already in a session with this lobby code
+    const { data: existingPlayerSession } = await supabase
+      .from("game_players")
+      .select("session_id, game_sessions!inner(lobby_code, status)")
+      .eq("player_id", playerId)
+      .eq("game_sessions.lobby_code", lobbyCode.toUpperCase())
+      .single();
+
+    // If player already joined this lobby
+    if (existingPlayerSession) {
+      const session = existingPlayerSession.game_sessions as any;
+      
+      // Check if lobby still exists and is active
+      if (session.status === "waiting" || session.status === "active") {
+        console.log("Player already in active lobby, returning session");
+        return new Response(
+          JSON.stringify({ 
+            session: { 
+              id: existingPlayerSession.session_id,
+              lobby_code: session.lobby_code,
+              status: session.status
+            }, 
+            message: "Already in lobby" 
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } else {
+        // Lobby was ended
+        return new Response(
+          JSON.stringify({ error: "This lobby has ended and is no longer available." }),
+          { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Check if lobby exists and is waiting for new players
     const { data: session, error: sessionError } = await supabase
       .from("game_sessions")
       .select("*")
@@ -56,23 +91,6 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Game has already started or lobby not found. You can only join games that haven't started yet." }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Check if player already in this session
-    const { data: existingPlayer } = await supabase
-      .from("game_players")
-      .select("id")
-      .eq("session_id", session.id)
-      .eq("player_id", playerId)
-      .single();
-
-    if (existingPlayer) {
-      // Player already in lobby, just return success
-      console.log("Player already in lobby, returning session");
-      return new Response(
-        JSON.stringify({ session, message: "Already in lobby" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
