@@ -553,7 +553,8 @@ export default function Lobby() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          turnId: currentTurn.id,
+          sessionId: sessionId,
+          roundNumber: session?.current_round ?? 1,
           playerId: currentPlayerId,
           guess: guessInput.trim(),
         }),
