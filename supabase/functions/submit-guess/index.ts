@@ -11,11 +11,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { turnId, playerId, guess } = await req.json();
+    const { sessionId, roundNumber, playerId, guess } = await req.json();
 
-    if (!turnId || !playerId || !guess) {
+    if (!sessionId || !roundNumber || !playerId || !guess) {
       return new Response(
-        JSON.stringify({ error: "Missing turnId, playerId, or guess" }),
+        JSON.stringify({ error: "Missing sessionId, roundNumber, playerId, or guess" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -25,11 +25,12 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get the turn data including secret element
+    // Get the turn data including secret element using sessionId and roundNumber
     const { data: turnData, error: turnError } = await supabase
       .from("game_turns")
-      .select("secret_element, session_id, completed_at")
-      .eq("id", turnId)
+      .select("id, secret_element, session_id, completed_at")
+      .eq("session_id", sessionId)
+      .eq("round_number", roundNumber)
       .single();
 
     if (turnError || !turnData) {
@@ -52,7 +53,7 @@ Deno.serve(async (req) => {
     const { data: existingGuesses, error: guessCheckError } = await supabase
       .from("game_guesses")
       .select("id")
-      .eq("turn_id", turnId)
+      .eq("turn_id", turnData.id)
       .gt("points_earned", 0)
       .limit(1);
 
@@ -81,7 +82,7 @@ Deno.serve(async (req) => {
     const { error: insertError } = await supabase
       .from("game_guesses")
       .insert({
-        turn_id: turnId,
+        turn_id: turnData.id,
         player_id: playerId,
         guessed_elements: [guess],
         points_earned: pointsEarned,
@@ -111,7 +112,7 @@ Deno.serve(async (req) => {
       const { error: completeError } = await supabase
         .from("game_turns")
         .update({ completed_at: new Date().toISOString() })
-        .eq("id", turnId);
+        .eq("id", turnData.id);
 
       if (completeError) {
         console.error("Error completing turn:", completeError);
