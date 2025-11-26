@@ -798,8 +798,8 @@ export default function Lobby() {
 
 
 
-         {/* Theme Selection for Storyteller - Step 1 */}
-        {isStoryteller && themes.length > 0 && !selectedTheme && session.status === "active" && (
+         {/* Theme Selection for Host - Step 1 */}
+        {isHost && themes.length > 0 && !selectedTheme && session.status === "waiting" && (
           <Card>
             <CardHeader>
               <CardTitle>Step 1: Select Theme</CardTitle>
@@ -828,8 +828,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Secret Element Selection for Storyteller - Step 2 (only visible to storyteller) */}
-        {isStoryteller && selectedTheme && !selectedElementId && session.status === "active" && (
+        {/* Secret Element Selection for Host - Step 2 (only visible to host) */}
+        {isHost && selectedTheme && !selectedElementId && session.status === "waiting" && (
           <Card>
             <CardHeader>
               <CardTitle>Step 2: Select Your Secret Element</CardTitle>
@@ -845,8 +845,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Audio Recording for Storyteller - Step 3 */}
-        {isStoryteller && selectedTheme && selectedElementId && !hasRecording && session.status === "active" && (
+        {/* Audio Recording for Host - Step 3 */}
+        {isHost && selectedTheme && selectedElementId && !hasRecording && session.status === "waiting" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -864,8 +864,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Guessing Interface - Show for non-storytellers when recording is complete */}
-        {!isStoryteller && hasRecording && currentTurn?.recording_url && session.status === "active" && (
+        {/* Guessing Interface - Show for other players when recording is complete */}
+        {!isHost && hasRecording && currentTurn?.recording_url && session.status === "waiting" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
