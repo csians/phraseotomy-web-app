@@ -70,3 +70,9 @@ verify_jwt = false
 
 [functions.save-lobby-secret]
 verify_jwt = false
+
+[functions.submit-guess]
+verify_jwt = false
+
+[functions.upload-customer-audio]
+verify_jwt = false

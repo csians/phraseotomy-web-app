@@ -6,23 +6,13 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface LobbyAudioRecordingProps {
-  sessionId: string;
-  customerId: string;
-  shopDomain: string;
-  tenantId: string;
-  onRecordingComplete?: (audioId: string) => void;
-  onStartGame?: () => void;
-  hasRecording: boolean;
+  onRecordingComplete: (audioBlob: Blob) => void;
+  isUploading: boolean;
 }
 
 export const LobbyAudioRecording = ({
-  sessionId,
-  customerId,
-  shopDomain,
-  tenantId,
   onRecordingComplete,
-  onStartGame,
-  hasRecording,
+  isUploading,
 }: LobbyAudioRecordingProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -121,39 +111,19 @@ export const LobbyAudioRecording = ({
 
     setIsSaving(true);
     try {
-      const formData = new FormData();
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      formData.append("audio", recordedAudio.blob, `lobby-recording-${timestamp}.webm`);
-      formData.append("customer_id", customerId);
-      formData.append("shop_domain", shopDomain);
-      formData.append("tenant_id", tenantId);
-      formData.append("session_id", sessionId);
-      formData.append("round_number", "1");
-      formData.append("duration_seconds", recordedAudio.duration.toFixed(2));
-      formData.append("mime_type", "audio/webm");
-
-      console.log("lobby audio");
-
-      const { data, error } = await supabase.functions.invoke("upload-customer-audio", {
-        body: formData,
-      });
-
-      console.log("data from lobby upload", data);
-
-      if (error) throw error;
+      // Call the parent handler with the audio blob
+      if (onRecordingComplete) {
+        onRecordingComplete(recordedAudio.blob);
+      }
 
       toast({
         title: "Recording Saved",
-        description: "Your recording has been uploaded successfully!",
+        description: "Your recording is being uploaded...",
       });
 
       // Clean up blob URL
       URL.revokeObjectURL(recordedAudio.url);
       setRecordedAudio(null);
-
-      if (onRecordingComplete && data?.audio_id) {
-        onRecordingComplete(data.audio_id);
-      }
     } catch (error) {
       console.error("Error uploading recording:", error);
       toast({
@@ -249,25 +219,16 @@ export const LobbyAudioRecording = ({
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={handleDiscardRecording} variant="outline" className="flex-1" disabled={isSaving}>
+                <Button onClick={handleDiscardRecording} variant="outline" className="flex-1" disabled={isSaving || isUploading}>
                   Re-record
                 </Button>
-                <Button onClick={handleSaveRecording} className="flex-1" disabled={isSaving}>
-                  {isSaving ? "Saving..." : "Save Recording"}
+                <Button onClick={handleSaveRecording} className="flex-1" disabled={isSaving || isUploading}>
+                  {isSaving || isUploading ? "Saving..." : "Save Recording"}
                 </Button>
               </div>
             </div>
           )}
         </div>
-
-        {hasRecording && !isRecording && !recordedAudio && (
-          <div className="pt-4 border-t border-border">
-            <Button onClick={onStartGame} className="w-full" size="lg">
-              <Music className="mr-2 h-5 w-5" />
-              Start Game
-            </Button>
-          </div>
-        )}
 
         <p className="text-xs text-muted-foreground text-center">
           {recordedAudio

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -62,6 +63,7 @@ interface GameSession {
   started_at: string | null;
   shop_domain: string;
   tenant_id: string;
+  current_round?: number;
 }
 
 interface Theme {
@@ -87,6 +89,10 @@ export default function Lobby() {
   const [isEndingLobby, setIsEndingLobby] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isGameStarted, setIsGameStarted] = useState(false);
+  const [currentTurn, setCurrentTurn] = useState<any>(null);
+  const [guessInput, setGuessInput] = useState("");
+  const [isSubmittingGuess, setIsSubmittingGuess] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (!sessionId) {
@@ -344,6 +350,7 @@ export default function Lobby() {
 
       // Check if there's already a turn with secret element and recording from currentTurn data
       if (data.currentTurn) {
+        setCurrentTurn(data.currentTurn);
         if (data.currentTurn.secret_element) {
           setSelectedElementId(data.currentTurn.secret_element);
         }
@@ -459,18 +466,114 @@ export default function Lobby() {
     }
   };
 
-  const handleRecordingComplete = async (audioId: string) => {
-    console.log("Recording complete, audio ID:", audioId);
-    setSelectedAudio(audioId);
-    setHasRecording(true);
+  const handleRecordingComplete = async (audioBlob: Blob) => {
+    console.log("Recording complete, uploading audio...");
+    setIsUploading(true);
 
-    // Refresh lobby data to get updated recording URL from game_turns
-    await fetchLobbyData();
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob);
+      formData.append("customerId", currentCustomerId || "");
+      formData.append("shopDomain", session?.shop_domain || "");
+      formData.append("sessionId", sessionId || "");
+      formData.append("roundNumber", session?.current_round?.toString() || "1");
 
-    toast({
-      title: "Ready to Start",
-      description: "Audio recorded successfully. You can now start the game.",
-    });
+      const response = await fetch(
+        `https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/upload-customer-audio`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Upload failed:", errorText);
+        throw new Error("Failed to upload audio");
+      }
+
+      const data = await response.json();
+      console.log("data from lobby upload", data);
+      
+      if (data.success && data.audio_id) {
+        console.log("Recording complete, audio ID:", data.audio_id);
+        setHasRecording(true);
+        // Refresh lobby data to get updated recording URL from game_turns
+        await fetchLobbyData();
+        toast({
+          title: "Recording saved",
+          description: "Your audio has been uploaded successfully",
+        });
+      }
+    } catch (error) {
+      console.error("Error uploading audio:", error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to save recording. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSubmitGuess = async () => {
+    if (!guessInput.trim() || !currentTurn) return;
+
+    setIsSubmittingGuess(true);
+    try {
+      const response = await fetch(
+        `https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/submit-guess`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            turnId: currentTurn.id,
+            playerId: currentCustomerId,
+            guess: guessInput.trim(),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.already_answered) {
+        toast({
+          title: "Round Complete",
+          description: "Someone already answered correctly!",
+        });
+        setGuessInput("");
+        return;
+      }
+
+      if (data.correct) {
+        toast({
+          title: "Correct! 🎉",
+          description: `You earned ${data.points_earned} points!`,
+        });
+        setGuessInput("");
+        // Refresh lobby data to show updated scores
+        fetchLobbyData();
+      } else {
+        toast({
+          title: "Incorrect",
+          description: "That's not the right answer. Try again!",
+          variant: "destructive",
+        });
+        setGuessInput("");
+      }
+    } catch (error) {
+      console.error("Error submitting guess:", error);
+      toast({
+        title: "Error",
+        description: "Failed to submit guess. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingGuess(false);
+    }
   };
 
   const handleThemeChange = async (themeId: string) => {
@@ -568,9 +671,10 @@ export default function Lobby() {
     sparkles: Sparkles,
   };
 
-  // Check if current user is the host
+  // Check if current user is the host and storyteller
   const currentCustomerId = getCurrentCustomerId();
   const isHost = currentCustomerId && session ? String(session.host_customer_id) === String(currentCustomerId) : false;
+  const isStoryteller = currentCustomerId && currentTurn ? String(currentTurn.storyteller_id) === String(currentCustomerId) : false;
 
   if (loading) {
     return (
@@ -694,8 +798,8 @@ export default function Lobby() {
 
 
 
-         {/* Theme Selection for Host - Step 1 */}
-        {isHost && themes.length > 0 && !selectedTheme && session.status === "active" && (
+         {/* Theme Selection for Storyteller - Step 1 */}
+        {isStoryteller && themes.length > 0 && !selectedTheme && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle>Step 1: Select Theme</CardTitle>
@@ -724,8 +828,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Secret Element Selection for Host - Step 2 (only visible to host) */}
-        {isHost && selectedTheme && !selectedElementId && session.status === "active" && (
+        {/* Secret Element Selection for Storyteller - Step 2 (only visible to storyteller) */}
+        {isStoryteller && selectedTheme && !selectedElementId && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle>Step 2: Select Your Secret Element</CardTitle>
@@ -741,8 +845,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Audio Recording for Host - Step 3 */}
-        {isHost && selectedTheme && selectedElementId && !hasRecording && session.status === "active" && (
+        {/* Audio Recording for Storyteller - Step 3 */}
+        {isStoryteller && selectedTheme && selectedElementId && !hasRecording && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -753,13 +857,51 @@ export default function Lobby() {
             </CardHeader>
             <CardContent>
               <LobbyAudioRecording
-                sessionId={sessionId!}
-                customerId={currentCustomerId || ""}
-                shopDomain={session.shop_domain}
-                tenantId={session.tenant_id}
-                hasRecording={hasRecording}
                 onRecordingComplete={handleRecordingComplete}
+                isUploading={isUploading}
               />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Guessing Interface - Show for non-storytellers when recording is complete */}
+        {!isStoryteller && hasRecording && currentTurn?.recording_url && session.status === "active" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Music className="w-5 h-5" />
+                Listen and Guess
+              </CardTitle>
+              <CardDescription>
+                Listen to the audio clue and guess the secret element
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <audio
+                controls
+                src={currentTurn.recording_url}
+                className="w-full"
+              />
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="Type your guess..."
+                  value={guessInput}
+                  onChange={(e) => setGuessInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !isSubmittingGuess) {
+                      handleSubmitGuess();
+                    }
+                  }}
+                  disabled={isSubmittingGuess}
+                />
+                <Button
+                  onClick={handleSubmitGuess}
+                  disabled={!guessInput.trim() || isSubmittingGuess}
+                >
+                  {isSubmittingGuess ? "Submitting..." : "Submit Guess"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
