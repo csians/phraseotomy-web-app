@@ -468,7 +468,7 @@ export default function Lobby() {
         console.log("Theme saved successfully:", data);
         toast({
           title: "Theme Selected",
-          description: `Theme saved by ${customerName || 'Unknown'}`,
+          description: "Now select your secret element",
         });
       }
     } catch (error) {
@@ -476,6 +476,47 @@ export default function Lobby() {
       toast({
         title: "Error",
         description: "Failed to save theme selection",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSecretElementSelect = async (elementId: string) => {
+    setSelectedElementId(elementId);
+
+    // Get customer data from localStorage
+    const customerData = localStorage.getItem('customerData');
+    const customerId = customerData ? JSON.parse(customerData).customer_id : null;
+
+    // Save secret element to database via edge function
+    try {
+      const { data, error } = await supabase.functions.invoke("save-lobby-secret", {
+        body: { 
+          sessionId, 
+          secretElementId: elementId,
+          customerId
+        },
+      });
+
+      if (error) {
+        console.error("Error saving secret element:", error);
+        toast({
+          title: "Error",
+          description: "Failed to save secret element",
+          variant: "destructive",
+        });
+      } else {
+        console.log("Secret element saved successfully:", data);
+        toast({
+          title: "Secret Element Selected",
+          description: "Now record your audio clue",
+        });
+      }
+    } catch (error) {
+      console.error("Error in handleSecretElementSelect:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save secret element",
         variant: "destructive",
       });
     }
@@ -656,11 +697,11 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Theme Selection for Host */}
-        {isHost && themes.length > 0 && (
+         {/* Theme Selection for Host - Step 1 */}
+        {isHost && themes.length > 0 && !selectedTheme && (
           <Card>
             <CardHeader>
-              <CardTitle>Select Theme</CardTitle>
+              <CardTitle>Step 1: Select Theme</CardTitle>
               <CardDescription>Choose a theme for the game</CardDescription>
             </CardHeader>
             <CardContent>
@@ -682,6 +723,46 @@ export default function Lobby() {
                   })}
                 </SelectContent>
               </Select>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Secret Element Selection for Host - Step 2 (only visible to host) */}
+        {isHost && selectedTheme && !selectedElementId && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Step 2: Select Your Secret Element</CardTitle>
+              <CardDescription>Choose 1 secret element (only you can see this)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ThemeElements 
+                themeId={selectedTheme} 
+                onElementSelect={handleSecretElementSelect}
+                selectedElementId={selectedElementId}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Audio Recording for Host - Step 3 */}
+        {isHost && selectedTheme && selectedElementId && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Music className="mr-2 h-5 w-5" />
+                Step 3: Record Audio Clue
+              </CardTitle>
+              <CardDescription>Record a clue about your secret element</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LobbyAudioRecording
+                sessionId={sessionId!}
+                customerId={currentCustomerId || ""}
+                shopDomain={session.shop_domain}
+                tenantId={session.tenant_id}
+                hasRecording={false}
+                onRecordingComplete={handleRecordingComplete}
+              />
             </CardContent>
           </Card>
         )}
