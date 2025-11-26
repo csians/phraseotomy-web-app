@@ -64,3 +64,6 @@ verify_jwt = false
 
 [functions.update-turn-secret]
 verify_jwt = false
+
+[functions.update-session-theme]
+verify_jwt = false
