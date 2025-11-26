@@ -124,6 +124,16 @@ export default function Lobby() {
             const updatedSession = payload.new as GameSession;
             setSession(updatedSession);
 
+            // Update selected theme in real-time
+            if (updatedSession.selected_theme_id) {
+              setSelectedTheme(updatedSession.selected_theme_id);
+            }
+
+            // Update selected audio in real-time
+            if (updatedSession.selected_audio_id) {
+              setSelectedAudio(updatedSession.selected_audio_id);
+            }
+
             // Navigate to game page when game starts
             if (updatedSession.status === "active" && !isGameStarted) {
               console.log("Game started - navigating to game page");
@@ -163,6 +173,27 @@ export default function Lobby() {
           console.log("Player left:", payload);
           // Remove the player from the list
           setPlayers((prev) => prev.filter((p) => p.id !== (payload.old as Player).id));
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "customer_audio",
+        },
+        async (payload) => {
+          console.log("Customer audio changed:", payload);
+          const currentCustomerId = getCurrentCustomerId();
+          
+          // Refresh audio files when new audio is uploaded or deleted
+          if (currentCustomerId && (payload.eventType === "INSERT" || payload.eventType === "DELETE")) {
+            await fetchCustomerAudio(currentCustomerId);
+            toast({
+              title: "Audio Updated",
+              description: payload.eventType === "INSERT" ? "New audio file uploaded" : "Audio file removed",
+            });
+          }
         },
       )
       .subscribe();
