@@ -322,13 +322,13 @@ export default function Lobby() {
       // Check if there's already a turn with secret element and recording
       const { data: turnData } = await supabase
         .from("game_turns")
-        .select("selected_elements, recording_url")
+        .select("secret_element, recording_url")
         .eq("session_id", sessionId)
         .maybeSingle();
 
       if (turnData) {
-        if (turnData.selected_elements && turnData.selected_elements.length > 0) {
-          setSelectedElementId(turnData.selected_elements[0]);
+        if (turnData.secret_element) {
+          setSelectedElementId(turnData.secret_element);
         }
         if (turnData.recording_url) {
           setHasRecording(true);

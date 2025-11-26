@@ -25,31 +25,11 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get current turn to get all elements
-    const { data: turn, error: turnError } = await supabase
-      .from("game_turns")
-      .select("selected_elements")
-      .eq("id", turnId)
-      .single();
-
-    if (turnError || !turn) {
-      return new Response(
-        JSON.stringify({ error: "Turn not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Reorder elements with secret element first
-    const reorderedElements = [
-      secretElementId,
-      ...(turn.selected_elements || []).filter((id: string) => id !== secretElementId)
-    ];
-
-    // Update turn with secret element at position 0
+    // Update turn with secret element
     const { error: updateError } = await supabase
       .from("game_turns")
       .update({ 
-        selected_elements: reorderedElements
+        secret_element: secretElementId
       })
       .eq("id", turnId);
 
