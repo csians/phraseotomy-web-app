@@ -439,7 +439,7 @@ export type Database = {
           recording_url: string | null
           round_number: number
           secret_element: string | null
-          selected_elements: string[] | null
+          selected_elements: string | null
           session_id: string
           storyteller_id: string
           theme_id: string | null
@@ -451,7 +451,7 @@ export type Database = {
           recording_url?: string | null
           round_number: number
           secret_element?: string | null
-          selected_elements?: string[] | null
+          selected_elements?: string | null
           session_id: string
           storyteller_id: string
           theme_id?: string | null
@@ -463,7 +463,7 @@ export type Database = {
           recording_url?: string | null
           round_number?: number
           secret_element?: string | null
-          selected_elements?: string[] | null
+          selected_elements?: string | null
           session_id?: string
           storyteller_id?: string
           theme_id?: string | null
