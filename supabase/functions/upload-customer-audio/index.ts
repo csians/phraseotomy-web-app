@@ -24,6 +24,15 @@ serve(async (req) => {
     const sessionId = formData.get('session_id');
     const roundNumber = formData.get('round_number');
 
+    console.log('Received formData:', {
+      hasAudio: !!audio,
+      customerId,
+      shopDomain,
+      tenantId,
+      sessionId,
+      roundNumber
+    });
+
     if (!audio || !(audio instanceof File)) {
       return new Response(
         JSON.stringify({ error: 'No audio file provided' }),
