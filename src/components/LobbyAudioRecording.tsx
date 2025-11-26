@@ -138,6 +138,8 @@ export const LobbyAudioRecording = ({
         body: formData,
       });
 
+      console.log("data from lobby upload", data);
+
       if (error) throw error;
 
       toast({
