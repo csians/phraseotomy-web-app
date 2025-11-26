@@ -21,6 +21,8 @@ serve(async (req) => {
     const customerId = formData.get('customer_id');
     const shopDomain = formData.get('shop_domain');
     const tenantId = formData.get('tenant_id');
+    const sessionId = formData.get('session_id');
+    const roundNumber = formData.get('round_number');
 
     if (!audio || !(audio instanceof File)) {
       return new Response(
@@ -107,6 +109,23 @@ serve(async (req) => {
     }
 
     console.log('Audio record created:', audioRecord.id, 'for customer:', audioRecord.customer_id);
+
+    // Update game_turns with recording_url if sessionId and roundNumber are provided
+    if (sessionId && roundNumber) {
+      console.log('Updating game_turns with recording_url for session:', sessionId, 'round:', roundNumber);
+      const { error: turnError } = await supabase
+        .from('game_turns')
+        .update({ recording_url: audioUrl })
+        .eq('session_id', sessionId)
+        .eq('round_number', parseInt(roundNumber.toString()));
+
+      if (turnError) {
+        console.error('Failed to update game_turns:', turnError);
+        // Don't fail the request, just log the error
+      } else {
+        console.log('Successfully updated game_turns with recording_url');
+      }
+    }
 
     return new Response(
       JSON.stringify({
