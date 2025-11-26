@@ -122,17 +122,45 @@ serve(async (req) => {
     // Update game_turns with recording_url if sessionId and roundNumber are provided
     if (sessionId && roundNumber) {
       console.log('Updating game_turns with recording_url for session:', sessionId, 'round:', roundNumber);
-      const { error: turnError } = await supabase
+      
+      // First check if turn exists
+      const { data: existingTurn } = await supabase
         .from('game_turns')
-        .update({ recording_url: audioUrl })
+        .select('id, storyteller_id')
         .eq('session_id', sessionId)
-        .eq('round_number', parseInt(roundNumber.toString()));
+        .eq('round_number', parseInt(roundNumber.toString()))
+        .maybeSingle();
 
-      if (turnError) {
-        console.error('Failed to update game_turns:', turnError);
-        // Don't fail the request, just log the error
+      if (existingTurn) {
+        // Update existing turn
+        const { error: turnError } = await supabase
+          .from('game_turns')
+          .update({ recording_url: audioUrl })
+          .eq('session_id', sessionId)
+          .eq('round_number', parseInt(roundNumber.toString()));
+
+        if (turnError) {
+          console.error('Failed to update game_turns:', turnError);
+        } else {
+          console.log('Successfully updated game_turns with recording_url');
+        }
       } else {
-        console.log('Successfully updated game_turns with recording_url');
+        // Create new turn record for lobby audio
+        console.log('Creating new game_turn record for lobby audio');
+        const { error: insertError } = await supabase
+          .from('game_turns')
+          .insert({
+            session_id: sessionId,
+            round_number: parseInt(roundNumber.toString()),
+            storyteller_id: customerId.toString(),
+            recording_url: audioUrl
+          });
+
+        if (insertError) {
+          console.error('Failed to create game_turns:', insertError);
+        } else {
+          console.log('Successfully created game_turns with recording_url');
+        }
       }
     }
 
