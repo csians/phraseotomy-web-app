@@ -46,7 +46,7 @@ export const LobbyAudioRecording = ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm',
+        mimeType: "audio/webm",
       });
 
       const audioChunks: Blob[] = [];
@@ -58,15 +58,15 @@ export const LobbyAudioRecording = ({
       };
 
       recorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
         const durationSeconds = (Date.now() - recordingStartTime.current) / 1000;
         const audioUrl = URL.createObjectURL(audioBlob);
-        
+
         setRecordedAudio({ blob: audioBlob, duration: durationSeconds, url: audioUrl });
 
         // Stop all tracks
         stream.getTracks().forEach((track) => track.stop());
-        
+
         toast({
           title: "Recording Complete",
           description: "Review your recording and click Save to upload",
@@ -122,17 +122,19 @@ export const LobbyAudioRecording = ({
     setIsSaving(true);
     try {
       const formData = new FormData();
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      formData.append('audio', recordedAudio.blob, `lobby-recording-${timestamp}.webm`);
-      formData.append('customer_id', customerId);
-      formData.append('shop_domain', shopDomain);
-      formData.append('tenant_id', tenantId);
-      formData.append('session_id', sessionId);
-      formData.append('round_number', '1');
-      formData.append('duration_seconds', recordedAudio.duration.toFixed(2));
-      formData.append('mime_type', 'audio/webm');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      formData.append("audio", recordedAudio.blob, `lobby-recording-${timestamp}.webm`);
+      formData.append("customer_id", customerId);
+      formData.append("shop_domain", shopDomain);
+      formData.append("tenant_id", tenantId);
+      formData.append("session_id", sessionId);
+      formData.append("round_number", "1");
+      formData.append("duration_seconds", recordedAudio.duration.toFixed(2));
+      formData.append("mime_type", "audio/webm");
 
-      const { data, error } = await supabase.functions.invoke('upload-customer-audio', {
+      console.log("lobby audio");
+
+      const { data, error } = await supabase.functions.invoke("upload-customer-audio", {
         body: formData,
       });
 
@@ -177,7 +179,7 @@ export const LobbyAudioRecording = ({
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const remainingTime = MAX_RECORDING_TIME - recordingTime;
@@ -189,36 +191,24 @@ export const LobbyAudioRecording = ({
           <Mic className="h-5 w-5" />
           Record Audio
         </CardTitle>
-        <CardDescription>
-          Record audio for this game (maximum 3 minutes)
-        </CardDescription>
+        <CardDescription>Record audio for this game (maximum 3 minutes)</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col items-center gap-4">
           {!isRecording && !recordedAudio && (
-            <Button
-              onClick={startRecording}
-              size="lg"
-              className="w-full"
-              variant="default"
-            >
+            <Button onClick={startRecording} size="lg" className="w-full" variant="default">
               <Mic className="mr-2 h-5 w-5" />
               Start Recording
             </Button>
           )}
-          
+
           {isRecording && (
             <>
-              <Button
-                onClick={stopRecording}
-                size="lg"
-                variant="destructive"
-                className="w-full animate-pulse"
-              >
+              <Button onClick={stopRecording} size="lg" variant="destructive" className="w-full animate-pulse">
                 <Square className="mr-2 h-5 w-5" />
                 Stop Recording
               </Button>
-              
+
               <div className="w-full space-y-2">
                 <div className="flex justify-between items-center text-sm">
                   <div className="flex items-center gap-2 text-destructive">
@@ -229,18 +219,16 @@ export const LobbyAudioRecording = ({
                     {formatTime(recordingTime)} / {formatTime(MAX_RECORDING_TIME)}
                   </span>
                 </div>
-                
+
                 <div className="relative w-full h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="absolute top-0 left-0 h-full bg-destructive transition-all duration-100"
                     style={{ width: `${(recordingTime / MAX_RECORDING_TIME) * 100}%` }}
                   />
                 </div>
-                
+
                 {remainingTime <= 30 && (
-                  <p className="text-xs text-destructive text-center font-medium">
-                    {remainingTime} seconds remaining
-                  </p>
+                  <p className="text-xs text-destructive text-center font-medium">{remainingTime} seconds remaining</p>
                 )}
               </div>
             </>
@@ -255,27 +243,14 @@ export const LobbyAudioRecording = ({
                     {formatTime(Math.floor(recordedAudio.duration))}
                   </span>
                 </div>
-                <audio 
-                  controls 
-                  src={recordedAudio.url}
-                  className="w-full"
-                />
+                <audio controls src={recordedAudio.url} className="w-full" />
               </div>
 
               <div className="flex gap-2">
-                <Button
-                  onClick={handleDiscardRecording}
-                  variant="outline"
-                  className="flex-1"
-                  disabled={isSaving}
-                >
+                <Button onClick={handleDiscardRecording} variant="outline" className="flex-1" disabled={isSaving}>
                   Re-record
                 </Button>
-                <Button
-                  onClick={handleSaveRecording}
-                  className="flex-1"
-                  disabled={isSaving}
-                >
+                <Button onClick={handleSaveRecording} className="flex-1" disabled={isSaving}>
                   {isSaving ? "Saving..." : "Save Recording"}
                 </Button>
               </div>
@@ -285,11 +260,7 @@ export const LobbyAudioRecording = ({
 
         {hasRecording && !isRecording && !recordedAudio && (
           <div className="pt-4 border-t border-border">
-            <Button 
-              onClick={onStartGame} 
-              className="w-full"
-              size="lg"
-            >
+            <Button onClick={onStartGame} className="w-full" size="lg">
               <Music className="mr-2 h-5 w-5" />
               Start Game
             </Button>
@@ -297,8 +268,8 @@ export const LobbyAudioRecording = ({
         )}
 
         <p className="text-xs text-muted-foreground text-center">
-          {recordedAudio 
-            ? "Listen to your recording before saving" 
+          {recordedAudio
+            ? "Listen to your recording before saving"
             : "Recording will automatically stop after 3 minutes"}
         </p>
       </CardContent>

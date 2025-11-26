@@ -40,12 +40,14 @@ export const CustomerAudioUpload = ({
 
     try {
       const formData = new FormData();
-      formData.append('audio', file);
-      formData.append('customer_id', customerId);
-      formData.append('shop_domain', shopDomain);
-      formData.append('tenant_id', tenantId);
+      formData.append("audio", file);
+      formData.append("customer_id", customerId);
+      formData.append("shop_domain", shopDomain);
+      formData.append("tenant_id", tenantId);
 
-      const { data, error } = await supabase.functions.invoke('upload-customer-audio', {
+      console.log("customer audio");
+
+      const { data, error } = await supabase.functions.invoke("upload-customer-audio", {
         body: formData,
       });
 
@@ -58,7 +60,7 @@ export const CustomerAudioUpload = ({
 
       onUploadComplete?.();
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error("Upload error:", error);
       toast({
         title: "Upload failed",
         description: "Failed to upload audio file",
@@ -77,10 +79,10 @@ export const CustomerAudioUpload = ({
 
       recorder.ondataavailable = (e) => chunks.push(e.data);
       recorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        const file = new File([blob], `recording_${Date.now()}.webm`, { type: 'audio/webm' });
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        const file = new File([blob], `recording_${Date.now()}.webm`, { type: "audio/webm" });
         await handleFileUpload(file);
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       };
 
       recorder.start();
@@ -92,7 +94,7 @@ export const CustomerAudioUpload = ({
         description: "Click Stop Recording when finished",
       });
     } catch (error) {
-      console.error('Recording error:', error);
+      console.error("Recording error:", error);
       toast({
         title: "Recording failed",
         description: "Could not access microphone",
@@ -102,7 +104,7 @@ export const CustomerAudioUpload = ({
   };
 
   const stopRecording = () => {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
       setIsRecording(false);
       setMediaRecorder(null);
@@ -120,9 +122,7 @@ export const CustomerAudioUpload = ({
     <Card>
       <CardHeader>
         <CardTitle>Upload Audio</CardTitle>
-        <CardDescription>
-          Upload or record an audio file for your games
-        </CardDescription>
+        <CardDescription>Upload or record an audio file for your games</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2">
@@ -137,44 +137,23 @@ export const CustomerAudioUpload = ({
           </Button>
 
           {!isRecording ? (
-            <Button
-              onClick={startRecording}
-              disabled={isUploading}
-              variant="outline"
-              className="flex-1"
-            >
+            <Button onClick={startRecording} disabled={isUploading} variant="outline" className="flex-1">
               <Mic className="mr-2 h-4 w-4" />
               Record Audio
             </Button>
           ) : (
-            <Button
-              onClick={stopRecording}
-              variant="destructive"
-              className="flex-1"
-            >
+            <Button onClick={stopRecording} variant="destructive" className="flex-1">
               <Square className="mr-2 h-4 w-4" />
               Stop Recording
             </Button>
           )}
         </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="audio/*"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
+        <input ref={fileInputRef} type="file" accept="audio/*" onChange={handleFileSelect} className="hidden" />
 
-        {isUploading && (
-          <p className="text-sm text-muted-foreground text-center">
-            Uploading audio...
-          </p>
-        )}
+        {isUploading && <p className="text-sm text-muted-foreground text-center">Uploading audio...</p>}
 
-        <p className="text-xs text-muted-foreground">
-          Supported formats: WAV, MP3, WebM, OGG (max 10MB)
-        </p>
+        <p className="text-xs text-muted-foreground">Supported formats: WAV, MP3, WebM, OGG (max 10MB)</p>
       </CardContent>
     </Card>
   );
