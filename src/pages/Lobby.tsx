@@ -791,8 +791,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Theme Selection for Host - Step 1 */}
-        {isStoryteller && themes.length > 0 && !selectedTheme && session.status === "active" && (
+        {/* Theme Selection - Step 1 (Only for current storyteller) */}
+        {isStoryteller && themes.length > 0 && !selectedTheme && (
           <Card>
             <CardHeader>
               <CardTitle>Step 1: Select Theme</CardTitle>
@@ -821,8 +821,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Secret Element Selection for Host - Step 2 (only visible to host) */}
-        {isStoryteller && selectedTheme && !selectedElementId && session.status === "active" && (
+        {/* Secret Element Selection - Step 2 (Only for current storyteller) */}
+        {isStoryteller && selectedTheme && !selectedElementId && (
           <Card>
             <CardHeader>
               <CardTitle>Step 2: Select Your Secret Element</CardTitle>
@@ -838,8 +838,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Audio Recording for Host - Step 3 */}
-        {isStoryteller && selectedTheme && selectedElementId && !hasRecording && session.status === "active" && (
+        {/* Audio Recording - Step 3 (Only for current storyteller) */}
+        {isStoryteller && selectedTheme && selectedElementId && !hasRecording && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -854,8 +854,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Guessing Interface - Show for other players when recording is complete */}
-        {!isHost && hasRecording && currentTurn?.recording_url && session.status === "active" && (
+        {/* Guessing Interface - Show for non-storyteller players when recording is complete */}
+        {!isStoryteller && hasRecording && currentTurn?.recording_url && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
