@@ -17,7 +17,8 @@ interface GuessingInterfaceProps {
   audioUrl: string;
   availableElements: Element[];
   correctElements: string[];
-  turnId: string;
+  sessionId: string;
+  roundNumber: number;
   playerId: string;
   onGuessSubmit: () => void;
 }
@@ -28,7 +29,8 @@ export function GuessingInterface({
   audioUrl,
   availableElements,
   correctElements,
-  turnId,
+  sessionId,
+  roundNumber,
   playerId,
   onGuessSubmit,
 }: GuessingInterfaceProps) {
@@ -54,35 +56,30 @@ export function GuessingInterface({
 
     setIsSubmitting(true);
     try {
-      // Check if guess is correct - the first element in correctElements is the secret one
-      const secretElementId = correctElements[0];
-      const isCorrect = selectedElements.length === 1 && selectedElements[0] === secretElementId;
-      const pointsEarned = isCorrect ? 10 : 0;
-
-      // Submit guess
-      const { error: guessError } = await supabase.from("game_guesses").insert({
-        turn_id: turnId,
-        player_id: playerId,
-        guessed_elements: selectedElements,
-        points_earned: pointsEarned,
-      });
-
-      if (guessError) throw guessError;
-
-      // Update player score
-      const { error: scoreError } = await supabase.rpc("increment_player_score", {
-        p_player_id: playerId,
-        p_points: pointsEarned,
-      });
-
-      if (scoreError) {
-        console.error("Error updating score:", scoreError);
+      // Get the element name from the selected element
+      const selectedElement = availableElements.find(el => el.id === selectedElements[0]);
+      if (!selectedElement) {
+        throw new Error("Selected element not found");
       }
 
+      // Submit guess to edge function
+      const { data, error } = await supabase.functions.invoke("submit-guess", {
+        body: {
+          sessionId,
+          roundNumber,
+          playerId,
+          guess: selectedElement.name,
+        },
+      });
+
+      if (error) throw error;
+
+      const { correct, points_earned } = data;
+
       toast({
-        title: isCorrect ? "🎉 Correct!" : "❌ Wrong Guess",
-        description: isCorrect ? `You earned ${pointsEarned} points!` : "Better luck next time!",
-        variant: isCorrect ? "default" : "destructive",
+        title: correct ? "🎉 Correct!" : "❌ Wrong Guess",
+        description: correct ? `You earned ${points_earned} points!` : "Better luck next time!",
+        variant: correct ? "default" : "destructive",
       });
 
       onGuessSubmit();

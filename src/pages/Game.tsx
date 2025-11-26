@@ -446,7 +446,8 @@ export default function Game() {
             audioUrl={currentTurn.recording_url}
             availableElements={selectedElements}
             correctElements={currentTurn.selected_elements}
-            turnId={currentTurn.id}
+            sessionId={session.id}
+            roundNumber={session.current_round || 1}
             playerId={currentPlayerId}
             onGuessSubmit={handleGuessSubmit}
           />
