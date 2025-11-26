@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
 
     console.log('✅ Game session created successfully:', session.id);
 
-    // Add the host as the first player in game_players
+    // Add the host as the first player in game_players (CRITICAL OPERATION)
     const { error: playerError } = await supabaseAdmin
       .from('game_players')
       .insert({
@@ -109,10 +109,25 @@ Deno.serve(async (req) => {
       });
 
     if (playerError) {
-      console.error('Error adding host to game_players:', playerError);
-      // Note: We don't fail the session creation if player insertion fails
-      // The session is already created, so we just log the error
+      console.error('❌ CRITICAL: Failed to add host to game_players:', playerError);
+      
+      // Delete the session since we couldn't add the host as a player
+      await supabaseAdmin
+        .from('game_sessions')
+        .delete()
+        .eq('id', session.id);
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to add host to lobby. Please try again.',
+          details: playerError.message,
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    console.log('✅ Host added to game_players successfully');
 
     return new Response(
       JSON.stringify({
