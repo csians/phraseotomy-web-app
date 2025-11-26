@@ -77,18 +77,31 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update session with selected theme
-    const { error: updateError } = await supabase
+    // Update session with selected theme (using service role to bypass RLS)
+    console.log("Updating session", sessionId, "with theme", themeId);
+    const { data: updatedSession, error: updateError } = await supabase
       .from("game_sessions")
       .update({ selected_theme_id: themeId })
-      .eq("id", sessionId);
+      .eq("id", sessionId)
+      .select("id, selected_theme_id")
+      .single();
 
     if (updateError) {
       console.error("Error updating session:", updateError);
+      return new Response(
+        JSON.stringify({ error: "Failed to update session: " + updateError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
+    console.log("Session updated successfully:", updatedSession);
+
     return new Response(
-      JSON.stringify({ turn }),
+      JSON.stringify({ 
+        turn,
+        session: updatedSession,
+        selectedElements 
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
