@@ -69,7 +69,7 @@ export default function Game() {
     };
   };
 
-  // WebSocket for real-time updates
+  // WebSocket for real-time updates - just refreshes from database
   const { sendMessage: sendWebSocketMessage } = useGameWebSocket({
     sessionId: sessionId || "",
     playerId: currentPlayerId,
@@ -80,18 +80,13 @@ export default function Game() {
       
       switch (message.type) {
         case "theme_selected":
-        case "elements_generated":
-        case "storyteller_ready":
+        case "secret_element_selected":
         case "recording_started":
         case "recording_stopped":
         case "story_submitted":
         case "guess_submitted":
         case "refresh_game_state":
-          // Refresh game state when receiving updates with longer delay for DB commit
-          toast({
-            title: "Game Updated",
-            description: "Receiving real-time updates...",
-          });
+          // Database is source of truth - just refresh
           setTimeout(() => initializeGame(), 500);
           break;
           
@@ -100,6 +95,7 @@ export default function Game() {
             title: "Player Joined",
             description: `${message.playerName} joined the game`,
           });
+          setTimeout(() => initializeGame(), 500);
           break;
           
         case "player_left":
@@ -107,6 +103,7 @@ export default function Game() {
             title: "Player Left",
             description: `${message.playerName} left the game`,
           });
+          setTimeout(() => initializeGame(), 500);
           break;
       }
     },
@@ -282,39 +279,28 @@ export default function Game() {
 
   const handleThemeSelect = async (themeId: string) => {
     try {
+      // Theme and elements are saved to database via start-turn
       const { data, error } = await supabase.functions.invoke("start-turn", {
         body: { sessionId, themeId },
       });
 
       if (error) throw error;
 
-      // Wait for DB to commit before refreshing
+      // Wait for DB to commit
       await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Refresh local state from database
       await initializeGame();
       
-      // Send WebSocket message with elements to notify other players
-      const theme = themes.find(t => t.id === themeId);
+      // Notify other players via WebSocket to refresh their state
       sendWebSocketMessage({
         type: "theme_selected",
         themeId,
-        themeName: theme?.name || "Unknown",
       });
-      
-      // After elements are loaded, broadcast them
-      const { data: turnData } = await supabase.functions.invoke("get-game-state", {
-        body: { sessionId },
-      });
-      
-      if (turnData?.selectedElements) {
-        sendWebSocketMessage({
-          type: "elements_generated",
-          elements: turnData.selectedElements,
-        });
-      }
 
       toast({
         title: "Theme Selected!",
-        description: "Now tell your story using the elements.",
+        description: "Now select your secret element and record your story.",
       });
     } catch (error) {
       console.error("Error starting turn:", error);

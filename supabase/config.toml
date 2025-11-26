@@ -61,3 +61,6 @@ verify_jwt = false
 
 [functions.game-websocket]
 verify_jwt = false
+
+[functions.update-turn-secret]
+verify_jwt = false
