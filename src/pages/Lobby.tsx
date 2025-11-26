@@ -447,6 +447,27 @@ export default function Lobby() {
     setSelectedAudio(audioId);
     setHasRecording(true);
 
+    // Get the audio URL from customer_audio table
+    const { data: audioData } = await supabase
+      .from("customer_audio")
+      .select("audio_url")
+      .eq("id", audioId)
+      .single();
+
+    if (audioData?.audio_url) {
+      // Update the game_turns table with the recording URL
+      const { error: updateError } = await supabase
+        .from("game_turns")
+        .update({ recording_url: audioData.audio_url })
+        .eq("session_id", sessionId);
+
+      if (updateError) {
+        console.error("Error updating recording URL:", updateError);
+      } else {
+        console.log("Recording URL saved to game_turns");
+      }
+    }
+
     // Refresh audio files
     await fetchLobbyData();
 
