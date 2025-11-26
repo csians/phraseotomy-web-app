@@ -96,12 +96,12 @@ serve(async (req) => {
         filename: audio.name,
       })
       .select()
-      .single();
+      .maybeSingle();
 
-    if (dbError) {
+    if (dbError || !audioRecord) {
       console.error('Database error:', dbError);
       return new Response(
-        JSON.stringify({ error: 'Failed to save audio metadata', details: dbError.message }),
+        JSON.stringify({ error: 'Failed to save audio metadata', details: dbError?.message || 'No record created' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

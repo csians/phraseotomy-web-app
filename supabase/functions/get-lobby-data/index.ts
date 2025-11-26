@@ -124,6 +124,11 @@ Deno.serve(async (req) => {
     } else if (turnData) {
       currentTurnData = turnData;
       console.log('Current turn data found:', turnData);
+      
+      // Hide secret_element from non-storytellers
+      if (currentTurnData && currentTurnData.storyteller_id !== customerId) {
+        currentTurnData = { ...currentTurnData, secret_element: null };
+      }
     }
 
     return new Response(
