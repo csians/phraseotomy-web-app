@@ -91,6 +91,7 @@ export default function Lobby() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [currentTurn, setCurrentTurn] = useState<any>(null);
+  console.log("currentTurn", currentTurn);
   const [guessInput, setGuessInput] = useState("");
   const [isSubmittingGuess, setIsSubmittingGuess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -670,15 +671,15 @@ export default function Lobby() {
   // Check if current user is the host and storyteller
   const currentCustomerId = getCurrentCustomerId();
   const isHost = currentCustomerId && session ? String(session.host_customer_id) === String(currentCustomerId) : false;
-  
+
   // Determine storyteller - use currentTurn if available, otherwise use session.current_storyteller_id or first player
-  const effectiveStorytellerId = currentTurn?.storyteller_id 
-    || session?.current_storyteller_id 
-    || players.sort((a, b) => a.turn_order - b.turn_order)[0]?.player_id;
-  
-  const isStoryteller = currentCustomerId && effectiveStorytellerId 
-    ? String(effectiveStorytellerId) === String(currentCustomerId) 
-    : false;
+  const effectiveStorytellerId =
+    currentTurn?.storyteller_id ||
+    session?.current_storyteller_id ||
+    players.sort((a, b) => a.turn_order - b.turn_order)[0]?.player_id;
+
+  const isStoryteller =
+    currentCustomerId && effectiveStorytellerId ? String(effectiveStorytellerId) === String(currentCustomerId) : false;
 
   if (loading) {
     return (
