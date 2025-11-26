@@ -54,8 +54,9 @@ export function GuessingInterface({
 
     setIsSubmitting(true);
     try {
-      // Check if guess is correct (only ONE correct element)
-      const isCorrect = selectedElements.length === 1 && selectedElements[0] === correctElements[0];
+      // Check if guess is correct - the first element in correctElements is the secret one
+      const secretElementId = correctElements[0];
+      const isCorrect = selectedElements.length === 1 && selectedElements[0] === secretElementId;
       const pointsEarned = isCorrect ? 10 : 0;
 
       // Submit guess

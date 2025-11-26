@@ -143,13 +143,18 @@ export function StorytellingInterface({
         .from("audio_uploads")
         .getPublicUrl(fileName);
 
-      // Update turn with recording URL and secret element
+      // Update turn with recording URL - keep all 5 elements, but move secret one to first position
+      const reorderedElements = [
+        secretElement,
+        ...elements.filter(e => e.id !== secretElement).map(e => e.id)
+      ];
+      
       const { error: updateError } = await supabase
         .from("game_turns")
         .update({ 
           recording_url: publicUrl,
           completed_at: new Date().toISOString(),
-          selected_elements: [secretElement]
+          selected_elements: reorderedElements
         })
         .eq("id", turnId);
 
