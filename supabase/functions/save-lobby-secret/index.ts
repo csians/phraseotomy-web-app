@@ -47,8 +47,7 @@ Deno.serve(async (req) => {
       const { data: updatedTurn, error: updateError } = await supabase
         .from("game_turns")
         .update({ 
-          secret_element: secretElementId,
-          updated_at: new Date().toISOString()
+          secret_element: secretElementId
         })
         .eq("id", existingTurn.id)
         .select()
