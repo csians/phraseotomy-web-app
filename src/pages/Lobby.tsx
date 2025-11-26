@@ -829,7 +829,7 @@ export default function Lobby() {
         )}
 
         {/* Secret Element Selection for Host - Step 2 (only visible to host) */}
-        {isHost && selectedTheme && !selectedElementId && session.status === "waiting" && (
+        {isHost && selectedTheme && !selectedElementId && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle>Step 2: Select Your Secret Element</CardTitle>
@@ -846,7 +846,7 @@ export default function Lobby() {
         )}
 
         {/* Audio Recording for Host - Step 3 */}
-        {isHost && selectedTheme && selectedElementId && !hasRecording && session.status === "waiting" && (
+        {isHost && selectedTheme && selectedElementId && !hasRecording && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -865,7 +865,7 @@ export default function Lobby() {
         )}
 
         {/* Guessing Interface - Show for other players when recording is complete */}
-        {!isHost && hasRecording && currentTurn?.recording_url && session.status === "waiting" && (
+        {!isHost && hasRecording && currentTurn?.recording_url && session.status === "active" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
