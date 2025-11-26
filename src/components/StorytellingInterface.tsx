@@ -155,18 +155,12 @@ export function StorytellingInterface({
         .from("audio_uploads")
         .getPublicUrl(fileName);
 
-      // Update turn with recording URL - keep all 5 elements, but move secret one to first position
-      const reorderedElements = [
-        secretElement,
-        ...elements.filter(e => e.id !== secretElement).map(e => e.id)
-      ];
-      
+      // Update turn with recording URL and mark as completed
       const { error: updateError } = await supabase
         .from("game_turns")
         .update({ 
           recording_url: publicUrl,
-          completed_at: new Date().toISOString(),
-          selected_elements: reorderedElements
+          completed_at: new Date().toISOString()
         })
         .eq("id", turnId);
 
@@ -235,13 +229,24 @@ export function StorytellingInterface({
                   return (
                     <button
                       key={element.id}
-                      onClick={() => {
+                      onClick={async () => {
                         if (isStoryteller) {
                           setSecretElement(element.id);
-                          sendWebSocketMessage?.({
-                            type: "secret_element_selected",
-                            elementId: element.id,
-                          });
+                          
+                          // Save to database immediately
+                          try {
+                            await supabase.functions.invoke("update-turn-secret", {
+                              body: { turnId, secretElementId: element.id },
+                            });
+                            
+                            // Notify others via WebSocket
+                            sendWebSocketMessage?.({
+                              type: "secret_element_selected",
+                              elementId: element.id,
+                            });
+                          } catch (error) {
+                            console.error("Error saving secret element:", error);
+                          }
                         }
                       }}
                       disabled={!isStoryteller || recordedAudio !== null}
