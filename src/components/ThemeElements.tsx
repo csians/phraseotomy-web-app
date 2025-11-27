@@ -15,9 +15,10 @@ interface ThemeElementsProps {
   themeId: string;
   onElementSelect?: (elementName: string) => void;
   selectedElementId?: string;
+  isGuessing?: boolean; // When true, hides custom element input (for guessing players)
 }
 
-export function ThemeElements({ themeId, onElementSelect, selectedElementId }: ThemeElementsProps) {
+export function ThemeElements({ themeId, onElementSelect, selectedElementId, isGuessing = false }: ThemeElementsProps) {
   const [elements, setElements] = useState<Element[]>([]);
   const [loading, setLoading] = useState(true);
   const [customElement, setCustomElement] = useState("");
@@ -107,33 +108,36 @@ export function ThemeElements({ themeId, onElementSelect, selectedElementId }: T
         })}
       </div>
 
-      <div className="border-t border-border pt-6">
-        <p className="text-sm font-medium mb-3 text-muted-foreground">Or add your own custom element:</p>
-        <div className="flex gap-2">
-          <Input
-            type="text"
-            placeholder="Type your custom element..."
-            value={customElement}
-            onChange={(e) => setCustomElement(e.target.value)}
-            onKeyPress={handleKeyPress}
-            maxLength={50}
-            className="flex-1"
-          />
-          <Button 
-            onClick={handleCustomElementSelect}
-            disabled={!customElement.trim()}
-            variant={isCustomSelected ? "default" : "outline"}
-          >
-            <PlusCircle className="h-4 w-4 mr-2" />
-            {isCustomSelected ? "Selected" : "Select"}
-          </Button>
+      {/* Only show custom element input for storyteller, not for guessing players */}
+      {!isGuessing && (
+        <div className="border-t border-border pt-6">
+          <p className="text-sm font-medium mb-3 text-muted-foreground">Or add your own custom element:</p>
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="Type your custom element..."
+              value={customElement}
+              onChange={(e) => setCustomElement(e.target.value)}
+              onKeyPress={handleKeyPress}
+              maxLength={50}
+              className="flex-1"
+            />
+            <Button 
+              onClick={handleCustomElementSelect}
+              disabled={!customElement.trim()}
+              variant={isCustomSelected ? "default" : "outline"}
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              {isCustomSelected ? "Selected" : "Select"}
+            </Button>
+          </div>
+          {isCustomSelected && selectedCustomText && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Custom element selected: <span className="font-medium text-foreground">"{selectedCustomText}"</span>
+            </p>
+          )}
         </div>
-        {isCustomSelected && selectedCustomText && (
-          <p className="text-sm text-muted-foreground mt-2">
-            Custom element selected: <span className="font-medium text-foreground">"{selectedCustomText}"</span>
-          </p>
-        )}
-      </div>
+      )}
     </div>
   );
 }
