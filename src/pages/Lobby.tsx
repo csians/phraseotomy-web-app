@@ -1060,8 +1060,14 @@ export default function Lobby() {
                       {player.player_id === session.host_customer_id && (
                         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Host</span>
                       )}
+                      {player.player_id === session.current_storyteller_id && (
+                        <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">Storyteller</span>
+                      )}
                     </div>
-                    <span className="text-sm text-muted-foreground">Turn {player.turn_order}</span>
+                    <div className="flex items-center gap-4">
+                      <span className="text-lg font-bold text-primary">{player.score ?? 0} pts</span>
+                      <span className="text-sm text-muted-foreground">Turn {player.turn_order}</span>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -1147,6 +1153,29 @@ export default function Lobby() {
           </Card>
         )}
 
+        {/* Show Selected Theme to non-storyteller players */}
+        {!isStoryteller && session.status === "active" && (selectedTheme || session.selected_theme_id) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {(() => {
+                  const themeId = selectedTheme || session.selected_theme_id;
+                  const theme = themes.find(t => t.id === themeId);
+                  const IconComponent = theme ? (iconMap[theme.icon.toLowerCase()] || Sparkles) : Sparkles;
+                  return <IconComponent className="h-5 w-5" />;
+                })()}
+                Current Theme
+              </CardTitle>
+              <CardDescription>The storyteller has selected this theme</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-lg font-semibold text-primary">
+                {themes.find(t => t.id === (selectedTheme || session.selected_theme_id))?.name || "Loading..."}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Guessing Interface - Show for non-storyteller players when recording is complete */}
         {!isStoryteller && hasRecording && currentTurn?.recording_url && (
           <Card>
@@ -1159,10 +1188,24 @@ export default function Lobby() {
             </CardHeader>
             <CardContent className="space-y-4">
               <audio controls src={currentTurn.recording_url} className="w-full" />
+              
+              {/* Show elements for guessing */}
+              {(selectedTheme || session.selected_theme_id) && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Choose from these elements:</p>
+                  <ThemeElements
+                    themeId={selectedTheme || session.selected_theme_id || ""}
+                    onElementSelect={(elementName) => setGuessInput(elementName)}
+                    selectedElementId={guessInput}
+                    isGuessing={true}
+                  />
+                </div>
+              )}
+              
               <div className="flex gap-2">
                 <Input
                   type="text"
-                  placeholder="Type your guess..."
+                  placeholder="Type your guess or click an element above..."
                   value={guessInput}
                   onChange={(e) => setGuessInput(e.target.value)}
                   onKeyDown={(e) => {
