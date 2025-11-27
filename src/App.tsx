@@ -21,21 +21,23 @@ const RootRedirect = () => {
   const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    // ONLY redirect to lobby from root path, not from other paths
     const currentPath = window.location.hash.replace('#', '');
     
-    // If we're already on a lobby or game page, don't redirect
+    // CRITICAL: Don't redirect if already on lobby/game pages
     if (currentPath.startsWith('/lobby/') || currentPath.startsWith('/game/')) {
-      console.log('Already on lobby/game page, skipping redirect');
+      console.log('Already on lobby/game page, skipping RootRedirect entirely');
+      setRedirectTarget(currentPath); // Stay on current path
       return;
     }
     
-    // Check if user is in an active lobby session (only from root path)
-    const currentLobbySession = sessionStorage.getItem('current_lobby_session');
-    if (currentLobbySession && (currentPath === '/' || currentPath === '')) {
-      console.log('Active lobby session found, redirecting to lobby');
-      setRedirectTarget(`/lobby/${currentLobbySession}`);
-      return;
+    // Only check for active lobby session from root path
+    if (currentPath === '/' || currentPath === '') {
+      const currentLobbySession = sessionStorage.getItem('current_lobby_session');
+      if (currentLobbySession) {
+        console.log('Active lobby session found, redirecting to lobby');
+        setRedirectTarget(`/lobby/${currentLobbySession}`);
+        return;
+      }
     }
 
     // Check if accessed from Shopify admin (has 'host' parameter for embedded app)

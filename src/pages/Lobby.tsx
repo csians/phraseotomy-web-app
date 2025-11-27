@@ -171,23 +171,15 @@ export default function Lobby() {
     console.log("🚀 [LOBBY] useEffect running - sessionId:", sessionId);
     console.log("🚀 [LOBBY] Supabase client:", supabase);
     
-    // First, store sessionId in sessionStorage immediately to persist across refreshes
-    if (sessionId) {
-      sessionStorage.setItem('current_lobby_session', sessionId);
-      console.log("✅ [LOBBY] Stored session in sessionStorage:", sessionId);
-    } else {
-      // If sessionId is missing from URL, try to recover from sessionStorage
-      const storedSessionId = sessionStorage.getItem('current_lobby_session');
-      if (storedSessionId) {
-        console.log("🔄 [LOBBY] Recovering sessionId from sessionStorage:", storedSessionId);
-        navigate(`/lobby/${storedSessionId}`, { replace: true });
-        return;
-      } else {
-        console.log("⚠️ [LOBBY] No sessionId available - staying on page");
-        setLoading(false);
-        return;
-      }
+    if (!sessionId) {
+      console.log("⚠️ [LOBBY] No sessionId available");
+      setLoading(false);
+      return;
     }
+
+    // Store sessionId in sessionStorage to persist across refreshes
+    sessionStorage.setItem('current_lobby_session', sessionId);
+    console.log("✅ [LOBBY] Stored session in sessionStorage:", sessionId);
     
     console.log("📡 [LOBBY] Calling fetchLobbyData...");
     fetchLobbyData();
