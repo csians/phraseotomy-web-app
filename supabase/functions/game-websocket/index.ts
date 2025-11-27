@@ -109,6 +109,28 @@ serve(async (req) => {
       // Broadcast game events to all players in the session
       switch (message.type) {
         // ==================== LOBBY EVENTS ====================
+        case "player_joined_notify":
+          // Explicit notification that a player has joined - broadcast to ALL including sender
+          console.log(`📢 Player ${playerName} (${playerId}) explicitly notifying join`);
+          broadcastToSession(sessionId, {
+            type: "player_joined",
+            playerId,
+            playerName: message.playerName || playerName,
+            timestamp: new Date().toISOString(),
+          }, playerId);
+          break;
+
+        case "request_players_list":
+          // Client requesting current connected players count
+          const sessionClients = clients.get(sessionId) || [];
+          socket.send(JSON.stringify({
+            type: "players_list",
+            connectedPlayers: sessionClients.length,
+            players: sessionClients.map(c => ({ playerId: c.playerId, playerName: c.playerName })),
+            timestamp: new Date().toISOString(),
+          }));
+          break;
+
         case "game_started":
           // Host started the game - notify ALL players
           broadcastToAll(sessionId, {

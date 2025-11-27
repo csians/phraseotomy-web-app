@@ -304,6 +304,21 @@ export default function Lobby() {
     onMessage: handleWebSocketMessage,
   });
 
+  // Send player_joined_notify when WebSocket connects to ensure all players are notified
+  useEffect(() => {
+    if (isConnected && currentPlayerId && currentPlayerName) {
+      console.log("📤 [WEBSOCKET] Sending player_joined_notify to all players");
+      // Small delay to ensure other clients are ready to receive
+      const timer = setTimeout(() => {
+        sendMessage({
+          type: "player_joined_notify",
+          playerName: currentPlayerName,
+        });
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isConnected, currentPlayerId, currentPlayerName, sendMessage]);
+
   useEffect(() => {
     console.log("🚀 [LOBBY] useEffect running - sessionId:", sessionId);
     console.log("🚀 [LOBBY] Supabase client:", supabase);
