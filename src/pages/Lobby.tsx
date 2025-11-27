@@ -43,6 +43,7 @@ interface Player {
   id: string;
   name: string;
   player_id: string;
+  session_id: string;
   turn_order: number;
   score?: number;
 }
@@ -366,16 +367,27 @@ export default function Lobby() {
           event: "INSERT",
           schema: "public",
           table: "game_players",
-          filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log("New player joined:", payload);
-          // Add the new player to the list
-          setPlayers((prev) => [...prev, payload.new as Player]);
-          toast({
-            title: "Player Joined",
-            description: `${(payload.new as Player).name} joined the lobby`,
-          });
+          console.log("New player joined (raw):", payload);
+          const newPlayer = payload.new as Player;
+          // Only process if it's for this session
+          if (newPlayer.session_id === sessionId) {
+            console.log("✅ Player joined this session:", newPlayer.name);
+            // Check if player already exists to avoid duplicates
+            setPlayers((prev) => {
+              const exists = prev.some(p => p.id === newPlayer.id || p.player_id === newPlayer.player_id);
+              if (exists) {
+                console.log("Player already in list, skipping");
+                return prev;
+              }
+              return [...prev, newPlayer];
+            });
+            toast({
+              title: "Player Joined",
+              description: `${newPlayer.name} joined the lobby`,
+            });
+          }
         },
       )
       .on(
@@ -384,12 +396,19 @@ export default function Lobby() {
           event: "DELETE",
           schema: "public",
           table: "game_players",
-          filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log("Player left:", payload);
-          // Remove the player from the list
-          setPlayers((prev) => prev.filter((p) => p.id !== (payload.old as Player).id));
+          console.log("Player left (raw):", payload);
+          const leftPlayer = payload.old as Player;
+          // Only process if it's for this session
+          if (leftPlayer.session_id === sessionId) {
+            console.log("✅ Player left this session:", leftPlayer.name);
+            setPlayers((prev) => prev.filter((p) => p.id !== leftPlayer.id));
+            toast({
+              title: "Player Left",
+              description: `${leftPlayer.name} left the lobby`,
+            });
+          }
         },
       )
       .on(
