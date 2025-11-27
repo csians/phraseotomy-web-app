@@ -313,6 +313,8 @@ export default function Lobby() {
     fetchLobbyData();
 
     // Set up real-time subscription for lobby updates
+    console.log("🔄 Setting up Supabase Realtime subscription for session:", sessionId);
+    
     const channel = supabase
       .channel(`lobby-${sessionId}`)
       .on(
@@ -324,7 +326,7 @@ export default function Lobby() {
           filter: `id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log("Game session changed:", payload);
+          console.log("📢 [REALTIME] game_sessions changed:", payload.eventType, payload);
 
           // If the session was deleted, redirect to homepage
           if (payload.eventType === "DELETE") {
@@ -339,6 +341,7 @@ export default function Lobby() {
           // If session was updated, refresh the data
           if (payload.eventType === "UPDATE") {
             const updatedSession = payload.new as GameSession;
+            console.log("📢 [REALTIME] Session UPDATE - status:", updatedSession.status, "theme:", updatedSession.selected_theme_id);
             setSession(updatedSession);
 
             // Update selected theme in real-time
@@ -353,9 +356,8 @@ export default function Lobby() {
 
             // Navigate to game page when game starts
             if (updatedSession.status === "active" && !isGameStarted) {
-              console.log("Game started - navigating to game page");
+              console.log("📢 [REALTIME] Game started - status changed to active");
               setIsGameStarted(true);
-              // navigate(`/game/${sessionId}`);
               fetchLobbyData();
             }
           }
@@ -369,16 +371,16 @@ export default function Lobby() {
           table: "game_players",
         },
         (payload) => {
-          console.log("New player joined (raw):", payload);
+          console.log("📢 [REALTIME] game_players INSERT:", payload);
           const newPlayer = payload.new as Player;
           // Only process if it's for this session
           if (newPlayer.session_id === sessionId) {
-            console.log("✅ Player joined this session:", newPlayer.name);
+            console.log("✅ [REALTIME] Player joined this session:", newPlayer.name);
             // Check if player already exists to avoid duplicates
             setPlayers((prev) => {
               const exists = prev.some(p => p.id === newPlayer.id || p.player_id === newPlayer.player_id);
               if (exists) {
-                console.log("Player already in list, skipping");
+                console.log("⚠️ [REALTIME] Player already in list, skipping");
                 return prev;
               }
               return [...prev, newPlayer];
@@ -387,6 +389,8 @@ export default function Lobby() {
               title: "Player Joined",
               description: `${newPlayer.name} joined the lobby`,
             });
+          } else {
+            console.log("⚠️ [REALTIME] Player joined different session:", newPlayer.session_id);
           }
         },
       )
@@ -398,11 +402,11 @@ export default function Lobby() {
           table: "game_players",
         },
         (payload) => {
-          console.log("Player left (raw):", payload);
+          console.log("📢 [REALTIME] game_players DELETE:", payload);
           const leftPlayer = payload.old as Player;
           // Only process if it's for this session
           if (leftPlayer.session_id === sessionId) {
-            console.log("✅ Player left this session:", leftPlayer.name);
+            console.log("✅ [REALTIME] Player left this session:", leftPlayer.name);
             setPlayers((prev) => prev.filter((p) => p.id !== leftPlayer.id));
             toast({
               title: "Player Left",
@@ -419,7 +423,7 @@ export default function Lobby() {
           table: "customer_audio",
         },
         async (payload) => {
-          console.log("Customer audio changed:", payload);
+          console.log("📢 [REALTIME] customer_audio changed:", payload.eventType, payload);
           const currentCustomerId = getCurrentCustomerId();
 
           // Refresh audio files when new audio is uploaded or deleted
@@ -441,11 +445,12 @@ export default function Lobby() {
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log("Game turn changed:", payload);
+          console.log("📢 [REALTIME] game_turns changed:", payload.eventType, payload);
 
           // Update secret element and recording status in real-time
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
             const turnData = payload.new as any;
+            console.log("📢 [REALTIME] Turn data - secret:", turnData.secret_element, "recording:", turnData.recording_url);
             if (turnData.secret_element) {
               setSelectedElementId(turnData.secret_element);
             }
@@ -455,7 +460,15 @@ export default function Lobby() {
           }
         },
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log("🔌 [REALTIME] Subscription status:", status);
+        if (err) {
+          console.error("❌ [REALTIME] Subscription error:", err);
+        }
+        if (status === "SUBSCRIBED") {
+          console.log("✅ [REALTIME] Successfully subscribed to channel lobby-" + sessionId);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
