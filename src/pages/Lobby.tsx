@@ -172,11 +172,15 @@ export default function Lobby() {
     console.log("🚀 [LOBBY] Supabase client:", supabase);
     
     if (!sessionId) {
-      console.log("⚠️ [LOBBY] No sessionId available");
+      console.log("⚠️ [LOBBY] No sessionId available - staying on page");
+      // Don't redirect, just show error state
       setLoading(false);
       return;
     }
 
+    // Store sessionId in sessionStorage to persist across refreshes
+    sessionStorage.setItem('current_lobby_session', sessionId);
+    
     console.log("📡 [LOBBY] Calling fetchLobbyData...");
     fetchLobbyData();
 
@@ -493,12 +497,13 @@ export default function Lobby() {
       console.log("Lobby data received:", data);
 
       if (!data?.session) {
+        console.error("Session not found in response");
         toast({
           title: "Session not found",
           description: "This game session doesn't exist or you don't have access to it",
           variant: "destructive",
         });
-        // navigate("/login");
+        // Don't navigate away - stay on lobby page to show error
         setLoading(false);
         return;
       }
@@ -538,14 +543,13 @@ export default function Lobby() {
     } catch (errors: any) {
       console.error("Error fetching lobby data:", errors);
       const errorMessage = errors?.message || "Failed to load lobby details";
-      const isNotFound = errorMessage.includes("not found") || errorMessage.includes("404");
 
       toast({
         title: "Error",
-        description: isNotFound,
+        description: errorMessage,
         variant: "destructive",
       });
-      // navigate("/login");
+      // Don't navigate away on error - stay on lobby page
     } finally {
       setLoading(false);
     }

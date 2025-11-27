@@ -21,6 +21,14 @@ const RootRedirect = () => {
   const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check if user is in an active lobby session
+    const currentLobbySession = sessionStorage.getItem('current_lobby_session');
+    if (currentLobbySession) {
+      console.log('Active lobby session found, redirecting to lobby');
+      setRedirectTarget(`/lobby/${currentLobbySession}`);
+      return;
+    }
+
     // Check if accessed from Shopify admin (has 'host' parameter for embedded app)
     const urlParams = getAllUrlParams();
     const hostParam = urlParams.get('host');
