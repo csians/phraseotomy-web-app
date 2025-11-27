@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useGameWebSocket } from "@/hooks/useGameWebSocket";
 import {
   ArrowLeft,
   Music,
@@ -18,6 +19,8 @@ import {
   Rocket,
   Skull,
   Sparkles,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { LobbyAudioRecording } from "@/components/LobbyAudioRecording";
 import { getAllUrlParams } from "@/lib/urlUtils";
@@ -41,6 +44,7 @@ interface Player {
   name: string;
   player_id: string;
   turn_order: number;
+  score?: number;
 }
 
 interface AudioFile {
@@ -65,6 +69,7 @@ interface GameSession {
   tenant_id: string;
   current_round?: number;
   current_storyteller_id?: string;
+  total_rounds?: number;
 }
 
 interface Theme {
@@ -95,6 +100,208 @@ export default function Lobby() {
   const [guessInput, setGuessInput] = useState("");
   const [isSubmittingGuess, setIsSubmittingGuess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Get current customer ID helper
+  const getCurrentCustomerId = useCallback(() => {
+    const urlParams = getAllUrlParams();
+    const urlCustomerId = urlParams.get("customer_id");
+    if (urlCustomerId) return urlCustomerId;
+
+    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
+    for (const key of storageKeys) {
+      let dataStr = sessionStorage.getItem(key) || localStorage.getItem(key);
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(dataStr);
+          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
+          if (customerId) return String(customerId);
+        } catch (e) {
+          console.error(`Error parsing ${key}:`, e);
+        }
+      }
+    }
+    return localStorage.getItem("guest_player_id") || null;
+  }, []);
+
+  // Get current player name
+  const getCurrentPlayerName = useCallback(() => {
+    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
+    for (const key of storageKeys) {
+      let dataStr = sessionStorage.getItem(key) || localStorage.getItem(key);
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed.name) return parsed.name;
+          if (parsed.first_name) return parsed.first_name;
+        } catch (e) {}
+      }
+    }
+    return localStorage.getItem("guest_player_name") || "Player";
+  }, []);
+
+  const currentPlayerId = getCurrentCustomerId();
+  const currentPlayerName = getCurrentPlayerName();
+
+  // WebSocket message handler
+  const handleWebSocketMessage = useCallback((message: any) => {
+    console.log("🎮 Lobby WebSocket message:", message.type, message);
+
+    switch (message.type) {
+      case "connected":
+        console.log("✅ Connected to game session WebSocket");
+        break;
+
+      case "game_started":
+        toast({
+          title: "Game Started! 🎮",
+          description: `${message.startedByName} started the game`,
+        });
+        // Refresh to get latest game state
+        fetchLobbyData();
+        break;
+
+      case "lobby_ended":
+        toast({
+          title: "Lobby Ended",
+          description: "The host has ended this lobby",
+        });
+        navigate("/login");
+        break;
+
+      case "player_joined":
+        toast({
+          title: "Player Joined",
+          description: `${message.playerName} joined the lobby`,
+        });
+        fetchLobbyData();
+        break;
+
+      case "player_left":
+        toast({
+          title: "Player Left",
+          description: `${message.playerName} left the lobby`,
+        });
+        fetchLobbyData();
+        break;
+
+      case "theme_selected":
+        toast({
+          title: "Theme Selected",
+          description: `${message.storytellerName} chose a theme`,
+        });
+        setSelectedTheme(message.themeId);
+        fetchLobbyData();
+        break;
+
+      case "storyteller_ready":
+        toast({
+          title: "Secret Element Selected",
+          description: `${message.storytellerName} has selected their secret element`,
+        });
+        fetchLobbyData();
+        break;
+
+      case "recording_started":
+        toast({
+          title: "Recording Started",
+          description: `${message.storytellerName} is recording their clue`,
+        });
+        break;
+
+      case "recording_stopped":
+        toast({
+          title: "Recording Complete",
+          description: `${message.storytellerName} finished recording`,
+        });
+        break;
+
+      case "recording_uploaded":
+      case "story_submitted":
+        toast({
+          title: "Audio Ready! 🎤",
+          description: "Listen to the clue and guess the secret element",
+        });
+        setHasRecording(true);
+        fetchLobbyData();
+        break;
+
+      case "guess_submitted":
+        if (message.playerId !== currentPlayerId) {
+          if (message.isCorrect) {
+            toast({
+              title: "Correct Answer! 🎉",
+              description: `${message.playerName} guessed correctly and earned ${message.pointsEarned} points!`,
+            });
+          } else {
+            toast({
+              title: "Guess Submitted",
+              description: `${message.playerName} made a guess`,
+            });
+          }
+        }
+        fetchLobbyData();
+        break;
+
+      case "correct_answer":
+        toast({
+          title: "Round Complete! 🏆",
+          description: `${message.winnerName} got it right! The answer was "${message.secretElement}"`,
+        });
+        fetchLobbyData();
+        break;
+
+      case "next_turn":
+        toast({
+          title: "Next Turn",
+          description: `${message.newStorytellerName}'s turn to tell a story!`,
+        });
+        // Reset local state for new turn
+        setSelectedTheme("");
+        setSelectedElementId("");
+        setHasRecording(false);
+        setGuessInput("");
+        fetchLobbyData();
+        break;
+
+      case "turn_completed":
+        toast({
+          title: "Turn Complete",
+          description: `Round ${message.roundNumber} finished`,
+        });
+        fetchLobbyData();
+        break;
+
+      case "game_completed":
+        toast({
+          title: "Game Over! 🎊",
+          description: `${message.winnerName} won the game!`,
+        });
+        fetchLobbyData();
+        break;
+
+      case "score_updated":
+        // Silently refresh to update scores
+        fetchLobbyData();
+        break;
+
+      case "refresh_game_state":
+        console.log("🔄 Refresh triggered by WebSocket");
+        fetchLobbyData();
+        break;
+
+      default:
+        console.log("Unknown WebSocket message type:", message.type);
+    }
+  }, [currentPlayerId, navigate, toast]);
+
+  // Initialize WebSocket connection
+  const { sendMessage, isConnected } = useGameWebSocket({
+    sessionId: sessionId || "",
+    playerId: currentPlayerId || "",
+    playerName: currentPlayerName,
+    enabled: !!sessionId && !!currentPlayerId,
+    onMessage: handleWebSocketMessage,
+  });
 
   useEffect(() => {
     if (!sessionId) {
@@ -236,49 +443,7 @@ export default function Lobby() {
     };
   }, [sessionId, navigate, toast]);
 
-  // Helper function to get current customer ID
-  const getCurrentCustomerId = () => {
-    // Check URL parameters first (in case customer_id is in URL)
-    const urlParams = getAllUrlParams();
-    const urlCustomerId = urlParams.get("customer_id");
-    if (urlCustomerId) {
-      return urlCustomerId;
-    }
-
-    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
-
-    for (const key of storageKeys) {
-      // Try sessionStorage
-      let dataStr = sessionStorage.getItem(key);
-      if (dataStr) {
-        try {
-          const parsed = JSON.parse(dataStr);
-          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
-          if (customerId) {
-            return String(customerId);
-          }
-        } catch (e) {
-          console.error(`Error parsing sessionStorage[${key}]:`, e);
-        }
-      }
-
-      // Try localStorage
-      dataStr = localStorage.getItem(key);
-      if (dataStr) {
-        try {
-          const parsed = JSON.parse(dataStr);
-          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
-          if (customerId) {
-            return String(customerId);
-          }
-        } catch (e) {
-          console.error(`Error parsing localStorage[${key}]:`, e);
-        }
-      }
-    }
-
-    return null;
-  };
+  // getCurrentCustomerId is already defined above as a useCallback
 
   const fetchCustomerAudio = async (customerId: string) => {
     try {
@@ -408,6 +573,12 @@ export default function Lobby() {
       }
 
       console.log("Game started successfully:", data);
+      
+      // Broadcast game_started to all players via WebSocket
+      sendMessage({
+        type: "game_started",
+      });
+
       // Update session state immediately to show dashboard
       if (data.session) {
         setSession(data.session);
@@ -417,8 +588,6 @@ export default function Lobby() {
         description: "Get ready to play!",
       });
 
-      // Navigate directly to the game page
-      // navigate(`/game/${sessionId}`);
       await fetchLobbyData();
     } catch (error) {
       console.error("Error in handleStartGame:", error);
@@ -431,8 +600,8 @@ export default function Lobby() {
   };
 
   const handleEndLobby = async () => {
-    const currentCustomerId = getCurrentCustomerId();
-    if (!session || !currentCustomerId) {
+    const customerId = getCurrentCustomerId();
+    if (!session || !customerId) {
       return;
     }
 
@@ -441,10 +610,15 @@ export default function Lobby() {
     try {
       console.log("Ending lobby:", sessionId);
 
+      // Broadcast lobby_ended to all players via WebSocket BEFORE deleting
+      sendMessage({
+        type: "lobby_ended",
+      });
+
       const { data, error } = await supabase.functions.invoke("end-lobby", {
         body: {
           sessionId,
-          hostCustomerId: currentCustomerId,
+          hostCustomerId: customerId,
         },
       });
 
@@ -519,6 +693,13 @@ export default function Lobby() {
       if (data.success && data.audio_id) {
         console.log("Recording complete, audio ID:", data.audio_id);
         setHasRecording(true);
+        
+        // Broadcast recording_uploaded to all players via WebSocket
+        sendMessage({
+          type: "recording_uploaded",
+          audioUrl: data.audio_url,
+        });
+        
         // Refresh lobby data to get updated recording URL from game_turns
         await fetchLobbyData();
         toast({
@@ -582,6 +763,40 @@ export default function Lobby() {
       }
 
       if (data.correct) {
+        // Broadcast correct_answer to all players via WebSocket
+        sendMessage({
+          type: "correct_answer",
+          pointsEarned: data.points_earned,
+          secretElement: data.secret_element,
+        });
+        
+        // If there's next round info, broadcast it
+        if (data.next_round && !data.game_completed) {
+          setTimeout(() => {
+            sendMessage({
+              type: "next_turn",
+              roundNumber: data.next_round.roundNumber,
+              newStorytellerId: data.next_round.newStorytellerId,
+              newStorytellerName: data.next_round.newStorytellerName,
+            });
+            // Reset local state for new turn
+            setSelectedTheme("");
+            setSelectedElementId("");
+            setHasRecording(false);
+          }, 2000); // Give players time to see the correct answer
+        }
+        
+        // If game is completed, broadcast it
+        if (data.game_completed && data.next_round) {
+          setTimeout(() => {
+            sendMessage({
+              type: "game_completed",
+              winnerId: data.next_round.winnerId,
+              winnerName: data.next_round.winnerName,
+            });
+          }, 2000);
+        }
+        
         toast({
           title: "Correct! 🎉",
           description: `You earned ${data.points_earned} points!`,
@@ -590,6 +805,13 @@ export default function Lobby() {
         // Refresh lobby data to show updated scores
         fetchLobbyData();
       } else {
+        // Broadcast incorrect guess to all players via WebSocket
+        sendMessage({
+          type: "guess_submitted",
+          isCorrect: false,
+          pointsEarned: 0,
+        });
+        
         toast({
           title: "Incorrect",
           description: "That's not the right answer. Try again!",
@@ -646,6 +868,15 @@ export default function Lobby() {
         });
       } else {
         console.log("Theme saved successfully:", data);
+        
+        // Broadcast theme_selected to all players via WebSocket
+        const themeName = themes.find(t => t.id === themeId)?.name || "Unknown";
+        sendMessage({
+          type: "theme_selected",
+          themeId,
+          themeName,
+        });
+        
         toast({
           title: "Theme Selected",
           description: "Now select your secret element",
@@ -693,6 +924,13 @@ export default function Lobby() {
         });
       } else {
         console.log("Secret element saved successfully:", data);
+        
+        // Broadcast secret_element_selected to all players via WebSocket
+        sendMessage({
+          type: "secret_element_selected",
+          elementId: elementName,
+        });
+        
         toast({
           title: "Secret Element Selected",
           description: "Now record your audio clue",
@@ -758,6 +996,27 @@ export default function Lobby() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
+        {/* Connection Status Indicator */}
+        <div className="fixed top-4 right-4 z-50">
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+            isConnected 
+              ? "bg-green-500/10 text-green-600 border border-green-500/20" 
+              : "bg-red-500/10 text-red-600 border border-red-500/20"
+          }`}>
+            {isConnected ? (
+              <>
+                <Wifi className="h-3 w-3" />
+                <span>Live</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-3 w-3" />
+                <span>Connecting...</span>
+              </>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-4">
           <Button variant="ghost" onClick={() => navigate("/play/host")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
