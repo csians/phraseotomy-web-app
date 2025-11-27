@@ -172,8 +172,8 @@ export default function Lobby() {
     console.log("🚀 [LOBBY] Supabase client:", supabase);
     
     if (!sessionId) {
-      console.log("⚠️ [LOBBY] No sessionId, redirecting to /play/host");
-      navigate("/play/host");
+      console.log("⚠️ [LOBBY] No sessionId available");
+      setLoading(false);
       return;
     }
 
