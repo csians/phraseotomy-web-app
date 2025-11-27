@@ -482,15 +482,8 @@ export default function Lobby() {
         }
       });
 
-    // Fallback polling every 3 seconds to catch updates if realtime fails
-    const pollInterval = setInterval(() => {
-      console.log("⏰ [POLL] Polling for session updates...");
-      fetchLobbyData();
-    }, 3000);
-
     return () => {
-      console.log("🧹 [LOBBY] Cleaning up subscription and polling");
-      clearInterval(pollInterval);
+      console.log("🧹 [LOBBY] Cleaning up subscription");
       supabase.removeChannel(channel);
     };
   }, [sessionId, navigate, toast]);
