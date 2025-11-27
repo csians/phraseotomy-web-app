@@ -453,16 +453,14 @@ export default function Lobby() {
         (payload) => {
           console.log("📢 [REALTIME] game_turns changed:", payload.eventType, payload);
 
-          // Update secret element and recording status in real-time
+          // Refresh lobby data when turns change (theme, secret, recording updates)
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
             const turnData = payload.new as any;
-            console.log("📢 [REALTIME] Turn data - secret:", turnData.secret_element, "recording:", turnData.recording_url);
-            if (turnData.secret_element) {
-              setSelectedElementId(turnData.secret_element);
-            }
-            if (turnData.recording_url) {
-              setHasRecording(true);
-            }
+            console.log("📢 [REALTIME] Turn data changed - refreshing lobby data");
+            console.log("📢 [REALTIME] Turn details - theme:", turnData.theme_id, "secret:", turnData.secret_element, "recording:", turnData.recording_url);
+            
+            // Refresh all lobby data to sync state across players
+            fetchLobbyData();
           }
         },
       )
