@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useGameWebSocket } from "@/hooks/useGameWebSocket";
 import {
   ArrowLeft,
   Music,
@@ -101,6 +100,7 @@ export default function Lobby() {
   const [guessInput, setGuessInput] = useState("");
   const [isSubmittingGuess, setIsSubmittingGuess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   // Get current customer ID helper
   const getCurrentCustomerId = useCallback(() => {
@@ -143,181 +143,25 @@ export default function Lobby() {
   const currentPlayerId = getCurrentCustomerId();
   const currentPlayerName = getCurrentPlayerName();
 
-  // WebSocket message handler
-  const handleWebSocketMessage = useCallback((message: any) => {
-    console.log("🎮 Lobby WebSocket message:", message.type, message);
+  // Broadcast channel ref for sending messages
+  const broadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-    switch (message.type) {
-      case "connected":
-        console.log("✅ Connected to game session WebSocket");
-        break;
-
-      case "game_started":
-        toast({
-          title: "Game Started! 🎮",
-          description: `${message.startedByName} started the game`,
-        });
-        // Refresh to get latest game state
-        fetchLobbyData();
-        break;
-
-      case "lobby_ended":
-        toast({
-          title: "Lobby Ended",
-          description: "The host has ended this lobby",
-        });
-        navigate("/login");
-        break;
-
-      case "player_joined":
-        toast({
-          title: "Player Joined",
-          description: `${message.playerName} joined the lobby`,
-        });
-        fetchLobbyData();
-        break;
-
-      case "player_left":
-        toast({
-          title: "Player Left",
-          description: `${message.playerName} left the lobby`,
-        });
-        fetchLobbyData();
-        break;
-
-      case "theme_selected":
-        toast({
-          title: "Theme Selected",
-          description: `${message.storytellerName} chose a theme`,
-        });
-        setSelectedTheme(message.themeId);
-        fetchLobbyData();
-        break;
-
-      case "storyteller_ready":
-        toast({
-          title: "Secret Element Selected",
-          description: `${message.storytellerName} has selected their secret element`,
-        });
-        fetchLobbyData();
-        break;
-
-      case "recording_started":
-        toast({
-          title: "Recording Started",
-          description: `${message.storytellerName} is recording their clue`,
-        });
-        break;
-
-      case "recording_stopped":
-        toast({
-          title: "Recording Complete",
-          description: `${message.storytellerName} finished recording`,
-        });
-        break;
-
-      case "recording_uploaded":
-      case "story_submitted":
-        toast({
-          title: "Audio Ready! 🎤",
-          description: "Listen to the clue and guess the secret element",
-        });
-        setHasRecording(true);
-        fetchLobbyData();
-        break;
-
-      case "guess_submitted":
-        if (message.playerId !== currentPlayerId) {
-          if (message.isCorrect) {
-            toast({
-              title: "Correct Answer! 🎉",
-              description: `${message.playerName} guessed correctly and earned ${message.pointsEarned} points!`,
-            });
-          } else {
-            toast({
-              title: "Guess Submitted",
-              description: `${message.playerName} made a guess`,
-            });
-          }
-        }
-        fetchLobbyData();
-        break;
-
-      case "correct_answer":
-        toast({
-          title: "Round Complete! 🏆",
-          description: `${message.winnerName} got it right! The answer was "${message.secretElement}"`,
-        });
-        fetchLobbyData();
-        break;
-
-      case "next_turn":
-        toast({
-          title: "Next Turn",
-          description: `${message.newStorytellerName}'s turn to tell a story!`,
-        });
-        // Reset local state for new turn
-        setSelectedTheme("");
-        setSelectedElementId("");
-        setHasRecording(false);
-        setGuessInput("");
-        fetchLobbyData();
-        break;
-
-      case "turn_completed":
-        toast({
-          title: "Turn Complete",
-          description: `Round ${message.roundNumber} finished`,
-        });
-        fetchLobbyData();
-        break;
-
-      case "game_completed":
-        toast({
-          title: "Game Over! 🎊",
-          description: `${message.winnerName} won the game!`,
-        });
-        fetchLobbyData();
-        break;
-
-      case "score_updated":
-        // Silently refresh to update scores
-        fetchLobbyData();
-        break;
-
-      case "refresh_game_state":
-        console.log("🔄 Refresh triggered by WebSocket");
-        fetchLobbyData();
-        break;
-
-      default:
-        console.log("Unknown WebSocket message type:", message.type);
+  // Function to broadcast events to all players in the lobby
+  const broadcastEvent = useCallback((event: string, payload: any) => {
+    if (broadcastChannelRef.current) {
+      console.log("📤 [BROADCAST] Sending event:", event, payload);
+      broadcastChannelRef.current.send({
+        type: "broadcast",
+        event,
+        payload: {
+          ...payload,
+          senderId: currentPlayerId,
+          senderName: currentPlayerName,
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
-  }, [currentPlayerId, navigate, toast]);
-
-  // Initialize WebSocket connection
-  const { sendMessage, isConnected } = useGameWebSocket({
-    sessionId: sessionId || "",
-    playerId: currentPlayerId || "",
-    playerName: currentPlayerName,
-    enabled: !!sessionId && !!currentPlayerId,
-    onMessage: handleWebSocketMessage,
-  });
-
-  // Send player_joined_notify when WebSocket connects to ensure all players are notified
-  useEffect(() => {
-    if (isConnected && currentPlayerId && currentPlayerName) {
-      console.log("📤 [WEBSOCKET] Sending player_joined_notify to all players");
-      // Small delay to ensure other clients are ready to receive
-      const timer = setTimeout(() => {
-        sendMessage({
-          type: "player_joined_notify",
-          playerName: currentPlayerName,
-        });
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isConnected, currentPlayerId, currentPlayerName, sendMessage]);
+  }, [currentPlayerId, currentPlayerName]);
 
   useEffect(() => {
     console.log("🚀 [LOBBY] useEffect running - sessionId:", sessionId);
@@ -332,12 +176,94 @@ export default function Lobby() {
     console.log("📡 [LOBBY] Calling fetchLobbyData...");
     fetchLobbyData();
 
-    // Set up real-time subscription for lobby updates
+    // Set up real-time subscription for lobby updates using Supabase Realtime Broadcast
     console.log("🔄 [REALTIME] Setting up Supabase Realtime subscription for session:", sessionId);
-    console.log("🔄 [REALTIME] Channel name will be: lobby-" + sessionId);
+    console.log("🔄 [REALTIME] Channel name will be: lobby-broadcast-" + sessionId);
     
     const channel = supabase
-      .channel(`lobby-${sessionId}`)
+      .channel(`lobby-broadcast-${sessionId}`, {
+        config: {
+          broadcast: { self: false }, // Don't receive own broadcasts
+        },
+      })
+      // Listen for broadcast events (player joins, game events, etc.)
+      .on("broadcast", { event: "player_joined" }, (payload) => {
+        console.log("📢 [BROADCAST] player_joined received:", payload);
+        toast({
+          title: "Player Joined! 🎮",
+          description: `${payload.payload?.senderName || 'A player'} joined the lobby`,
+        });
+        // Refresh player list
+        fetchLobbyData();
+      })
+      .on("broadcast", { event: "player_left" }, (payload) => {
+        console.log("📢 [BROADCAST] player_left received:", payload);
+        toast({
+          title: "Player Left",
+          description: `${payload.payload?.senderName || 'A player'} left the lobby`,
+        });
+        fetchLobbyData();
+      })
+      .on("broadcast", { event: "game_started" }, (payload) => {
+        console.log("📢 [BROADCAST] game_started received:", payload);
+        toast({
+          title: "Game Started! 🎮",
+          description: `${payload.payload?.senderName || 'Host'} started the game`,
+        });
+        setIsGameStarted(true);
+        fetchLobbyData();
+      })
+      .on("broadcast", { event: "lobby_ended" }, (payload) => {
+        console.log("📢 [BROADCAST] lobby_ended received:", payload);
+        toast({
+          title: "Lobby Ended",
+          description: "The host has ended this lobby",
+        });
+        navigate("/login");
+      })
+      .on("broadcast", { event: "theme_selected" }, (payload) => {
+        console.log("📢 [BROADCAST] theme_selected received:", payload);
+        toast({
+          title: "Theme Selected",
+          description: `${payload.payload?.senderName || 'Host'} chose a theme`,
+        });
+        if (payload.payload?.themeId) {
+          setSelectedTheme(payload.payload.themeId);
+        }
+        fetchLobbyData();
+      })
+      .on("broadcast", { event: "secret_selected" }, (payload) => {
+        console.log("📢 [BROADCAST] secret_selected received:", payload);
+        toast({
+          title: "Secret Element Selected",
+          description: `${payload.payload?.senderName || 'Storyteller'} has selected their secret element`,
+        });
+        fetchLobbyData();
+      })
+      .on("broadcast", { event: "recording_uploaded" }, (payload) => {
+        console.log("📢 [BROADCAST] recording_uploaded received:", payload);
+        toast({
+          title: "Audio Ready! 🎤",
+          description: "Listen to the clue and guess the secret element",
+        });
+        setHasRecording(true);
+        fetchLobbyData();
+      })
+      .on("broadcast", { event: "guess_submitted" }, (payload) => {
+        console.log("📢 [BROADCAST] guess_submitted received:", payload);
+        if (payload.payload?.isCorrect) {
+          toast({
+            title: "Correct Answer! 🎉",
+            description: `${payload.payload?.senderName || 'A player'} guessed correctly!`,
+          });
+        }
+        fetchLobbyData();
+      })
+      .on("broadcast", { event: "refresh_state" }, (payload) => {
+        console.log("📢 [BROADCAST] refresh_state received:", payload);
+        fetchLobbyData();
+      })
+      // Also listen for postgres changes as backup
       .on(
         "postgres_changes",
         {
@@ -349,7 +275,6 @@ export default function Lobby() {
         (payload) => {
           console.log("📢 [REALTIME] game_sessions changed:", payload.eventType, payload);
 
-          // If the session was deleted, redirect to homepage
           if (payload.eventType === "DELETE") {
             toast({
               title: "Lobby Ended",
@@ -359,23 +284,19 @@ export default function Lobby() {
             return;
           }
 
-          // If session was updated, refresh the data
           if (payload.eventType === "UPDATE") {
             const updatedSession = payload.new as GameSession;
             console.log("📢 [REALTIME] Session UPDATE - status:", updatedSession.status, "theme:", updatedSession.selected_theme_id);
             setSession(updatedSession);
 
-            // Update selected theme in real-time
             if (updatedSession.selected_theme_id) {
               setSelectedTheme(updatedSession.selected_theme_id);
             }
 
-            // Update selected audio in real-time
             if (updatedSession.selected_audio_id) {
               setSelectedAudio(updatedSession.selected_audio_id);
             }
 
-            // Navigate to game page when game starts
             if (updatedSession.status === "active" && !isGameStarted) {
               console.log("📢 [REALTIME] Game started - status changed to active");
               setIsGameStarted(true);
@@ -394,24 +315,17 @@ export default function Lobby() {
         (payload) => {
           console.log("📢 [REALTIME] game_players INSERT:", payload);
           const newPlayer = payload.new as Player;
-          // Only process if it's for this session
           if (newPlayer.session_id === sessionId) {
             console.log("✅ [REALTIME] Player joined this session:", newPlayer.name);
-            // Check if player already exists to avoid duplicates
             setPlayers((prev) => {
               const exists = prev.some(p => p.id === newPlayer.id || p.player_id === newPlayer.player_id);
-              if (exists) {
-                console.log("⚠️ [REALTIME] Player already in list, skipping");
-                return prev;
-              }
+              if (exists) return prev;
               return [...prev, newPlayer];
             });
             toast({
               title: "Player Joined",
               description: `${newPlayer.name} joined the lobby`,
             });
-          } else {
-            console.log("⚠️ [REALTIME] Player joined different session:", newPlayer.session_id);
           }
         },
       )
@@ -425,7 +339,6 @@ export default function Lobby() {
         (payload) => {
           console.log("📢 [REALTIME] game_players DELETE:", payload);
           const leftPlayer = payload.old as Player;
-          // Only process if it's for this session
           if (leftPlayer.session_id === sessionId) {
             console.log("✅ [REALTIME] Player left this session:", leftPlayer.name);
             setPlayers((prev) => prev.filter((p) => p.id !== leftPlayer.id));
@@ -447,7 +360,6 @@ export default function Lobby() {
           console.log("📢 [REALTIME] customer_audio changed:", payload.eventType, payload);
           const currentCustomerId = getCurrentCustomerId();
 
-          // Refresh audio files when new audio is uploaded or deleted
           if (currentCustomerId && (payload.eventType === "INSERT" || payload.eventType === "DELETE")) {
             await fetchCustomerAudio(currentCustomerId);
             toast({
@@ -468,13 +380,10 @@ export default function Lobby() {
         (payload) => {
           console.log("📢 [REALTIME] game_turns changed:", payload.eventType, payload);
 
-          // Refresh lobby data when turns change (theme, secret, recording updates)
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
             const turnData = payload.new as any;
             console.log("📢 [REALTIME] Turn data changed - refreshing lobby data");
             console.log("📢 [REALTIME] Turn details - theme:", turnData.theme_id, "secret:", turnData.secret_element, "recording:", turnData.recording_url);
-            
-            // Refresh all lobby data to sync state across players
             fetchLobbyData();
           }
         },
@@ -483,23 +392,45 @@ export default function Lobby() {
         console.log("🔌 [REALTIME] Subscription status:", status, "error:", err);
         if (err) {
           console.error("❌ [REALTIME] Subscription error:", err);
+          setIsConnected(false);
         }
         if (status === "SUBSCRIBED") {
-          console.log("✅ [REALTIME] Successfully subscribed to channel lobby-" + sessionId);
+          console.log("✅ [REALTIME] Successfully subscribed to channel lobby-broadcast-" + sessionId);
+          setIsConnected(true);
+          
+          // Announce our presence after subscribing
+          setTimeout(() => {
+            console.log("📤 [BROADCAST] Announcing player joined to all");
+            channel.send({
+              type: "broadcast",
+              event: "player_joined",
+              payload: {
+                senderId: currentPlayerId,
+                senderName: currentPlayerName,
+                timestamp: new Date().toISOString(),
+              },
+            });
+          }, 500);
         }
         if (status === "CHANNEL_ERROR") {
           console.error("❌ [REALTIME] Channel error - realtime will not work");
+          setIsConnected(false);
         }
         if (status === "TIMED_OUT") {
           console.error("❌ [REALTIME] Subscription timed out");
+          setIsConnected(false);
         }
       });
 
+    // Store channel ref for broadcasting
+    broadcastChannelRef.current = channel;
+
     return () => {
       console.log("🧹 [LOBBY] Cleaning up subscription");
+      setIsConnected(false);
       supabase.removeChannel(channel);
     };
-  }, [sessionId, navigate, toast]);
+  }, [sessionId, navigate, toast, currentPlayerId, currentPlayerName]);
 
   // getCurrentCustomerId is already defined above as a useCallback
 
@@ -632,10 +563,8 @@ export default function Lobby() {
 
       console.log("Game started successfully:", data);
       
-      // Broadcast game_started to all players via WebSocket
-      sendMessage({
-        type: "game_started",
-      });
+      // Broadcast game_started to all players via Supabase Broadcast
+      broadcastEvent("game_started", {});
 
       // Update session state immediately to show dashboard
       if (data.session) {
@@ -668,10 +597,8 @@ export default function Lobby() {
     try {
       console.log("Ending lobby:", sessionId);
 
-      // Broadcast lobby_ended to all players via WebSocket BEFORE deleting
-      sendMessage({
-        type: "lobby_ended",
-      });
+      // Broadcast lobby_ended to all players via Supabase Broadcast BEFORE deleting
+      broadcastEvent("lobby_ended", {});
 
       const { data, error } = await supabase.functions.invoke("end-lobby", {
         body: {
@@ -752,11 +679,8 @@ export default function Lobby() {
         console.log("Recording complete, audio ID:", data.audio_id);
         setHasRecording(true);
         
-        // Broadcast recording_uploaded to all players via WebSocket
-        sendMessage({
-          type: "recording_uploaded",
-          audioUrl: data.audio_url,
-        });
+        // Broadcast recording_uploaded to all players via Supabase Broadcast
+        broadcastEvent("recording_uploaded", { audioUrl: data.audio_url });
         
         // Refresh lobby data to get updated recording URL from game_turns
         await fetchLobbyData();
@@ -821,9 +745,9 @@ export default function Lobby() {
       }
 
       if (data.correct) {
-        // Broadcast correct_answer to all players via WebSocket
-        sendMessage({
-          type: "correct_answer",
+        // Broadcast correct_answer to all players via Supabase Broadcast
+        broadcastEvent("guess_submitted", {
+          isCorrect: true,
           pointsEarned: data.points_earned,
           secretElement: data.secret_element,
         });
@@ -831,8 +755,7 @@ export default function Lobby() {
         // If there's next round info, broadcast it
         if (data.next_round && !data.game_completed) {
           setTimeout(() => {
-            sendMessage({
-              type: "next_turn",
+            broadcastEvent("refresh_state", {
               roundNumber: data.next_round.roundNumber,
               newStorytellerId: data.next_round.newStorytellerId,
               newStorytellerName: data.next_round.newStorytellerName,
@@ -847,8 +770,8 @@ export default function Lobby() {
         // If game is completed, broadcast it
         if (data.game_completed && data.next_round) {
           setTimeout(() => {
-            sendMessage({
-              type: "game_completed",
+            broadcastEvent("refresh_state", {
+              gameCompleted: true,
               winnerId: data.next_round.winnerId,
               winnerName: data.next_round.winnerName,
             });
@@ -863,9 +786,8 @@ export default function Lobby() {
         // Refresh lobby data to show updated scores
         fetchLobbyData();
       } else {
-        // Broadcast incorrect guess to all players via WebSocket
-        sendMessage({
-          type: "guess_submitted",
+        // Broadcast incorrect guess to all players via Supabase Broadcast
+        broadcastEvent("guess_submitted", {
           isCorrect: false,
           pointsEarned: 0,
         });
@@ -927,13 +849,9 @@ export default function Lobby() {
       } else {
         console.log("Theme saved successfully:", data);
         
-        // Broadcast theme_selected to all players via WebSocket
+        // Broadcast theme_selected to all players via Supabase Broadcast
         const themeName = themes.find(t => t.id === themeId)?.name || "Unknown";
-        sendMessage({
-          type: "theme_selected",
-          themeId,
-          themeName,
-        });
+        broadcastEvent("theme_selected", { themeId, themeName });
         
         toast({
           title: "Theme Selected",
@@ -983,11 +901,8 @@ export default function Lobby() {
       } else {
         console.log("Secret element saved successfully:", data);
         
-        // Broadcast secret_element_selected to all players via WebSocket
-        sendMessage({
-          type: "secret_element_selected",
-          elementId: elementName,
-        });
+        // Broadcast secret_selected to all players via Supabase Broadcast
+        broadcastEvent("secret_selected", { elementId: elementName });
         
         toast({
           title: "Secret Element Selected",
