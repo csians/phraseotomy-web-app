@@ -20,6 +20,8 @@ import {
   Sparkles,
   Wifi,
   WifiOff,
+  Trophy,
+  PartyPopper,
 } from "lucide-react";
 import { LobbyAudioRecording } from "@/components/LobbyAudioRecording";
 import { getAllUrlParams } from "@/lib/urlUtils";
@@ -101,6 +103,8 @@ export default function Lobby() {
   const [isSubmittingGuess, setIsSubmittingGuess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [showCountdown, setShowCountdown] = useState(false);
+  const [countdownNumber, setCountdownNumber] = useState(3);
 
   // Get current customer ID helper
   const getCurrentCustomerId = useCallback(() => {
@@ -211,7 +215,15 @@ export default function Lobby() {
           description: `${payload.payload?.senderName || 'Host'} started the game`,
         });
         setIsGameStarted(true);
-        fetchLobbyData();
+        // Show countdown for all players
+        setShowCountdown(true);
+        setCountdownNumber(3);
+        setTimeout(() => setCountdownNumber(2), 1000);
+        setTimeout(() => setCountdownNumber(1), 2000);
+        setTimeout(() => {
+          setShowCountdown(false);
+          fetchLobbyData();
+        }, 3000);
       })
       .on("broadcast", { event: "lobby_ended" }, (payload) => {
         console.log("📢 [BROADCAST] lobby_ended received:", payload);
@@ -566,16 +578,26 @@ export default function Lobby() {
       // Broadcast game_started to all players via Supabase Broadcast
       broadcastEvent("game_started", {});
 
-      // Update session state immediately to show dashboard
-      if (data.session) {
-        setSession(data.session);
-      }
+      // Show countdown animation
+      setShowCountdown(true);
+      setCountdownNumber(3);
+      
+      // Countdown sequence
+      setTimeout(() => setCountdownNumber(2), 1000);
+      setTimeout(() => setCountdownNumber(1), 2000);
+      setTimeout(() => {
+        setShowCountdown(false);
+        // Update session state after countdown
+        if (data.session) {
+          setSession(data.session);
+        }
+        fetchLobbyData();
+      }, 3000);
+      
       toast({
         title: "Game Started!",
         description: "Get ready to play!",
       });
-
-      await fetchLobbyData();
     } catch (error) {
       console.error("Error in handleStartGame:", error);
       toast({
@@ -968,6 +990,62 @@ export default function Lobby() {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
+      {/* Countdown Overlay */}
+      {showCountdown && (
+        <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm flex items-center justify-center">
+          <div className="text-center animate-pulse">
+            <div className="text-[150px] md:text-[200px] font-bold text-primary animate-bounce">
+              {countdownNumber}
+            </div>
+            <p className="text-2xl text-muted-foreground mt-4">Get Ready!</p>
+          </div>
+        </div>
+      )}
+
+      {/* Game Completed Screen */}
+      {session?.status === "completed" && (
+        <div className="fixed inset-0 z-[90] bg-background flex items-center justify-center p-4">
+          <Card className="max-w-md w-full text-center">
+            <CardHeader className="pb-2">
+              <div className="flex justify-center mb-4">
+                <PartyPopper className="h-16 w-16 text-primary animate-bounce" />
+              </div>
+              <CardTitle className="text-3xl">Game Complete!</CardTitle>
+              <CardDescription className="text-lg">Thank you for playing!</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Final Scores */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold flex items-center justify-center gap-2">
+                  <Trophy className="h-5 w-5 text-yellow-500" />
+                  Final Scores
+                </h3>
+                <div className="space-y-2">
+                  {[...players].sort((a, b) => (b.score || 0) - (a.score || 0)).map((player, index) => (
+                    <div
+                      key={player.id}
+                      className={`flex items-center justify-between p-3 rounded-lg ${
+                        index === 0 ? "bg-yellow-500/20 border border-yellow-500/50" : "bg-muted"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {index === 0 && <Trophy className="h-4 w-4 text-yellow-500" />}
+                        <span className={index === 0 ? "font-bold" : ""}>{player.name}</span>
+                      </div>
+                      <span className="font-bold text-primary">{player.score || 0} pts</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <Button onClick={() => navigate("/play/host")} className="w-full">
+                Back to Home
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Connection Status Indicator */}
         <div className="fixed top-4 right-4 z-50">
