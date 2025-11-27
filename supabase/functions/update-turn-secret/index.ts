@@ -25,11 +25,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // Strip "custom:" prefix if present so guesses can match directly
+    const cleanSecretElement = secretElementId.startsWith('custom:') 
+      ? secretElementId.replace('custom:', '') 
+      : secretElementId;
+
     // Update turn with secret element
     const { error: updateError } = await supabase
       .from("game_turns")
       .update({ 
-        secret_element: secretElementId
+        secret_element: cleanSecretElement
       })
       .eq("id", turnId);
 

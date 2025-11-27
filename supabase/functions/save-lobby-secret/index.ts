@@ -25,7 +25,12 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    console.log("Saving secret element for session", sessionId, "element:", secretElementId);
+    // Strip "custom:" prefix if present so guesses can match directly
+    const cleanSecretElement = secretElementId.startsWith('custom:') 
+      ? secretElementId.replace('custom:', '') 
+      : secretElementId;
+    
+    console.log("Saving secret element for session", sessionId, "element:", cleanSecretElement);
 
     // Check if a turn already exists for this session
     const { data: existingTurn, error: checkError } = await supabase
@@ -47,7 +52,7 @@ Deno.serve(async (req) => {
       const { data: updatedTurn, error: updateError } = await supabase
         .from("game_turns")
         .update({ 
-          secret_element: secretElementId
+          secret_element: cleanSecretElement
         })
         .eq("id", existingTurn.id)
         .select()
@@ -85,7 +90,7 @@ Deno.serve(async (req) => {
           round_number: session.current_round || 1,
           storyteller_id: customerId,
           theme_id: session.selected_theme_id,
-          secret_element: secretElementId,
+          secret_element: cleanSecretElement,
         })
         .select()
         .single();
