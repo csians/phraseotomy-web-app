@@ -305,15 +305,21 @@ export default function Lobby() {
   });
 
   useEffect(() => {
+    console.log("🚀 [LOBBY] useEffect running - sessionId:", sessionId);
+    console.log("🚀 [LOBBY] Supabase client:", supabase);
+    
     if (!sessionId) {
+      console.log("⚠️ [LOBBY] No sessionId, redirecting to /play/host");
       navigate("/play/host");
       return;
     }
 
+    console.log("📡 [LOBBY] Calling fetchLobbyData...");
     fetchLobbyData();
 
     // Set up real-time subscription for lobby updates
-    console.log("🔄 Setting up Supabase Realtime subscription for session:", sessionId);
+    console.log("🔄 [REALTIME] Setting up Supabase Realtime subscription for session:", sessionId);
+    console.log("🔄 [REALTIME] Channel name will be: lobby-" + sessionId);
     
     const channel = supabase
       .channel(`lobby-${sessionId}`)
@@ -461,16 +467,30 @@ export default function Lobby() {
         },
       )
       .subscribe((status, err) => {
-        console.log("🔌 [REALTIME] Subscription status:", status);
+        console.log("🔌 [REALTIME] Subscription status:", status, "error:", err);
         if (err) {
           console.error("❌ [REALTIME] Subscription error:", err);
         }
         if (status === "SUBSCRIBED") {
           console.log("✅ [REALTIME] Successfully subscribed to channel lobby-" + sessionId);
         }
+        if (status === "CHANNEL_ERROR") {
+          console.error("❌ [REALTIME] Channel error - realtime will not work");
+        }
+        if (status === "TIMED_OUT") {
+          console.error("❌ [REALTIME] Subscription timed out");
+        }
       });
 
+    // Fallback polling every 3 seconds to catch updates if realtime fails
+    const pollInterval = setInterval(() => {
+      console.log("⏰ [POLL] Polling for session updates...");
+      fetchLobbyData();
+    }, 3000);
+
     return () => {
+      console.log("🧹 [LOBBY] Cleaning up subscription and polling");
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [sessionId, navigate, toast]);
