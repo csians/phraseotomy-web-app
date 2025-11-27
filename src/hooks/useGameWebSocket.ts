@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 interface WebSocketMessage {
@@ -25,10 +25,21 @@ export const useGameWebSocket = ({
   const { toast } = useToast();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 5;
+  const maxReconnectAttempts = 10;
+  const [isConnected, setIsConnected] = useState(false);
+  const heartbeatRef = useRef<NodeJS.Timeout>();
 
   const connect = useCallback(() => {
-    if (!enabled || !sessionId || !playerId) return;
+    if (!enabled || !sessionId || !playerId) {
+      console.log('🔌 WebSocket not enabled or missing params:', { enabled, sessionId, playerId });
+      return;
+    }
+
+    // Close existing connection if any
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      console.log('🔌 Closing existing WebSocket connection');
+      wsRef.current.close();
+    }
 
     // Use the full WebSocket URL for the edge function
     const wsUrl = `wss://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/game-websocket?sessionId=${sessionId}&playerId=${playerId}&playerName=${encodeURIComponent(playerName)}`;
@@ -40,14 +51,26 @@ export const useGameWebSocket = ({
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('✅ WebSocket connected');
+        console.log('✅ WebSocket connected successfully');
         reconnectAttemptsRef.current = 0;
+        setIsConnected(true);
+
+        // Start heartbeat to keep connection alive
+        heartbeatRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 30000); // Ping every 30 seconds
       };
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('📨 WebSocket message received:', message.type);
+          
+          // Ignore pong messages
+          if (message.type === 'pong') return;
+          
+          console.log('📨 WebSocket message received:', message.type, message);
           onMessage(message);
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -56,22 +79,29 @@ export const useGameWebSocket = ({
 
       ws.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
+        setIsConnected(false);
       };
 
-      ws.onclose = () => {
-        console.log('🔌 WebSocket disconnected');
+      ws.onclose = (event) => {
+        console.log('🔌 WebSocket disconnected:', event.code, event.reason);
         wsRef.current = null;
+        setIsConnected(false);
 
-        // Attempt to reconnect
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+        // Clear heartbeat
+        if (heartbeatRef.current) {
+          clearInterval(heartbeatRef.current);
+        }
+
+        // Attempt to reconnect with exponential backoff
+        if (reconnectAttemptsRef.current < maxReconnectAttempts && enabled) {
           reconnectAttemptsRef.current++;
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
           console.log(`🔄 Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, delay);
-        } else {
+        } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
           toast({
             title: "Connection Lost",
             description: "Real-time updates disconnected. Refresh the page to reconnect.",
@@ -81,25 +111,34 @@ export const useGameWebSocket = ({
       };
     } catch (error) {
       console.error('Error creating WebSocket:', error);
+      setIsConnected(false);
     }
   }, [enabled, sessionId, playerId, playerName, onMessage, toast]);
 
   const disconnect = useCallback(() => {
+    console.log('🔌 Disconnecting WebSocket');
+    
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
+    }
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
     }
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
+    setIsConnected(false);
   }, []);
 
   const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log('📤 Sending WebSocket message:', message.type);
+      console.log('📤 Sending WebSocket message:', message.type, message);
       wsRef.current.send(JSON.stringify(message));
+      return true;
     } else {
-      console.warn('WebSocket not connected, cannot send message');
+      console.warn('⚠️ WebSocket not connected, cannot send message:', message.type);
+      return false;
     }
   }, []);
 
@@ -110,5 +149,5 @@ export const useGameWebSocket = ({
     };
   }, [connect, disconnect]);
 
-  return { sendMessage, disconnect };
+  return { sendMessage, disconnect, isConnected };
 };

@@ -7,6 +7,7 @@ import { Scoreboard } from "@/components/Scoreboard";
 import { ThemeSelection } from "@/components/ThemeSelection";
 import { StorytellingInterface } from "@/components/StorytellingInterface";
 import { GuessingInterface } from "@/components/GuessingInterface";
+import { Wifi, WifiOff } from "lucide-react";
 
 interface Player {
   id: string;
@@ -70,32 +71,87 @@ export default function Game() {
   };
 
   // WebSocket for real-time updates - just refreshes from database
-  const { sendMessage: sendWebSocketMessage } = useGameWebSocket({
+  const { sendMessage: sendWebSocketMessage, isConnected } = useGameWebSocket({
     sessionId: sessionId || "",
     playerId: currentPlayerId,
     playerName: getCurrentPlayerInfo().playerName,
     enabled: !!sessionId && !!currentPlayerId,
     onMessage: (message) => {
-      console.log('🎮 Game WebSocket message:', message.type);
+      console.log('🎮 Game WebSocket message:', message.type, message);
       
       switch (message.type) {
         case "theme_selected":
-        case "secret_element_selected":
-        case "recording_started":
-        case "recording_stopped":
+          toast({
+            title: "Theme Selected",
+            description: `${message.storytellerName || 'Storyteller'} chose a theme`,
+          });
+          setTimeout(() => initializeGame(), 300);
+          break;
+
+        case "storyteller_ready":
+          toast({
+            title: "Secret Element Selected",
+            description: `${message.storytellerName || 'Storyteller'} has selected their secret element`,
+          });
+          setTimeout(() => initializeGame(), 300);
+          break;
+
+        case "recording_uploaded":
         case "story_submitted":
+          toast({
+            title: "Audio Ready! 🎤",
+            description: "Listen to the clue and guess the secret element",
+          });
+          setTimeout(() => initializeGame(), 300);
+          break;
+
         case "guess_submitted":
-        case "refresh_game_state":
-          // Database is source of truth - just refresh
+          if (message.playerId !== currentPlayerId) {
+            if (message.isCorrect) {
+              toast({
+                title: "Correct Answer! 🎉",
+                description: `${message.playerName} got it right!`,
+              });
+            } else {
+              toast({
+                title: "Guess Made",
+                description: `${message.playerName} made a guess`,
+              });
+            }
+          }
+          setTimeout(() => initializeGame(), 300);
+          break;
+
+        case "correct_answer":
+          toast({
+            title: "Round Complete! 🏆",
+            description: `${message.winnerName} got it right! The answer was "${message.secretElement}"`,
+          });
           setTimeout(() => initializeGame(), 500);
           break;
-          
+
+        case "next_turn":
+          toast({
+            title: "Next Turn",
+            description: `${message.newStorytellerName}'s turn to tell a story!`,
+          });
+          setTimeout(() => initializeGame(), 500);
+          break;
+
+        case "game_completed":
+          toast({
+            title: "Game Over! 🎊",
+            description: `${message.winnerName} won the game!`,
+          });
+          setTimeout(() => initializeGame(), 500);
+          break;
+
         case "player_joined":
           toast({
             title: "Player Joined",
             description: `${message.playerName} joined the game`,
           });
-          setTimeout(() => initializeGame(), 500);
+          setTimeout(() => initializeGame(), 300);
           break;
           
         case "player_left":
@@ -103,8 +159,18 @@ export default function Game() {
             title: "Player Left",
             description: `${message.playerName} left the game`,
           });
-          setTimeout(() => initializeGame(), 500);
+          setTimeout(() => initializeGame(), 300);
           break;
+
+        case "refresh_game_state":
+          console.log("🔄 Refresh triggered by WebSocket");
+          setTimeout(() => initializeGame(), 300);
+          break;
+
+        default:
+          console.log("Unknown WebSocket message:", message.type);
+          // Refresh on any unknown message type to stay in sync
+          setTimeout(() => initializeGame(), 500);
       }
     },
   });
@@ -349,6 +415,27 @@ export default function Game() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Connection Status Indicator */}
+      <div className="fixed top-4 right-4 z-50">
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+          isConnected 
+            ? "bg-green-500/10 text-green-600 border border-green-500/20" 
+            : "bg-red-500/10 text-red-600 border border-red-500/20"
+        }`}>
+          {isConnected ? (
+            <>
+              <Wifi className="h-3 w-3" />
+              <span>Live</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="h-3 w-3" />
+              <span>Connecting...</span>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Scoreboard - Always visible */}
       <div className="fixed top-4 left-4 w-80 z-50">
         <Scoreboard

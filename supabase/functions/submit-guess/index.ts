@@ -125,6 +125,9 @@ Deno.serve(async (req) => {
         .eq("id", sessionId)
         .single();
 
+      let nextRoundInfo = null;
+      let gameCompleted = false;
+
       if (sessionError || !sessionData) {
         console.error("Error fetching session for round advancement:", sessionError);
       } else {
@@ -135,7 +138,7 @@ Deno.serve(async (req) => {
           // Get next storyteller (next player in turn order)
           const { data: allPlayers, error: playersError } = await supabase
             .from("game_players")
-            .select("player_id, turn_order")
+            .select("player_id, name, turn_order")
             .eq("session_id", sessionId)
             .order("turn_order", { ascending: true });
 
@@ -152,6 +155,7 @@ Deno.serve(async (req) => {
                 .update({
                   current_round: nextRound,
                   current_storyteller_id: nextStoryteller.player_id,
+                  selected_theme_id: null, // Reset theme for new turn
                 })
                 .eq("id", sessionId);
 
@@ -159,11 +163,24 @@ Deno.serve(async (req) => {
                 console.error("Error advancing to next round:", updateError);
               } else {
                 console.log(`✅ Advanced to round ${nextRound}, storyteller: ${nextStoryteller.player_id}`);
+                nextRoundInfo = {
+                  roundNumber: nextRound,
+                  newStorytellerId: nextStoryteller.player_id,
+                  newStorytellerName: nextStoryteller.name,
+                };
               }
             }
           }
         } else {
           // Game complete - all rounds finished
+          // Get winner (player with highest score)
+          const { data: winners, error: winnerError } = await supabase
+            .from("game_players")
+            .select("player_id, name, score")
+            .eq("session_id", sessionId)
+            .order("score", { ascending: false })
+            .limit(1);
+
           const { error: endError } = await supabase
             .from("game_sessions")
             .update({ status: "completed", ended_at: new Date().toISOString() })
@@ -173,9 +190,32 @@ Deno.serve(async (req) => {
             console.error("Error ending game:", endError);
           } else {
             console.log("🎉 Game completed - all rounds finished");
+            gameCompleted = true;
+            
+            if (winners && winners.length > 0) {
+              nextRoundInfo = {
+                gameCompleted: true,
+                winnerId: winners[0].player_id,
+                winnerName: winners[0].name,
+                winnerScore: winners[0].score,
+              };
+            }
           }
         }
       }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          correct: isCorrect,
+          points_earned: pointsEarned,
+          already_answered: alreadyAnswered,
+          secret_element: turnData.secret_element,
+          next_round: nextRoundInfo,
+          game_completed: gameCompleted,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(
