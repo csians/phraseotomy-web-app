@@ -1,19 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
+const SUPABASE_URL = 'https://egrwijzbxxhkhrrelsgi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncndpanpieHhoa2hycmVsc2dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzOTk1MTQsImV4cCI6MjA3ODk3NTUxNH0._Vwhvuyh7PN8yfja1xkymBwQLrCxzVzP8E_MO_iGxdc';
+
 // Check if Supabase is properly configured
 export function isSupabaseConfigured(): boolean {
-  return !!(
-    import.meta.env.VITE_SUPABASE_URL &&
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY &&
-    import.meta.env.VITE_SUPABASE_URL.trim() !== '' &&
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY.trim() !== ''
-  );
+  return true; // Always configured with hardcoded values
 }
 
-// Create single Supabase client instance
+// Create single Supabase client instance with realtime enabled
 export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY!,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
   {
     auth: {
       storage: localStorage,
@@ -21,16 +19,16 @@ export const supabase = createClient(
       autoRefreshToken: true,
       storageKey: 'phraseotomy-auth',
     },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
+    },
   }
 );
 
 // Helper to get client and throw error if not configured
 function getClient() {
-  if (!isSupabaseConfigured()) {
-    throw new Error(
-      'Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in your .env file.'
-    );
-  }
   return supabase;
 }
 
