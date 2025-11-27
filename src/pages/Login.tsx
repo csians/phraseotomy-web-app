@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getAppBridge } from "@/lib/appBridge";
 import { Redirect } from "@shopify/app-bridge/actions";
+import { DebugInfo } from "@/components/DebugInfo";
 import type { TenantConfig } from "@/lib/types";
 import { getAllUrlParams } from "@/lib/urlUtils";
 
@@ -372,81 +374,97 @@ const Login = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <Skeleton className="h-24 w-24 rounded-xl mb-6" />
-        <Skeleton className="h-10 w-48 mb-4" />
-        <Skeleton className="h-6 w-64 mb-8" />
-        <Skeleton className="h-12 w-32" />
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-full" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      {/* Logo Icon */}
-      <div className="w-24 h-24 bg-primary rounded-2xl flex items-center justify-center mb-6 shadow-lg">
-        <span className="text-5xl font-bold text-primary-foreground">P</span>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-6">
+        <DebugInfo 
+          tenant={tenant}
+          shopDomain={shopDomain}
+          customer={null}
+          backendConnected={true}
+        />
+
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Phraseotomy
+            </CardTitle>
+            <CardDescription>
+              Welcome! Log in to host games
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button 
+              onClick={handleLogin}
+              className="w-full"
+              size="lg"
+            >
+              Log in with Shopify
+            </Button>
+            
+            {tenant && (
+              <p className="text-xs text-center text-muted-foreground">
+                Connected to {tenant.name}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl text-center">Join a Game</CardTitle>
+            <CardDescription className="text-center">
+              Enter the lobby code to join
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleJoinGame} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="lobbyCode">Lobby Code</Label>
+                <Input
+                  id="lobbyCode"
+                  placeholder="Enter 6-digit code"
+                  value={lobbyCode}
+                  onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
+                  maxLength={6}
+                  className="text-center text-lg tracking-widest font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="playerName">Your Name</Label>
+                <Input
+                  id="playerName"
+                  placeholder="Enter your name"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={isJoining || !lobbyCode.trim() || !playerName.trim()}
+              >
+                {isJoining ? "Joining..." : "Join Game"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
-
-      {/* Title */}
-      <h1 className="text-4xl font-bold text-primary tracking-wide mb-4">
-        PHRASEOTOMY
-      </h1>
-
-      {/* Subtitle */}
-      <p className="text-primary/80 text-center mb-8 max-w-sm">
-        Please log in to your account to access the game
-      </p>
-
-      {/* Login Button */}
-      <Button 
-        onClick={handleLogin}
-        size="lg"
-        className="px-12 py-6 text-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg shadow-md"
-      >
-        Log In
-      </Button>
-
-      {/* Join Game Section - Separator */}
-      <div className="flex items-center gap-4 my-10 w-full max-w-xs">
-        <div className="flex-1 h-px bg-border" />
-        <span className="text-muted-foreground text-sm">or join a game</span>
-        <div className="flex-1 h-px bg-border" />
-      </div>
-
-      {/* Join Game Form */}
-      <form onSubmit={handleJoinGame} className="w-full max-w-xs space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="lobbyCode" className="text-foreground">Lobby Code</Label>
-          <Input
-            id="lobbyCode"
-            placeholder="Enter 6-digit code"
-            value={lobbyCode}
-            onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
-            maxLength={6}
-            className="text-center text-lg tracking-widest font-mono bg-card border-border"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="playerName" className="text-foreground">Your Name</Label>
-          <Input
-            id="playerName"
-            placeholder="Enter your name"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            className="bg-card border-border"
-          />
-        </div>
-        <Button
-          type="submit"
-          variant="outline"
-          className="w-full"
-          size="lg"
-          disabled={isJoining || !lobbyCode.trim() || !playerName.trim()}
-        >
-          {isJoining ? "Joining..." : "Join Game"}
-        </Button>
-      </form>
     </div>
   );
 };
