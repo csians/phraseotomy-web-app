@@ -370,8 +370,8 @@ export default function Lobby() {
         setThemes(themesData);
       }
     } catch (errors: any) {
-      console.error("Error fetching lobby data:", error);
-      const errorMessage = error?.message || "Failed to load lobby details";
+      console.error("Error fetching lobby data:", errors);
+      const errorMessage = errors?.message || "Failed to load lobby details";
       const isNotFound = errorMessage.includes("not found") || errorMessage.includes("404");
 
       toast({
