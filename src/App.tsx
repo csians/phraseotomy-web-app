@@ -21,9 +21,18 @@ const RootRedirect = () => {
   const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user is in an active lobby session
+    // ONLY redirect to lobby from root path, not from other paths
+    const currentPath = window.location.hash.replace('#', '');
+    
+    // If we're already on a lobby or game page, don't redirect
+    if (currentPath.startsWith('/lobby/') || currentPath.startsWith('/game/')) {
+      console.log('Already on lobby/game page, skipping redirect');
+      return;
+    }
+    
+    // Check if user is in an active lobby session (only from root path)
     const currentLobbySession = sessionStorage.getItem('current_lobby_session');
-    if (currentLobbySession) {
+    if (currentLobbySession && (currentPath === '/' || currentPath === '')) {
       console.log('Active lobby session found, redirecting to lobby');
       setRedirectTarget(`/lobby/${currentLobbySession}`);
       return;
