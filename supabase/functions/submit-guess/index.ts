@@ -63,6 +63,14 @@ Deno.serve(async (req) => {
 
     const alreadyAnswered = existingGuesses && existingGuesses.length > 0;
 
+    // Check if secret element exists
+    if (!turnData.secret_element) {
+      return new Response(
+        JSON.stringify({ error: "Secret element not set for this turn", correct: false }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Normalize the guess and secret element for comparison
     const normalizedGuess = guess.trim().toLowerCase();
     let normalizedSecret = "";
