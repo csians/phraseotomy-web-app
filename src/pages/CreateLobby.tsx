@@ -145,11 +145,11 @@ export default function CreateLobby() {
 
       toast({
         title: 'Lobby Created!',
-        description: `Lobby Code: ${lobbyCode}. Redirecting to lobby...`,
+        description: `Lobby Code: ${lobbyCode}`,
       });
 
-      // Redirect to lobby page
-      setTimeout(() => navigate(`/lobby/${newSession.id}`), 1000);
+      // Redirect to lobby page (replace to avoid back navigation issues)
+      navigate(`/lobby/${newSession.id}`, { replace: true });
     } catch (error) {
       console.error('Error creating lobby:', error);
       toast({
