@@ -186,8 +186,14 @@ Deno.serve(async (req) => {
         console.log("✅ Guest joined successfully, session:", sessionId);
 
         // Redirect directly to the lobby page on standalone app
+        // Put params BEFORE the hash for HashRouter to access them
         const baseUrl = "https://phraseotomy.ourstagingserver.com";
-        const redirectUrl = `${baseUrl}/#/lobby/${sessionId}?guestData=${encodeURIComponent(guestDataStr)}&shop=${shop}`;
+        const params = new URLSearchParams({
+          guestData: guestDataStr,
+          shop: shop,
+          guestSession: sessionId,
+        });
+        const redirectUrl = `${baseUrl}/?${params.toString()}#/lobby/${sessionId}`;
         
         return new Response(generateGuestRedirectHtml(redirectUrl, guestData.name, sessionId), {
           status: 200,

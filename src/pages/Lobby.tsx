@@ -106,6 +106,34 @@ export default function Lobby() {
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdownNumber, setCountdownNumber] = useState(3);
 
+  // Handle guest data from URL params on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const guestDataStr = urlParams.get('guestData');
+    const guestSession = urlParams.get('guestSession');
+    
+    if (guestDataStr) {
+      try {
+        const guestData = JSON.parse(guestDataStr);
+        console.log('Guest data from URL:', guestData);
+        
+        // Store guest data in localStorage
+        localStorage.setItem('guest_player_id', guestData.player_id);
+        localStorage.setItem('guestPlayerData', JSON.stringify(guestData));
+        
+        if (guestSession) {
+          sessionStorage.setItem('current_lobby_session', guestSession);
+        }
+        
+        // Clean up URL params
+        const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+        window.history.replaceState({}, '', cleanUrl);
+      } catch (e) {
+        console.error('Error parsing guest data:', e);
+      }
+    }
+  }, []);
+
   // Get current customer ID helper
   const getCurrentCustomerId = useCallback(() => {
     const urlParams = getAllUrlParams();
