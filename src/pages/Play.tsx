@@ -398,9 +398,18 @@ const Play = () => {
   };
 
   const handleLogout = () => {
+    // Clear local storage
     localStorage.removeItem('phraseotomy_session_token');
     localStorage.removeItem('customerData');
-    navigate('/login');
+    
+    // If running in Shopify app proxy (has shop domain), logout from Shopify
+    if (shopDomain) {
+      // Redirect to Shopify logout, which will return to app proxy and show login page
+      window.top!.location.href = `https://${shopDomain}/account/logout`;
+    } else {
+      // Fallback for standalone mode
+      navigate('/login');
+    }
   };
 
   if (loading) {
