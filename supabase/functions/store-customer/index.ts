@@ -43,10 +43,31 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Get tenant info to determine environment
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select('environment')
+      .eq('id', tenant_id)
+      .single();
+
+    if (tenantError) {
+      console.error('Error fetching tenant:', tenantError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid tenant' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const environment = tenant.environment; // 'staging' or 'production'
+    const envCustomerIdColumn = environment === 'staging' ? 'staging_customer_id' : 'prod_customer_id';
+
     // Check if customer already exists by customer_id
     const { data: existingCustomer, error: checkError } = await supabase
       .from('customers')
-      .select('id, customer_email')
+      .select('id, customer_email, staging_customer_id, prod_customer_id')
       .eq('customer_id', customer_id)
       .eq('tenant_id', tenant_id)
       .maybeSingle();
@@ -74,37 +95,43 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if customer exists by email in the same tenant (different environment)
+    // Check if customer exists by email across all tenants
     if (customer_email) {
       const { data: existingByEmail, error: emailCheckError } = await supabase
         .from('customers')
-        .select('id, customer_id')
+        .select('id, customer_id, customer_name, staging_customer_id, prod_customer_id')
         .eq('customer_email', customer_email)
-        .eq('tenant_id', tenant_id)
         .maybeSingle();
 
       if (emailCheckError) {
         console.error('Error checking customer by email:', emailCheckError);
       } else if (existingByEmail) {
-        // Customer exists with same email but different customer_id (different environment)
-        // Update the customer_id to the new one from this environment
+        // Customer exists with same email - update environment-specific customer_id
+        const updateData: any = {
+          customer_name,
+          first_name,
+          last_name,
+          [envCustomerIdColumn]: customer_id,
+        };
+
+        // If this customer doesn't have a primary customer_id for this tenant yet, set it
+        if (existingByEmail.customer_id !== customer_id) {
+          updateData.customer_id = customer_id;
+          updateData.tenant_id = tenant_id;
+          updateData.shop_domain = shop_domain;
+        }
+
         const { data: updatedCustomer, error: updateError } = await supabase
           .from('customers')
-          .update({
-            customer_id,
-            customer_name,
-            first_name,
-            last_name,
-            shop_domain,
-          })
+          .update(updateData)
           .eq('id', existingByEmail.id)
           .select()
           .single();
 
         if (updateError) {
-          console.error('Error updating customer_id:', updateError);
+          console.error('Error updating customer:', updateError);
         } else {
-          console.log('✅ Updated customer_id from', existingByEmail.customer_id, 'to', customer_id);
+          console.log(`✅ Updated customer with ${environment} customer_id:`, customer_id);
           return new Response(
             JSON.stringify({ success: true, customer: updatedCustomer, is_new: false, updated: true }),
             {
@@ -117,17 +144,20 @@ Deno.serve(async (req) => {
     }
 
     // Customer doesn't exist at all, insert new record
+      const insertData: any = {
+        customer_id,
+        customer_email,
+        customer_name,
+        first_name,
+        last_name,
+        shop_domain,
+        tenant_id,
+        [envCustomerIdColumn]: customer_id,
+      };
+
       const { data: newCustomer, error: insertError } = await supabase
         .from('customers')
-        .insert({
-          customer_id,
-          customer_email,
-          customer_name,
-          first_name,
-          last_name,
-          shop_domain,
-          tenant_id,
-        })
+        .insert(insertData)
         .select()
         .single();
 
