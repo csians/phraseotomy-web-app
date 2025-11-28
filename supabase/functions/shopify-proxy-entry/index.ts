@@ -215,13 +215,46 @@ Deno.serve(async (req) => {
 
     // Extract customer ID from Shopify proxy parameters
     const customerId = queryParams.get("logged_in_customer_id") || null;
+    
+    // Check if this is a returning guest from a successful lobby join
+    const guestSession = queryParams.get("guestSession");
+    const returningGuestData = queryParams.get("guestData");
 
-    // If no customer is logged in, show login page with guest option
-    if (!customerId) {
+    // If no customer is logged in and NOT a returning guest, show login page
+    if (!customerId && !guestSession) {
       console.log("No customer logged in, showing login options");
       const loginUrl = `https://${shop}/account/login?return_url=/apps/phraseotomy`;
 
       return new Response(generateLoginRedirectHtml(loginUrl, shop), {
+        status: 200,
+        headers: { "Content-Type": "application/liquid" },
+      });
+    }
+    
+    // Handle returning guest - serve them the app with their guest data
+    if (!customerId && guestSession && returningGuestData) {
+      console.log("✅ Guest returning from lobby join, serving app HTML");
+      console.log("Guest session:", guestSession);
+      
+      const nonce = crypto.randomUUID();
+      
+      // Parse guest data to create a guest customer object
+      let guestCustomerData = null;
+      try {
+        const parsedGuestData = JSON.parse(decodeURIComponent(returningGuestData));
+        guestCustomerData = {
+          id: parsedGuestData.player_id,
+          email: null,
+          firstName: parsedGuestData.name,
+          lastName: null,
+          name: parsedGuestData.name,
+          isGuest: true,
+        };
+      } catch (e) {
+        console.error("Failed to parse guest data:", e);
+      }
+      
+      return new Response(generateAppHtml(tenant, shop, guestCustomerData, nonce, guestSession), {
         status: 200,
         headers: { "Content-Type": "application/liquid" },
       });
@@ -547,7 +580,7 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
 /**
  * Generate HTML that embeds the React app from custom domain
  */
-function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce: string): string {
+function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce: string, guestSession: string | null = null): string {
   // Sanitize tenant data for embedding
   const tenantConfig = {
     id: tenant.id,
@@ -567,9 +600,17 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
     shop: shop,
     customer: customer ? JSON.stringify(customer) : "",
   });
+  
+  // If guest session provided, add it to params
+  if (guestSession) {
+    configParams.set("guestSession", guestSession);
+  }
+
+  // Determine the route - if guest session, go to lobby; otherwise go to play/host
+  const route = guestSession ? `/lobby/${guestSession}` : "/play/host";
 
   // For HashRouter, parameters must come before the hash
-  const appUrl = `${baseUrl}/?${configParams.toString()}#/play/host`;
+  const appUrl = `${baseUrl}/?${configParams.toString()}#${route}`;
 
   // Return iframe embed with custom domain
   return `<style nonce="${nonce}">
