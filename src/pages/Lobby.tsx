@@ -108,37 +108,67 @@ export default function Lobby() {
 
   // Handle guest data from URL params on mount
   useEffect(() => {
+    console.log("🚀 [GUEST] Checking for guest data in URL...");
     const urlParams = new URLSearchParams(window.location.search);
     const guestDataStr = urlParams.get('guestData');
     const guestSession = urlParams.get('guestSession');
     
+    console.log("🔍 [GUEST] guestData param:", guestDataStr);
+    console.log("🔍 [GUEST] guestSession param:", guestSession);
+    
     if (guestDataStr) {
       try {
         const guestData = JSON.parse(guestDataStr);
-        console.log('Guest data from URL:', guestData);
+        console.log('✅ [GUEST] Guest data from URL:', guestData);
         
-        // Store guest data in localStorage
+        // Store guest data in BOTH storages for reliability in Shopify context
+        sessionStorage.setItem('guest_player_id', guestData.player_id);
+        sessionStorage.setItem('guestPlayerData', JSON.stringify(guestData));
         localStorage.setItem('guest_player_id', guestData.player_id);
         localStorage.setItem('guestPlayerData', JSON.stringify(guestData));
+        console.log('✅ [GUEST] Stored guest_player_id in both storages:', guestData.player_id);
         
         if (guestSession) {
           sessionStorage.setItem('current_lobby_session', guestSession);
+          console.log('✅ [GUEST] Stored guestSession:', guestSession);
         }
         
         // Clean up URL params
         const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
         window.history.replaceState({}, '', cleanUrl);
+        console.log('✅ [GUEST] Cleaned URL');
       } catch (e) {
-        console.error('Error parsing guest data:', e);
+        console.error('❌ [GUEST] Error parsing guest data:', e);
+      }
+    } else {
+      console.log('ℹ️ [GUEST] No guest data in URL');
+      // Check if we already have guest data stored
+      const storedGuestIdSession = sessionStorage.getItem('guest_player_id');
+      const storedGuestIdLocal = localStorage.getItem('guest_player_id');
+      console.log('🔍 [GUEST] Existing guest_player_id in sessionStorage:', storedGuestIdSession);
+      console.log('🔍 [GUEST] Existing guest_player_id in localStorage:', storedGuestIdLocal);
+      
+      // Sync between storages if one has it
+      if (storedGuestIdSession && !storedGuestIdLocal) {
+        localStorage.setItem('guest_player_id', storedGuestIdSession);
+        console.log('✅ [GUEST] Synced from session to local storage');
+      } else if (storedGuestIdLocal && !storedGuestIdSession) {
+        sessionStorage.setItem('guest_player_id', storedGuestIdLocal);
+        console.log('✅ [GUEST] Synced from local to session storage');
       }
     }
   }, []);
 
   // Get current customer ID helper
   const getCurrentCustomerId = useCallback(() => {
+    console.log("🔍 [GET_ID] Starting getCurrentCustomerId...");
+    
     const urlParams = getAllUrlParams();
     const urlCustomerId = urlParams.get("customer_id");
-    if (urlCustomerId) return urlCustomerId;
+    if (urlCustomerId) {
+      console.log("✅ [GET_ID] Found customer ID in URL:", urlCustomerId);
+      return urlCustomerId;
+    }
 
     const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
     for (const key of storageKeys) {
@@ -147,13 +177,51 @@ export default function Lobby() {
         try {
           const parsed = JSON.parse(dataStr);
           const customerId = parsed.customer_id || parsed.id || parsed.customerId;
-          if (customerId) return String(customerId);
+          if (customerId) {
+            console.log(`✅ [GET_ID] Found customer ID in ${key}:`, customerId);
+            return String(customerId);
+          }
         } catch (e) {
           console.error(`Error parsing ${key}:`, e);
         }
       }
     }
-    return localStorage.getItem("guest_player_id") || null;
+    
+    // Check for guest player ID in both sessionStorage and localStorage
+    const guestPlayerIdSession = sessionStorage.getItem("guest_player_id");
+    const guestPlayerIdLocal = localStorage.getItem("guest_player_id");
+    const guestPlayerId = guestPlayerIdSession || guestPlayerIdLocal;
+    
+    console.log("🔍 [GET_ID] Guest player ID (session):", guestPlayerIdSession);
+    console.log("🔍 [GET_ID] Guest player ID (local):", guestPlayerIdLocal);
+    
+    if (guestPlayerId) {
+      console.log("✅ [GET_ID] Found guest player ID:", guestPlayerId);
+      // Store in both storages for reliability
+      if (!guestPlayerIdSession) sessionStorage.setItem("guest_player_id", guestPlayerId);
+      if (!guestPlayerIdLocal) localStorage.setItem("guest_player_id", guestPlayerId);
+      return guestPlayerId;
+    }
+    
+    // As a last resort, check if we have guestPlayerData
+    const guestDataStr = sessionStorage.getItem("guestPlayerData") || localStorage.getItem("guestPlayerData");
+    if (guestDataStr) {
+      try {
+        const guestData = JSON.parse(guestDataStr);
+        if (guestData.player_id) {
+          console.log("✅ [GET_ID] Found player ID in guestPlayerData:", guestData.player_id);
+          // Store it for next time
+          sessionStorage.setItem("guest_player_id", guestData.player_id);
+          localStorage.setItem("guest_player_id", guestData.player_id);
+          return guestData.player_id;
+        }
+      } catch (e) {
+        console.error("Error parsing guestPlayerData:", e);
+      }
+    }
+    
+    console.log("❌ [GET_ID] No player ID found anywhere");
+    return null;
   }, []);
 
   // Get current player name
@@ -697,7 +765,12 @@ export default function Lobby() {
 
     try {
       const currentCustomerId = getCurrentCustomerId();
+      console.log("🔍 [UPLOAD] Current customer ID:", currentCustomerId);
+      console.log("🔍 [UPLOAD] Guest player ID from localStorage:", localStorage.getItem("guest_player_id"));
+      console.log("🔍 [UPLOAD] All localStorage keys:", Object.keys(localStorage));
+      
       if (!currentCustomerId) {
+        console.error("❌ [UPLOAD] No customer ID found!");
         toast({
           title: "Error",
           description: "Unable to identify player. Please refresh the page.",

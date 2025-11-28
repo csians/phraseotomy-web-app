@@ -25,7 +25,9 @@ const GuestJoin = () => {
 
         const guestData = JSON.parse(decodeURIComponent(guestDataStr));
         
-        // Store guest data in localStorage
+        // Store guest data in BOTH storages for Shopify context
+        sessionStorage.setItem("guest_player_id", guestData.player_id);
+        sessionStorage.setItem("guestPlayerData", JSON.stringify(guestData));
         localStorage.setItem("guest_player_id", guestData.player_id);
         localStorage.setItem("guestPlayerData", JSON.stringify(guestData));
         if (shop) {
