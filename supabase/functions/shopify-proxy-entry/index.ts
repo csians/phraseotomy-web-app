@@ -48,6 +48,16 @@ Deno.serve(async (req) => {
     hasCustomer: !!queryParams.get("logged_in_customer_id"),
   });
 
+  console.log("🔍 [PROXY_PARAMS] All query parameters:");
+  for (const [key, value] of queryParams.entries()) {
+    if (key !== "signature") {  // Don't log the signature itself
+      console.log(`  ${key}: ${value}`);
+    }
+  }
+  
+  const loggedInCustomerId = queryParams.get("logged_in_customer_id");
+  console.log("🔍 [CUSTOMER_ID] logged_in_customer_id from Shopify:", loggedInCustomerId);
+
   // CORS headers for browser requests
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -212,6 +222,8 @@ Deno.serve(async (req) => {
 
     // Extract customer ID from Shopify proxy parameters
     const customerId = queryParams.get("logged_in_customer_id") || null;
+    console.log("🔍 [CUSTOMER_ID] Extracted customerId:", customerId);
+    console.log("🔍 [CUSTOMER_ID] Will fetch from Shopify API with this ID:", customerId);
 
     // Check if this is a returning guest from a successful lobby join
     const guestSession = queryParams.get("guestSession");
@@ -302,7 +314,10 @@ Deno.serve(async (req) => {
             id: customerData.id,
             email: customerData.email,
             name: customerData.name,
+            firstName: customerData.firstName,
+            lastName: customerData.lastName,
           });
+          console.log("🔍 [CUSTOMER_DATA] Full customerData object being passed to app:", JSON.stringify(customerData));
         } else {
           const errorText = await shopifyResponse.text();
           console.warn("❌ Failed to fetch customer from Shopify. Status:", shopifyResponse.status);
