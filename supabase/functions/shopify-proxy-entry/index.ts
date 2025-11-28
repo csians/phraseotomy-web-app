@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
       console.log("No customer logged in, showing login options");
       const loginUrl = `https://${shop}/customer_authentication/login?return_to=/pages/app-redirect`;
 
-      return new Response(generateLoginRedirectHtml(loginUrl, shop), {
+      return new Response(generateLoginRedirectHtml(loginUrl, shop, tenant.environment), {
         status: 200,
         headers: { "Content-Type": "application/liquid" },
       });
@@ -344,8 +344,11 @@ Deno.serve(async (req) => {
 /**
  * Generate login redirect HTML for unauthenticated users
  */
-function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
-  const baseUrl = "https://phraseotomy.ourstagingserver.com";
+function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: string): string {
+  // Use environment-specific URL
+  const baseUrl = environment === "production" 
+    ? "https://app.phraseotomy.com" 
+    : "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
   #header-group,.header-group, footer, header {
     display: none !important;
@@ -597,8 +600,10 @@ function generateAppHtml(
     verified: true,
   };
 
-  // Use custom domain
-  const baseUrl = "https://phraseotomy.ourstagingserver.com";
+  // Use environment-specific URL
+  const baseUrl = tenant.environment === "production" 
+    ? "https://app.phraseotomy.com" 
+    : "https://phraseotomy.ourstagingserver.com";
 
   // Encode configuration as URL parameters (before hash for HashRouter)
   const configParams = new URLSearchParams({
