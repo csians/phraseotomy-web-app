@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
 
         console.log("✅ Guest joined successfully, session:", sessionId);
 
-        // Redirect directly to the lobby page on standalone app
+        // Redirect directly to the lobby page on standalone app using HTTP 302
         // Put params BEFORE the hash for HashRouter to access them
         const baseUrl = "https://phraseotomy.ourstagingserver.com";
         const params = new URLSearchParams({
@@ -195,9 +195,13 @@ Deno.serve(async (req) => {
         });
         const redirectUrl = `${baseUrl}/?${params.toString()}#/lobby/${sessionId}`;
         
-        return new Response(generateGuestRedirectHtml(redirectUrl, guestData.name, sessionId), {
-          status: 200,
-          headers: { "Content-Type": "text/html" },
+        // Use HTTP 302 redirect instead of HTML page with JavaScript redirect
+        return new Response(null, {
+          status: 302,
+          headers: { 
+            "Location": redirectUrl,
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+          },
         });
       } catch (error) {
         console.error("Error processing guest join:", error);
