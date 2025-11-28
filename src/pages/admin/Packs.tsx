@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,42 @@ import { RefreshCw, Plus, Download, Trash2 } from "lucide-react";
 import { useTenant } from "@/hooks/useTenant";
 import type { Tables } from "@/integrations/supabase/types";
 import { PackCSVImport } from "@/components/admin/PackCSVImport";
+import { getAllUrlParams } from "@/lib/urlUtils";
+
+// Extract shop domain from Shopify's host parameter (base64 encoded)
+const extractShopFromHost = (host: string | null): string | null => {
+  if (!host) return null;
+  try {
+    const decoded = atob(host);
+    const shopMatch = decoded.match(/([a-zA-Z0-9-]+\.myshopify\.com)/);
+    return shopMatch ? shopMatch[1] : null;
+  } catch (e) {
+    console.error('Error decoding host parameter:', e);
+    return null;
+  }
+};
 
 type Pack = Tables<"packs">;
 
 export default function Packs() {
   const [searchParams] = useSearchParams();
-  const shopDomain = searchParams.get("shop") || "";
+  
+  // Get shop from multiple sources
+  const shopDomain = useMemo(() => {
+    const shopParam = searchParams.get('shop');
+    if (shopParam) return shopParam;
+    
+    const allParams = getAllUrlParams();
+    const shopFromAll = allParams.get('shop');
+    if (shopFromAll) return shopFromAll;
+    
+    const hostParam = allParams.get('host');
+    const shopFromHost = extractShopFromHost(hostParam);
+    if (shopFromHost) return shopFromHost;
+    
+    return 'testing-cs-store.myshopify.com';
+  }, [searchParams]);
+  
   const { tenant, loading: tenantLoading, error: tenantError } = useTenant(shopDomain);
   
   const [packs, setPacks] = useState<Pack[]>([]);
