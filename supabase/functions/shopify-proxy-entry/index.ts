@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
     // If no customer is logged in and NOT a returning guest, show login page
     if (!customerId && !guestSession) {
       console.log("No customer logged in, showing login options");
-      const loginUrl = `https://${shop}/account/login?return_url=/apps/phraseotomy`;
+      const loginUrl = `https://${shop}/customer_authentication/login?return_to=/apps/phraseotomy`;
 
       return new Response(generateLoginRedirectHtml(loginUrl, shop), {
         status: 200,
