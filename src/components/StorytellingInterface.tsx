@@ -253,6 +253,8 @@ export function StorytellingInterface({
                           setIsLoadingWhisp(true);
                           
                           try {
+                            console.log("Generating whisp for element:", element.name, "theme:", theme.name);
+                            
                             // Generate whisp (one-word hint)
                             const { data: whispData, error: whispError } = await supabase.functions.invoke("generate-whisp", {
                               body: { 
@@ -261,21 +263,33 @@ export function StorytellingInterface({
                               },
                             });
 
-                            if (whispError) throw whispError;
+                            console.log("Whisp response:", whispData, "error:", whispError);
+
+                            if (whispError) {
+                              console.error("Whisp generation error:", whispError);
+                              throw whispError;
+                            }
+
+                            if (!whispData || !whispData.whisp) {
+                              throw new Error("No whisp data returned");
+                            }
 
                             const generatedWhisp = whispData.whisp;
+                            console.log("Generated whisp:", generatedWhisp);
                             setWhisp(generatedWhisp);
 
-                            // Save secret element and whisp to database
-                            await supabase.functions.invoke("update-turn-secret", {
-                              body: { turnId, secretElementId: element.id },
-                            });
-
-                            // Update turn with whisp
-                            await supabase
+                            // Update turn with whisp and secret element
+                            const { error: updateError } = await supabase
                               .from("game_turns")
-                              .update({ whisp: generatedWhisp })
+                              .update({ 
+                                whisp: generatedWhisp,
+                                secret_element: element.id 
+                              })
                               .eq("id", turnId);
+
+                            if (updateError) {
+                              console.error("Error updating turn:", updateError);
+                            }
                             
                             // Notify others via WebSocket
                             sendWebSocketMessage?.({
@@ -288,10 +302,10 @@ export function StorytellingInterface({
                               description: `Your hint word is: "${generatedWhisp}"`,
                             });
                           } catch (error) {
-                            console.error("Error saving secret element or generating whisp:", error);
+                            console.error("Error generating whisp:", error);
                             toast({
                               title: "Error",
-                              description: "Failed to generate hint. Please try again.",
+                              description: error instanceof Error ? error.message : "Failed to generate hint. Please try again.",
                               variant: "destructive",
                             });
                           } finally {
