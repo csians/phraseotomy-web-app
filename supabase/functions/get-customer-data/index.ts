@@ -110,18 +110,25 @@ Deno.serve(async (req) => {
     let customerDetails = null;
     if (tenant.access_token) {
       try {
-        const shopifyResponse = await fetch(
-          `https://${shopDomain}/admin/api/2024-01/customers/${customerId}.json`,
-          {
-            headers: {
-              'X-Shopify-Access-Token': tenant.access_token,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        const shopifyUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}.json`;
+        console.log('🔍 Fetching customer from Shopify:', { shopifyUrl, customerId, shopDomain });
+        
+        const shopifyResponse = await fetch(shopifyUrl, {
+          headers: {
+            'X-Shopify-Access-Token': tenant.access_token,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        console.log('📡 Shopify response status:', shopifyResponse.status);
+        
+        const responseText = await shopifyResponse.text();
+        console.log('📦 Shopify raw response:', responseText.substring(0, 500));
 
         if (shopifyResponse.ok) {
-          const shopifyData = await shopifyResponse.json();
+          const shopifyData = JSON.parse(responseText);
+          console.log('✅ Shopify customer data:', JSON.stringify(shopifyData.customer, null, 2));
+          
           customerDetails = {
             id: customerId,
             email: shopifyData.customer?.email || null,
@@ -131,13 +138,15 @@ Deno.serve(async (req) => {
             first_name: shopifyData.customer?.first_name || null,
             last_name: shopifyData.customer?.last_name || null,
           };
-          console.log('✅ Customer details fetched from Shopify:', customerDetails);
+          console.log('✅ Extracted customer details:', customerDetails);
         } else {
-          console.warn('⚠️ Failed to fetch customer from Shopify:', shopifyResponse.status, await shopifyResponse.text());
+          console.warn('⚠️ Failed to fetch customer from Shopify:', shopifyResponse.status, responseText);
         }
       } catch (error) {
-        console.error('Error fetching customer from Shopify:', error);
+        console.error('❌ Error fetching customer from Shopify:', error);
       }
+    } else {
+      console.warn('⚠️ No access_token found for tenant:', shopDomain);
     }
 
     // Fallback if Shopify API call failed
