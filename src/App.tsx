@@ -23,6 +23,15 @@ const RootRedirect = () => {
 
   useEffect(() => {
     const currentPath = window.location.hash.replace('#', '');
+    const urlParams = getAllUrlParams();
+    
+    // CRITICAL: Check for guest join first - bypass all other logic
+    const guestParam = urlParams.get('guest');
+    if (guestParam === 'true' && currentPath.startsWith('/lobby/join')) {
+      console.log('Guest join detected, staying on /lobby/join');
+      setRedirectTarget('/lobby/join');
+      return;
+    }
     
     // CRITICAL: Don't redirect if already on lobby/game pages
     if (currentPath.startsWith('/lobby/') || currentPath.startsWith('/game/')) {
@@ -42,7 +51,6 @@ const RootRedirect = () => {
     }
 
     // Check if accessed from Shopify admin (has 'host' parameter for embedded app)
-    const urlParams = getAllUrlParams();
     const hostParam = urlParams.get('host');
     
     // Check for embedded customer data from iframe
