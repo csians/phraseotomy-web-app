@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Plus, Download, Trash2 } from "lucide-react";
+import { RefreshCw, Plus, Download, Trash2, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useTenant } from "@/hooks/useTenant";
 import type { Tables } from "@/integrations/supabase/types";
 import { PackCSVImport } from "@/components/admin/PackCSVImport";
@@ -221,15 +222,32 @@ export default function Packs() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Game Packs Management</CardTitle>
-          <CardDescription>
-            Manage game packs for {tenant.name} ({tenant.shop_domain})
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link to={`/admin?shop=${shopDomain}`}>
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Game Packs</h1>
+              <p className="text-muted-foreground mt-1">
+                {tenant.name} - Manage game packs and content
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>All Packs</CardTitle>
+            <CardDescription>
+              Manage game packs for {tenant.shop_domain}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
           <div className="flex gap-2 flex-wrap">
             <Button onClick={loadPacks} variant="outline" disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -338,6 +356,7 @@ export default function Packs() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
