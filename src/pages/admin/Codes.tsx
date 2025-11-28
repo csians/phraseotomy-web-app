@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/hooks/useTenant";
@@ -19,12 +19,42 @@ import { CodeExport } from "@/components/admin/CodeExport";
 import type { Tables } from "@/integrations/supabase/types";
 import { redemptionCodeSchema, packsArraySchema, validateInput } from "@/lib/validation";
 import { cn } from "@/lib/utils";
+import { getAllUrlParams } from "@/lib/urlUtils";
+
+// Extract shop domain from Shopify's host parameter (base64 encoded)
+const extractShopFromHost = (host: string | null): string | null => {
+  if (!host) return null;
+  try {
+    const decoded = atob(host);
+    const shopMatch = decoded.match(/([a-zA-Z0-9-]+\.myshopify\.com)/);
+    return shopMatch ? shopMatch[1] : null;
+  } catch (e) {
+    console.error('Error decoding host parameter:', e);
+    return null;
+  }
+};
 
 type LicenseCode = Tables<"license_codes">;
 
 const Codes = () => {
   const [searchParams] = useSearchParams();
-  const shop = searchParams.get('shop');
+  
+  // Get shop from multiple sources
+  const shop = useMemo(() => {
+    const shopParam = searchParams.get('shop');
+    if (shopParam) return shopParam;
+    
+    const allParams = getAllUrlParams();
+    const shopFromAll = allParams.get('shop');
+    if (shopFromAll) return shopFromAll;
+    
+    const hostParam = allParams.get('host');
+    const shopFromHost = extractShopFromHost(hostParam);
+    if (shopFromHost) return shopFromHost;
+    
+    return 'testing-cs-store.myshopify.com';
+  }, [searchParams]);
+  
   const { tenant, loading: tenantLoading, error: tenantError } = useTenant(shop);
   
   const [codes, setCodes] = useState<LicenseCode[]>([]);
