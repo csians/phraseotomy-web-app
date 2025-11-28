@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       .select("session_id, game_sessions!inner(lobby_code, status)")
       .eq("player_id", playerId)
       .eq("game_sessions.lobby_code", lobbyCode.toUpperCase())
-      .single();
+      .maybeSingle();
 
     // If player already joined this lobby
     if (existingPlayerSession) {
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("lobby_code", lobbyCode.toUpperCase())
       .eq("status", "waiting")
-      .single();
+      .maybeSingle();
 
     if (sessionError || !session) {
       console.error("Lobby not found or not accepting players:", sessionError);
