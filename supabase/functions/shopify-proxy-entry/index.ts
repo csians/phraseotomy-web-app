@@ -349,10 +349,32 @@ Deno.serve(async (req) => {
  */
 function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
   const baseUrl = "https://phraseotomy.ourstagingserver.com";
-  return `<style nonce="${crypto.randomUUID()}">
+  return `{% layout none %}
+<style nonce="${crypto.randomUUID()}">
+  /* Hide all Shopify theme header and footer elements */
+  header,
+  .header,
+  .site-header,
+  footer,
+  .footer,
+  .site-footer,
+  .shopify-section-header,
+  .shopify-section-footer,
+  .shopify-section-group-header-group,
+  .shopify-section-group-footer-group,
+  [data-section-type="header"],
+  [data-section-type="footer"],
+  #shopify-section-header,
+  #shopify-section-footer,
+  .announcement-bar,
+  nav,
+  .navigation {
+    display: none !important;
+  }
+  
   body {
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: #0a0a0a;
     color: #fbbf24;
