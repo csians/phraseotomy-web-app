@@ -449,6 +449,7 @@ export type Database = {
           session_id: string
           storyteller_id: string
           theme_id: string | null
+          whisp: string | null
         }
         Insert: {
           completed_at?: string | null
@@ -461,6 +462,7 @@ export type Database = {
           session_id: string
           storyteller_id: string
           theme_id?: string | null
+          whisp?: string | null
         }
         Update: {
           completed_at?: string | null
@@ -473,6 +475,7 @@ export type Database = {
           session_id?: string
           storyteller_id?: string
           theme_id?: string | null
+          whisp?: string | null
         }
         Relationships: [
           {

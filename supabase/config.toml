@@ -85,3 +85,6 @@ verify_jwt = false
 
 [functions.import-packs]
 verify_jwt = false
+
+[functions.generate-whisp]
+verify_jwt = false

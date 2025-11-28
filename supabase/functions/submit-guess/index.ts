@@ -63,6 +63,22 @@ Deno.serve(async (req) => {
 
     const alreadyAnswered = existingGuesses && existingGuesses.length > 0;
 
+    // Check how many attempts this player has made for this turn
+    const { data: playerGuesses, error: playerGuessError } = await supabase
+      .from("game_guesses")
+      .select("id")
+      .eq("turn_id", turnData.id)
+      .eq("player_id", playerId);
+
+    if (playerGuessError) {
+      console.error("Error checking player guesses:", playerGuessError);
+    }
+
+    const attemptNumber = (playerGuesses?.length || 0) + 1;
+    const maxAttempts = 3;
+
+    console.log(`Player ${playerId} attempt ${attemptNumber}/${maxAttempts} for turn ${turnData.id}`);
+
     // Check if secret element exists
     if (!turnData.secret_element) {
       return new Response(
@@ -102,6 +118,15 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "Failed to submit guess" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Check if player has reached max attempts and failed all
+    const isLastAttempt = attemptNumber >= maxAttempts;
+    const shouldFailPlayer = isLastAttempt && !isCorrect;
+
+    if (shouldFailPlayer) {
+      console.log(`Player ${playerId} failed after ${maxAttempts} attempts`);
+      // Don't complete the turn yet - let other players continue guessing
     }
 
     // If correct and first to answer, update player score and complete turn
@@ -221,6 +246,7 @@ Deno.serve(async (req) => {
           secret_element: turnData.secret_element,
           next_round: nextRoundInfo,
           game_completed: gameCompleted,
+          attempts_remaining: 0,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -232,6 +258,8 @@ Deno.serve(async (req) => {
         correct: isCorrect,
         points_earned: pointsEarned,
         already_answered: alreadyAnswered,
+        attempts_remaining: Math.max(0, maxAttempts - attemptNumber),
+        max_attempts_reached: shouldFailPlayer,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
