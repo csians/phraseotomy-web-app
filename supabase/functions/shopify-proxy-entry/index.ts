@@ -262,16 +262,33 @@ Deno.serve(async (req) => {
     if (customerId && secretData.access_token) {
       // Fetch full customer data from Shopify API
       try {
-        const shopifyResponse = await fetch(`https://${shop}/admin/api/2024-01/customers/${customerId}.json`, {
+        const apiUrl = `https://${shop}/admin/api/2024-01/customers/${customerId}.json`;
+        console.log("🔍 [SHOPIFY_API] Fetching customer from:", apiUrl);
+        console.log("🔍 [SHOPIFY_API] Has access token:", !!secretData.access_token);
+        
+        const shopifyResponse = await fetch(apiUrl, {
           headers: {
             "X-Shopify-Access-Token": secretData.access_token,
             "Content-Type": "application/json",
           },
         });
 
+        console.log("🔍 [SHOPIFY_API] Response status:", shopifyResponse.status);
+        console.log("🔍 [SHOPIFY_API] Response ok:", shopifyResponse.ok);
+
         if (shopifyResponse.ok) {
-          const shopifyData = await shopifyResponse.json();
+          const responseText = await shopifyResponse.text();
+          console.log("🔍 [SHOPIFY_API] Raw response (first 500 chars):", responseText.substring(0, 500));
+          
+          const shopifyData = JSON.parse(responseText);
           const customer = shopifyData.customer;
+          
+          console.log("🔍 [SHOPIFY_API] Parsed customer object:", {
+            id: customer?.id,
+            email: customer?.email,
+            first_name: customer?.first_name,
+            last_name: customer?.last_name,
+          });
 
           customerData = {
             id: customerId,
@@ -287,7 +304,9 @@ Deno.serve(async (req) => {
             name: customerData.name,
           });
         } else {
-          console.warn("Failed to fetch customer from Shopify:", shopifyResponse.status);
+          const errorText = await shopifyResponse.text();
+          console.warn("❌ Failed to fetch customer from Shopify. Status:", shopifyResponse.status);
+          console.warn("❌ Error response:", errorText);
           // Fallback to just ID
           customerData = {
             id: customerId,
@@ -298,7 +317,8 @@ Deno.serve(async (req) => {
           };
         }
       } catch (error) {
-        console.error("Error fetching customer from Shopify:", error);
+        console.error("❌ Error fetching customer from Shopify:", error);
+        console.error("❌ Error details:", error instanceof Error ? error.message : String(error));
         // Fallback to just ID
         customerData = {
           id: customerId,
