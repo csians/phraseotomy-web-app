@@ -345,10 +345,8 @@ Deno.serve(async (req) => {
  * Generate login redirect HTML for unauthenticated users
  */
 function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: string): string {
-  // Use environment-specific URL
-  const baseUrl = environment === "production" 
-    ? "https://app.phraseotomy.com" 
-    : "https://phraseotomy.ourstagingserver.com";
+  // Use staging domain for both environments
+  const baseUrl = "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
   #header-group,.header-group, footer, header {
     display: none !important;
@@ -600,10 +598,8 @@ function generateAppHtml(
     verified: true,
   };
 
-  // Use environment-specific URL
-  const baseUrl = tenant.environment === "production" 
-    ? "https://app.phraseotomy.com" 
-    : "https://phraseotomy.ourstagingserver.com";
+  // Use staging domain for both environments
+  const baseUrl = "https://phraseotomy.ourstagingserver.com";
 
   // Encode configuration as URL parameters (before hash for HashRouter)
   const configParams = new URLSearchParams({
