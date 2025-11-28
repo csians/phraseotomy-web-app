@@ -71,6 +71,9 @@ const GuestJoin = () => {
         setStatus("Success! Redirecting...");
         toast.success("Joined lobby successfully!");
         
+        // Clean the URL before navigating
+        window.history.replaceState({}, '', window.location.pathname + window.location.hash.split('?')[0]);
+        
         // Navigate to lobby
         navigate(`/lobby/${sessionId}`, { replace: true });
       } catch (error) {
