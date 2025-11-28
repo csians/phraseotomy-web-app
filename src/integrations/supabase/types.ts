@@ -121,7 +121,9 @@ export type Database = {
           first_name: string | null
           id: string
           last_name: string | null
+          prod_customer_id: string | null
           shop_domain: string
+          staging_customer_id: string | null
           tenant_id: string
           updated_at: string
         }
@@ -133,7 +135,9 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
+          prod_customer_id?: string | null
           shop_domain: string
+          staging_customer_id?: string | null
           tenant_id: string
           updated_at?: string
         }
@@ -145,7 +149,9 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
+          prod_customer_id?: string | null
           shop_domain?: string
+          staging_customer_id?: string | null
           tenant_id?: string
           updated_at?: string
         }
