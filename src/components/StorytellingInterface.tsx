@@ -41,6 +41,8 @@ export function StorytellingInterface({
   const [isUploading, setIsUploading] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [secretElement, setSecretElement] = useState<string | null>(null);
+  const [whisp, setWhisp] = useState<string>("");
+  const [isLoadingWhisp, setIsLoadingWhisp] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -248,20 +250,52 @@ export function StorytellingInterface({
                       onClick={async () => {
                         if (isStoryteller) {
                           setSecretElement(element.id);
+                          setIsLoadingWhisp(true);
                           
-                          // Save to database immediately
                           try {
+                            // Generate whisp (one-word hint)
+                            const { data: whispData, error: whispError } = await supabase.functions.invoke("generate-whisp", {
+                              body: { 
+                                elementName: element.name,
+                                themeName: theme.name 
+                              },
+                            });
+
+                            if (whispError) throw whispError;
+
+                            const generatedWhisp = whispData.whisp;
+                            setWhisp(generatedWhisp);
+
+                            // Save secret element and whisp to database
                             await supabase.functions.invoke("update-turn-secret", {
                               body: { turnId, secretElementId: element.id },
                             });
+
+                            // Update turn with whisp
+                            await supabase
+                              .from("game_turns")
+                              .update({ whisp: generatedWhisp })
+                              .eq("id", turnId);
                             
                             // Notify others via WebSocket
                             sendWebSocketMessage?.({
                               type: "secret_element_selected",
                               elementId: element.id,
                             });
+
+                            toast({
+                              title: "Whisp Generated! ✨",
+                              description: `Your hint word is: "${generatedWhisp}"`,
+                            });
                           } catch (error) {
-                            console.error("Error saving secret element:", error);
+                            console.error("Error saving secret element or generating whisp:", error);
+                            toast({
+                              title: "Error",
+                              description: "Failed to generate hint. Please try again.",
+                              variant: "destructive",
+                            });
+                          } finally {
+                            setIsLoadingWhisp(false);
                           }
                         }
                       }}
@@ -280,17 +314,30 @@ export function StorytellingInterface({
               </div>
             </div>
 
+            {isStoryteller && whisp && (
+              <div className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Lightbulb className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-semibold text-primary">Your Whisp (Hint)</h3>
+                </div>
+                <p className="text-2xl font-bold text-center text-primary">{whisp}</p>
+                <p className="text-sm text-muted-foreground text-center mt-2">
+                  Use this word as inspiration for your story!
+                </p>
+              </div>
+            )}
+
             <div className="border-t border-border pt-6">
               <h3 className="text-lg font-semibold mb-3">
                 {isStoryteller ? "Step 2: Record Your Story" : "Waiting for Story"}
               </h3>
               {isStoryteller ? (
                 <>
-                  {!secretElement && (
+                  {(!secretElement || isLoadingWhisp) && (
                     <Alert className="mb-4">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        Please select your secret element first
+                        {isLoadingWhisp ? "Generating your whisp (hint)..." : "Please select your secret element first"}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -311,7 +358,7 @@ export function StorytellingInterface({
                         size="lg"
                         variant={isRecording ? "destructive" : "default"}
                         className="w-full"
-                        disabled={!secretElement}
+                        disabled={!secretElement || isLoadingWhisp}
                       >
                         {isRecording ? (
                           <>
@@ -367,8 +414,8 @@ export function StorytellingInterface({
                 <Lightbulb className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
                   {isStoryteller 
-                    ? "Craft a creative story using the elements above. Other players will listen and try to guess which element you used!"
-                    : "Listen carefully when the storyteller records their clue, then you'll guess which element they described!"}
+                    ? "Use your whisp (hint word) as inspiration! Craft a creative story that describes your secret element. Other players will listen and try to guess which element you used!"
+                    : "Listen carefully when the storyteller records their clue, then you'll have 3 attempts to guess which element they described!"}
                 </p>
               </div>
             </div>

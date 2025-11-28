@@ -47,6 +47,8 @@ export function GuessingInterface({
   const { toast } = useToast();
   const [selectedElements, setSelectedElements] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attemptsRemaining, setAttemptsRemaining] = useState(3);
+  const [hasFailedAllAttempts, setHasFailedAllAttempts] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const toggleElement = (elementId: string) => {
@@ -59,6 +61,15 @@ export function GuessingInterface({
       toast({
         title: "No Selection",
         description: "Please select one element.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (hasFailedAllAttempts) {
+      toast({
+        title: "No Attempts Left",
+        description: "You've used all 3 attempts for this round.",
         variant: "destructive",
       });
       return;
@@ -84,15 +95,33 @@ export function GuessingInterface({
 
       if (error) throw error;
 
-      const { correct, points_earned } = data;
+      const { correct, points_earned, attempts_remaining, max_attempts_reached } = data;
 
-      toast({
-        title: correct ? "🎉 Correct!" : "❌ Wrong Guess",
-        description: correct ? `You earned ${points_earned} points!` : "Better luck next time!",
-        variant: correct ? "default" : "destructive",
-      });
+      // Update attempts remaining
+      setAttemptsRemaining(attempts_remaining);
+      setHasFailedAllAttempts(max_attempts_reached);
 
-      onGuessSubmit();
+      if (correct) {
+        toast({
+          title: "🎉 Correct!",
+          description: `You earned ${points_earned} points!`,
+        });
+        onGuessSubmit();
+      } else if (max_attempts_reached) {
+        toast({
+          title: "❌ Out of Attempts",
+          description: "You've used all 3 attempts. Waiting for other players...",
+          variant: "destructive",
+        });
+        setSelectedElements([]); // Clear selection
+      } else {
+        toast({
+          title: "❌ Wrong Guess",
+          description: `You have ${attempts_remaining} attempt${attempts_remaining === 1 ? '' : 's'} left!`,
+          variant: "destructive",
+        });
+        setSelectedElements([]); // Clear selection for next attempt
+      }
     } catch (error) {
       console.error("Error submitting guess:", error);
       toast({
@@ -123,9 +152,19 @@ export function GuessingInterface({
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold mb-3">
-                Which element was {storytellerName} describing? (10 points):
-              </h3>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-semibold">
+                  Which element was {storytellerName} describing? (10 points):
+                </h3>
+                <div className={`text-sm font-medium px-3 py-1 rounded-full ${
+                  attemptsRemaining === 3 ? 'bg-green-500/10 text-green-600' :
+                  attemptsRemaining === 2 ? 'bg-yellow-500/10 text-yellow-600' :
+                  attemptsRemaining === 1 ? 'bg-orange-500/10 text-orange-600' :
+                  'bg-red-500/10 text-red-600'
+                }`}>
+                  {hasFailedAllAttempts ? 'No attempts left' : `${attemptsRemaining}/3 attempts`}
+                </div>
+              </div>
               <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
                 {availableElements.map((element) => (
                   <button
@@ -147,11 +186,11 @@ export function GuessingInterface({
 
             <Button
               onClick={handleSubmitGuess}
-              disabled={isSubmitting || selectedElements.length === 0}
+              disabled={isSubmitting || selectedElements.length === 0 || hasFailedAllAttempts}
               size="lg"
               className="w-full"
             >
-              {isSubmitting ? "Submitting..." : "Submit Guess"}
+              {isSubmitting ? "Submitting..." : hasFailedAllAttempts ? "No Attempts Left" : "Submit Guess"}
             </Button>
           </CardContent>
         </Card>
