@@ -213,6 +213,16 @@ serve(async (req) => {
           }, playerId);
           break;
 
+        case "audio_chunk":
+          // Stream audio chunk to other players in real-time
+          broadcastToSession(sessionId, {
+            type: "audio_chunk",
+            audioData: message.audioData,
+            storytellerId: playerId,
+            timestamp: new Date().toISOString(),
+          }, playerId);
+          break;
+
         case "recording_uploaded":
           // Audio recording uploaded - notify ALL players to start guessing
           broadcastToAll(sessionId, {
