@@ -33,7 +33,7 @@ const Play = () => {
   // Store customer in database on first login
   const storeCustomerInDatabase = async (customerData: ShopifyCustomer, shopDomain: string, tenantId: string) => {
     try {
-      const { error } = await supabase.functions.invoke('store-customer', {
+      const { error } = await supabase.functions.invoke("store-customer", {
         body: {
           customer_id: customerData.id,
           customer_email: customerData.email,
@@ -46,12 +46,12 @@ const Play = () => {
       });
 
       if (error) {
-        console.error('Error storing customer:', error);
+        console.error("Error storing customer:", error);
       } else {
-        console.log('✅ Customer stored/verified in database');
+        console.log("✅ Customer stored/verified in database");
       }
     } catch (error) {
-      console.error('Error calling store-customer:', error);
+      console.error("Error calling store-customer:", error);
     }
   };
 
@@ -62,126 +62,132 @@ const Play = () => {
       if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
         setTenant(window.__PHRASEOTOMY_CONFIG__);
         setShopDomain(window.__PHRASEOTOMY_SHOP__);
-        
+
         if (window.__PHRASEOTOMY_CUSTOMER__) {
-          console.log('👤 Customer Data from proxy:', {
+          console.log("👤 Customer Data from proxy:", {
             id: window.__PHRASEOTOMY_CUSTOMER__.id,
             email: window.__PHRASEOTOMY_CUSTOMER__.email,
             name: window.__PHRASEOTOMY_CUSTOMER__.name,
           });
           setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
-          
+
           // Store customer data in localStorage for Lobby page
-          localStorage.setItem('customerData', JSON.stringify({
-            customer_id: window.__PHRASEOTOMY_CUSTOMER__.id,
-            id: window.__PHRASEOTOMY_CUSTOMER__.id,
-            email: window.__PHRASEOTOMY_CUSTOMER__.email,
-            name: window.__PHRASEOTOMY_CUSTOMER__.name,
-            first_name: window.__PHRASEOTOMY_CUSTOMER__.firstName,
-            last_name: window.__PHRASEOTOMY_CUSTOMER__.lastName,
-          }));
+          localStorage.setItem(
+            "customerData",
+            JSON.stringify({
+              customer_id: window.__PHRASEOTOMY_CUSTOMER__.id,
+              id: window.__PHRASEOTOMY_CUSTOMER__.id,
+              email: window.__PHRASEOTOMY_CUSTOMER__.email,
+              name: window.__PHRASEOTOMY_CUSTOMER__.name,
+              first_name: window.__PHRASEOTOMY_CUSTOMER__.firstName,
+              last_name: window.__PHRASEOTOMY_CUSTOMER__.lastName,
+            }),
+          );
 
           // Store customer in database
           storeCustomerInDatabase(
             window.__PHRASEOTOMY_CUSTOMER__,
             window.__PHRASEOTOMY_SHOP__,
-            window.__PHRASEOTOMY_CONFIG__.id
+            window.__PHRASEOTOMY_CONFIG__.id,
           );
         }
-        
+
         setLoading(false);
         return;
       }
 
       const urlParams = getAllUrlParams();
-      
+
       // Check for iframe config from URL parameters (fallback method)
-      const configParam = urlParams.get('config');
-      const shopParam = urlParams.get('shop');
-      const customerParam = urlParams.get('customer');
-      
+      const configParam = urlParams.get("config");
+      const shopParam = urlParams.get("shop");
+      const customerParam = urlParams.get("customer");
+
       if (configParam && shopParam) {
         try {
           const tenantConfig = JSON.parse(configParam);
           const customerData = customerParam ? JSON.parse(customerParam) : null;
-          
-          console.log('🎯 Config loaded from URL params (iframe mode)');
+
+          console.log("🎯 Config loaded from URL params (iframe mode)");
           setTenant(tenantConfig);
           setShopDomain(shopParam);
-          
+
           if (customerData) {
-            console.log('👤 Customer Data from iframe params:', {
+            console.log("👤 Customer Data from iframe params:", {
               id: customerData.id,
               email: customerData.email,
               name: customerData.name,
             });
             setCustomer(customerData);
-            
+
             // Store customer data in localStorage for Lobby page
-            localStorage.setItem('customerData', JSON.stringify({
-              customer_id: customerData.id,
-              id: customerData.id,
-              email: customerData.email,
-              name: customerData.name,
-              first_name: customerData.firstName,
-              last_name: customerData.lastName,
-            }));
+            localStorage.setItem(
+              "customerData",
+              JSON.stringify({
+                customer_id: customerData.id,
+                id: customerData.id,
+                email: customerData.email,
+                name: customerData.name,
+                first_name: customerData.firstName,
+                last_name: customerData.lastName,
+              }),
+            );
 
             // Store customer in database
             storeCustomerInDatabase(customerData, shopParam, tenantConfig.id);
           }
-          
+
           setLoading(false);
           return;
         } catch (error) {
-          console.error('Error parsing URL config:', error);
+          console.error("Error parsing URL config:", error);
         }
       }
 
       // Check if accessed from Shopify embedded app (has host parameter)
-      const hostParam = urlParams.get('host');
-      
+      const hostParam = urlParams.get("host");
+
       if (hostParam && shopParam) {
-        console.log('🔗 Embedded app detected, redirecting to login with shop context');
+        console.log("🔗 Embedded app detected, redirecting to login with shop context");
         navigate(`/login?shop=${shopParam}&host=${hostParam}`, { replace: true });
         return;
       }
 
       // Try to restore session from localStorage
-      const sessionToken = localStorage.getItem('phraseotomy_session_token');
-      const storedCustomerData = localStorage.getItem('customerData');
-      
+      const sessionToken = localStorage.getItem("phraseotomy_session_token");
+      const storedCustomerData = localStorage.getItem("customerData");
+
       if (!sessionToken || !storedCustomerData) {
-        console.log('⚠️ No session found, redirecting to login');
-        navigate('/login', { replace: true });
+        console.log("⚠️ No session found, redirecting to login");
+        navigate("/login", { replace: true });
         return;
       }
 
       try {
         // Verify session token is still valid
-        const { data: customerData, error: customerError } = await supabase.functions.invoke('get-customer-data', {
+        const { data: customerData, error: customerError } = await supabase.functions.invoke("get-customer-data", {
           body: { sessionToken },
         });
 
         if (customerError || !customerData) {
-          console.warn('⚠️ Invalid session, clearing and redirecting to login');
-          localStorage.removeItem('phraseotomy_session_token');
-          localStorage.removeItem('customerData');
-          navigate('/login', { replace: true });
+          console.warn("⚠️ Invalid session, clearing and redirecting to login");
+          localStorage.removeItem("phraseotomy_session_token");
+          localStorage.removeItem("customerData");
+          navigate("/login", { replace: true });
           return;
         }
 
         // Decode session token to get customer info
-        const [payloadB64] = sessionToken.split('.');
+        const [payloadB64] = sessionToken.split(".");
         if (payloadB64) {
-          const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
-          
+          const payload = JSON.parse(atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/")));
+
           // Check if token is expired
           if (payload.exp && payload.exp * 1000 < Date.now()) {
-            console.warn('⚠️ Session token expired, redirecting to login');
-            localStorage.removeItem('phraseotomy_session_token');
-            localStorage.removeItem('customerData');
-            navigate('/login', { replace: true });
+            console.warn("⚠️ Session token expired, redirecting to login");
+            localStorage.removeItem("phraseotomy_session_token");
+            localStorage.removeItem("customerData");
+            navigate("/login", { replace: true });
             return;
           }
 
@@ -222,13 +228,13 @@ const Play = () => {
             }
           }
 
-          console.log('✅ Session restored successfully');
+          console.log("✅ Session restored successfully");
         }
       } catch (error) {
-        console.error('Error restoring session:', error);
-        localStorage.removeItem('phraseotomy_session_token');
-        localStorage.removeItem('customerData');
-        navigate('/login', { replace: true });
+        console.error("Error restoring session:", error);
+        localStorage.removeItem("phraseotomy_session_token");
+        localStorage.removeItem("customerData");
+        navigate("/login", { replace: true });
         return;
       }
 
@@ -271,11 +277,11 @@ const Play = () => {
     try {
       // Validate lobby code
       const validatedLobbyCode = validateInput(lobbyCodeSchema, lobbyCode);
-      
+
       // Determine player ID and name
       let playerId: string;
       let playerName: string;
-      
+
       if (customer) {
         playerId = customer.id;
         playerName = customer.name || customer.email || "Customer";
@@ -312,7 +318,7 @@ const Play = () => {
           title: "Joined Lobby!",
           description: `You've joined lobby ${validatedLobbyCode}`,
         });
-        
+
         // Navigate to lobby page
         navigate(`/lobby/${data.session.id}`);
       }
@@ -354,16 +360,16 @@ const Play = () => {
     setIsRedeeming(true);
     try {
       const result = await redeemCode(redemptionCode, customer.id, shopDomain);
-      
+
       if (result.success) {
         toast({
           title: "Success!",
           description: result.message,
         });
-        
+
         // Clear the input
         setRedemptionCode("");
-        
+
         // Refresh customer data to show updated licenses
         setDataLoading(true);
         try {
@@ -399,16 +405,16 @@ const Play = () => {
 
   const handleLogout = () => {
     // Clear local storage
-    localStorage.removeItem('phraseotomy_session_token');
-    localStorage.removeItem('customerData');
-    
+    localStorage.removeItem("phraseotomy_session_token");
+    localStorage.removeItem("customerData");
+
     // If running in Shopify app proxy (has shop domain), logout from Shopify
     if (shopDomain) {
       // Redirect to Shopify logout, which will return to app proxy and show login page
       window.top!.location.href = `https://${shopDomain}/account/logout`;
     } else {
       // Fallback for standalone mode
-      navigate('/login');
+      navigate("/login");
     }
   };
 
@@ -453,12 +459,7 @@ const Play = () => {
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-white">Welcome, {customer?.name || customer?.email}!</h2>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleLogout}
-            className="ml-4"
-          >
+          <Button variant="outline" size="sm" onClick={handleLogout} className="ml-4">
             Logout
           </Button>
         </div>
@@ -517,9 +518,7 @@ const Play = () => {
                 <Input
                   placeholder="Enter code"
                   value={redemptionCode}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setRedemptionCode(e.target.value.toUpperCase())
-                  }
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRedemptionCode(e.target.value.toUpperCase())}
                   maxLength={6}
                 />
                 <Button onClick={handleRedeemCode} disabled={redemptionCode.length !== 6 || isRedeeming}>
@@ -535,7 +534,7 @@ const Play = () => {
           <CardHeader>
             <CardTitle className="text-lg">Host New Game</CardTitle>
             <CardDescription>
-              {hasActiveLicenses 
+              {hasActiveLicenses
                 ? "Start a new game session and invite friends"
                 : "You're in the right place! Redeem a code above to unlock game packs"}
             </CardDescription>
@@ -551,9 +550,7 @@ const Play = () => {
             </Button>
             {!hasActiveLicenses && (
               <div className="bg-muted/50 border border-border rounded-lg p-3 text-center">
-                <p className="text-sm text-muted-foreground">
-                  👆 Enter a code above to get started
-                </p>
+                <p className="text-sm text-muted-foreground">👆 Enter a code above to get started</p>
               </div>
             )}
           </CardContent>
@@ -581,11 +578,7 @@ const Play = () => {
                       <p className="font-mono text-lg text-game-yellow font-bold">{session.lobby_code}</p>
                       <p className="text-xs text-muted-foreground capitalize">{session.status}</p>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => navigate(`/lobby/${session.id}`)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/lobby/${session.id}`)}>
                       Rejoin
                     </Button>
                   </div>
@@ -603,7 +596,7 @@ const Play = () => {
         <Card className="bg-card border-game-gray">
           <CardHeader>
             <CardTitle className="text-lg">Join Another Game</CardTitle>
-            <CardDescription>Enter a lobby code to join someone else's game</CardDescription>
+            <CardDescription>Enter a lobby code to join someone else game</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
