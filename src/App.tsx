@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import CreateLobby from "./pages/CreateLobby";
 import Lobby from "./pages/Lobby";
 import Game from "./pages/Game";
+import GuestJoin from "./pages/GuestJoin";
 import NotFound from "./pages/NotFound";
 import AdminHome from "./pages/admin/AdminHome";
 import Codes from "./pages/admin/Codes";
@@ -92,6 +93,7 @@ const App = () => (
           <Route path="/play/host" element={<Play />} />
           <Route path="/apps/phraseotomy" element={<Play />} />
           <Route path="/create-lobby" element={<CreateLobby />} />
+          <Route path="/lobby/join" element={<GuestJoin />} />
           <Route path="/lobby/:sessionId" element={<Lobby />} />
           <Route path="/game/:sessionId" element={<Game />} />
           <Route path="/admin" element={<AdminHome />} />

@@ -237,6 +237,7 @@ Deno.serve(async (req) => {
  * Generate login redirect HTML for unauthenticated users
  */
 function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
+  const baseUrl = "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
   body {
     margin: 0;
@@ -274,7 +275,7 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
   }
   p {
     font-size: 16px;
-    margin: 0 0 32px 0;
+    margin: 0 0 24px 0;
     opacity: 0.8;
   }
   .login-btn {
@@ -287,17 +288,159 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
     font-weight: 600;
     font-size: 16px;
     transition: transform 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+    border: none;
+    cursor: pointer;
   }
   .login-btn:hover {
     transform: scale(1.05);
+  }
+  .divider {
+    display: flex;
+    align-items: center;
+    margin: 24px 0;
+    color: rgba(251, 191, 36, 0.5);
+  }
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(251, 191, 36, 0.3);
+  }
+  .divider span {
+    padding: 0 16px;
+    font-size: 14px;
+  }
+  .guest-section {
+    margin-top: 16px;
+  }
+  .guest-btn {
+    display: inline-block;
+    padding: 14px 28px;
+    background: transparent;
+    color: #fbbf24;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.2s;
+    border: 2px solid rgba(251, 191, 36, 0.5);
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .guest-btn:hover {
+    background: rgba(251, 191, 36, 0.1);
+    border-color: #fbbf24;
+  }
+  .guest-form {
+    display: none;
+    margin-top: 16px;
+  }
+  .guest-form.active {
+    display: block;
+  }
+  .guest-input {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(251, 191, 36, 0.1);
+    border: 2px solid rgba(251, 191, 36, 0.3);
+    border-radius: 8px;
+    color: #fbbf24;
+    font-size: 16px;
+    text-align: center;
+    letter-spacing: 4px;
+    font-weight: 600;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+  }
+  .guest-input::placeholder {
+    color: rgba(251, 191, 36, 0.5);
+    letter-spacing: normal;
+  }
+  .guest-input:focus {
+    outline: none;
+    border-color: #fbbf24;
+  }
+  .join-btn {
+    display: inline-block;
+    padding: 14px 28px;
+    background: #fbbf24;
+    color: #0a0a0a;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: transform 0.2s;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .join-btn:hover {
+    transform: scale(1.05);
+  }
+  .join-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
   }
 </style>
 <div class="login-prompt">
   <div class="logo">P</div>
   <h1>PHRASEOTOMY</h1>
-  <p>Please log in to your account to access the game n</p>
+  <p>Log in to your account to host a game</p>
   <a href="${loginUrl}" class="login-btn">Log In</a>
-</div>`;
+  
+  <div class="divider"><span>or</span></div>
+  
+  <div class="guest-section">
+    <button class="guest-btn" onclick="toggleGuestForm()">Join Lobby Without Login</button>
+    <div id="guestForm" class="guest-form">
+      <input 
+        type="text" 
+        id="lobbyCode" 
+        class="guest-input" 
+        placeholder="Enter 6-digit code" 
+        maxlength="6"
+        oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '')"
+      />
+      <button class="join-btn" onclick="joinAsGuest()" id="joinBtn" disabled>Join as Guest</button>
+    </div>
+  </div>
+</div>
+<script>
+  function toggleGuestForm() {
+    const form = document.getElementById('guestForm');
+    form.classList.toggle('active');
+    if (form.classList.contains('active')) {
+      document.getElementById('lobbyCode').focus();
+    }
+  }
+  
+  document.getElementById('lobbyCode').addEventListener('input', function() {
+    document.getElementById('joinBtn').disabled = this.value.length !== 6;
+  });
+  
+  function joinAsGuest() {
+    const code = document.getElementById('lobbyCode').value;
+    if (code.length === 6) {
+      const guestId = 'guest_' + Math.random().toString(36).substring(2, 11);
+      const guestName = 'Guest' + Math.floor(Math.random() * 900 + 100);
+      const guestData = JSON.stringify({ player_id: guestId, name: guestName, is_guest: true });
+      
+      // Redirect to standalone app with guest params
+      const params = new URLSearchParams({
+        lobbyCode: code,
+        guestData: guestData,
+        shop: '${shop}'
+      });
+      window.top.location.href = '${baseUrl}/?guest=true&' + params.toString() + '#/lobby/join';
+    }
+  }
+</script>`;
 }
 
 /**
