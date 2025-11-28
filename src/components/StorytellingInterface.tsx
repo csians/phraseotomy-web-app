@@ -69,6 +69,21 @@ export function StorytellingInterface({
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
+          
+          // Stream audio chunk to other players via WebSocket
+          if (sendWebSocketMessage) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64data = reader.result as string;
+              const base64Audio = base64data.split(',')[1]; // Remove data:audio/webm;base64, prefix
+              
+              sendWebSocketMessage({
+                type: "audio_chunk",
+                audioData: base64Audio,
+              });
+            };
+            reader.readAsDataURL(event.data);
+          }
         }
       };
 
@@ -83,7 +98,8 @@ export function StorytellingInterface({
         });
       };
 
-      mediaRecorder.start();
+      // Request data every 100ms for real-time streaming
+      mediaRecorder.start(100);
       setIsRecording(true);
       setRecordingTime(0);
 

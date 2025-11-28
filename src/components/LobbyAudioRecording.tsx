@@ -8,9 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 interface LobbyAudioRecordingProps {
   onRecordingComplete: (audioBlob: Blob) => void;
   isUploading: boolean;
+  sendWebSocketMessage?: (message: any) => void;
 }
 
-export const LobbyAudioRecording = ({ onRecordingComplete, isUploading }: LobbyAudioRecordingProps) => {
+export const LobbyAudioRecording = ({ onRecordingComplete, isUploading, sendWebSocketMessage }: LobbyAudioRecordingProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob; duration: number; url: string } | null>(null);
@@ -41,6 +42,21 @@ export const LobbyAudioRecording = ({ onRecordingComplete, isUploading }: LobbyA
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunks.push(event.data);
+          
+          // Stream audio chunk to other players via WebSocket
+          if (sendWebSocketMessage) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64data = reader.result as string;
+              const base64Audio = base64data.split(',')[1]; // Remove data:audio/webm;base64, prefix
+              
+              sendWebSocketMessage({
+                type: "audio_chunk",
+                audioData: base64Audio,
+              });
+            };
+            reader.readAsDataURL(event.data);
+          }
         }
       };
 
@@ -54,6 +70,13 @@ export const LobbyAudioRecording = ({ onRecordingComplete, isUploading }: LobbyA
         // Stop all tracks
         stream.getTracks().forEach((track) => track.stop());
 
+        // Notify others recording stopped
+        if (sendWebSocketMessage) {
+          sendWebSocketMessage({
+            type: "recording_stopped",
+          });
+        }
+
         toast({
           title: "Recording Complete",
           description: "Review your recording and click Save to upload",
@@ -62,9 +85,18 @@ export const LobbyAudioRecording = ({ onRecordingComplete, isUploading }: LobbyA
 
       recordingStartTime.current = Date.now();
       setRecordingTime(0);
-      recorder.start();
+      
+      // Request data every 100ms for real-time streaming
+      recorder.start(100);
       setMediaRecorder(recorder);
       setIsRecording(true);
+
+      // Notify others recording started
+      if (sendWebSocketMessage) {
+        sendWebSocketMessage({
+          type: "recording_started",
+        });
+      }
 
       // Start timer
       timerInterval.current = setInterval(() => {
@@ -79,7 +111,7 @@ export const LobbyAudioRecording = ({ onRecordingComplete, isUploading }: LobbyA
 
       toast({
         title: "Recording Started",
-        description: "Maximum recording time is 3 minutes",
+        description: "Maximum recording time is 3 minutes. Other players can hear you live!",
       });
     } catch (error) {
       console.error("Error starting recording:", error);

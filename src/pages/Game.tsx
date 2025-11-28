@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +59,10 @@ export default function Game() {
   const [themeElements, setThemeElements] = useState<Element[]>([]);
   const [gamePhase, setGamePhase] = useState<"theme_selection" | "storytelling" | "guessing" | "scoring">("theme_selection");
   const [currentPlayerId, setCurrentPlayerId] = useState<string>("");
+  const [isReceivingAudio, setIsReceivingAudio] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioQueueRef = useRef<string[]>([]);
+  const isPlayingRef = useRef(false);
 
   // Get current player info for WebSocket
   const getCurrentPlayerInfo = () => {
@@ -68,6 +72,42 @@ export default function Game() {
       playerId,
       playerName: player?.name || "Player"
     };
+  };
+
+  // Initialize audio context for real-time playback
+  useEffect(() => {
+    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  // Function to play audio chunks in real-time
+  const playAudioChunk = async (base64Audio: string) => {
+    if (!audioContextRef.current) return;
+
+    try {
+      // Decode base64 to ArrayBuffer
+      const binaryString = atob(base64Audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      // Decode audio data
+      const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
+      
+      // Create source and play
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current.destination);
+      source.start(0);
+    } catch (error) {
+      console.error("Error playing audio chunk:", error);
+    }
   };
 
   // WebSocket for real-time updates - just refreshes from database
@@ -80,6 +120,25 @@ export default function Game() {
       console.log('🎮 Game WebSocket message:', message.type, message);
       
       switch (message.type) {
+        case "recording_started":
+          setIsReceivingAudio(true);
+          toast({
+            title: "🎤 Recording Started",
+            description: "Listen to the storyteller's live recording",
+          });
+          break;
+
+        case "recording_stopped":
+          setIsReceivingAudio(false);
+          break;
+
+        case "audio_chunk":
+          // Play audio chunk in real-time
+          if (message.audioData && message.storytellerId !== currentPlayerId) {
+            playAudioChunk(message.audioData);
+          }
+          break;
+
         case "theme_selected":
           toast({
             title: "Theme Selected",
@@ -498,6 +557,12 @@ export default function Game() {
                 <p className="text-muted-foreground">
                   Watch the elements below - one of them is the secret!
                 </p>
+                {isReceivingAudio && (
+                  <div className="mt-4 flex items-center justify-center gap-2 text-sm text-green-600">
+                    <div className="h-3 w-3 rounded-full bg-green-600 animate-pulse" />
+                    <span className="font-medium">Listening to live recording...</span>
+                  </div>
+                )}
               </div>
               
               {selectedElements.length > 0 && (
