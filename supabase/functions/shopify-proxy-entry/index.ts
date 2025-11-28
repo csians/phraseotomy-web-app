@@ -1,47 +1,38 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 /**
  * Verify Shopify HMAC signature for app proxy requests
  */
-async function verifyShopifyHmac(
-  queryParams: URLSearchParams,
-  clientSecret: string
-): Promise<boolean> {
-  const signature = queryParams.get('signature');
+async function verifyShopifyHmac(queryParams: URLSearchParams, clientSecret: string): Promise<boolean> {
+  const signature = queryParams.get("signature");
   if (!signature) {
     return false;
   }
 
   // Create a copy without the signature
   const paramsWithoutSignature = new URLSearchParams(queryParams);
-  paramsWithoutSignature.delete('signature');
+  paramsWithoutSignature.delete("signature");
 
   // Sort and format parameters as Shopify expects
   const sortedParams = Array.from(paramsWithoutSignature.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => `${key}=${value}`)
-    .join('');
+    .join("");
 
   // Generate HMAC
   const encoder = new TextEncoder();
   const keyData = encoder.encode(clientSecret);
   const messageData = encoder.encode(sortedParams);
 
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
+  const cryptoKey = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
 
-  const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
+  const signatureBuffer = await crypto.subtle.sign("HMAC", cryptoKey, messageData);
   const calculatedSignature = Array.from(new Uint8Array(signatureBuffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 
   return signature === calculatedSignature;
 }
@@ -49,34 +40,31 @@ async function verifyShopifyHmac(
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   const queryParams = url.searchParams;
-  const shop = queryParams.get('shop');
+  const shop = queryParams.get("shop");
 
-  console.log('Proxy request received:', { 
-    shop, 
-    hasSignature: !!queryParams.get('signature'), 
-    hasCustomer: !!queryParams.get('logged_in_customer_id') 
+  console.log("Proxy request received:", {
+    shop,
+    hasSignature: !!queryParams.get("signature"),
+    hasCustomer: !!queryParams.get("logged_in_customer_id"),
   });
 
   // CORS headers for browser requests
   const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   };
 
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   // If no shop parameter, return error
   if (!shop) {
-    return new Response(
-      JSON.stringify({ error: 'No shop parameter', verified: false }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return new Response(JSON.stringify({ error: "No shop parameter", verified: false }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
@@ -85,180 +73,162 @@ Deno.serve(async (req) => {
 
     // Fetch tenant configuration (excluding secrets)
     const { data: tenant, error: tenantError } = await supabase
-      .from('tenants')
-      .select('id, name, tenant_key, shop_domain, environment, is_active')
-      .eq('shop_domain', shop)
-      .eq('is_active', true)
+      .from("tenants")
+      .select("id, name, tenant_key, shop_domain, environment, is_active")
+      .eq("shop_domain", shop)
+      .eq("is_active", true)
       .maybeSingle();
 
     if (tenantError) {
-      console.error('Error fetching tenant:', tenantError);
-      return new Response(
-        JSON.stringify({ error: tenantError.message, verified: false }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      console.error("Error fetching tenant:", tenantError);
+      return new Response(JSON.stringify({ error: tenantError.message, verified: false }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (!tenant) {
-      console.log('Tenant not found for shop:', shop);
+      console.log("Tenant not found for shop:", shop);
       return new Response(
         generateErrorHtml(
-          'Tenant Not Found',
-          `No active tenant found for shop: ${shop}. Please ensure the tenant is configured in Supabase with shop_domain matching exactly.`
+          "Tenant Not Found",
+          `No active tenant found for shop: ${shop}. Please ensure the tenant is configured in Supabase with shop_domain matching exactly.`,
         ),
         {
           status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'text/html' },
-        }
+          headers: { ...corsHeaders, "Content-Type": "text/html" },
+        },
       );
     }
 
     // Fetch client secret and access token separately for HMAC verification and API calls
     const { data: secretData, error: secretError } = await supabase
-      .from('tenants')
-      .select('shopify_client_secret, access_token')
-      .eq('shop_domain', shop)
+      .from("tenants")
+      .select("shopify_client_secret, access_token")
+      .eq("shop_domain", shop)
       .single();
 
     if (secretError || !secretData) {
-      console.error('Error fetching tenant credentials');
-      return new Response(
-        generateErrorHtml('Configuration Error', 'Unable to verify request authenticity.'),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'text/html' },
-        }
-      );
+      console.error("Error fetching tenant credentials");
+      return new Response(generateErrorHtml("Configuration Error", "Unable to verify request authenticity."), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "text/html" },
+      });
     }
 
     // Verify HMAC signature
-    const isValidSignature = await verifyShopifyHmac(
-      queryParams,
-      secretData.shopify_client_secret
-    );
+    const isValidSignature = await verifyShopifyHmac(queryParams, secretData.shopify_client_secret);
 
     if (!isValidSignature) {
-      console.log('Invalid HMAC signature for shop:', shop);
+      console.log("Invalid HMAC signature for shop:", shop);
       return new Response(
         generateErrorHtml(
-          'Authentication Failed',
-          'HMAC signature verification failed. Please check your Shopify Client Secret in the tenant configuration.'
+          "Authentication Failed",
+          "HMAC signature verification failed. Please check your Shopify Client Secret in the tenant configuration.",
         ),
         {
           status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'text/html' },
-        }
+          headers: { ...corsHeaders, "Content-Type": "text/html" },
+        },
       );
     }
 
-    console.log('HMAC verified successfully for tenant:', tenant.tenant_key);
+    console.log("HMAC verified successfully for tenant:", tenant.tenant_key);
 
     // Extract customer ID from Shopify proxy parameters
-    const customerId = queryParams.get('logged_in_customer_id') || null;
-    
+    const customerId = queryParams.get("logged_in_customer_id") || null;
+
     // If no customer is logged in, redirect to Shopify login
     if (!customerId) {
-      console.log('No customer logged in, redirecting to Shopify login');
+      console.log("No customer logged in, redirecting to Shopify login");
       const loginUrl = `https://${shop}/account/login?return_url=/apps/phraseotomy`;
-      
-      return new Response(
-        generateLoginRedirectHtml(loginUrl, shop),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/liquid' },
-        }
-      );
+
+      return new Response(generateLoginRedirectHtml(loginUrl, shop), {
+        status: 200,
+        headers: { "Content-Type": "application/liquid" },
+      });
     }
-    
+
     let customerData = null;
-    
+
     if (customerId && secretData.access_token) {
       // Fetch full customer data from Shopify API
       try {
-        const shopifyResponse = await fetch(
-          `https://${shop}/admin/api/2024-01/customers/${customerId}.json`,
-          {
-            headers: {
-              'X-Shopify-Access-Token': secretData.access_token,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        const shopifyResponse = await fetch(`https://${shop}/admin/api/2024-01/customers/${customerId}.json`, {
+          headers: {
+            "X-Shopify-Access-Token": secretData.access_token,
+            "Content-Type": "application/json",
+          },
+        });
 
         if (shopifyResponse.ok) {
           const shopifyData = await shopifyResponse.json();
           const customer = shopifyData.customer;
-          
+
           customerData = {
             id: customerId,
             email: customer.email || null,
             firstName: customer.first_name || null,
             lastName: customer.last_name || null,
-            name: [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.email || null
+            name: [customer.first_name, customer.last_name].filter(Boolean).join(" ") || customer.email || null,
           };
-          
-          console.log('✅ Customer data fetched from Shopify:', {
+
+          console.log("✅ Customer data fetched from Shopify:", {
             id: customerData.id,
             email: customerData.email,
-            name: customerData.name
+            name: customerData.name,
           });
         } else {
-          console.warn('Failed to fetch customer from Shopify:', shopifyResponse.status);
+          console.warn("Failed to fetch customer from Shopify:", shopifyResponse.status);
           // Fallback to just ID
           customerData = {
             id: customerId,
             email: null,
             firstName: null,
             lastName: null,
-            name: null
+            name: null,
           };
         }
       } catch (error) {
-        console.error('Error fetching customer from Shopify:', error);
+        console.error("Error fetching customer from Shopify:", error);
         // Fallback to just ID
         customerData = {
           id: customerId,
           email: null,
           firstName: null,
           lastName: null,
-          name: null
+          name: null,
         };
       }
     }
 
-    console.log('Customer data:', customerData ? `Logged in: ${customerId}` : 'Not logged in');
+    console.log("Customer data:", customerData ? `Logged in: ${customerId}` : "Not logged in");
 
     // Generate nonce for CSP
     const nonce = crypto.randomUUID();
-    
+
     // Return HTML with application/liquid content type so Shopify renders it
     const headers = new Headers({
-      'Content-Type': 'application/liquid',
+      "Content-Type": "application/liquid",
     });
 
     // Pass token and customer data to app
-    return new Response(
-      generateAppHtml(tenant, shop, customerData, nonce),
-      {
-        status: 200,
-        headers,
-      }
-    );
+    return new Response(generateAppHtml(tenant, shop, customerData, nonce), {
+      status: 200,
+      headers,
+    });
   } catch (error) {
-    console.error('Error in shopify-proxy-entry:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error("Error in shopify-proxy-entry:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return new Response(
       generateErrorHtml(
-        'Server Error',
-        `An error occurred: ${errorMessage}. Please check the Edge Function logs in Supabase.`
+        "Server Error",
+        `An error occurred: ${errorMessage}. Please check the Edge Function logs in Supabase.`,
       ),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'text/html' },
-      }
+        headers: { ...corsHeaders, "Content-Type": "text/html" },
+      },
     );
   }
 });
@@ -325,7 +295,7 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
 <div class="login-prompt">
   <div class="logo">P</div>
   <h1>PHRASEOTOMY</h1>
-  <p>Please log in to your account to access the game</p>
+  <p>Please log in to your account to access the game n</p>
   <a href="${loginUrl}" class="login-btn">Log In</a>
 </div>`;
 }
@@ -345,13 +315,13 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
   };
 
   // Use custom domain
-  const baseUrl = 'https://phraseotomy.ourstagingserver.com';
+  const baseUrl = "https://phraseotomy.ourstagingserver.com";
 
   // Encode configuration as URL parameters (before hash for HashRouter)
   const configParams = new URLSearchParams({
     config: JSON.stringify(tenantConfig),
     shop: shop,
-    customer: customer ? JSON.stringify(customer) : ''
+    customer: customer ? JSON.stringify(customer) : "",
   });
 
   // For HashRouter, parameters must come before the hash
