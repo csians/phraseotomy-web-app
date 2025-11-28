@@ -351,10 +351,12 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
     color: #fbbf24;
     font-size: 16px;
     text-align: center;
-    letter-spacing: 4px;
     font-weight: 600;
     box-sizing: border-box;
     margin-bottom: 12px;
+  }
+  .guest-input.lobby-code {
+    letter-spacing: 4px;
   }
   .guest-input::placeholder {
     color: rgba(251, 191, 36, 0.5);
@@ -363,6 +365,12 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
   .guest-input:focus {
     outline: none;
     border-color: #fbbf24;
+  }
+  .input-label {
+    font-size: 12px;
+    color: rgba(251, 191, 36, 0.7);
+    margin-bottom: 6px;
+    text-align: left;
   }
   .join-btn {
     display: inline-block;
@@ -399,15 +407,24 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
   <div class="guest-section">
     <button class="guest-btn" onclick="toggleGuestForm()">Join Lobby Without Login</button>
     <div id="guestForm" class="guest-form">
+      <div class="input-label">Your Name</div>
+      <input 
+        type="text" 
+        id="guestName" 
+        class="guest-input" 
+        placeholder="Enter your name" 
+        maxlength="50"
+      />
+      <div class="input-label">Lobby Code</div>
       <input 
         type="text" 
         id="lobbyCode" 
-        class="guest-input" 
-        placeholder="Enter 6-digit code" 
+        class="guest-input lobby-code" 
+        placeholder="Enter 6-digit lobby code" 
         maxlength="6"
         oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '')"
       />
-      <button class="join-btn" onclick="joinAsGuest()" id="joinBtn" disabled>Join as Guest</button>
+      <button class="join-btn" onclick="joinAsGuest()" id="joinBtn" disabled>Join Game</button>
     </div>
   </div>
 </div>
@@ -416,20 +433,26 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
     const form = document.getElementById('guestForm');
     form.classList.toggle('active');
     if (form.classList.contains('active')) {
-      document.getElementById('lobbyCode').focus();
+      document.getElementById('guestName').focus();
     }
   }
   
-  document.getElementById('lobbyCode').addEventListener('input', function() {
-    document.getElementById('joinBtn').disabled = this.value.length !== 6;
-  });
+  function validateForm() {
+    const name = document.getElementById('guestName').value.trim();
+    const code = document.getElementById('lobbyCode').value;
+    document.getElementById('joinBtn').disabled = !name || code.length !== 6;
+  }
+  
+  document.getElementById('guestName').addEventListener('input', validateForm);
+  document.getElementById('lobbyCode').addEventListener('input', validateForm);
   
   function joinAsGuest() {
+    const name = document.getElementById('guestName').value.trim();
     const code = document.getElementById('lobbyCode').value;
-    if (code.length === 6) {
+    if (name && code.length === 6) {
       const guestId = 'guest_' + Math.random().toString(36).substring(2, 11);
-      const guestName = 'Guest' + Math.floor(Math.random() * 900 + 100);
-      const guestData = JSON.stringify({ player_id: guestId, name: guestName, is_guest: true });
+      const playerName = name + Math.floor(Math.random() * 900 + 100);
+      const guestData = JSON.stringify({ player_id: guestId, name: playerName, is_guest: true });
       
       // Redirect to standalone app with guest params
       const params = new URLSearchParams({

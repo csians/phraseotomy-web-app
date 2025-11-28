@@ -32,39 +32,16 @@ const GuestJoin = () => {
           localStorage.setItem("shop_domain", shop);
         }
 
-        setStatus("Looking up lobby...");
-
-        // First, find the session by lobby code
-        const { data: session, error: sessionError } = await supabase
-          .from("game_sessions")
-          .select("id, status, tenant_id, shop_domain")
-          .eq("lobby_code", lobbyCode.toUpperCase())
-          .maybeSingle();
-
-        if (sessionError || !session) {
-          setStatus("Lobby not found");
-          toast.error("Lobby not found. Please check the code and try again.");
-          setTimeout(() => navigate("/login"), 2000);
-          return;
-        }
-
-        if (session.status !== "waiting") {
-          setStatus("Lobby is no longer accepting players");
-          toast.error("This lobby is no longer accepting new players.");
-          setTimeout(() => navigate("/login"), 2000);
-          return;
-        }
-
         setStatus("Joining lobby...");
 
-        // Join the lobby
+        // Join the lobby using lobbyCode directly
         const { data: joinData, error: joinError } = await supabase.functions.invoke(
           "join-lobby",
           {
             body: {
-              session_id: session.id,
-              player_id: guestData.player_id,
-              player_name: guestData.name,
+              lobbyCode: lobbyCode.toUpperCase(),
+              playerName: guestData.name,
+              playerId: guestData.player_id,
             },
           }
         );
@@ -77,14 +54,25 @@ const GuestJoin = () => {
           return;
         }
 
+        if (joinData?.error) {
+          console.error("Join lobby error:", joinData.error);
+          setStatus(joinData.error);
+          toast.error(joinData.error);
+          setTimeout(() => navigate("/login"), 2000);
+          return;
+        }
+
         // Store session for persistence
-        sessionStorage.setItem("current_lobby_session", session.id);
+        const sessionId = joinData?.session?.id;
+        if (sessionId) {
+          sessionStorage.setItem("current_lobby_session", sessionId);
+        }
 
         setStatus("Success! Redirecting...");
         toast.success("Joined lobby successfully!");
         
         // Navigate to lobby
-        navigate(`/lobby/${session.id}`, { replace: true });
+        navigate(`/lobby/${sessionId}`, { replace: true });
       } catch (error) {
         console.error("Error in guest join:", error);
         setStatus("An error occurred");
