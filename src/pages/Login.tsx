@@ -42,8 +42,14 @@ const Login = () => {
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [lobbyCode, setLobbyCode] = useState("");
-  const [playerName, setPlayerName] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+  const [showGuestJoin, setShowGuestJoin] = useState(false);
+
+  // Generate a random guest name
+  const generateGuestName = () => {
+    const randomNum = Math.floor(Math.random() * 900) + 100; // 100-999
+    return `Guest${randomNum}`;
+  };
 
   useEffect(() => {
     // Check for embedded config from proxy (primary method)
@@ -320,13 +326,13 @@ const Login = () => {
     }
   };
 
-  const handleJoinGame = async (e: React.FormEvent) => {
+  const handleGuestJoin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!lobbyCode.trim() || !playerName.trim()) {
+    if (!lobbyCode.trim()) {
       toast({
         title: "Missing Information",
-        description: "Please enter both lobby code and your name",
+        description: "Please enter the lobby code",
         variant: "destructive",
       });
       return;
@@ -342,10 +348,20 @@ const Login = () => {
         localStorage.setItem('guest_player_id', guestPlayerId);
       }
 
+      // Generate guest name
+      const guestName = generateGuestName();
+
+      // Store guest data in localStorage for the session
+      localStorage.setItem('guestData', JSON.stringify({
+        player_id: guestPlayerId,
+        name: guestName,
+        is_guest: true,
+      }));
+
       const { data, error } = await supabase.functions.invoke('join-lobby', {
         body: {
           lobbyCode: lobbyCode.toUpperCase(),
-          playerName: playerName.trim(),
+          playerName: guestName,
           playerId: guestPlayerId,
         },
       });
@@ -356,15 +372,18 @@ const Login = () => {
       
       toast({
         title: "Success!",
-        description: "Joined the lobby successfully",
+        description: `Joined as ${guestName}`,
       });
+      
+      // Store session in sessionStorage for persistence
+      sessionStorage.setItem('current_lobby_session', data.session.id);
       
       navigate(`/lobby/${data.session.id}`);
     } catch (error: any) {
       console.error("Error joining lobby:", error);
       toast({
         title: "Failed to Join",
-        description: error.message || "Could not join the lobby",
+        description: error.message || "Could not join the lobby. Please check the code.",
         variant: "destructive",
       });
     } finally {
@@ -389,8 +408,8 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8">
         <DebugInfo 
           tenant={tenant}
           shopDomain={shopDomain}
@@ -398,72 +417,107 @@ const Login = () => {
           backendConnected={true}
         />
 
-        <Card>
-          <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Phraseotomy
-            </CardTitle>
-            <CardDescription>
-              Welcome! Log in to host games
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button 
-              onClick={handleLogin}
-              className="w-full"
-              size="lg"
-            >
-              Log in with Shopify
-            </Button>
-            
-            {tenant && (
-              <p className="text-xs text-center text-muted-foreground">
-                Connected to {tenant.name}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        {/* Logo and Title */}
+        <div className="text-center space-y-4">
+          <div className="mx-auto w-20 h-20 bg-primary rounded-2xl flex items-center justify-center">
+            <span className="text-4xl font-bold text-primary-foreground">P</span>
+          </div>
+          <h1 className="text-3xl font-bold text-primary tracking-wide">
+            PHRASEOTOMY
+          </h1>
+          <p className="text-muted-foreground">
+            Please log in to your account to access the game
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl text-center">Join a Game</CardTitle>
-            <CardDescription className="text-center">
-              Enter the lobby code to join
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleJoinGame} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="lobbyCode">Lobby Code</Label>
-                <Input
-                  id="lobbyCode"
-                  placeholder="Enter 6-digit code"
-                  value={lobbyCode}
-                  onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
-                  maxLength={6}
-                  className="text-center text-lg tracking-widest font-mono"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="playerName">Your Name</Label>
-                <Input
-                  id="playerName"
-                  placeholder="Enter your name"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={isJoining || !lobbyCode.trim() || !playerName.trim()}
-              >
-                {isJoining ? "Joining..." : "Join Game"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        {/* Login Button */}
+        <div className="space-y-4">
+          <Button 
+            onClick={handleLogin}
+            className="w-full py-6 text-lg"
+            size="lg"
+          >
+            Log In
+          </Button>
+          
+          {tenant && (
+            <p className="text-xs text-center text-muted-foreground">
+              Connected to {tenant.name}
+            </p>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              or
+            </span>
+          </div>
+        </div>
+
+        {/* Guest Join Section */}
+        {!showGuestJoin ? (
+          <Button
+            variant="outline"
+            className="w-full py-6 text-lg"
+            size="lg"
+            onClick={() => setShowGuestJoin(true)}
+          >
+            Join Lobby Without Login
+          </Button>
+        ) : (
+          <Card className="border-primary/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg text-center">Join as Guest</CardTitle>
+              <CardDescription className="text-center">
+                Enter the lobby code to join instantly
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleGuestJoin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="lobbyCode">Lobby Code</Label>
+                  <Input
+                    id="lobbyCode"
+                    placeholder="Enter 6-digit code"
+                    value={lobbyCode}
+                    onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
+                    maxLength={6}
+                    className="text-center text-xl tracking-widest font-mono"
+                    autoFocus
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  You'll join as a guest with an auto-generated name
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex-1"
+                    onClick={() => {
+                      setShowGuestJoin(false);
+                      setLobbyCode("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    disabled={isJoining || lobbyCode.trim().length !== 6}
+                  >
+                    {isJoining ? "Joining..." : "Join Game"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
