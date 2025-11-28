@@ -142,45 +142,42 @@ Deno.serve(async (req) => {
 
     if (isGuestJoin && guestLobbyCode && guestDataStr) {
       console.log("Guest join detected, processing...");
-      
+
       try {
         const guestData = JSON.parse(guestDataStr);
         console.log("Guest data:", guestData);
 
         // Call join-lobby directly
-        const { data: joinResult, error: joinError } = await supabase.functions.invoke(
-          "join-lobby",
-          {
-            body: {
-              lobbyCode: guestLobbyCode.toUpperCase(),
-              playerName: guestData.name,
-              playerId: guestData.player_id,
-            },
-          }
-        );
+        const { data: joinResult, error: joinError } = await supabase.functions.invoke("join-lobby", {
+          body: {
+            lobbyCode: guestLobbyCode.toUpperCase(),
+            playerName: guestData.name,
+            playerId: guestData.player_id,
+          },
+        });
 
         if (joinError) {
           console.error("Error joining lobby:", joinError);
-          return new Response(
-            generateErrorHtml("Failed to Join", `Could not join lobby: ${joinError.message}`),
-            { status: 400, headers: { "Content-Type": "text/html" } }
-          );
+          return new Response(generateErrorHtml("Failed to Join", `Could not join lobby: ${joinError.message}`), {
+            status: 400,
+            headers: { "Content-Type": "text/html" },
+          });
         }
 
         if (joinResult?.error) {
           console.error("Join lobby error:", joinResult.error);
-          return new Response(
-            generateErrorHtml("Failed to Join", joinResult.error),
-            { status: 400, headers: { "Content-Type": "text/html" } }
-          );
+          return new Response(generateErrorHtml("Failed to Join", joinResult.error), {
+            status: 400,
+            headers: { "Content-Type": "text/html" },
+          });
         }
 
         const sessionId = joinResult?.session?.id;
         if (!sessionId) {
-          return new Response(
-            generateErrorHtml("Failed to Join", "No session ID returned"),
-            { status: 400, headers: { "Content-Type": "text/html" } }
-          );
+          return new Response(generateErrorHtml("Failed to Join", "No session ID returned"), {
+            status: 400,
+            headers: { "Content-Type": "text/html" },
+          });
         }
 
         console.log("✅ Guest joined successfully, session:", sessionId);
@@ -193,29 +190,29 @@ Deno.serve(async (req) => {
           guestSession: sessionId,
         });
         const redirectUrl = `https://${shop}/apps/phraseotomy?${params.toString()}#/lobby/${sessionId}`;
-        
+
         console.log("🔄 Redirecting guest to:", redirectUrl);
-        
+
         // Use HTTP 302 redirect to stay within Shopify proxy
         return new Response(null, {
           status: 302,
-          headers: { 
-            "Location": redirectUrl,
-            "Cache-Control": "no-cache, no-store, must-revalidate"
+          headers: {
+            Location: redirectUrl,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
           },
         });
       } catch (error) {
         console.error("Error processing guest join:", error);
-        return new Response(
-          generateErrorHtml("Failed to Join", "Could not process guest join"),
-          { status: 400, headers: { "Content-Type": "text/html" } }
-        );
+        return new Response(generateErrorHtml("Failed to Join", "Could not process guest join"), {
+          status: 400,
+          headers: { "Content-Type": "text/html" },
+        });
       }
     }
 
     // Extract customer ID from Shopify proxy parameters
     const customerId = queryParams.get("logged_in_customer_id") || null;
-    
+
     // Check if this is a returning guest from a successful lobby join
     const guestSession = queryParams.get("guestSession");
     const returningGuestData = queryParams.get("guestData");
@@ -230,14 +227,14 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/liquid" },
       });
     }
-    
+
     // Handle returning guest - serve them the app with their guest data
     if (!customerId && guestSession && returningGuestData) {
       console.log("✅ Guest returning from lobby join, serving app HTML");
       console.log("Guest session:", guestSession);
-      
+
       const nonce = crypto.randomUUID();
-      
+
       // Parse guest data to create a guest customer object
       let guestCustomerData = null;
       try {
@@ -253,7 +250,7 @@ Deno.serve(async (req) => {
       } catch (e) {
         console.error("Failed to parse guest data:", e);
       }
-      
+
       return new Response(generateAppHtml(tenant, shop, guestCustomerData, nonce, guestSession), {
         status: 200,
         headers: { "Content-Type": "application/liquid" },
@@ -349,32 +346,10 @@ Deno.serve(async (req) => {
  */
 function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
   const baseUrl = "https://phraseotomy.ourstagingserver.com";
-  return `{% layout none %}
-<style nonce="${crypto.randomUUID()}">
-  /* Hide all Shopify theme header and footer elements */
-  header,
-  .header,
-  .site-header,
-  footer,
-  .footer,
-  .site-footer,
-  .shopify-section-header,
-  .shopify-section-footer,
-  .shopify-section-group-header-group,
-  .shopify-section-group-footer-group,
-  [data-section-type="header"],
-  [data-section-type="footer"],
-  #shopify-section-header,
-  #shopify-section-footer,
-  .announcement-bar,
-  nav,
-  .navigation {
-    display: none !important;
-  }
-  
+  return `<style nonce="${crypto.randomUUID()}">
   body {
-    margin: 0 !important;
-    padding: 0 !important;
+    margin: 0;
+    padding: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: #0a0a0a;
     color: #fbbf24;
@@ -602,7 +577,13 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
 /**
  * Generate HTML that embeds the React app from custom domain
  */
-function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce: string, guestSession: string | null = null): string {
+function generateAppHtml(
+  tenant: any,
+  shop: string,
+  customer: any = null,
+  nonce: string,
+  guestSession: string | null = null,
+): string {
   // Sanitize tenant data for embedding
   const tenantConfig = {
     id: tenant.id,
@@ -622,7 +603,7 @@ function generateAppHtml(tenant: any, shop: string, customer: any = null, nonce:
     shop: shop,
     customer: customer ? JSON.stringify(customer) : "",
   });
-  
+
   // If guest session provided, add it to params
   if (guestSession) {
     configParams.set("guestSession", guestSession);
