@@ -52,6 +52,19 @@ const Login = () => {
   };
 
   useEffect(() => {
+    // Check for guest join parameters FIRST - redirect immediately if present
+    const urlParams = getAllUrlParams();
+    const guestParam = urlParams.get('guest');
+    const lobbyCodeParam = urlParams.get('lobbyCode');
+    const guestDataParam = urlParams.get('guestData');
+    
+    if (guestParam === 'true' && lobbyCodeParam && guestDataParam) {
+      console.log('Guest parameters detected, redirecting to lobby join');
+      setLoading(false);
+      navigate('/lobby/join', { replace: true });
+      return;
+    }
+    
     // Check for embedded config from proxy (primary method)
     if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
       setTenant(window.__PHRASEOTOMY_CONFIG__);
@@ -95,7 +108,6 @@ const Login = () => {
     }
 
     // Check for signed token in URL (from Shopify app-login page)
-    const urlParams = getAllUrlParams();
     const token = urlParams.get('r');
     const shopParam = urlParams.get('shop');
     const customerIdParam = urlParams.get('customer_id');
