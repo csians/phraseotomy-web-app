@@ -43,11 +43,12 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Check if customer already exists
+    // Check if customer already exists by customer_id
     const { data: existingCustomer, error: checkError } = await supabase
       .from('customers')
-      .select('id')
+      .select('id, customer_email')
       .eq('customer_id', customer_id)
+      .eq('tenant_id', tenant_id)
       .maybeSingle();
 
     if (checkError) {
@@ -61,8 +62,61 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If customer doesn't exist, insert them
-    if (!existingCustomer) {
+    // If found by customer_id, customer already exists
+    if (existingCustomer) {
+      console.log('✅ Customer already exists:', customer_id);
+      return new Response(
+        JSON.stringify({ success: true, customer: existingCustomer, is_new: false }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Check if customer exists by email in the same tenant (different environment)
+    if (customer_email) {
+      const { data: existingByEmail, error: emailCheckError } = await supabase
+        .from('customers')
+        .select('id, customer_id')
+        .eq('customer_email', customer_email)
+        .eq('tenant_id', tenant_id)
+        .maybeSingle();
+
+      if (emailCheckError) {
+        console.error('Error checking customer by email:', emailCheckError);
+      } else if (existingByEmail) {
+        // Customer exists with same email but different customer_id (different environment)
+        // Update the customer_id to the new one from this environment
+        const { data: updatedCustomer, error: updateError } = await supabase
+          .from('customers')
+          .update({
+            customer_id,
+            customer_name,
+            first_name,
+            last_name,
+            shop_domain,
+          })
+          .eq('id', existingByEmail.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error('Error updating customer_id:', updateError);
+        } else {
+          console.log('✅ Updated customer_id from', existingByEmail.customer_id, 'to', customer_id);
+          return new Response(
+            JSON.stringify({ success: true, customer: updatedCustomer, is_new: false, updated: true }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+      }
+    }
+
+    // Customer doesn't exist at all, insert new record
       const { data: newCustomer, error: insertError } = await supabase
         .from('customers')
         .insert({
@@ -96,17 +150,6 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
-    }
-
-    // Customer already exists
-    console.log('✅ Customer already exists:', customer_id);
-    return new Response(
-      JSON.stringify({ success: true, customer: existingCustomer, is_new: false }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
   } catch (error) {
     console.error('Error in store-customer:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
