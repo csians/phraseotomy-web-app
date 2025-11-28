@@ -170,6 +170,108 @@ const Login = () => {
     const shopParam = urlParams.get('shop');
     const customerIdParam = urlParams.get('customer_id');
     
+    // Handle direct login with shop and customer_id (no token)
+    if (shopParam && customerIdParam && !token) {
+      console.log('🔄 Direct login detected with shop and customer_id');
+      const handleDirectLogin = async () => {
+        try {
+          // Load tenant for the shop
+          const { data: dbTenant } = await supabase
+            .from("tenants")
+            .select("id, name, tenant_key, shop_domain, environment")
+            .eq("shop_domain", shopParam)
+            .eq("is_active", true)
+            .maybeSingle();
+
+          if (!dbTenant) {
+            console.error('Tenant not found for shop:', shopParam);
+            toast({
+              title: 'Configuration Error',
+              description: 'Shop not found. Please contact support.',
+              variant: 'destructive',
+            });
+            setLoading(false);
+            return;
+          }
+
+          const mappedTenant: TenantConfig = {
+            id: dbTenant.id,
+            name: dbTenant.name,
+            tenant_key: dbTenant.tenant_key,
+            shop_domain: dbTenant.shop_domain,
+            environment: dbTenant.environment,
+            verified: true,
+          };
+          setTenant(mappedTenant);
+          setShopDomain(dbTenant.shop_domain);
+
+          // Generate session token for this customer
+          const { data: sessionData, error: sessionError } = await supabase.functions.invoke('generate-session-token', {
+            body: { customerId: customerIdParam, shopDomain: shopParam },
+          });
+
+          if (sessionError) {
+            console.error('Error generating session token:', sessionError);
+            toast({
+              title: 'Login Failed',
+              description: 'Could not authenticate. Please try again.',
+              variant: 'destructive',
+            });
+            setLoading(false);
+            return;
+          }
+
+          if (sessionData?.sessionToken) {
+            localStorage.setItem('phraseotomy_session_token', sessionData.sessionToken);
+            console.log('✅ Session token generated and stored');
+
+            // Fetch full customer data
+            const { data: customerData, error: customerError } = await supabase.functions.invoke('get-customer-data', {
+              body: { sessionToken: sessionData.sessionToken },
+            });
+
+            if (!customerError && customerData) {
+              console.log('📦 Customer Data Retrieved:', {
+                customer_id: customerIdParam,
+                shop: shopParam,
+                customer: customerData.customer,
+              });
+
+              // Store customer data in localStorage
+              localStorage.setItem('customerData', JSON.stringify({
+                customer_id: customerIdParam,
+                id: customerIdParam,
+                email: customerData.customer?.email || null,
+                name: customerData.customer?.name || null,
+                first_name: customerData.customer?.first_name || null,
+                last_name: customerData.customer?.last_name || null,
+              }));
+              localStorage.setItem('shop_domain', shopParam);
+
+              // Redirect to the production app proxy URL
+              const appProxyUrl = `https://${shopParam}/apps/phraseotomy`;
+              console.log('🚀 Redirecting to app proxy:', appProxyUrl);
+              window.location.href = appProxyUrl;
+              return;
+            }
+          }
+          
+          setLoading(false);
+        } catch (error) {
+          console.error('Error in direct login:', error);
+          toast({
+            title: 'Login Failed',
+            description: 'An error occurred during authentication.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+        }
+      };
+      
+      handleDirectLogin();
+      return;
+    }
+    
     // Helper function to load tenant for a shop
     const loadTenantForShop = async (shop: string) => {
       try {
