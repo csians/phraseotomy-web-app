@@ -347,7 +347,7 @@ Deno.serve(async (req) => {
 function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
   const baseUrl = "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
-  .header-group, footer, header {
+  #header-group,.header-group, footer, header {
     display: none !important;
   }
   body {
