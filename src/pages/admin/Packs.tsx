@@ -99,13 +99,16 @@ export default function Packs() {
     }
 
     try {
-      const { error } = await supabase.from("packs").insert({
-        tenant_id: tenant.id,
-        name: newPack.name.trim(),
-        description: newPack.description.trim() || null,
+      const { data, error } = await supabase.functions.invoke('admin-create-pack', {
+        body: {
+          tenant_id: tenant.id,
+          name: newPack.name.trim(),
+          description: newPack.description.trim() || null,
+        },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast({
         title: "Pack created",
@@ -125,14 +128,21 @@ export default function Packs() {
   };
 
   const handleDeletePack = async (packId: string, packName: string) => {
+    if (!tenant?.id) return;
     if (!confirm(`Are you sure you want to delete pack "${packName}"? This will also remove it from all associated codes.`)) {
       return;
     }
 
     try {
-      const { error } = await supabase.from("packs").delete().eq("id", packId);
+      const { data, error } = await supabase.functions.invoke('admin-delete-pack', {
+        body: {
+          pack_id: packId,
+          tenant_id: tenant.id,
+        },
+      });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast({
         title: "Pack deleted",

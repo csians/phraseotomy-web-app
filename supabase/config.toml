@@ -76,3 +76,12 @@ verify_jwt = false
 
 [functions.upload-customer-audio]
 verify_jwt = false
+
+[functions.admin-create-pack]
+verify_jwt = false
+
+[functions.admin-delete-pack]
+verify_jwt = false
+
+[functions.import-packs]
+verify_jwt = false
