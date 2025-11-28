@@ -454,13 +454,13 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
       const playerName = name + Math.floor(Math.random() * 900 + 100);
       const guestData = JSON.stringify({ player_id: guestId, name: playerName, is_guest: true });
       
-      // Redirect to standalone app with guest params
+      // Redirect to Shopify proxy with guest params
       const params = new URLSearchParams({
         lobbyCode: code,
         guestData: guestData,
         shop: '${shop}'
       });
-      window.top.location.href = '${baseUrl}/?guest=true&' + params.toString() + '#/lobby/join';
+      window.top.location.href = 'https://${shop}/apps/phraseotomy?guest=true&' + params.toString() + '#/lobby/join';
     }
   }
 </script>`;
