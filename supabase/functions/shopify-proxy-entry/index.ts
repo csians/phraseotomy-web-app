@@ -185,17 +185,18 @@ Deno.serve(async (req) => {
 
         console.log("✅ Guest joined successfully, session:", sessionId);
 
-        // Redirect directly to the lobby page on standalone app using HTTP 302
-        // Put params BEFORE the hash for HashRouter to access them
-        const baseUrl = "https://phraseotomy.ourstagingserver.com";
+        // Redirect to lobby within the Shopify proxy context (iframe)
+        // The URL stays as the Shopify proxy URL with hash-based routing
         const params = new URLSearchParams({
           guestData: guestDataStr,
           shop: shop,
           guestSession: sessionId,
         });
-        const redirectUrl = `${baseUrl}/?${params.toString()}#/lobby/${sessionId}`;
+        const redirectUrl = `https://${shop}/apps/phraseotomy?${params.toString()}#/lobby/${sessionId}`;
         
-        // Use HTTP 302 redirect instead of HTML page with JavaScript redirect
+        console.log("🔄 Redirecting guest to:", redirectUrl);
+        
+        // Use HTTP 302 redirect to stay within Shopify proxy
         return new Response(null, {
           status: 302,
           headers: { 
