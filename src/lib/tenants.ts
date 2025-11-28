@@ -62,25 +62,12 @@ export function getTenantByAppDomain(hostname: string): TenantConfig | null {
 
 /**
  * Auto-detect tenant based on current environment
- * Checks app domain first, then falls back to shop parameter
- * @param searchParams - URLSearchParams object for shop parameter fallback
+ * Prioritizes shop parameter over app domain for accurate tenant detection
+ * @param searchParams - URLSearchParams object for shop parameter
  * @returns Tenant configuration or null if not found
  */
 export function autoDetectTenant(searchParams?: URLSearchParams | string): TenantConfig | null {
-  // First try to detect by app domain
-  const hostname = window.location.hostname;
-  const tenantByDomain = getTenantByAppDomain(hostname);
-  
-  if (tenantByDomain) {
-    console.log('🎯 Tenant detected by app domain:', {
-      hostname,
-      tenant: tenantByDomain.id,
-      shopDomain: tenantByDomain.shopDomain
-    });
-    return tenantByDomain;
-  }
-  
-  // Fallback to shop parameter
+  // First try to detect by shop parameter (most reliable for multi-tenant apps)
   if (searchParams) {
     const params = typeof searchParams === 'string' 
       ? new URLSearchParams(searchParams) 
@@ -97,6 +84,19 @@ export function autoDetectTenant(searchParams?: URLSearchParams | string): Tenan
         return tenantByShop;
       }
     }
+  }
+  
+  // Fallback to app domain detection
+  const hostname = window.location.hostname;
+  const tenantByDomain = getTenantByAppDomain(hostname);
+  
+  if (tenantByDomain) {
+    console.log('🎯 Tenant detected by app domain:', {
+      hostname,
+      tenant: tenantByDomain.id,
+      shopDomain: tenantByDomain.shopDomain
+    });
+    return tenantByDomain;
   }
   
   return null;
