@@ -135,12 +135,79 @@ Deno.serve(async (req) => {
 
     console.log("HMAC verified successfully for tenant:", tenant.tenant_key);
 
+    // Check for guest join parameters FIRST
+    const isGuestJoin = queryParams.get("guest") === "true";
+    const guestLobbyCode = queryParams.get("lobbyCode");
+    const guestDataStr = queryParams.get("guestData");
+
+    if (isGuestJoin && guestLobbyCode && guestDataStr) {
+      console.log("Guest join detected, processing...");
+      
+      try {
+        const guestData = JSON.parse(guestDataStr);
+        console.log("Guest data:", guestData);
+
+        // Call join-lobby directly
+        const { data: joinResult, error: joinError } = await supabase.functions.invoke(
+          "join-lobby",
+          {
+            body: {
+              lobbyCode: guestLobbyCode.toUpperCase(),
+              playerName: guestData.name,
+              playerId: guestData.player_id,
+            },
+          }
+        );
+
+        if (joinError) {
+          console.error("Error joining lobby:", joinError);
+          return new Response(
+            generateErrorHtml("Failed to Join", `Could not join lobby: ${joinError.message}`),
+            { status: 400, headers: { "Content-Type": "text/html" } }
+          );
+        }
+
+        if (joinResult?.error) {
+          console.error("Join lobby error:", joinResult.error);
+          return new Response(
+            generateErrorHtml("Failed to Join", joinResult.error),
+            { status: 400, headers: { "Content-Type": "text/html" } }
+          );
+        }
+
+        const sessionId = joinResult?.session?.id;
+        if (!sessionId) {
+          return new Response(
+            generateErrorHtml("Failed to Join", "No session ID returned"),
+            { status: 400, headers: { "Content-Type": "text/html" } }
+          );
+        }
+
+        console.log("✅ Guest joined successfully, session:", sessionId);
+
+        // Redirect directly to the lobby page on standalone app
+        const baseUrl = "https://phraseotomy.ourstagingserver.com";
+        const redirectUrl = `${baseUrl}/#/lobby/${sessionId}?guestData=${encodeURIComponent(guestDataStr)}&shop=${shop}`;
+        
+        return new Response(generateGuestRedirectHtml(redirectUrl, guestData.name, sessionId), {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        });
+      } catch (error) {
+        console.error("Error processing guest join:", error);
+        return new Response(
+          generateErrorHtml("Failed to Join", "Could not process guest join"),
+          { status: 400, headers: { "Content-Type": "text/html" } }
+        );
+      }
+    }
+
     // Extract customer ID from Shopify proxy parameters
     const customerId = queryParams.get("logged_in_customer_id") || null;
 
-    // If no customer is logged in, redirect to Shopify login
+    // If no customer is logged in, show login page with guest option
     if (!customerId) {
-      console.log("No customer logged in, redirecting to Shopify login");
+      console.log("No customer logged in, showing login options");
       const loginUrl = `https://${shop}/account/login?return_url=/apps/phraseotomy`;
 
       return new Response(generateLoginRedirectHtml(loginUrl, shop), {
@@ -606,6 +673,87 @@ function generateErrorHtml(title: string, message: string): string {
         <p>${message}</p>
       </div>
     </div>
+  </body>
+</html>`;
+}
+
+/**
+ * Generate redirect HTML for guest users joining lobby
+ */
+function generateGuestRedirectHtml(redirectUrl: string, playerName: string, sessionId: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Joining Lobby - Phraseotomy</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        background: #0a0a0a;
+        color: #fbbf24;
+      }
+      .container {
+        text-align: center;
+        padding: 2rem;
+      }
+      .logo {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 24px;
+        background: #fbbf24;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        font-weight: 900;
+        color: #0a0a0a;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin: 0 0 0.5rem 0;
+      }
+      p {
+        font-size: 1rem;
+        margin: 0;
+        opacity: 0.8;
+      }
+      .spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(251, 191, 36, 0.3);
+        border-top-color: #fbbf24;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 24px auto 0;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo">P</div>
+      <h1>Joining Lobby...</h1>
+      <p>Welcome, ${playerName}!</p>
+      <div class="spinner"></div>
+    </div>
+    <script>
+      // Store guest data in localStorage before redirect
+      localStorage.setItem('current_lobby_session', '${sessionId}');
+      
+      // Redirect to lobby
+      setTimeout(function() {
+        window.top.location.href = '${redirectUrl}';
+      }, 500);
+    </script>
   </body>
 </html>`;
 }
