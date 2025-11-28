@@ -175,16 +175,28 @@ const Login = () => {
       console.log('🔄 Direct login detected with shop and customer_id');
       const handleDirectLogin = async () => {
         try {
+          // Resolve custom domain to .myshopify.com domain
+          const { resolveShopDomain } = await import("@/lib/tenants");
+          const resolvedShopDomain = resolveShopDomain(shopParam);
+          
+          console.log('🔍 Resolving shop domain:', {
+            original: shopParam,
+            resolved: resolvedShopDomain
+          });
+          
           // Load tenant for the shop
           const { data: dbTenant } = await supabase
             .from("tenants")
             .select("id, name, tenant_key, shop_domain, environment")
-            .eq("shop_domain", shopParam)
+            .eq("shop_domain", resolvedShopDomain)
             .eq("is_active", true)
             .maybeSingle();
 
           if (!dbTenant) {
-            console.error('Tenant not found for shop:', shopParam);
+            console.error('Tenant not found for shop:', {
+              original: shopParam,
+              resolved: resolvedShopDomain
+            });
             toast({
               title: 'Configuration Error',
               description: 'Shop not found. Please contact support.',
@@ -205,9 +217,9 @@ const Login = () => {
           setTenant(mappedTenant);
           setShopDomain(dbTenant.shop_domain);
 
-          // Generate session token for this customer
+          // Generate session token for this customer (use resolved shop domain)
           const { data: sessionData, error: sessionError } = await supabase.functions.invoke('generate-session-token', {
-            body: { customerId: customerIdParam, shopDomain: shopParam },
+            body: { customerId: customerIdParam, shopDomain: resolvedShopDomain },
           });
 
           if (sessionError) {

@@ -4,6 +4,7 @@ export interface TenantConfig {
   displayName: string;
   themeColor?: string;
   appDomains?: string[]; // Custom app domains for this tenant
+  customShopDomains?: string[]; // Custom Shopify domains that map to shopDomain
 }
 
 // Tenant configurations for different Shopify stores
@@ -21,21 +22,34 @@ const tenants: TenantConfig[] = [
     displayName: 'Phraseotomy',
     themeColor: '#FBBF24',
     appDomains: ['app.phraseotomy.com'],
+    customShopDomains: ['phraseotomy.com'],
   },
 ];
 
 /**
  * Get tenant configuration based on shop domain
- * @param shopDomain - The Shopify shop domain (e.g., "testing-cs-store.myshopify.com")
+ * Supports both .myshopify.com domains and custom domains
+ * @param shopDomain - The Shopify shop domain (e.g., "testing-cs-store.myshopify.com" or "phraseotomy.com")
  * @returns Tenant configuration or null if not found
  */
 export function getTenantConfig(shopDomain: string): TenantConfig | null {
   const normalizedDomain = shopDomain.toLowerCase().trim();
   const tenant = tenants.find(
-    (t) => t.shopDomain.toLowerCase() === normalizedDomain
+    (t) => t.shopDomain.toLowerCase() === normalizedDomain ||
+          t.customShopDomains?.some(domain => domain.toLowerCase() === normalizedDomain)
   );
   
   return tenant || null;
+}
+
+/**
+ * Resolve a custom shop domain to its .myshopify.com equivalent
+ * @param shopDomain - Any shop domain (custom or .myshopify.com)
+ * @returns The .myshopify.com domain or original if no mapping found
+ */
+export function resolveShopDomain(shopDomain: string): string {
+  const tenant = getTenantConfig(shopDomain);
+  return tenant?.shopDomain || shopDomain;
 }
 
 /**
