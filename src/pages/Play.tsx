@@ -457,7 +457,9 @@ const Play = () => {
         {/* Welcome message */}
         <div className="text-center flex items-center justify-between">
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-white">Welcome, {customer?.name || customer?.email}!</h2>
+            <h2 className="text-2xl font-bold text-white">
+              Welcome, {customer?.name || `${customer?.firstName || ''} ${customer?.lastName || ''}`.trim() || customer?.email}!
+            </h2>
           </div>
           <Button variant="outline" size="sm" onClick={handleLogout} className="ml-4">
             Logout
