@@ -83,9 +83,52 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If found by customer_id, customer already exists
+    // If found by customer_id, customer already exists - update if email/name changed
     if (existingCustomer) {
       console.log('✅ Customer already exists:', customer_id);
+      
+      // Update customer data if email or name is provided and different
+      const updateData: any = {};
+      if (customer_email && customer_email !== existingCustomer.customer_email) {
+        updateData.customer_email = customer_email;
+      }
+      if (customer_name) {
+        updateData.customer_name = customer_name;
+      }
+      if (first_name) {
+        updateData.first_name = first_name;
+      }
+      if (last_name) {
+        updateData.last_name = last_name;
+      }
+      
+      // Update environment-specific customer_id if not already set
+      if (!existingCustomer[envCustomerIdColumn]) {
+        updateData[envCustomerIdColumn] = customer_id;
+      }
+      
+      if (Object.keys(updateData).length > 0) {
+        const { data: updatedCustomer, error: updateError } = await supabase
+          .from('customers')
+          .update(updateData)
+          .eq('id', existingCustomer.id)
+          .select()
+          .single();
+          
+        if (updateError) {
+          console.error('Error updating existing customer:', updateError);
+        } else {
+          console.log('✅ Updated existing customer with new data:', customer_id);
+          return new Response(
+            JSON.stringify({ success: true, customer: updatedCustomer, is_new: false, updated: true }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+      }
+      
       return new Response(
         JSON.stringify({ success: true, customer: existingCustomer, is_new: false }),
         {
