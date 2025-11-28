@@ -52,16 +52,74 @@ const Login = () => {
   };
 
   useEffect(() => {
-    // Check for guest join parameters FIRST - redirect immediately if present
+    // Check for guest join parameters FIRST - join lobby directly
     const urlParams = getAllUrlParams();
     const guestParam = urlParams.get('guest');
     const lobbyCodeParam = urlParams.get('lobbyCode');
     const guestDataParam = urlParams.get('guestData');
+    const guestShopParam = urlParams.get('shop');
     
     if (guestParam === 'true' && lobbyCodeParam && guestDataParam) {
-      console.log('Guest parameters detected, redirecting to lobby join');
-      setLoading(false);
-      navigate('/lobby/join', { replace: true });
+      console.log('Guest parameters detected, joining lobby directly');
+      
+      const joinLobbyAsGuest = async () => {
+        try {
+          const guestData = JSON.parse(decodeURIComponent(guestDataParam));
+          
+          // Store guest data in localStorage
+          localStorage.setItem('guest_player_id', guestData.player_id);
+          localStorage.setItem('guestPlayerData', JSON.stringify(guestData));
+          if (guestShopParam) {
+            localStorage.setItem('shop_domain', guestShopParam);
+          }
+
+          // Join the lobby directly
+          const { data: joinData, error: joinError } = await supabase.functions.invoke(
+            'join-lobby',
+            {
+              body: {
+                lobbyCode: lobbyCodeParam.toUpperCase(),
+                playerName: guestData.name,
+                playerId: guestData.player_id,
+              },
+            }
+          );
+
+          if (joinError || joinData?.error) {
+            console.error('Error joining lobby:', joinError || joinData?.error);
+            toast({
+              title: 'Failed to Join',
+              description: joinData?.error || 'Could not join the lobby',
+              variant: 'destructive',
+            });
+            setLoading(false);
+            return;
+          }
+
+          // Store session for persistence
+          const sessionId = joinData?.session?.id;
+          if (sessionId) {
+            sessionStorage.setItem('current_lobby_session', sessionId);
+            toast({
+              title: 'Success!',
+              description: `Joined as ${guestData.name}`,
+            });
+            navigate(`/lobby/${sessionId}`, { replace: true });
+          } else {
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error('Error in guest join:', error);
+          toast({
+            title: 'Failed to Join',
+            description: 'Could not join the lobby',
+            variant: 'destructive',
+          });
+          setLoading(false);
+        }
+      };
+      
+      joinLobbyAsGuest();
       return;
     }
     
