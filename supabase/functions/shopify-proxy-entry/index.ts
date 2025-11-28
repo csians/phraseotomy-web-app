@@ -346,28 +346,54 @@ Deno.serve(async (req) => {
  */
 function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
   const baseUrl = "https://phraseotomy.ourstagingserver.com";
-  return `<style nonce="${crypto.randomUUID()}">
-  /* Hide Shopify theme header and footer only */
-  header,
-  .header,
-  .site-header,
-  footer,
-  .footer,
-  .site-footer,
-  .shopify-section-header,
-  .shopify-section-footer,
-  [data-section-type="header"],
-  [data-section-type="footer"],
-  #shopify-section-header,
-  #shopify-section-footer {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phraseotomy - Login</title>
+  <style>
+  /* Aggressively hide ALL Shopify theme elements */
+  body > *:not(.phraseotomy-login-container),
+  header, .header, .site-header,
+  footer, .footer, .site-footer,
+  .shopify-section, .shopify-section-header, .shopify-section-footer,
+  [data-section-type], [data-section-id],
+  #shopify-section-header, #shopify-section-footer,
+  nav, .nav, .navigation, .menu,
+  .announcement-bar, .header-wrapper, .footer-wrapper,
+  #PageContainer > *:not(.phraseotomy-login-container),
+  main > *:not(.phraseotomy-login-container),
+  #MainContent > *:not(.phraseotomy-login-container) {
     display: none !important;
+    visibility: hidden !important;
   }
   
-  /* Basic body reset */
-  body {
+  /* Reset body styling */
+  html, body {
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: #0a0a0a !important;
+    color: #fbbf24 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
+    overflow-x: hidden !important;
   }
+  
+  /* Ensure login container is visible and centered */
+  .phraseotomy-login-container {
+    display: flex !important;
+    visibility: visible !important;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    width: 100%;
+    background: #0a0a0a;
+    position: relative;
+    z-index: 10000;
+  }
+  
   .login-prompt {
     text-align: center;
     max-width: 400px;
@@ -514,11 +540,14 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
     transform: none;
   }
 </style>
-<div class="login-prompt">
-  <div class="logo">P</div>
-  <h1>PHRASEOTOMY</h1>
-  <p>Log in to your account to host a game</p>
-  <a href="${loginUrl}" class="login-btn">Log In</a>
+</head>
+<body>
+<div class="phraseotomy-login-container">
+  <div class="login-prompt">
+    <div class="logo">P</div>
+    <h1>PHRASEOTOMY</h1>
+    <p>Log in to your account to host a game</p>
+    <a href="${loginUrl}" class="login-btn">Log In</a>
   
   <div class="divider"><span>or</span></div>
   
@@ -581,7 +610,11 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
       window.top.location.href = 'https://${shop}/apps/phraseotomy?guest=true&' + params.toString() + '#/lobby/join';
     }
   }
-</script>`;
+</script>
+  </div>
+</div>
+</body>
+</html>`;
 }
 
 /**
