@@ -347,12 +347,44 @@ Deno.serve(async (req) => {
 function generateLoginRedirectHtml(loginUrl: string, shop: string): string {
   const baseUrl = "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
+  /* Hide Shopify theme header and footer */
+  header,
+  .header,
+  .site-header,
+  footer,
+  .footer,
+  .site-footer,
+  .shopify-section-header,
+  .shopify-section-footer,
+  [data-section-type="header"],
+  [data-section-type="footer"],
+  #shopify-section-header,
+  #shopify-section-footer {
+    display: none !important;
+  }
+  
+  /* Reset body and main content area */
   body {
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0a0a0a;
+    background: #0a0a0a !important;
     color: #fbbf24;
+    min-height: 100vh;
+  }
+  
+  main,
+  .main-content,
+  #MainContent,
+  .shopify-section {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  
+  /* Center login content */
+  body > * {
     display: flex;
     align-items: center;
     justify-content: center;
