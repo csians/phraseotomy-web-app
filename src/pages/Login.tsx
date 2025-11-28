@@ -42,13 +42,13 @@ const Login = () => {
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [lobbyCode, setLobbyCode] = useState("");
+  const [guestName, setGuestName] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [showGuestJoin, setShowGuestJoin] = useState(false);
 
-  // Generate a random guest name
-  const generateGuestName = () => {
-    const randomNum = Math.floor(Math.random() * 900) + 100; // 100-999
-    return `Guest${randomNum}`;
+  // Generate a random guest name suffix
+  const generateRandomSuffix = () => {
+    return Math.floor(Math.random() * 900) + 100; // 100-999
   };
 
   useEffect(() => {
@@ -329,10 +329,19 @@ const Login = () => {
   const handleGuestJoin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!lobbyCode.trim()) {
+    if (!guestName.trim()) {
       toast({
         title: "Missing Information",
-        description: "Please enter the lobby code",
+        description: "Please enter your name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!lobbyCode.trim() || lobbyCode.trim().length !== 6) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a valid 6-digit lobby code",
         variant: "destructive",
       });
       return;
@@ -344,24 +353,24 @@ const Login = () => {
       // Generate or retrieve guest player ID
       let guestPlayerId = localStorage.getItem('guest_player_id');
       if (!guestPlayerId) {
-        guestPlayerId = crypto.randomUUID();
+        guestPlayerId = `guest_${Math.random().toString(36).substring(2, 15)}`;
         localStorage.setItem('guest_player_id', guestPlayerId);
       }
 
-      // Generate guest name
-      const guestName = generateGuestName();
+      // Use the entered name with a random suffix for uniqueness
+      const playerName = `${guestName.trim()}${generateRandomSuffix()}`;
 
       // Store guest data in localStorage for the session
-      localStorage.setItem('guestData', JSON.stringify({
+      localStorage.setItem('guestPlayerData', JSON.stringify({
         player_id: guestPlayerId,
-        name: guestName,
+        name: playerName,
         is_guest: true,
       }));
 
       const { data, error } = await supabase.functions.invoke('join-lobby', {
         body: {
           lobbyCode: lobbyCode.toUpperCase(),
-          playerName: guestName,
+          playerName: playerName,
           playerId: guestPlayerId,
         },
       });
@@ -369,10 +378,14 @@ const Login = () => {
       if (error) {
         throw new Error(error.message || "Failed to join lobby");
       }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
       
       toast({
         title: "Success!",
-        description: `Joined as ${guestName}`,
+        description: `Joined as ${playerName}`,
       });
       
       // Store session in sessionStorage for persistence
@@ -474,26 +487,34 @@ const Login = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg text-center">Join as Guest</CardTitle>
               <CardDescription className="text-center">
-                Enter the lobby code to join instantly
+                Enter your name and the lobby code to join
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleGuestJoin} className="space-y-4">
                 <div className="space-y-2">
+                  <Label htmlFor="guestName">Your Name</Label>
+                  <Input
+                    id="guestName"
+                    placeholder="Enter your name"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    maxLength={50}
+                    className="text-center"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="lobbyCode">Lobby Code</Label>
                   <Input
                     id="lobbyCode"
-                    placeholder="Enter 6-digit code"
+                    placeholder="Enter 6-digit lobby code"
                     value={lobbyCode}
                     onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
                     maxLength={6}
                     className="text-center text-xl tracking-widest font-mono"
-                    autoFocus
                   />
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  You'll join as a guest with an auto-generated name
-                </p>
                 <div className="flex gap-2">
                   <Button
                     type="button"
@@ -502,6 +523,7 @@ const Login = () => {
                     onClick={() => {
                       setShowGuestJoin(false);
                       setLobbyCode("");
+                      setGuestName("");
                     }}
                   >
                     Cancel
@@ -509,7 +531,7 @@ const Login = () => {
                   <Button
                     type="submit"
                     className="flex-1"
-                    disabled={isJoining || lobbyCode.trim().length !== 6}
+                    disabled={isJoining || lobbyCode.trim().length !== 6 || !guestName.trim()}
                   >
                     {isJoining ? "Joining..." : "Join Game"}
                   </Button>
