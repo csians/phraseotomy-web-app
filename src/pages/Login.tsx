@@ -182,6 +182,8 @@ const Login = () => {
     const token = urlParams.get("r");
     const shopParam = urlParams.get("shop");
     const customerIdParam = urlParams.get("customer_id");
+    const customerNameParam = urlParams.get("customer_name");
+    const customerEmailParam = urlParams.get("customer_email");
 
     // Handle direct login with shop and customer_id (no token)
     if (shopParam && customerIdParam && !token) {
@@ -251,7 +253,26 @@ const Login = () => {
             localStorage.setItem("phraseotomy_session_token", sessionData.sessionToken);
             console.log("✅ Session token generated and stored");
 
-            // Fetch full customer data
+            // Parse customer name from URL if available
+            const customerName = customerNameParam ? decodeURIComponent(customerNameParam.replace(/\+/g, ' ')) : null;
+            const firstName = customerName ? customerName.split(' ')[0] : null;
+            const lastName = customerName ? customerName.split(' ').slice(1).join(' ') : null;
+            const email = customerEmailParam ? decodeURIComponent(customerEmailParam) : null;
+
+            // Store customer data from URL immediately
+            const immediateCustomerData = {
+              customer_id: customerIdParam,
+              id: customerIdParam,
+              email: email,
+              name: customerName,
+              first_name: firstName,
+              last_name: lastName,
+            };
+            
+            localStorage.setItem("customerData", JSON.stringify(immediateCustomerData));
+            localStorage.setItem("shop_domain", shopParam);
+
+            // Fetch full customer data in background for additional info
             const { data: customerData, error: customerError } = await supabase.functions.invoke("get-customer-data", {
               body: { sessionToken: sessionData.sessionToken },
             });
@@ -263,36 +284,35 @@ const Login = () => {
                 customer: customerData.customer,
               });
 
-              // Store customer data in localStorage
+              // Update with fetched data if available
               localStorage.setItem(
                 "customerData",
                 JSON.stringify({
                   customer_id: customerIdParam,
                   id: customerIdParam,
-                  email: customerData.customer?.email || null,
-                  name: customerData.customer?.name || null,
-                  first_name: customerData.customer?.first_name || null,
-                  last_name: customerData.customer?.last_name || null,
+                  email: customerData.customer?.email || email,
+                  name: customerData.customer?.name || customerName,
+                  first_name: customerData.customer?.first_name || firstName,
+                  last_name: customerData.customer?.last_name || lastName,
                 }),
               );
-              localStorage.setItem("shop_domain", shopParam);
-
-              // Get tenant config to determine redirect URL
-              const { getTenantConfig } = await import("@/lib/tenants");
-              const tenant = getTenantConfig(shopParam);
-
-              // For production with Shopify proxy, redirect to proxy URL
-              if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
-                const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
-                console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
-                window.location.href = proxyUrl;
-              } else {
-                // Staging or no proxy - stay on current domain
-                console.log("🚀 Navigating to play page on current domain");
-                navigate("/play/host", { replace: true });
-              }
-              return;
             }
+
+            // Get tenant config to determine redirect URL
+            const { getTenantConfig } = await import("@/lib/tenants");
+            const tenant = getTenantConfig(shopParam);
+
+            // For production with Shopify proxy, redirect to proxy URL
+            if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
+              const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
+              console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
+              window.location.href = proxyUrl;
+            } else {
+              // Staging or no proxy - stay on current domain
+              console.log("🚀 Navigating to play page on current domain");
+              navigate("/play/host", { replace: true });
+            }
+            return;
           }
 
           setLoading(false);
