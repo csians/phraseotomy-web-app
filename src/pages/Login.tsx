@@ -229,56 +229,49 @@ const Login = () => {
           setTenant(mappedTenant);
           setShopDomain(dbTenant.shop_domain);
 
-          // Generate customer token (30-day token for custom domain access)
-          console.log('🔐 Generating token with customer data:', {
-            customerId: customerIdParam,
-            shopDomain: resolvedShopDomain,
-            customerName: customerName || 'not provided',
-            customerEmail: customerEmail || 'not provided',
+          // Store customer data directly in Supabase
+          console.log('💾 Storing customer data in Supabase:', {
+            customer_id: customerIdParam,
+            customer_name: customerName || null,
+            customer_email: customerEmail || null,
+            shop_domain: resolvedShopDomain,
+            tenant_id: dbTenant.id,
           });
 
-          const { data: tokenData, error: tokenError } = await supabase.functions.invoke('generate-customer-token', {
-            body: { 
-              customerId: customerIdParam, 
-              shopDomain: resolvedShopDomain,
-              userAgent: navigator.userAgent,
-              customerName: customerName || undefined,
-              customerEmail: customerEmail || undefined,
+          const { data: storeResult, error: storeError } = await supabase.functions.invoke('store-customer', {
+            body: {
+              customer_id: customerIdParam,
+              customer_email: customerEmail || null,
+              customer_name: customerName || null,
+              shop_domain: resolvedShopDomain,
+              tenant_id: dbTenant.id,
             },
           });
 
-          if (tokenError || !tokenData?.token) {
-            console.error('Error generating customer token:', tokenError);
+          if (storeError) {
+            console.error('❌ Error storing customer:', storeError);
             toast({
-              title: 'Login Failed',
-              description: 'Could not authenticate. Please try again.',
+              title: 'Storage Error',
+              description: 'Could not save customer data. Please try again.',
               variant: 'destructive',
             });
             setLoading(false);
             return;
           }
 
-          const customerToken = tokenData.token;
-          console.log('✅ Customer token generated');
+          console.log('✅ Customer data stored:', storeResult);
 
-          // Store customer data directly from URL parameters
-          const customerData = {
+          // Store minimal data in localStorage for quick access
+          localStorage.setItem('customerData', JSON.stringify({
             customer_id: customerIdParam,
             id: customerIdParam,
             email: customerEmail || null,
             name: customerName || null,
-            first_name: null,
-            last_name: null,
-          };
-
-          console.log('📦 Storing customer data in localStorage:', customerData);
-
-          localStorage.setItem('customerData', JSON.stringify(customerData));
+          }));
           localStorage.setItem('shop_domain', shopParam);
-          localStorage.setItem('phraseotomy_customer_token', customerToken);
 
-          // Redirect immediately to the app proxy URL with customer token
-          const appProxyUrl = `https://${shopParam}/apps/phraseotomy?customerToken=${customerToken}`;
+          // Redirect immediately to the app proxy URL
+          const appProxyUrl = `https://${shopParam}/apps/phraseotomy`;
           console.log('🚀 Redirecting to app proxy');
           window.location.href = appProxyUrl;
         } catch (error) {
