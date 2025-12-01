@@ -33,7 +33,7 @@ const Play = () => {
   // Store customer in database on first login
   const storeCustomerInDatabase = async (customerData: ShopifyCustomer, shopDomain: string, tenantId: string) => {
     try {
-      const { error } = await supabase.functions.invoke("store-customer", {
+      const { data, error } = await supabase.functions.invoke("store-customer", {
         body: {
           customer_id: customerData.id,
           customer_email: customerData.email,
@@ -48,7 +48,26 @@ const Play = () => {
       if (error) {
         console.error("Error storing customer:", error);
       } else {
-        console.log("✅ Customer stored/verified in database");
+        console.log("✅ Customer stored/verified in database", data);
+        
+        // Store the API response customer data in localStorage
+        if (data?.customer) {
+          const existingData = localStorage.getItem("customerData");
+          const existing = existingData ? JSON.parse(existingData) : {};
+          
+          localStorage.setItem(
+            "customerData",
+            JSON.stringify({
+              ...existing,
+              db_id: data.customer.id,
+              customer_email: data.customer.customer_email,
+              staging_customer_id: data.customer.staging_customer_id,
+              prod_customer_id: data.customer.prod_customer_id,
+              is_new: data.is_new,
+            }),
+          );
+          console.log("✅ Customer data stored in localStorage from API response");
+        }
       }
     } catch (error) {
       console.error("Error calling store-customer:", error);
