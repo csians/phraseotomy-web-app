@@ -221,9 +221,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Extract customer ID from Shopify proxy parameters
+    // Extract customer ID and other data from Shopify proxy parameters
     const customerId = queryParams.get("logged_in_customer_id") || null;
+    const customerNameFromProxy = queryParams.get("customer_name") || null;
+    const customerEmailFromProxy = queryParams.get("customer_email") || null;
+    
     console.log("🔍 [CUSTOMER_ID] Extracted customerId:", customerId);
+    console.log("🔍 [CUSTOMER_ID] customer_name from proxy:", customerNameFromProxy);
+    console.log("🔍 [CUSTOMER_ID] customer_email from proxy:", customerEmailFromProxy);
     console.log("🔍 [CUSTOMER_ID] Will fetch from Shopify API with this ID:", customerId);
 
     // Check if this is a returning guest from a successful lobby join
@@ -270,6 +275,10 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Parse name from proxy params
+    const proxyFirstName = customerNameFromProxy ? customerNameFromProxy.split(' ')[0] : null;
+    const proxyLastName = customerNameFromProxy ? customerNameFromProxy.split(' ').slice(1).join(' ') || null : null;
+
     let customerData = null;
 
     if (customerId && secretData.access_token) {
@@ -303,15 +312,21 @@ Deno.serve(async (req) => {
             last_name: customer?.last_name,
           });
 
+          // Use Shopify API data with proxy params as fallback
+          const firstName = customer?.first_name || proxyFirstName;
+          const lastName = customer?.last_name || proxyLastName;
+          const email = customer?.email || customerEmailFromProxy;
+          const name = [firstName, lastName].filter(Boolean).join(" ") || customerNameFromProxy || email || null;
+
           customerData = {
             id: customerId,
-            email: customer.email || null,
-            firstName: customer.first_name || null,
-            lastName: customer.last_name || null,
-            name: [customer.first_name, customer.last_name].filter(Boolean).join(" ") || customer.email || null,
+            email: email,
+            firstName: firstName,
+            lastName: lastName,
+            name: name,
           };
 
-          console.log("✅ Customer data fetched from Shopify:", {
+          console.log("✅ Customer data fetched from Shopify (with proxy fallback):", {
             id: customerData.id,
             email: customerData.email,
             name: customerData.name,
@@ -323,27 +338,39 @@ Deno.serve(async (req) => {
           const errorText = await shopifyResponse.text();
           console.warn("❌ Failed to fetch customer from Shopify. Status:", shopifyResponse.status);
           console.warn("❌ Error response:", errorText);
-          // Fallback to just ID
+          // Fallback to proxy params
           customerData = {
             id: customerId,
-            email: null,
-            firstName: null,
-            lastName: null,
-            name: null,
+            email: customerEmailFromProxy,
+            firstName: proxyFirstName,
+            lastName: proxyLastName,
+            name: customerNameFromProxy,
           };
+          console.log("🔄 Using proxy params as fallback:", customerData);
         }
       } catch (error) {
         console.error("❌ Error fetching customer from Shopify:", error);
         console.error("❌ Error details:", error instanceof Error ? error.message : String(error));
-        // Fallback to just ID
+        // Fallback to proxy params
         customerData = {
           id: customerId,
-          email: null,
-          firstName: null,
-          lastName: null,
-          name: null,
+          email: customerEmailFromProxy,
+          firstName: proxyFirstName,
+          lastName: proxyLastName,
+          name: customerNameFromProxy,
         };
+        console.log("🔄 Using proxy params as fallback:", customerData);
       }
+    } else if (customerId) {
+      // No access token, use proxy params directly
+      customerData = {
+        id: customerId,
+        email: customerEmailFromProxy,
+        firstName: proxyFirstName,
+        lastName: proxyLastName,
+        name: customerNameFromProxy,
+      };
+      console.log("🔄 No access token, using proxy params:", customerData);
     }
 
     console.log("Customer data:", customerData ? `Logged in: ${customerId}` : "Not logged in");
