@@ -6,6 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Key, Package } from "lucide-react";
 import { getAllUrlParams } from "@/lib/urlUtils";
 
+// Map Shopify internal domains to production domains
+const mapShopDomain = (domain: string): string => {
+  const domainMappings: Record<string, string> = {
+    'qxqtbf-21.myshopify.com': 'phraseotomy.com',
+  };
+  return domainMappings[domain] || domain;
+};
+
 // Extract shop domain from Shopify's host parameter (base64 encoded)
 const extractShopFromHost = (host: string | null): string | null => {
   if (!host) return null;
@@ -25,26 +33,35 @@ const AdminHome = () => {
   
   // Get shop from multiple sources
   const shop = useMemo(() => {
+    let rawShop: string | null = null;
+    
     // First try direct shop param
     const shopParam = searchParams.get('shop');
-    if (shopParam) return shopParam;
+    if (shopParam) rawShop = shopParam;
     
     // Try from all URL params (includes query params before hash)
-    const allParams = getAllUrlParams();
-    const shopFromAll = allParams.get('shop');
-    if (shopFromAll) return shopFromAll;
+    if (!rawShop) {
+      const allParams = getAllUrlParams();
+      rawShop = allParams.get('shop');
+    }
     
     // Try from sessionStorage (stored during URL cleanup in App.tsx)
-    const storedShop = sessionStorage.getItem('shopify_admin_shop');
-    if (storedShop) return storedShop;
+    if (!rawShop) {
+      rawShop = sessionStorage.getItem('shopify_admin_shop');
+    }
     
     // Try to extract from host param (Shopify Admin embedded app)
-    const hostParam = allParams.get('host') || sessionStorage.getItem('shopify_host');
-    const shopFromHost = extractShopFromHost(hostParam);
-    if (shopFromHost) return shopFromHost;
+    if (!rawShop) {
+      const allParams = getAllUrlParams();
+      const hostParam = allParams.get('host') || sessionStorage.getItem('shopify_host');
+      rawShop = extractShopFromHost(hostParam);
+    }
     
     // Fallback to production domain
-    return 'phraseotomy.com';
+    if (!rawShop) rawShop = 'phraseotomy.com';
+    
+    // Map Shopify internal domain to production domain
+    return mapShopDomain(rawShop);
   }, [searchParams]);
   
   const { tenant, loading, error } = useTenant(shop);
