@@ -29,16 +29,31 @@ Deno.serve(async (req) => {
     const cleanSecretElement = secretElementId.startsWith('custom:') 
       ? secretElementId.replace('custom:', '') 
       : secretElementId;
-    
-    console.log("Saving secret element for session", sessionId, "element:", cleanSecretElement);
 
-    // Check if a turn already exists for this session
+    // Get current round from session
+    const { data: session, error: sessionError } = await supabase
+      .from("game_sessions")
+      .select("current_round, current_storyteller_id, selected_theme_id")
+      .eq("id", sessionId)
+      .single();
+
+    if (sessionError || !session) {
+      console.error("Error fetching session:", sessionError);
+      return new Response(
+        JSON.stringify({ error: "Session not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const currentRound = session.current_round || 1;
+    console.log("Saving secret element for session", sessionId, "round:", currentRound, "element:", cleanSecretElement);
+
+    // Check if a turn exists for the CURRENT round
     const { data: existingTurn, error: checkError } = await supabase
       .from("game_turns")
-      .select("id")
+      .select("id, round_number")
       .eq("session_id", sessionId)
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .eq("round_number", currentRound)
       .maybeSingle();
 
     if (checkError) {
@@ -48,7 +63,8 @@ Deno.serve(async (req) => {
     let turnData;
 
     if (existingTurn) {
-      // Update existing turn with secret element
+      // Update existing turn for current round with secret element
+      console.log("Found existing turn for round", currentRound, "- updating secret element");
       const { data: updatedTurn, error: updateError } = await supabase
         .from("game_turns")
         .update({ 
@@ -67,19 +83,15 @@ Deno.serve(async (req) => {
       }
 
       turnData = updatedTurn;
-      console.log("Secret element updated in existing turn:", turnData);
+      console.log("Secret element updated in existing turn for round", currentRound, ":", turnData);
     } else {
-      // Create new turn record with secret element
-      const { data: session } = await supabase
-        .from("game_sessions")
-        .select("current_round, current_storyteller_id, selected_theme_id")
-        .eq("id", sessionId)
-        .single();
-
-      if (!session || !session.selected_theme_id) {
+      // Create new turn record for current round with secret element
+      console.log("No turn found for round", currentRound, "- creating new turn");
+      
+      if (!session.selected_theme_id) {
         return new Response(
-          JSON.stringify({ error: "Session not found or theme not selected" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "Theme not selected for session" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -87,8 +99,8 @@ Deno.serve(async (req) => {
         .from("game_turns")
         .insert({
           session_id: sessionId,
-          round_number: session.current_round || 1,
-          storyteller_id: customerId,
+          round_number: currentRound,
+          storyteller_id: customerId || session.current_storyteller_id,
           theme_id: session.selected_theme_id,
           secret_element: cleanSecretElement,
         })
@@ -104,13 +116,14 @@ Deno.serve(async (req) => {
       }
 
       turnData = newTurn;
-      console.log("Secret element saved in new turn:", turnData);
+      console.log("Secret element saved in new turn for round", currentRound, ":", turnData);
     }
 
     return new Response(
       JSON.stringify({ 
         turn: turnData,
-        secretElementId 
+        secretElementId,
+        roundNumber: currentRound
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
