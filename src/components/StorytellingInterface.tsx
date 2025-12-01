@@ -328,15 +328,26 @@ export function StorytellingInterface({
               </div>
             </div>
 
-            {isStoryteller && whisp && (
+            {isStoryteller && secretElement && (
               <div className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20">
                 <div className="flex items-center gap-2 mb-2">
                   <Lightbulb className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold text-primary">Your Whisp (Hint)</h3>
+                  <h3 className="text-lg font-semibold text-primary">Your Secret Element</h3>
                 </div>
-                <p className="text-2xl font-bold text-center text-primary">{whisp}</p>
+                <p className="text-xl font-bold text-center text-primary">
+                  {elements.find(el => el.id === secretElement)?.name || 'Selected'}
+                </p>
+                {whisp && (
+                  <>
+                    <div className="my-3 border-t border-primary/20" />
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground mb-1">Your Whisp (Hint):</p>
+                      <p className="text-2xl font-bold text-primary">{whisp}</p>
+                    </div>
+                  </>
+                )}
                 <p className="text-sm text-muted-foreground text-center mt-2">
-                  Use this word as inspiration for your story!
+                  {whisp ? "Use this word as inspiration for your story!" : "Generating your hint..."}
                 </p>
               </div>
             )}

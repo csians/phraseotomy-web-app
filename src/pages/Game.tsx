@@ -204,6 +204,13 @@ export default function Game() {
             duration: 5000,
           });
           
+          // Mark session as expired immediately
+          supabase
+            .from('game_sessions')
+            .update({ status: 'expired' })
+            .eq('id', sessionId)
+            .then(() => console.log('✅ Session marked as expired'));
+          
           // Schedule automatic cleanup after 35 seconds
           console.log('🧹 Scheduling game cleanup in 35 seconds...');
           supabase.functions.invoke('cleanup-game-session', {

@@ -49,6 +49,7 @@ export function GuessingInterface({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attemptsRemaining, setAttemptsRemaining] = useState(3);
   const [hasFailedAllAttempts, setHasFailedAllAttempts] = useState(false);
+  const [wrongGuesses, setWrongGuesses] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const toggleElement = (elementId: string) => {
@@ -115,6 +116,8 @@ export function GuessingInterface({
         });
         setSelectedElements([]); // Clear selection
       } else {
+        // Add the wrong guess to the disabled list
+        setWrongGuesses([...wrongGuesses, selectedElements[0]]);
         toast({
           title: "❌ Wrong Guess",
           description: `You have ${attempts_remaining} attempt${attempts_remaining === 1 ? '' : 's'} left!`,
@@ -166,21 +169,27 @@ export function GuessingInterface({
                 </div>
               </div>
               <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                {availableElements.map((element) => (
-                  <button
-                    key={element.id}
-                    onClick={() => toggleElement(element.id)}
-                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
-                      selectedElements.includes(element.id)
-                        ? "bg-primary/20 border-primary"
-                        : "bg-card border-border hover:border-primary/50"
-                    }`}
-                  >
-                    <div className="text-2xl mb-2">{element.icon}</div>
-                    <p className="text-xs font-medium text-center">{element.name}</p>
-                    {selectedElements.includes(element.id) && <Check className="h-4 w-4 text-primary mt-1" />}
-                  </button>
-                ))}
+                {availableElements.map((element) => {
+                  const isWrongGuess = wrongGuesses.includes(element.id);
+                  return (
+                    <button
+                      key={element.id}
+                      onClick={() => !isWrongGuess && toggleElement(element.id)}
+                      disabled={isWrongGuess}
+                      className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                        isWrongGuess
+                          ? "bg-destructive/10 border-destructive/50 opacity-50 cursor-not-allowed"
+                          : selectedElements.includes(element.id)
+                          ? "bg-primary/20 border-primary"
+                          : "bg-card border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">{element.icon}</div>
+                      <p className="text-xs font-medium text-center">{element.name}</p>
+                      {selectedElements.includes(element.id) && <Check className="h-4 w-4 text-primary mt-1" />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
