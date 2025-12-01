@@ -333,10 +333,14 @@ const Login = () => {
               console.log("🚀 Already on proxy domain, using React Router navigation");
               navigate("/play/host", { replace: true });
             } else if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
-              // Different domain, need full redirect
+              // Different domain, need full redirect - use top for iframe context
               const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
               console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
-              window.location.href = proxyUrl;
+              if (window.self !== window.top) {
+                window.top!.location.href = proxyUrl;
+              } else {
+                window.location.href = proxyUrl;
+              }
             } else {
               // Staging or no proxy - stay on current domain
               console.log("🚀 Navigating to play page on current domain");
@@ -599,7 +603,12 @@ const Login = () => {
           const redirect = Redirect.create(app);
           redirect.dispatch(Redirect.Action.REMOTE, data.loginUrl);
         } else {
-          window.location.href = data.loginUrl;
+          // Use top location for iframe context to avoid CSP frame-ancestors error
+          if (window.self !== window.top) {
+            window.top!.location.href = data.loginUrl;
+          } else {
+            window.location.href = data.loginUrl;
+          }
         }
       }
     } catch (error) {
