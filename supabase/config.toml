@@ -5,12 +5,6 @@ enabled = true
 port = 54321
 max_rows = 1000
 
-[functions.end-all-lobbies]
-verify_jwt = false
-
-[functions.start-game]
-verify_jwt = false
-
 [functions.verify-shopify-proxy]
 verify_jwt = false
 
@@ -93,10 +87,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-whisp]
-verify_jwt = false
-
-[functions.generate-customer-token]
-verify_jwt = false
-
-[functions.validate-customer-token]
 verify_jwt = false

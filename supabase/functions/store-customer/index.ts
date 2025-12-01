@@ -86,18 +86,14 @@ Deno.serve(async (req) => {
     // If found by customer_id, customer already exists - update if email/name changed
     if (existingCustomer) {
       console.log('✅ Customer already exists:', customer_id);
-      console.log('📋 Existing customer data:', existingCustomer);
-      console.log('📝 New data to potentially update:', { customer_email, customer_name, first_name, last_name });
       
       // Update customer data if email or name is provided and different
       const updateData: any = {};
       if (customer_email && customer_email !== existingCustomer.customer_email) {
         updateData.customer_email = customer_email;
-        console.log('📧 Will update email:', customer_email);
       }
       if (customer_name) {
         updateData.customer_name = customer_name;
-        console.log('👤 Will update name:', customer_name);
       }
       if (first_name) {
         updateData.first_name = first_name;
@@ -112,7 +108,6 @@ Deno.serve(async (req) => {
       }
       
       if (Object.keys(updateData).length > 0) {
-        console.log('🔄 Updating customer with:', updateData);
         const { data: updatedCustomer, error: updateError } = await supabase
           .from('customers')
           .update(updateData)
@@ -121,9 +116,9 @@ Deno.serve(async (req) => {
           .single();
           
         if (updateError) {
-          console.error('❌ Error updating existing customer:', updateError);
+          console.error('Error updating existing customer:', updateError);
         } else {
-          console.log('✅ Updated existing customer with new data:', updatedCustomer);
+          console.log('✅ Updated existing customer with new data:', customer_id);
           return new Response(
             JSON.stringify({ success: true, customer: updatedCustomer, is_new: false, updated: true }),
             {
@@ -132,8 +127,6 @@ Deno.serve(async (req) => {
             }
           );
         }
-      } else {
-        console.log('ℹ️ No updates needed, customer data unchanged');
       }
       
       return new Response(

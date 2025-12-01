@@ -15,8 +15,7 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store" },
-        { "key": "X-Frame-Options", "value": "ALLOWALL" }
+        { "key": "Cache-Control", "value": "no-store" }
       ]
     }
   ]

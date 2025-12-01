@@ -30,54 +30,32 @@ const Play = () => {
   const [redemptionCode, setRedemptionCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
 
-  // Fetch customer from database with retry logic
-  const fetchCustomerFromDatabase = async (customerId: string, shopDomain: string, tenantId: string, retries = 3): Promise<ShopifyCustomer | null> => {
-    for (let attempt = 0; attempt < retries; attempt++) {
-      try {
-        const { data: dbCustomer, error: dbError } = await supabase
-          .from("customers")
-          .select("customer_id, customer_email, customer_name, first_name, last_name")
-          .eq("customer_id", customerId)
-          .eq("shop_domain", shopDomain)
-          .eq("tenant_id", tenantId)
-          .maybeSingle();
+  // Store customer in database on first login
+  const storeCustomerInDatabase = async (customerData: ShopifyCustomer, shopDomain: string, tenantId: string) => {
+    try {
+      const { error } = await supabase.functions.invoke("store-customer", {
+        body: {
+          customer_id: customerData.id,
+          customer_email: customerData.email,
+          customer_name: customerData.name,
+          first_name: customerData.firstName,
+          last_name: customerData.lastName,
+          shop_domain: shopDomain,
+          tenant_id: tenantId,
+        },
+      });
 
-        if (dbError) {
-          console.error(`Attempt ${attempt + 1}: Error fetching customer from database:`, dbError);
-          if (attempt < retries - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
-            continue;
-          }
-          return null;
-        }
-
-        if (dbCustomer) {
-          console.log(`✅ Customer found in database on attempt ${attempt + 1}:`, dbCustomer);
-          return {
-            id: dbCustomer.customer_id,
-            email: dbCustomer.customer_email || null,
-            firstName: dbCustomer.first_name || null,
-            lastName: dbCustomer.last_name || null,
-            name: dbCustomer.customer_name || null,
-          };
-        }
-        
-        console.log(`⚠️ Attempt ${attempt + 1}: Customer not found in database`);
-        if (attempt < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500)); // Wait before retry
-        }
-      } catch (error) {
-        console.error(`Attempt ${attempt + 1}: Exception fetching customer:`, error);
-        if (attempt < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
+      if (error) {
+        console.error("Error storing customer:", error);
+      } else {
+        console.log("✅ Customer stored/verified in database");
       }
+    } catch (error) {
+      console.error("Error calling store-customer:", error);
     }
-    
-    return null;
   };
 
-  // Initialize from customer token and fetch from Supabase
+  // Initialize from localStorage and verify session
   useEffect(() => {
     const initializeSession = async () => {
       // Check for embedded config from proxy (primary method)
@@ -86,23 +64,32 @@ const Play = () => {
         setShopDomain(window.__PHRASEOTOMY_SHOP__);
 
         if (window.__PHRASEOTOMY_CUSTOMER__) {
-          console.log("👤 Customer from proxy, fetching from database...");
-          
-          // Fetch customer data from Supabase (proxy already stored it)
-          const dbCustomer = await fetchCustomerFromDatabase(
-            window.__PHRASEOTOMY_CUSTOMER__.id,
+          console.log("👤 Customer Data from proxy:", {
+            id: window.__PHRASEOTOMY_CUSTOMER__.id,
+            email: window.__PHRASEOTOMY_CUSTOMER__.email,
+            name: window.__PHRASEOTOMY_CUSTOMER__.name,
+          });
+          setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
+
+          // Store customer data in localStorage for Lobby page
+          localStorage.setItem(
+            "customerData",
+            JSON.stringify({
+              customer_id: window.__PHRASEOTOMY_CUSTOMER__.id,
+              id: window.__PHRASEOTOMY_CUSTOMER__.id,
+              email: window.__PHRASEOTOMY_CUSTOMER__.email,
+              name: window.__PHRASEOTOMY_CUSTOMER__.name,
+              first_name: window.__PHRASEOTOMY_CUSTOMER__.firstName,
+              last_name: window.__PHRASEOTOMY_CUSTOMER__.lastName,
+            }),
+          );
+
+          // Store customer in database
+          storeCustomerInDatabase(
+            window.__PHRASEOTOMY_CUSTOMER__,
             window.__PHRASEOTOMY_SHOP__,
             window.__PHRASEOTOMY_CONFIG__.id,
           );
-
-          if (dbCustomer) {
-            console.log("✅ Customer data loaded from Supabase:", dbCustomer);
-            setCustomer(dbCustomer);
-          } else {
-            // Fallback to proxy data if still not in DB
-            console.log("⚠️ Customer not found in DB after retries, using proxy data");
-            setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
-          }
         }
 
         setLoading(false);
@@ -126,20 +113,28 @@ const Play = () => {
           setShopDomain(shopParam);
 
           if (customerData) {
-            // Fetch customer data from Supabase (already stored by proxy)
-            const dbCustomer = await fetchCustomerFromDatabase(
-              customerData.id,
-              shopParam,
-              tenantConfig.id,
+            console.log("👤 Customer Data from iframe params:", {
+              id: customerData.id,
+              email: customerData.email,
+              name: customerData.name,
+            });
+            setCustomer(customerData);
+
+            // Store customer data in localStorage for Lobby page
+            localStorage.setItem(
+              "customerData",
+              JSON.stringify({
+                customer_id: customerData.id,
+                id: customerData.id,
+                email: customerData.email,
+                name: customerData.name,
+                first_name: customerData.firstName,
+                last_name: customerData.lastName,
+              }),
             );
 
-            if (dbCustomer) {
-              console.log("✅ Customer data loaded from Supabase:", dbCustomer);
-              setCustomer(dbCustomer);
-            } else {
-              console.log("⚠️ Customer not found in DB after retries, using URL data");
-              setCustomer(customerData);
-            }
+            // Store customer in database
+            storeCustomerInDatabase(customerData, shopParam, tenantConfig.id);
           }
 
           setLoading(false);
@@ -158,92 +153,87 @@ const Play = () => {
         return;
       }
 
-      // Try to restore session from customer token
-      const customerToken = localStorage.getItem("phraseotomy_customer_token");
+      // Try to restore session from localStorage
+      const sessionToken = localStorage.getItem("phraseotomy_session_token");
+      const storedCustomerData = localStorage.getItem("customerData");
 
-      if (!customerToken) {
-        console.log("⚠️ No customer token found, redirecting to login");
+      if (!sessionToken || !storedCustomerData) {
+        console.log("⚠️ No session found, redirecting to login");
         navigate("/login", { replace: true });
         return;
       }
 
       try {
-        // Validate token and get customer data from Supabase
-        const { data: tokenData, error: tokenError } = await supabase.functions.invoke("validate-customer-token", {
-          body: { token: customerToken },
+        // Verify session token is still valid
+        const { data: customerData, error: customerError } = await supabase.functions.invoke("get-customer-data", {
+          body: { sessionToken },
         });
 
-        if (tokenError || !tokenData?.valid) {
-          console.warn("⚠️ Invalid customer token, redirecting to login");
-          localStorage.removeItem("phraseotomy_customer_token");
-          localStorage.removeItem("phraseotomy_token_expiry");
+        if (customerError || !customerData) {
+          console.warn("⚠️ Invalid session, clearing and redirecting to login");
+          localStorage.removeItem("phraseotomy_session_token");
+          localStorage.removeItem("customerData");
           navigate("/login", { replace: true });
           return;
         }
 
-        console.log("✅ Token validated, fetching customer from database...");
+        // Decode session token to get customer info
+        const [payloadB64] = sessionToken.split(".");
+        if (payloadB64) {
+          const payload = JSON.parse(atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/")));
 
-        // Fetch tenant
-        const { data: dbTenant, error: tenantError } = await supabase
-          .from("tenants")
-          .select("id, name, tenant_key, shop_domain, environment")
-          .eq("id", tokenData.tenantId)
-          .eq("is_active", true)
-          .maybeSingle();
+          // Check if token is expired
+          if (payload.exp && payload.exp * 1000 < Date.now()) {
+            console.warn("⚠️ Session token expired, redirecting to login");
+            localStorage.removeItem("phraseotomy_session_token");
+            localStorage.removeItem("customerData");
+            navigate("/login", { replace: true });
+            return;
+          }
 
-        if (tenantError || !dbTenant) {
-          console.warn("⚠️ Tenant not found or error:", tenantError);
-          navigate("/login", { replace: true });
-          return;
+          // Load tenant for this shop
+          if (payload.shop) {
+            const { data: dbTenant } = await supabase
+              .from("tenants")
+              .select("id, name, tenant_key, shop_domain, environment")
+              .eq("shop_domain", payload.shop)
+              .eq("is_active", true)
+              .maybeSingle();
+
+            if (dbTenant) {
+              const mappedTenant: TenantConfig = {
+                id: dbTenant.id,
+                name: dbTenant.name,
+                tenant_key: dbTenant.tenant_key,
+                shop_domain: dbTenant.shop_domain,
+                environment: dbTenant.environment,
+                verified: true,
+              };
+              setTenant(mappedTenant);
+              setShopDomain(dbTenant.shop_domain);
+
+              // Set customer state
+              const parsedCustomerData = JSON.parse(storedCustomerData);
+              const customerObj: ShopifyCustomer = {
+                id: payload.customer_id,
+                email: parsedCustomerData.email || null,
+                firstName: parsedCustomerData.first_name || null,
+                lastName: parsedCustomerData.last_name || null,
+                name: parsedCustomerData.name || null,
+              };
+              setCustomer(customerObj);
+
+              // Store customer in database
+              storeCustomerInDatabase(customerObj, dbTenant.shop_domain, dbTenant.id);
+            }
+          }
+
+          console.log("✅ Session restored successfully");
         }
-
-        const mappedTenant: TenantConfig = {
-          id: dbTenant.id,
-          name: dbTenant.name,
-          tenant_key: dbTenant.tenant_key,
-          shop_domain: dbTenant.shop_domain,
-          environment: dbTenant.environment,
-          verified: true,
-        };
-        setTenant(mappedTenant);
-        setShopDomain(dbTenant.shop_domain);
-
-        // Fetch customer from database
-        const { data: dbCustomer, error: customerError } = await supabase
-          .from("customers")
-          .select("customer_id, customer_email, customer_name, first_name, last_name")
-          .eq("customer_id", tokenData.customerId)
-          .eq("shop_domain", tokenData.shopDomain)
-          .eq("tenant_id", tokenData.tenantId)
-          .maybeSingle();
-
-        if (customerError) {
-          console.error("Error fetching customer from database:", customerError);
-        }
-
-        if (dbCustomer) {
-          const customerObj: ShopifyCustomer = {
-            id: dbCustomer.customer_id,
-            email: dbCustomer.customer_email || null,
-            firstName: dbCustomer.first_name || null,
-            lastName: dbCustomer.last_name || null,
-            name: dbCustomer.customer_name || null,
-          };
-          console.log("✅ Customer data loaded from Supabase:", customerObj);
-          setCustomer(customerObj);
-        } else {
-          console.warn("⚠️ Customer not found in database");
-          localStorage.removeItem("phraseotomy_customer_token");
-          localStorage.removeItem("phraseotomy_token_expiry");
-          navigate("/login", { replace: true });
-          return;
-        }
-
-        console.log("✅ Session restored from database");
       } catch (error) {
         console.error("Error restoring session:", error);
-        localStorage.removeItem("phraseotomy_customer_token");
-        localStorage.removeItem("phraseotomy_token_expiry");
+        localStorage.removeItem("phraseotomy_session_token");
+        localStorage.removeItem("customerData");
         navigate("/login", { replace: true });
         return;
       }
@@ -415,13 +405,13 @@ const Play = () => {
 
   const handleLogout = () => {
     // Clear local storage
-    localStorage.removeItem("phraseotomy_customer_token");
-    localStorage.removeItem("phraseotomy_token_expiry");
+    localStorage.removeItem("phraseotomy_session_token");
+    localStorage.removeItem("customerData");
 
     // If running in Shopify app proxy (has shop domain), logout from Shopify
     if (shopDomain) {
-      // Redirect to Shopify logout with return to app proxy
-      window.top!.location.href = `https://${shopDomain}/account/logout?return_url=/apps/phraseotomy`;
+      // Redirect to Shopify logout, which will return to app proxy and show login page
+      window.top!.location.href = `https://${shopDomain}/account/logout`;
     } else {
       // Fallback for standalone mode
       navigate("/login");
@@ -468,16 +458,8 @@ const Play = () => {
         <div className="text-center flex items-center justify-between">
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-white">
-              Welcome, {
-                customer?.name || 
-                (customer?.firstName && customer?.lastName 
-                  ? `${customer.firstName} ${customer.lastName}` 
-                  : customer?.firstName || customer?.lastName || customer?.email || "Guest")
-              }!
+              Welcome, {customer?.name || `${customer?.firstName || ''} ${customer?.lastName || ''}`.trim() || customer?.email}!
             </h2>
-            {customer?.email && customer?.name !== customer?.email && (
-              <p className="text-sm text-muted-foreground mt-1">{customer.email}</p>
-            )}
           </div>
           <Button variant="outline" size="sm" onClick={handleLogout} className="ml-4">
             Logout

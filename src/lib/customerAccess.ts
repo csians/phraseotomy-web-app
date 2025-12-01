@@ -1,11 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { getCustomerTokenForRequest } from './customerToken';
-
-export interface Pack {
-  id: string;
-  name: string;
-  description: string | null;
-}
 
 export interface CustomerLicense {
   id: string;
@@ -30,9 +23,8 @@ export async function getCustomerLicenses(
   shopDomain: string
 ): Promise<CustomerLicense[]> {
   try {
-    const customerToken = getCustomerTokenForRequest();
     const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
-      body: { customerId, shopDomain, customerToken },
+      body: { customerId, shopDomain },
     });
 
     if (error) {
@@ -52,9 +44,8 @@ export async function getCustomerSessions(
   shopDomain: string
 ): Promise<GameSession[]> {
   try {
-    const customerToken = getCustomerTokenForRequest();
     const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
-      body: { customerId, shopDomain, customerToken },
+      body: { customerId, shopDomain },
     });
 
     if (error) {
@@ -63,28 +54,6 @@ export async function getCustomerSessions(
     }
 
     return data?.sessions || [];
-  } catch (error) {
-    console.error('Error calling get-customer-licenses-sessions function:', error);
-    return [];
-  }
-}
-
-export async function getCustomerAvailablePacks(
-  customerId: string,
-  shopDomain: string
-): Promise<Pack[]> {
-  try {
-    const customerToken = getCustomerTokenForRequest();
-    const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
-      body: { customerId, shopDomain, customerToken },
-    });
-
-    if (error) {
-      console.error('Error fetching customer available packs:', error);
-      return [];
-    }
-
-    return data?.availablePacks || [];
   } catch (error) {
     console.error('Error calling get-customer-licenses-sessions function:', error);
     return [];

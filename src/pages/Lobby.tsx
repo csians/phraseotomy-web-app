@@ -105,7 +105,6 @@ export default function Lobby() {
   const [isConnected, setIsConnected] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdownNumber, setCountdownNumber] = useState(3);
-  const [customerData, setCustomerData] = useState<{ id: string; name: string | null; email: string | null } | null>(null);
 
   // Handle guest data from URL params on mount
   useEffect(() => {
@@ -160,116 +159,86 @@ export default function Lobby() {
     }
   }, []);
 
-  // Fetch customer data from Supabase
-  useEffect(() => {
-    const fetchCustomerData = async () => {
-      const customerToken = localStorage.getItem('phraseotomy_customer_token');
-      if (!customerToken) {
-        console.log('ℹ️ No customer token, skipping customer data fetch');
-        return;
-      }
-
-      try {
-        // Validate token and get customer data
-        const { data: tokenData, error: tokenError } = await supabase.functions.invoke('validate-customer-token', {
-          body: { token: customerToken },
-        });
-
-        if (tokenError || !tokenData?.valid) {
-          console.warn('⚠️ Invalid customer token');
-          return;
-        }
-
-        // Fetch customer from database
-        const { data: dbCustomer, error: customerError } = await supabase
-          .from('customers')
-          .select('customer_id, customer_email, customer_name, first_name, last_name')
-          .eq('customer_id', tokenData.customerId)
-          .eq('shop_domain', tokenData.shopDomain)
-          .eq('tenant_id', tokenData.tenantId)
-          .maybeSingle();
-
-        if (customerError) {
-          console.error('Error fetching customer:', customerError);
-          return;
-        }
-
-        if (dbCustomer) {
-          setCustomerData({
-            id: dbCustomer.customer_id,
-            name: dbCustomer.customer_name || dbCustomer.first_name || null,
-            email: dbCustomer.customer_email || null,
-          });
-          console.log('✅ Customer data loaded from Supabase:', dbCustomer);
-        }
-      } catch (error) {
-        console.error('Error fetching customer data:', error);
-      }
-    };
-
-    fetchCustomerData();
-  }, []);
-
-  // Get current customer ID helper - ONLY from Supabase, no localStorage fallback
+  // Get current customer ID helper
   const getCurrentCustomerId = useCallback(() => {
     console.log("🔍 [GET_ID] Starting getCurrentCustomerId...");
     
-    // Priority 1: Customer data from Supabase state
-    if (customerData?.id) {
-      console.log("✅ [GET_ID] Found customer ID from Supabase:", customerData.id);
-      return customerData.id;
-    }
-
-    // Priority 2: URL params (for iframe/proxy mode)
     const urlParams = getAllUrlParams();
     const urlCustomerId = urlParams.get("customer_id");
     if (urlCustomerId) {
       console.log("✅ [GET_ID] Found customer ID in URL:", urlCustomerId);
       return urlCustomerId;
     }
+
+    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
+    for (const key of storageKeys) {
+      let dataStr = sessionStorage.getItem(key) || localStorage.getItem(key);
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(dataStr);
+          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
+          if (customerId) {
+            console.log(`✅ [GET_ID] Found customer ID in ${key}:`, customerId);
+            return String(customerId);
+          }
+        } catch (e) {
+          console.error(`Error parsing ${key}:`, e);
+        }
+      }
+    }
     
-    // Priority 3: Guest player ID (for guest join functionality)
+    // Check for guest player ID in both sessionStorage and localStorage
     const guestPlayerIdSession = sessionStorage.getItem("guest_player_id");
     const guestPlayerIdLocal = localStorage.getItem("guest_player_id");
     const guestPlayerId = guestPlayerIdSession || guestPlayerIdLocal;
     
+    console.log("🔍 [GET_ID] Guest player ID (session):", guestPlayerIdSession);
+    console.log("🔍 [GET_ID] Guest player ID (local):", guestPlayerIdLocal);
+    
     if (guestPlayerId) {
       console.log("✅ [GET_ID] Found guest player ID:", guestPlayerId);
+      // Store in both storages for reliability
       if (!guestPlayerIdSession) sessionStorage.setItem("guest_player_id", guestPlayerId);
       if (!guestPlayerIdLocal) localStorage.setItem("guest_player_id", guestPlayerId);
       return guestPlayerId;
     }
     
-    console.log("❌ [GET_ID] No player ID found");
+    // As a last resort, check if we have guestPlayerData
+    const guestDataStr = sessionStorage.getItem("guestPlayerData") || localStorage.getItem("guestPlayerData");
+    if (guestDataStr) {
+      try {
+        const guestData = JSON.parse(guestDataStr);
+        if (guestData.player_id) {
+          console.log("✅ [GET_ID] Found player ID in guestPlayerData:", guestData.player_id);
+          // Store it for next time
+          sessionStorage.setItem("guest_player_id", guestData.player_id);
+          localStorage.setItem("guest_player_id", guestData.player_id);
+          return guestData.player_id;
+        }
+      } catch (e) {
+        console.error("Error parsing guestPlayerData:", e);
+      }
+    }
+    
+    console.log("❌ [GET_ID] No player ID found anywhere");
     return null;
-  }, [customerData]);
+  }, []);
 
-  // Get current player name - ONLY from Supabase, no localStorage fallback
+  // Get current player name
   const getCurrentPlayerName = useCallback(() => {
-    // Priority 1: Customer data from Supabase state
-    if (customerData) {
-      const name = customerData.name || customerData.email || "Customer";
-      console.log("✅ [GET_NAME] Using name from Supabase:", name);
-      return name;
+    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
+    for (const key of storageKeys) {
+      let dataStr = sessionStorage.getItem(key) || localStorage.getItem(key);
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed.name) return parsed.name;
+          if (parsed.first_name) return parsed.first_name;
+        } catch (e) {}
+      }
     }
-
-    // Priority 2: URL params (for iframe/proxy mode)
-    const urlParams = getAllUrlParams();
-    const urlCustomerName = urlParams.get("customer_name");
-    if (urlCustomerName) {
-      console.log("✅ [GET_NAME] Using name from URL:", urlCustomerName);
-      return urlCustomerName;
-    }
-
-    // Priority 3: Guest player name
-    const guestPlayerName = localStorage.getItem("guest_player_name");
-    if (guestPlayerName) {
-      console.log("✅ [GET_NAME] Using guest player name:", guestPlayerName);
-      return guestPlayerName;
-    }
-
-    return "Player";
-  }, [customerData]);
+    return localStorage.getItem("guest_player_name") || "Player";
+  }, []);
 
   const currentPlayerId = getCurrentCustomerId();
   const currentPlayerName = getCurrentPlayerName();
@@ -982,8 +951,9 @@ export default function Lobby() {
       return;
     }
 
-    // Get customer name from state (fetched from Supabase)
-    const customerName = getCurrentPlayerName();
+    // Get customer name from storage if available
+    const customerData = localStorage.getItem("customerData");
+    const customerName = customerData ? JSON.parse(customerData).name : null;
 
     // Update session with selected theme via edge function
     try {

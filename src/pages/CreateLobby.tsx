@@ -7,8 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { getCustomerAvailablePacks, type Pack } from '@/lib/customerAccess';
+import { getCustomerLicenses } from '@/lib/customerAccess';
 import { Skeleton } from '@/components/ui/skeleton';
+
+
+const ALL_PACKS = [
+  { id: 'base', name: 'Base Pack', description: 'Core game cards' },
+  { id: 'expansion1', name: 'Expansion 1', description: 'Additional themed cards' },
+  { id: 'expansion2', name: 'Expansion 2', description: 'More variety' },
+  { id: 'premium', name: 'Premium Pack', description: 'Exclusive content' },
+];
 
 export default function CreateLobby() {
   const navigate = useNavigate();
@@ -16,96 +24,17 @@ export default function CreateLobby() {
   const { toast } = useToast();
   
   const [lobbyName, setLobbyName] = useState('');
-  const [selectedPacks, setSelectedPacks] = useState<string[]>([]);
+  const [selectedPacks, setSelectedPacks] = useState<string[]>(['base']);
   const [isCreating, setIsCreating] = useState(false);
-  const [availablePacks, setAvailablePacks] = useState<Pack[]>([]);
+  const [availablePacks, setAvailablePacks] = useState<string[]>(['base']); // Default to base pack
   const [loadingPacks, setLoadingPacks] = useState(true);
-  const [customer, setCustomer] = useState<any>(null);
-  const [shopDomain, setShopDomain] = useState<string | null>(null);
-  const [tenant, setTenant] = useState<any>(null);
-  const [loadingAuth, setLoadingAuth] = useState(true);
 
-  // Fetch customer data from Supabase using token
-  useEffect(() => {
-    const fetchCustomerData = async () => {
-      const customerToken = localStorage.getItem('phraseotomy_customer_token');
-      
-      if (!customerToken) {
-        console.warn('No customer token found');
-        navigate('/play/host');
-        return;
-      }
+  // Get customer and shop info from location state or window
+  const customer = location.state?.customer || window.__PHRASEOTOMY_CUSTOMER__;
+  const shopDomain = location.state?.shopDomain || window.__PHRASEOTOMY_SHOP__;
+  const tenant = location.state?.tenant || window.__PHRASEOTOMY_CONFIG__;
 
-      try {
-        const { data: tokenData, error: tokenError } = await supabase.functions.invoke('validate-customer-token', {
-          body: { token: customerToken },
-        });
-
-        if (tokenError || !tokenData?.valid) {
-          console.warn('Invalid customer token');
-          navigate('/play/host');
-          return;
-        }
-
-        // Fetch tenant
-        const { data: dbTenant } = await supabase
-          .from('tenants')
-          .select('id, name, tenant_key, shop_domain, environment')
-          .eq('id', tokenData.tenantId)
-          .eq('is_active', true)
-          .maybeSingle();
-
-        if (!dbTenant) {
-          console.warn('Tenant not found');
-          navigate('/play/host');
-          return;
-        }
-
-        setTenant({
-          id: dbTenant.id,
-          name: dbTenant.name,
-          tenant_key: dbTenant.tenant_key,
-          shop_domain: dbTenant.shop_domain,
-          environment: dbTenant.environment,
-          verified: true,
-        });
-        setShopDomain(dbTenant.shop_domain);
-
-        // Fetch customer from database
-        const { data: dbCustomer } = await supabase
-          .from('customers')
-          .select('customer_id, customer_email, customer_name, first_name, last_name')
-          .eq('customer_id', tokenData.customerId)
-          .eq('shop_domain', tokenData.shopDomain)
-          .eq('tenant_id', tokenData.tenantId)
-          .maybeSingle();
-
-        if (dbCustomer) {
-          setCustomer({
-            id: dbCustomer.customer_id,
-            email: dbCustomer.customer_email,
-            name: dbCustomer.customer_name,
-            firstName: dbCustomer.first_name,
-            lastName: dbCustomer.last_name,
-          });
-          console.log('✅ Customer loaded from Supabase:', dbCustomer);
-        } else {
-          console.warn('Customer not found in database');
-          navigate('/play/host');
-          return;
-        }
-      } catch (error) {
-        console.error('Error fetching customer data:', error);
-        navigate('/play/host');
-      } finally {
-        setLoadingAuth(false);
-      }
-    };
-
-    fetchCustomerData();
-  }, [navigate]);
-
-  // Load customer's available packs from database
+  // Load customer's available packs from redeemed codes
   useEffect(() => {
     const loadCustomerPacks = async () => {
       if (!customer || !shopDomain) {
@@ -116,17 +45,36 @@ export default function CreateLobby() {
       try {
         setLoadingPacks(true);
         
-        // Get customer's available packs from backend (dynamically from database)
-        const packs = await getCustomerAvailablePacks(customer.id, shopDomain);
+        // Get customer licenses (redeemed codes)
+        const licenses = await getCustomerLicenses(customer.id, shopDomain);
         
-        setAvailablePacks(packs);
+        // Extract all unique packs from all licenses
+        const allPacks = new Set<string>();
+        licenses.forEach(license => {
+          if (license.packs_unlocked && Array.isArray(license.packs_unlocked)) {
+            license.packs_unlocked.forEach(pack => allPacks.add(pack));
+          }
+        });
         
-        // Auto-select the first pack if available
-        if (packs.length > 0 && selectedPacks.length === 0) {
-          setSelectedPacks([packs[0].id]);
-        }
+        const packsArray = Array.from(allPacks);
+        setAvailablePacks(packsArray.length > 0 ? packsArray : []);
+        
+        // Update selected packs to only include available ones
+        setSelectedPacks(prev => {
+          const filtered = prev.filter(packId => packsArray.includes(packId));
+          
+          // If no packs selected after filtering, select the first available pack
+          if (filtered.length === 0 && packsArray.length > 0) {
+            // Select base pack if available, otherwise first pack
+            const packToSelect = packsArray.includes('base') ? 'base' : packsArray[0];
+            return [packToSelect];
+          }
+          
+          return filtered;
+        });
       } catch (error) {
         console.error('Error loading customer packs:', error);
+        // On error, no packs available
         setAvailablePacks([]);
       } finally {
         setLoadingPacks(false);
@@ -214,17 +162,6 @@ export default function CreateLobby() {
     }
   };
 
-  if (loadingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   if (!customer) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -283,10 +220,7 @@ export default function CreateLobby() {
                 </div>
                 <div>
                   <h2 className="text-xl font-semibold">
-                    {customer.name || 
-                     (customer.firstName && customer.lastName 
-                       ? `${customer.firstName} ${customer.lastName}` 
-                       : customer.firstName || customer.lastName || customer.email || 'Guest')}
+                    {customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email}
                   </h2>
                   {customer.email && (
                     <p className="text-sm text-muted-foreground">{customer.email}</p>
@@ -327,39 +261,53 @@ export default function CreateLobby() {
                   <Skeleton className="h-16 w-full" />
                   <Skeleton className="h-16 w-full" />
                 </div>
-              ) : availablePacks.length > 0 ? (
+              ) : (
                 <div className="space-y-3">
-                  {availablePacks.map((pack) => {
+                  {ALL_PACKS.map((pack) => {
+                    const isAvailable = availablePacks.includes(pack.id);
                     const isSelected = selectedPacks.includes(pack.id);
                     
                     return (
                       <div 
                         key={pack.id} 
-                        className="flex items-start space-x-3 p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors"
+                        className={`flex items-start space-x-3 p-3 rounded-lg border ${
+                          isAvailable 
+                            ? 'border-border bg-card' 
+                            : 'border-muted bg-muted/30 opacity-60'
+                        }`}
                       >
                         <Checkbox
                           id={pack.id}
                           checked={isSelected}
-                          onCheckedChange={() => handlePackToggle(pack.id)}
+                          disabled={!isAvailable}
+                          onCheckedChange={() => isAvailable && handlePackToggle(pack.id)}
                         />
                         <div className="space-y-1 leading-none flex-1">
-                          <Label
-                            htmlFor={pack.id}
-                            className="text-sm font-medium leading-none cursor-pointer"
-                          >
-                            {pack.name}
-                          </Label>
-                          {pack.description && (
-                            <p className="text-sm text-muted-foreground">
-                              {pack.description}
-                            </p>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <Label
+                              htmlFor={pack.id}
+                              className={`text-sm font-medium leading-none ${
+                                !isAvailable ? 'cursor-not-allowed opacity-70' : ''
+                              }`}
+                            >
+                              {pack.name}
+                            </Label>
+                            {!isAvailable && (
+                              <span className="text-xs text-muted-foreground italic">
+                                (Not available)
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {pack.description}
+                          </p>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              ) : (
+              )}
+              {!loadingPacks && availablePacks.length === 0 && (
                 <div className="text-center py-4 text-muted-foreground">
                   <p>No packs available. Please contact support to assign packs to your account.</p>
                 </div>
@@ -389,10 +337,7 @@ export default function CreateLobby() {
         <Card className="bg-muted/50">
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground space-y-1">
-              <p><strong>Host:</strong> {customer.name || 
-                (customer.firstName && customer.lastName 
-                  ? `${customer.firstName} ${customer.lastName}` 
-                  : customer.firstName || customer.lastName || customer.email || 'Guest')}</p>
+              <p><strong>Host:</strong> {customer.name || customer.email}</p>
               <p><strong>Shop:</strong> {shopDomain}</p>
             </div>
           </CardContent>

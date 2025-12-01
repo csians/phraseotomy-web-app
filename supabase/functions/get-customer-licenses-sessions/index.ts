@@ -119,43 +119,15 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Get all unique pack names from all licenses
-    const allPackNames = new Set<string>();
-    formattedLicenses.forEach(license => {
-      if (license.packs_unlocked && Array.isArray(license.packs_unlocked)) {
-        license.packs_unlocked.forEach(packName => allPackNames.add(packName));
-      }
-    });
-
-    console.log('Pack names to fetch:', Array.from(allPackNames));
-
-    // Fetch pack details from the database for the unlocked packs (matching by name, not id)
-    let availablePacks: Array<{ id: string; name: string; description: string | null }> = [];
-    if (allPackNames.size > 0) {
-      const { data: packsData, error: packsError } = await supabase
-        .from('packs')
-        .select('id, name, description')
-        .in('name', Array.from(allPackNames));
-
-      if (packsError) {
-        console.error('Error fetching packs:', packsError);
-      } else {
-        availablePacks = packsData || [];
-        console.log('Fetched packs:', availablePacks);
-      }
-    }
-
     console.log('Successfully fetched data:', {
       licenses: formattedLicenses.length,
       sessions: sessions?.length || 0,
-      availablePacks: availablePacks.length,
     });
 
     return new Response(
       JSON.stringify({
         licenses: formattedLicenses,
         sessions: sessions || [],
-        availablePacks: availablePacks,
       }),
       {
         status: 200,

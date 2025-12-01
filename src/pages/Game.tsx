@@ -301,29 +301,20 @@ export default function Game() {
       let phase: "theme_selection" | "storytelling" | "guessing" | "scoring";
       if (!data.currentTurn) {
         phase = "theme_selection";
-        console.log("🎮 No current turn - setting phase to theme_selection");
+        console.log("No current turn - setting phase to theme_selection");
       } else if (!data.currentTurn.completed_at) {
         phase = "storytelling";
-        console.log("🎮 Turn exists but not completed - setting phase to storytelling");
+        console.log("Turn exists but not completed - setting phase to storytelling");
       } else {
         phase = "guessing";
-        console.log("🎮 Turn completed - setting phase to guessing");
+        console.log("Turn completed - setting phase to guessing");
       }
       setGamePhase(phase);
       
       // Check if current player is storyteller
       const isStoryteller = playerId === data.session?.current_storyteller_id;
-      console.log("🎤 Is current player storyteller?", isStoryteller);
-      console.log("🎤 Player ID:", playerId, "Storyteller ID:", data.session?.current_storyteller_id);
-      console.log("🎤 Current Round:", data.session?.current_round, "Phase:", phase);
-      
-      // Debug all players and their turn orders
-      console.log("👥 All players:", data.players?.map(p => ({
-        name: p.name,
-        player_id: p.player_id,
-        turn_order: p.turn_order,
-        isStoryteller: p.player_id === data.session?.current_storyteller_id
-      })));
+      console.log("Is current player storyteller?", isStoryteller);
+      console.log("Player ID:", playerId, "Storyteller ID:", data.session?.current_storyteller_id);
     } catch (error) {
       console.error("Error initializing game:", error);
       toast({

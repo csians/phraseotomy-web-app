@@ -50,12 +50,11 @@ Deno.serve(async (req) => {
 
   console.log("🔍 [PROXY_PARAMS] All query parameters:");
   for (const [key, value] of queryParams.entries()) {
-    if (key !== "signature") {
-      // Don't log the signature itself
+    if (key !== "signature") {  // Don't log the signature itself
       console.log(`  ${key}: ${value}`);
     }
   }
-
+  
   const loggedInCustomerId = queryParams.get("logged_in_customer_id");
   console.log("🔍 [CUSTOMER_ID] logged_in_customer_id from Shopify:", loggedInCustomerId);
 
@@ -221,99 +220,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Check for existing customer token first
-    const existingToken = queryParams.get("customerToken");
-    
-    let customerId: string | null = null;
-    let customerToken: string | null = existingToken;
-    
-    // If we have a token, validate it
-    if (existingToken) {
-      console.log("🔍 [TOKEN_AUTH] Validating existing customer token");
-      try {
-        const { data: validationResult, error: validationError } = await supabase.functions.invoke(
-          "validate-customer-token",
-          {
-            body: { token: existingToken },
-          }
-        );
-
-        if (!validationError && validationResult?.valid) {
-          customerId = validationResult.customerId;
-          console.log("✅ [TOKEN_AUTH] Token valid for customer:", customerId);
-        } else {
-          console.log("❌ [TOKEN_AUTH] Invalid or expired token");
-          customerToken = null;
-        }
-      } catch (error) {
-        console.error("❌ [TOKEN_AUTH] Error validating token:", error);
-        customerToken = null;
-      }
-    }
-    
-    // If no valid token, check Shopify's logged_in_customer_id
-    if (!customerId) {
-      const shopifyCustomerId = queryParams.get("logged_in_customer_id");
-      console.log("🔍 [CUSTOMER_ID] logged_in_customer_id from Shopify:", shopifyCustomerId);
-      
-      if (shopifyCustomerId) {
-        customerId = shopifyCustomerId;
-        console.log("🔍 [CUSTOMER_ID] Extracted customerId:", customerId);
-        console.log("🔍 [CUSTOMER_ID] Will fetch from Shopify API with this ID:", customerId);
-        
-        // Store customer BEFORE generating token
-        console.log("💾 [CUSTOMER_STORE] Storing customer in database first");
-        try {
-          const { data: storeResult, error: storeError } = await supabase.functions.invoke(
-            "store-customer",
-            {
-              body: {
-                customer_id: customerId,
-                customer_email: null, // Will be fetched from Shopify API later
-                customer_name: null,
-                shop_domain: shop,
-                tenant_id: tenant.id,
-              },
-            }
-          );
-
-          if (storeError) {
-            console.error("❌ [CUSTOMER_STORE] Error storing customer:", storeError);
-          } else {
-            console.log("✅ [CUSTOMER_STORE] Customer stored/verified in database");
-          }
-        } catch (error) {
-          console.error("❌ [CUSTOMER_STORE] Exception storing customer:", error);
-        }
-        
-        // Generate a new token for this customer
-        console.log("🔐 [TOKEN_GEN] Generating new token for customer");
-        try {
-          const { data: tokenResult, error: tokenError } = await supabase.functions.invoke(
-            "generate-customer-token",
-            {
-              body: {
-                customerId: customerId,
-                shopDomain: shop,
-                userAgent: req.headers.get("user-agent"),
-                ipAddress: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip"),
-              },
-            }
-          );
-
-          if (!tokenError && tokenResult?.token) {
-            customerToken = tokenResult.token;
-            console.log("✅ [TOKEN_GEN] Token generated successfully");
-          } else {
-            console.warn("⚠️ [TOKEN_GEN] Failed to generate token:", tokenError);
-          }
-        } catch (error) {
-          console.error("❌ [TOKEN_GEN] Error generating token:", error);
-        }
-      } else {
-        console.log("🔍 [CUSTOMER_ID] No logged_in_customer_id from Shopify");
-      }
-    }
+    // Extract customer ID from Shopify proxy parameters
+    const customerId = queryParams.get("logged_in_customer_id") || null;
+    console.log("🔍 [CUSTOMER_ID] Extracted customerId:", customerId);
+    console.log("🔍 [CUSTOMER_ID] Will fetch from Shopify API with this ID:", customerId);
 
     // Check if this is a returning guest from a successful lobby join
     const guestSession = queryParams.get("guestSession");
@@ -367,7 +277,7 @@ Deno.serve(async (req) => {
         const apiUrl = `https://${shop}/admin/api/2024-01/customers/${customerId}.json`;
         console.log("🔍 [SHOPIFY_API] Fetching customer from:", apiUrl);
         console.log("🔍 [SHOPIFY_API] Has access token:", !!secretData.access_token);
-
+        
         const shopifyResponse = await fetch(apiUrl, {
           headers: {
             "X-Shopify-Access-Token": secretData.access_token,
@@ -381,49 +291,16 @@ Deno.serve(async (req) => {
         if (shopifyResponse.ok) {
           const responseText = await shopifyResponse.text();
           console.log("🔍 [SHOPIFY_API] Raw response (first 500 chars):", responseText.substring(0, 500));
-
+          
           const shopifyData = JSON.parse(responseText);
           const customer = shopifyData.customer;
-
+          
           console.log("🔍 [SHOPIFY_API] Parsed customer object:", {
             id: customer?.id,
             email: customer?.email,
             first_name: customer?.first_name,
             last_name: customer?.last_name,
-            state: customer?.state,
           });
-
-          // Auto-enable disabled customer accounts
-          if (customer?.state === "disabled") {
-            console.log("🔧 [AUTO_ENABLE] Customer account is disabled, attempting to enable...");
-            try {
-              const inviteUrl = `https://${shop}/admin/api/2024-01/customers/${customerId}/send_invite.json`;
-              const inviteResponse = await fetch(inviteUrl, {
-                method: "POST",
-                headers: {
-                  "X-Shopify-Access-Token": secretData.access_token,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  customer_invite: {
-                    to: customer.email,
-                    from: null,
-                    subject: "Activate your account",
-                    custom_message: "Welcome! Please activate your account to access Phraseotomy.",
-                  },
-                }),
-              });
-
-              if (inviteResponse.ok) {
-                console.log("✅ [AUTO_ENABLE] Account activation email sent successfully");
-              } else {
-                const errorText = await inviteResponse.text();
-                console.warn("⚠️ [AUTO_ENABLE] Failed to send activation email:", errorText);
-              }
-            } catch (enableError) {
-              console.error("❌ [AUTO_ENABLE] Error enabling customer account:", enableError);
-            }
-          }
 
           customerData = {
             id: customerId,
@@ -431,7 +308,6 @@ Deno.serve(async (req) => {
             firstName: customer.first_name || null,
             lastName: customer.last_name || null,
             name: [customer.first_name, customer.last_name].filter(Boolean).join(" ") || customer.email || null,
-            token: customerToken,
           };
 
           console.log("✅ Customer data fetched from Shopify:", {
@@ -442,33 +318,6 @@ Deno.serve(async (req) => {
             lastName: customerData.lastName,
           });
           console.log("🔍 [CUSTOMER_DATA] Full customerData object being passed to app:", JSON.stringify(customerData));
-          
-          // Update customer data in database with Shopify details
-          console.log("💾 [CUSTOMER_UPDATE] Updating customer with Shopify data");
-          try {
-            const { error: updateError } = await supabase.functions.invoke(
-              "store-customer",
-              {
-                body: {
-                  customer_id: customerId,
-                  customer_email: customer.email || null,
-                  customer_name: customerData.name,
-                  first_name: customer.first_name || null,
-                  last_name: customer.last_name || null,
-                  shop_domain: shop,
-                  tenant_id: tenant.id,
-                },
-              }
-            );
-
-            if (updateError) {
-              console.error("❌ [CUSTOMER_UPDATE] Error updating customer:", updateError);
-            } else {
-              console.log("✅ [CUSTOMER_UPDATE] Customer data updated with Shopify details");
-            }
-          } catch (error) {
-            console.error("❌ [CUSTOMER_UPDATE] Exception updating customer:", error);
-          }
         } else {
           const errorText = await shopifyResponse.text();
           console.warn("❌ Failed to fetch customer from Shopify. Status:", shopifyResponse.status);
@@ -480,7 +329,6 @@ Deno.serve(async (req) => {
             firstName: null,
             lastName: null,
             name: null,
-            token: customerToken,
           };
         }
       } catch (error) {
@@ -493,7 +341,6 @@ Deno.serve(async (req) => {
           firstName: null,
           lastName: null,
           name: null,
-          token: customerToken,
         };
       }
     }
@@ -509,7 +356,7 @@ Deno.serve(async (req) => {
     });
 
     // Pass token and customer data to app
-    return new Response(generateAppHtml(tenant, shop, customerData, nonce, null, customerToken), {
+    return new Response(generateAppHtml(tenant, shop, customerData, nonce), {
       status: 200,
       headers,
     });
@@ -533,8 +380,7 @@ Deno.serve(async (req) => {
  * Generate login redirect HTML for unauthenticated users
  */
 function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: string): string {
-  console.log("redirect 11111");
-  // Use staging domain for both environments until production CSP is configured
+  // Use staging domain for both environments
   const baseUrl = "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
   #header-group,.header-group, footer, header {
@@ -701,7 +547,7 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: 
   <div class="logo">P</div>
   <h1>PHRASEOTOMY</h1>
   <p>Log in to your account to host a game</p>
-  <button class="login-btn" onclick="loginRedirect()">Log In</button>
+  <a href="${loginUrl}" class="login-btn">Log In</a>
   
   <div class="divider"><span>or</span></div>
   
@@ -730,15 +576,6 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: 
   </div>
 </div>
 <script>
-  function loginRedirect() {
-    // Break out of iframe and redirect parent window to Shopify login
-    if (window.top) {
-      window.top.location.href = '${loginUrl}';
-    } else {
-      window.location.href = '${loginUrl}';
-    }
-  }
-
   function toggleGuestForm() {
     const form = document.getElementById('guestForm');
     form.classList.toggle('active');
@@ -785,7 +622,6 @@ function generateAppHtml(
   customer: any = null,
   nonce: string,
   guestSession: string | null = null,
-  customerToken: string | null = null,
 ): string {
   // Sanitize tenant data for embedding
   const tenantConfig = {
@@ -797,8 +633,7 @@ function generateAppHtml(
     verified: true,
   };
 
-  // Use staging domain for both environments until production CSP is configured
-  console.log("redirect 2222");
+  // Use staging domain for both environments
   const baseUrl = "https://phraseotomy.ourstagingserver.com";
 
   // Encode configuration as URL parameters (before hash for HashRouter)
@@ -807,11 +642,6 @@ function generateAppHtml(
     shop: shop,
     customer: customer ? JSON.stringify(customer) : "",
   });
-  
-  // Add customer token if available
-  if (customer?.token) {
-    configParams.set("customerToken", customer.token);
-  }
 
   // If guest session provided, add it to params
   if (guestSession) {

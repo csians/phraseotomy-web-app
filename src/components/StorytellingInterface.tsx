@@ -249,13 +249,11 @@ export function StorytellingInterface({
                       key={element.id}
                       onClick={async () => {
                         if (isStoryteller) {
-                          console.log("🎯 Element clicked:", element.name);
                           setSecretElement(element.id);
                           setIsLoadingWhisp(true);
                           
                           try {
-                            console.log("📝 Generating whisp for element:", element.name, "theme:", theme.name);
-                            console.log("🔑 Calling supabase.functions.invoke('generate-whisp')");
+                            console.log("Generating whisp for element:", element.name, "theme:", theme.name);
                             
                             // Generate whisp (one-word hint)
                             const { data: whispData, error: whispError } = await supabase.functions.invoke("generate-whisp", {
@@ -265,7 +263,7 @@ export function StorytellingInterface({
                               },
                             });
 
-                            console.log("✅ Whisp response received:", whispData, "error:", whispError);
+                            console.log("Whisp response:", whispData, "error:", whispError);
 
                             if (whispError) {
                               console.error("Whisp generation error:", whispError);

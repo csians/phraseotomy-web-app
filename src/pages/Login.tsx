@@ -173,18 +173,6 @@ const Login = () => {
     // Handle direct login with shop and customer_id (no token)
     if (shopParam && customerIdParam && !token) {
       console.log('🔄 Direct login detected with shop and customer_id');
-      
-      // Extract customer name and email from URL if provided
-      const customerName = urlParams.get('customer_name');
-      const customerEmail = urlParams.get('customer_email');
-      
-      console.log('📋 URL Parameters:', {
-        customerIdParam,
-        customerName,
-        customerEmail,
-        shopParam
-      });
-      
       const handleDirectLogin = async () => {
         try {
           // Resolve custom domain to .myshopify.com domain
@@ -229,51 +217,58 @@ const Login = () => {
           setTenant(mappedTenant);
           setShopDomain(dbTenant.shop_domain);
 
-          // Store customer data directly in Supabase
-          console.log('💾 Storing customer data in Supabase:', {
-            customer_id: customerIdParam,
-            customer_name: customerName || null,
-            customer_email: customerEmail || null,
-            shop_domain: resolvedShopDomain,
-            tenant_id: dbTenant.id,
+          // Generate session token for this customer (use resolved shop domain)
+          const { data: sessionData, error: sessionError } = await supabase.functions.invoke('generate-session-token', {
+            body: { customerId: customerIdParam, shopDomain: resolvedShopDomain },
           });
 
-          const { data: storeResult, error: storeError } = await supabase.functions.invoke('store-customer', {
-            body: {
-              customer_id: customerIdParam,
-              customer_email: customerEmail || null,
-              customer_name: customerName || null,
-              shop_domain: resolvedShopDomain,
-              tenant_id: dbTenant.id,
-            },
-          });
-
-          if (storeError) {
-            console.error('❌ Error storing customer:', storeError);
+          if (sessionError) {
+            console.error('Error generating session token:', sessionError);
             toast({
-              title: 'Storage Error',
-              description: 'Could not save customer data. Please try again.',
+              title: 'Login Failed',
+              description: 'Could not authenticate. Please try again.',
               variant: 'destructive',
             });
             setLoading(false);
             return;
           }
 
-          console.log('✅ Customer data stored:', storeResult);
+          if (sessionData?.sessionToken) {
+            localStorage.setItem('phraseotomy_session_token', sessionData.sessionToken);
+            console.log('✅ Session token generated and stored');
 
-          // Store minimal data in localStorage for quick access
-          localStorage.setItem('customerData', JSON.stringify({
-            customer_id: customerIdParam,
-            id: customerIdParam,
-            email: customerEmail || null,
-            name: customerName || null,
-          }));
-          localStorage.setItem('shop_domain', shopParam);
+            // Fetch full customer data
+            const { data: customerData, error: customerError } = await supabase.functions.invoke('get-customer-data', {
+              body: { sessionToken: sessionData.sessionToken },
+            });
 
-          // Redirect immediately to the app proxy URL
-          const appProxyUrl = `https://${shopParam}/apps/phraseotomy`;
-          console.log('🚀 Redirecting to app proxy');
-          window.location.href = appProxyUrl;
+            if (!customerError && customerData) {
+              console.log('📦 Customer Data Retrieved:', {
+                customer_id: customerIdParam,
+                shop: shopParam,
+                customer: customerData.customer,
+              });
+
+              // Store customer data in localStorage
+              localStorage.setItem('customerData', JSON.stringify({
+                customer_id: customerIdParam,
+                id: customerIdParam,
+                email: customerData.customer?.email || null,
+                name: customerData.customer?.name || null,
+                first_name: customerData.customer?.first_name || null,
+                last_name: customerData.customer?.last_name || null,
+              }));
+              localStorage.setItem('shop_domain', shopParam);
+
+              // Redirect to the production app proxy URL
+              const appProxyUrl = `https://${shopParam}/apps/phraseotomy`;
+              console.log('🚀 Redirecting to app proxy:', appProxyUrl);
+              window.location.href = appProxyUrl;
+              return;
+            }
+          }
+          
+          setLoading(false);
         } catch (error) {
           console.error('Error in direct login:', error);
           toast({
