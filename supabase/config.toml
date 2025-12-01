@@ -88,3 +88,6 @@ verify_jwt = false
 
 [functions.generate-whisp]
 verify_jwt = false
+
+[functions.cleanup-game-session]
+verify_jwt = false

@@ -55,8 +55,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Delete related data first (if there are no cascade deletes set up)
-    // Delete game_audio
+    // Delete related data first (in proper order due to foreign keys)
+    // 1. Delete game_guesses (references game_turns)
+    const { data: turns } = await supabase
+      .from("game_turns")
+      .select("id")
+      .eq("session_id", sessionId);
+
+    const turnIds = (turns || []).map(t => t.id);
+    
+    if (turnIds.length > 0) {
+      const { error: guessesError } = await supabase
+        .from("game_guesses")
+        .delete()
+        .in("turn_id", turnIds);
+
+      if (guessesError) {
+        console.error("Error deleting game guesses:", guessesError);
+      }
+    }
+
+    // 2. Delete game_audio
     const { error: audioError } = await supabase
       .from("game_audio")
       .delete()
@@ -66,7 +85,17 @@ Deno.serve(async (req) => {
       console.error("Error deleting game audio:", audioError);
     }
 
-    // Delete game_rounds
+    // 3. Delete game_turns
+    const { error: turnsError } = await supabase
+      .from("game_turns")
+      .delete()
+      .eq("session_id", sessionId);
+
+    if (turnsError) {
+      console.error("Error deleting game turns:", turnsError);
+    }
+
+    // 4. Delete game_rounds
     const { error: roundsError } = await supabase
       .from("game_rounds")
       .delete()
@@ -76,7 +105,7 @@ Deno.serve(async (req) => {
       console.error("Error deleting game rounds:", roundsError);
     }
 
-    // Delete game_players
+    // 5. Delete game_players
     const { error: playersError } = await supabase
       .from("game_players")
       .delete()

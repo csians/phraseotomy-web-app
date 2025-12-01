@@ -201,7 +201,17 @@ export default function Game() {
           toast({
             title: "Game Over! 🎊",
             description: `${message.winnerName} won the game!`,
+            duration: 5000,
           });
+          
+          // Schedule automatic cleanup after 35 seconds
+          console.log('🧹 Scheduling game cleanup in 35 seconds...');
+          supabase.functions.invoke('cleanup-game-session', {
+            body: { sessionId, delaySeconds: 35 }
+          }).catch(err => {
+            console.error('Failed to schedule cleanup:', err);
+          });
+          
           setTimeout(() => initializeGame(), 500);
           break;
 
