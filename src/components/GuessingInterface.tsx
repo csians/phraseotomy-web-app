@@ -47,18 +47,14 @@ export function GuessingInterface({
   const { toast } = useToast();
   const [selectedElements, setSelectedElements] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [attemptsRemaining, setAttemptsRemaining] = useState(3);
-  const [hasFailedAllAttempts, setHasFailedAllAttempts] = useState(false);
-  const [wrongGuesses, setWrongGuesses] = useState<string[]>([]);
+  const [isLockedOut, setIsLockedOut] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Reset guessing state when round changes (allows players to answer in new rounds)
   useEffect(() => {
     console.log("Round changed to:", roundNumber, "- Resetting guessing state");
     setSelectedElements([]);
-    setAttemptsRemaining(3);
-    setHasFailedAllAttempts(false);
-    setWrongGuesses([]);
+    setIsLockedOut(false);
   }, [roundNumber]);
 
   const toggleElement = (elementId: string) => {
@@ -76,10 +72,10 @@ export function GuessingInterface({
       return;
     }
 
-    if (hasFailedAllAttempts) {
+    if (isLockedOut) {
       toast({
-        title: "No Attempts Left",
-        description: "You've used all 3 attempts for this round.",
+        title: "Already Answered",
+        description: "You already gave a wrong answer. Wait for the next round!",
         variant: "destructive",
       });
       return;
@@ -105,11 +101,7 @@ export function GuessingInterface({
 
       if (error) throw error;
 
-      const { correct, points_earned, attempts_remaining, max_attempts_reached } = data;
-
-      // Update attempts remaining
-      setAttemptsRemaining(attempts_remaining);
-      setHasFailedAllAttempts(max_attempts_reached);
+      const { correct, points_earned } = data;
 
       if (correct) {
         toast({
@@ -117,22 +109,16 @@ export function GuessingInterface({
           description: `You earned ${points_earned} points!`,
         });
         onGuessSubmit();
-      } else if (max_attempts_reached) {
-        toast({
-          title: "❌ Out of Attempts",
-          description: "You cannot answer in this round. Wait for the next round!",
-          variant: "destructive",
-        });
-        setSelectedElements([]); // Clear selection
       } else {
-        // Add the wrong guess to the disabled list for this round only
-        setWrongGuesses([...wrongGuesses, selectedElements[0]]);
+        // Lock player out after first wrong answer
+        setIsLockedOut(true);
+        setSelectedElements([]);
         toast({
-          title: "❌ Wrong Guess",
-          description: `You have ${attempts_remaining} attempt${attempts_remaining === 1 ? '' : 's'} left!`,
+          title: "❌ Wrong Answer!",
+          description: "You cannot answer again in this round. Wait for the next round!",
           variant: "destructive",
+          duration: 5000,
         });
-        setSelectedElements([]); // Clear selection for next attempt
       }
     } catch (error) {
       console.error("Error submitting guess:", error);
@@ -168,27 +154,28 @@ export function GuessingInterface({
                 <h3 className="text-lg font-semibold">
                   Which element was {storytellerName} describing? (10 points):
                 </h3>
-                <div className={`text-sm font-medium px-3 py-1 rounded-full ${
-                  attemptsRemaining === 3 ? 'bg-green-500/10 text-green-600' :
-                  attemptsRemaining === 2 ? 'bg-yellow-500/10 text-yellow-600' :
-                  attemptsRemaining === 1 ? 'bg-orange-500/10 text-orange-600' :
-                  'bg-red-500/10 text-red-600'
-                }`}>
-                  {hasFailedAllAttempts ? 'Locked this round' : `${attemptsRemaining}/3 attempts`}
-                </div>
+                {isLockedOut && (
+                  <div className="text-sm font-medium px-3 py-1 rounded-full bg-red-500/10 text-red-600">
+                    🔒 Locked this round
+                  </div>
+                )}
               </div>
-              <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                {availableElements.map((element) => {
-                  const isWrongGuess = wrongGuesses.includes(element.id);
-                  return (
+              
+              {isLockedOut ? (
+                <div className="bg-destructive/10 border-2 border-destructive/50 rounded-lg p-8 text-center">
+                  <p className="text-lg font-semibold text-destructive mb-2">❌ You Already Answered Wrong</p>
+                  <p className="text-sm text-muted-foreground">
+                    Wait for the next round to answer again. Other players are still guessing!
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                  {availableElements.map((element) => (
                     <button
                       key={element.id}
-                      onClick={() => !isWrongGuess && toggleElement(element.id)}
-                      disabled={isWrongGuess}
+                      onClick={() => toggleElement(element.id)}
                       className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
-                        isWrongGuess
-                          ? "bg-destructive/10 border-destructive/50 opacity-50 cursor-not-allowed"
-                          : selectedElements.includes(element.id)
+                        selectedElements.includes(element.id)
                           ? "bg-primary/20 border-primary"
                           : "bg-card border-border hover:border-primary/50"
                       }`}
@@ -197,18 +184,18 @@ export function GuessingInterface({
                       <p className="text-xs font-medium text-center">{element.name}</p>
                       {selectedElements.includes(element.id) && <Check className="h-4 w-4 text-primary mt-1" />}
                     </button>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Button
               onClick={handleSubmitGuess}
-              disabled={isSubmitting || selectedElements.length === 0 || hasFailedAllAttempts}
+              disabled={isSubmitting || selectedElements.length === 0 || isLockedOut}
               size="lg"
               className="w-full"
             >
-              {isSubmitting ? "Submitting..." : hasFailedAllAttempts ? "Wait for Next Round" : "Submit Guess"}
+              {isSubmitting ? "Submitting..." : isLockedOut ? "🔒 Locked - Wait for Next Round" : "Submit Guess"}
             </Button>
           </CardContent>
         </Card>
