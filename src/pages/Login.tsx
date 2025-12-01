@@ -178,6 +178,13 @@ const Login = () => {
       const customerName = urlParams.get('customer_name');
       const customerEmail = urlParams.get('customer_email');
       
+      console.log('📋 URL Parameters:', {
+        customerIdParam,
+        customerName,
+        customerEmail,
+        shopParam
+      });
+      
       const handleDirectLogin = async () => {
         try {
           // Resolve custom domain to .myshopify.com domain
@@ -223,13 +230,20 @@ const Login = () => {
           setShopDomain(dbTenant.shop_domain);
 
           // Generate customer token (30-day token for custom domain access)
+          console.log('🔐 Generating token with customer data:', {
+            customerId: customerIdParam,
+            shopDomain: resolvedShopDomain,
+            customerName: customerName || 'not provided',
+            customerEmail: customerEmail || 'not provided',
+          });
+
           const { data: tokenData, error: tokenError } = await supabase.functions.invoke('generate-customer-token', {
             body: { 
               customerId: customerIdParam, 
               shopDomain: resolvedShopDomain,
               userAgent: navigator.userAgent,
-              customerName: customerName ? decodeURIComponent(customerName) : undefined,
-              customerEmail: customerEmail ? decodeURIComponent(customerEmail) : undefined,
+              customerName: customerName || undefined,
+              customerEmail: customerEmail || undefined,
             },
           });
 
@@ -247,17 +261,17 @@ const Login = () => {
           const customerToken = tokenData.token;
           console.log('✅ Customer token generated');
 
-          // Store customer data directly from URL parameters (no Shopify API call needed)
+          // Store customer data directly from URL parameters
           const customerData = {
             customer_id: customerIdParam,
             id: customerIdParam,
-            email: customerEmail ? decodeURIComponent(customerEmail) : null,
-            name: customerName ? decodeURIComponent(customerName) : null,
+            email: customerEmail || null,
+            name: customerName || null,
             first_name: null,
             last_name: null,
           };
 
-          console.log('📦 Customer Data from URL:', customerData);
+          console.log('📦 Storing customer data in localStorage:', customerData);
 
           localStorage.setItem('customerData', JSON.stringify(customerData));
           localStorage.setItem('shop_domain', shopParam);

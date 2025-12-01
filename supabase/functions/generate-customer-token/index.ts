@@ -100,23 +100,37 @@ Deno.serve(async (req) => {
 
     console.log(`✅ [TOKEN_GEN] Token generated successfully for customer: ${customerId}`);
 
-    // Store/update customer data if name or email provided (production only)
+    // Store/update customer data if name or email provided
     if (customerName || customerEmail) {
+      console.log(`📝 [TOKEN_GEN] Storing customer data:`, {
+        customer_id: customerId,
+        customer_name: customerName,
+        customer_email: customerEmail,
+        shop_domain: shopDomain,
+        tenant_id: tenantData.id,
+      });
+
       try {
-        await supabase.functions.invoke('store-customer', {
+        const { data: storeData, error: storeError } = await supabase.functions.invoke('store-customer', {
           body: {
             customer_id: customerId,
-            customer_email: customerEmail,
-            customer_name: customerName,
+            customer_email: customerEmail || null,
+            customer_name: customerName || null,
             shop_domain: shopDomain,
             tenant_id: tenantData.id,
           },
         });
-        console.log(`📝 [TOKEN_GEN] Customer data stored/updated`);
+
+        if (storeError) {
+          console.error('❌ [TOKEN_GEN] Error storing customer:', storeError);
+        } else {
+          console.log(`✅ [TOKEN_GEN] Customer data stored/updated:`, storeData);
+        }
       } catch (storeError) {
-        console.warn('⚠️ [TOKEN_GEN] Failed to store customer data:', storeError);
-        // Don't fail the token generation if customer storage fails
+        console.error('❌ [TOKEN_GEN] Exception storing customer data:', storeError);
       }
+    } else {
+      console.log(`ℹ️ [TOKEN_GEN] No customer name/email provided, skipping store`);
     }
 
     return new Response(
