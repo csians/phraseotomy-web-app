@@ -69,7 +69,7 @@ const Play = () => {
             email: window.__PHRASEOTOMY_CUSTOMER__.email,
             name: window.__PHRASEOTOMY_CUSTOMER__.name,
           });
-          connsole.log("customer date in live", window.__PHRASEOTOMY_CUSTOMER__);
+          console.log("customer data in live", window.__PHRASEOTOMY_CUSTOMER__);
           setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
 
           // Store customer data in localStorage for Lobby page
@@ -411,8 +411,8 @@ const Play = () => {
 
     // If running in Shopify app proxy (has shop domain), logout from Shopify
     if (shopDomain) {
-      // Redirect to Shopify logout, which will return to app proxy and show login page
-      window.top!.location.href = `https://${shopDomain}/account/logout`;
+      // Redirect to Shopify logout with return to app proxy
+      window.top!.location.href = `https://${shopDomain}/account/logout?return_url=/apps/phraseotomy`;
     } else {
       // Fallback for standalone mode
       navigate("/login");
