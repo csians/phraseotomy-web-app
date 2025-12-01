@@ -34,16 +34,10 @@ export function getAppUrlForShop(shopDomain: string): string | null {
 const tenants: TenantConfig[] = [
   {
     id: "staging",
-    // shopDomain: "testing-cs-store.myshopify.com",
-    // displayName: "Phraseotomy Staging",
-    // themeColor: "#FCD34D",
-    // appDomains: ["phraseotomy.ourstagingserver.com", "localhost"],
-    shopDomain: "qxqtbf-21.myshopify.com",
-    displayName: "Phraseotomy",
-    themeColor: "#FBBF24",
-    appDomains: ["phraseotomy.com"],
-    customShopDomains: ["phraseotomy.com"],
-    proxyPath: "/apps/phraseotomy",
+    shopDomain: "testing-cs-store.myshopify.com",
+    displayName: "Phraseotomy Staging",
+    themeColor: "#FCD34D",
+    appDomains: ["phraseotomy.ourstagingserver.com", "localhost"],
   },
   {
     id: "prod",
