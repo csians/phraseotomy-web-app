@@ -20,6 +20,16 @@ const Play = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [shopDomain, setShopDomain] = useState<string | null>(null);
+
+  // Clean URL on mount - remove query parameters like shop, customer_id, customer_email
+  useEffect(() => {
+    const hasQueryParams = window.location.search || window.location.href.includes('?');
+    if (hasQueryParams) {
+      const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash ? window.location.hash.split('?')[0] : '');
+      window.history.replaceState({}, document.title, cleanUrl);
+      console.log("🧹 URL cleaned to:", cleanUrl);
+    }
+  }, []);
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
   const [customer, setCustomer] = useState<ShopifyCustomer | null>(null);
   const [licenses, setLicenses] = useState<CustomerLicense[]>([]);

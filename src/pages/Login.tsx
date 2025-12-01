@@ -192,11 +192,6 @@ const Login = () => {
     if (shopParam && customerIdParam && !token) {
       console.log("🔄 Direct login detected with shop and customer_id");
       
-      // Clean URL immediately by removing all query parameters
-      const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash ? window.location.hash.split('?')[0] : '');
-      window.history.replaceState({}, document.title, cleanUrl);
-      console.log("🧹 URL cleaned to:", cleanUrl);
-      
       const handleDirectLogin = async () => {
         try {
           // Resolve custom domain to .myshopify.com domain
