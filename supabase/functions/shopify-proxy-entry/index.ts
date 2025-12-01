@@ -221,10 +221,74 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Extract customer ID from Shopify proxy parameters
-    const customerId = queryParams.get("logged_in_customer_id") || null;
-    console.log("🔍 [CUSTOMER_ID] Extracted customerId:", customerId);
-    console.log("🔍 [CUSTOMER_ID] Will fetch from Shopify API with this ID:", customerId);
+    // Check for existing customer token first
+    const existingToken = queryParams.get("customerToken");
+    
+    let customerId: string | null = null;
+    let customerToken: string | null = existingToken;
+    
+    // If we have a token, validate it
+    if (existingToken) {
+      console.log("🔍 [TOKEN_AUTH] Validating existing customer token");
+      try {
+        const { data: validationResult, error: validationError } = await supabase.functions.invoke(
+          "validate-customer-token",
+          {
+            body: { token: existingToken },
+          }
+        );
+
+        if (!validationError && validationResult?.valid) {
+          customerId = validationResult.customerId;
+          console.log("✅ [TOKEN_AUTH] Token valid for customer:", customerId);
+        } else {
+          console.log("❌ [TOKEN_AUTH] Invalid or expired token");
+          customerToken = null;
+        }
+      } catch (error) {
+        console.error("❌ [TOKEN_AUTH] Error validating token:", error);
+        customerToken = null;
+      }
+    }
+    
+    // If no valid token, check Shopify's logged_in_customer_id
+    if (!customerId) {
+      const shopifyCustomerId = queryParams.get("logged_in_customer_id");
+      console.log("🔍 [CUSTOMER_ID] logged_in_customer_id from Shopify:", shopifyCustomerId);
+      
+      if (shopifyCustomerId) {
+        customerId = shopifyCustomerId;
+        console.log("🔍 [CUSTOMER_ID] Extracted customerId:", customerId);
+        console.log("🔍 [CUSTOMER_ID] Will fetch from Shopify API with this ID:", customerId);
+        
+        // Generate a new token for this customer
+        console.log("🔐 [TOKEN_GEN] Generating new token for customer");
+        try {
+          const { data: tokenResult, error: tokenError } = await supabase.functions.invoke(
+            "generate-customer-token",
+            {
+              body: {
+                customerId: customerId,
+                shopDomain: shop,
+                userAgent: req.headers.get("user-agent"),
+                ipAddress: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip"),
+              },
+            }
+          );
+
+          if (!tokenError && tokenResult?.token) {
+            customerToken = tokenResult.token;
+            console.log("✅ [TOKEN_GEN] Token generated successfully");
+          } else {
+            console.warn("⚠️ [TOKEN_GEN] Failed to generate token:", tokenError);
+          }
+        } catch (error) {
+          console.error("❌ [TOKEN_GEN] Error generating token:", error);
+        }
+      } else {
+        console.log("🔍 [CUSTOMER_ID] No logged_in_customer_id from Shopify");
+      }
+    }
 
     // Check if this is a returning guest from a successful lobby join
     const guestSession = queryParams.get("guestSession");
@@ -342,6 +406,7 @@ Deno.serve(async (req) => {
             firstName: customer.first_name || null,
             lastName: customer.last_name || null,
             name: [customer.first_name, customer.last_name].filter(Boolean).join(" ") || customer.email || null,
+            token: customerToken,
           };
 
           console.log("✅ Customer data fetched from Shopify:", {
@@ -390,7 +455,7 @@ Deno.serve(async (req) => {
     });
 
     // Pass token and customer data to app
-    return new Response(generateAppHtml(tenant, shop, customerData, nonce), {
+    return new Response(generateAppHtml(tenant, shop, customerData, nonce, null, customerToken), {
       status: 200,
       headers,
     });
@@ -666,6 +731,7 @@ function generateAppHtml(
   customer: any = null,
   nonce: string,
   guestSession: string | null = null,
+  customerToken: string | null = null,
 ): string {
   // Sanitize tenant data for embedding
   const tenantConfig = {
@@ -687,6 +753,11 @@ function generateAppHtml(
     shop: shop,
     customer: customer ? JSON.stringify(customer) : "",
   });
+  
+  // Add customer token if available
+  if (customer?.token) {
+    configParams.set("customerToken", customer.token);
+  }
 
   // If guest session provided, add it to params
   if (guestSession) {

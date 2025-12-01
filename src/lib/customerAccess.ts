@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getCustomerTokenForRequest } from './customerToken';
 
 export interface Pack {
   id: string;
@@ -29,8 +30,9 @@ export async function getCustomerLicenses(
   shopDomain: string
 ): Promise<CustomerLicense[]> {
   try {
+    const customerToken = getCustomerTokenForRequest();
     const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
-      body: { customerId, shopDomain },
+      body: { customerId, shopDomain, customerToken },
     });
 
     if (error) {
@@ -50,8 +52,9 @@ export async function getCustomerSessions(
   shopDomain: string
 ): Promise<GameSession[]> {
   try {
+    const customerToken = getCustomerTokenForRequest();
     const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
-      body: { customerId, shopDomain },
+      body: { customerId, shopDomain, customerToken },
     });
 
     if (error) {
@@ -71,8 +74,9 @@ export async function getCustomerAvailablePacks(
   shopDomain: string
 ): Promise<Pack[]> {
   try {
+    const customerToken = getCustomerTokenForRequest();
     const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
-      body: { customerId, shopDomain },
+      body: { customerId, shopDomain, customerToken },
     });
 
     if (error) {

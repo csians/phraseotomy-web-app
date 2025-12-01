@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getAllUrlParams } from "@/lib/urlUtils";
+import { initializeTokenFromURL } from "@/lib/customerToken";
 import Play from "./pages/Play";
 import Login from "./pages/Login";
 import CreateLobby from "./pages/CreateLobby";
@@ -22,6 +23,9 @@ const RootRedirect = () => {
   const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
 
   useEffect(() => {
+    // Initialize customer token from URL if present
+    initializeTokenFromURL();
+    
     const currentPath = window.location.hash.replace('#', '');
     const urlParams = getAllUrlParams();
     
