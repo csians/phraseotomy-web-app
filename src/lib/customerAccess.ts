@@ -1,5 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export interface Pack {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
 export interface CustomerLicense {
   id: string;
   license_code_id: string;
@@ -54,6 +60,27 @@ export async function getCustomerSessions(
     }
 
     return data?.sessions || [];
+  } catch (error) {
+    console.error('Error calling get-customer-licenses-sessions function:', error);
+    return [];
+  }
+}
+
+export async function getCustomerAvailablePacks(
+  customerId: string,
+  shopDomain: string
+): Promise<Pack[]> {
+  try {
+    const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
+      body: { customerId, shopDomain },
+    });
+
+    if (error) {
+      console.error('Error fetching customer available packs:', error);
+      return [];
+    }
+
+    return data?.availablePacks || [];
   } catch (error) {
     console.error('Error calling get-customer-licenses-sessions function:', error);
     return [];
