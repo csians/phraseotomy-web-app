@@ -1,5 +1,5 @@
 export interface TenantConfig {
-  id: 'staging' | 'prod';
+  id: "staging" | "prod";
   shopDomain: string;
   displayName: string;
   themeColor?: string;
@@ -9,20 +9,20 @@ export interface TenantConfig {
 
 // Tenant configurations for different Shopify stores
 const tenants: TenantConfig[] = [
-  // {
-  //   id: 'staging',
-  //   shopDomain: 'testing-cs-store.myshopify.com',
-  //   displayName: 'Phraseotomy Staging',
-  //   themeColor: '#FCD34D',
-  //   appDomains: ['phraseotomy.ourstagingserver.com', 'localhost'],
-  // },
   {
-    id: 'prod',
-    shopDomain: 'qxqtbf-21.myshopify.com',
-    displayName: 'Phraseotomy',
-    themeColor: '#FBBF24',
-    appDomains: ['app.phraseotomy.com'],
-    customShopDomains: ['phraseotomy.com'],
+    id: "staging",
+    shopDomain: "testing-cs-store.myshopify.com",
+    displayName: "Phraseotomy Staging",
+    themeColor: "#FCD34D",
+    appDomains: ["phraseotomy.ourstagingserver.com", "localhost"],
+  },
+  {
+    id: "prod",
+    shopDomain: "qxqtbf-21.myshopify.com",
+    displayName: "Phraseotomy",
+    themeColor: "#FBBF24",
+    appDomains: ["app.phraseotomy.com"],
+    customShopDomains: ["phraseotomy.com"],
   },
 ];
 
@@ -35,10 +35,11 @@ const tenants: TenantConfig[] = [
 export function getTenantConfig(shopDomain: string): TenantConfig | null {
   const normalizedDomain = shopDomain.toLowerCase().trim();
   const tenant = tenants.find(
-    (t) => t.shopDomain.toLowerCase() === normalizedDomain ||
-          t.customShopDomains?.some(domain => domain.toLowerCase() === normalizedDomain)
+    (t) =>
+      t.shopDomain.toLowerCase() === normalizedDomain ||
+      t.customShopDomains?.some((domain) => domain.toLowerCase() === normalizedDomain),
   );
-  
+
   return tenant || null;
 }
 
@@ -67,10 +68,8 @@ export function getAllTenants(): TenantConfig[] {
  */
 export function getTenantByAppDomain(hostname: string): TenantConfig | null {
   const normalizedHostname = hostname.toLowerCase().trim();
-  const tenant = tenants.find(
-    (t) => t.appDomains?.some(domain => normalizedHostname.includes(domain))
-  );
-  
+  const tenant = tenants.find((t) => t.appDomains?.some((domain) => normalizedHostname.includes(domain)));
+
   return tenant || null;
 }
 
@@ -83,36 +82,34 @@ export function getTenantByAppDomain(hostname: string): TenantConfig | null {
 export function autoDetectTenant(searchParams?: URLSearchParams | string): TenantConfig | null {
   // First try to detect by shop parameter (most reliable for multi-tenant apps)
   if (searchParams) {
-    const params = typeof searchParams === 'string' 
-      ? new URLSearchParams(searchParams) 
-      : searchParams;
-    const shop = params.get('shop');
-    
+    const params = typeof searchParams === "string" ? new URLSearchParams(searchParams) : searchParams;
+    const shop = params.get("shop");
+
     if (shop) {
       const tenantByShop = getTenantConfig(shop);
       if (tenantByShop) {
-        console.log('🎯 Tenant detected by shop parameter:', {
+        console.log("🎯 Tenant detected by shop parameter:", {
           shop,
-          tenant: tenantByShop.id
+          tenant: tenantByShop.id,
         });
         return tenantByShop;
       }
     }
   }
-  
+
   // Fallback to app domain detection
   const hostname = window.location.hostname;
   const tenantByDomain = getTenantByAppDomain(hostname);
-  
+
   if (tenantByDomain) {
-    console.log('🎯 Tenant detected by app domain:', {
+    console.log("🎯 Tenant detected by app domain:", {
       hostname,
       tenant: tenantByDomain.id,
-      shopDomain: tenantByDomain.shopDomain
+      shopDomain: tenantByDomain.shopDomain,
     });
     return tenantByDomain;
   }
-  
+
   return null;
 }
 
@@ -134,9 +131,9 @@ export function getAppDomainForShop(shopDomain: string): string | null {
 export function isCorrectAppDomain(shopDomain: string): boolean {
   const tenant = getTenantConfig(shopDomain);
   if (!tenant?.appDomains) return true; // No restriction
-  
+
   const currentHost = window.location.hostname.toLowerCase();
-  return tenant.appDomains.some(domain => currentHost.includes(domain.toLowerCase()));
+  return tenant.appDomains.some((domain) => currentHost.includes(domain.toLowerCase()));
 }
 
 /**
@@ -145,9 +142,7 @@ export function isCorrectAppDomain(shopDomain: string): boolean {
  * @returns Shop domain or null
  */
 export function getShopFromParams(searchParams: URLSearchParams | string): string | null {
-  const params = typeof searchParams === 'string' 
-    ? new URLSearchParams(searchParams) 
-    : searchParams;
-  
-  return params.get('shop');
+  const params = typeof searchParams === "string" ? new URLSearchParams(searchParams) : searchParams;
+
+  return params.get("shop");
 }
