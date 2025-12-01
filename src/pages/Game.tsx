@@ -212,6 +212,15 @@ export default function Game() {
             console.error('Failed to schedule cleanup:', err);
           });
           
+          // Show countdown warning after 5 seconds (30 seconds before cleanup)
+          setTimeout(() => {
+            toast({
+              title: "⏰ Lobby Cleanup Warning",
+              description: "This lobby will be automatically deleted in 30 seconds...",
+              duration: 30000,
+            });
+          }, 5000);
+          
           setTimeout(() => initializeGame(), 500);
           break;
 
