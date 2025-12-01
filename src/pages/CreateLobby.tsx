@@ -20,11 +20,90 @@ export default function CreateLobby() {
   const [isCreating, setIsCreating] = useState(false);
   const [availablePacks, setAvailablePacks] = useState<Pack[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(true);
+  const [customer, setCustomer] = useState<any>(null);
+  const [shopDomain, setShopDomain] = useState<string | null>(null);
+  const [tenant, setTenant] = useState<any>(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
-  // Get customer and shop info from location state or window
-  const customer = location.state?.customer || window.__PHRASEOTOMY_CUSTOMER__;
-  const shopDomain = location.state?.shopDomain || window.__PHRASEOTOMY_SHOP__;
-  const tenant = location.state?.tenant || window.__PHRASEOTOMY_CONFIG__;
+  // Fetch customer data from Supabase using token
+  useEffect(() => {
+    const fetchCustomerData = async () => {
+      const customerToken = localStorage.getItem('phraseotomy_customer_token');
+      
+      if (!customerToken) {
+        console.warn('No customer token found');
+        navigate('/play/host');
+        return;
+      }
+
+      try {
+        const { data: tokenData, error: tokenError } = await supabase.functions.invoke('validate-customer-token', {
+          body: { token: customerToken },
+        });
+
+        if (tokenError || !tokenData?.valid) {
+          console.warn('Invalid customer token');
+          navigate('/play/host');
+          return;
+        }
+
+        // Fetch tenant
+        const { data: dbTenant } = await supabase
+          .from('tenants')
+          .select('id, name, tenant_key, shop_domain, environment')
+          .eq('id', tokenData.tenantId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (!dbTenant) {
+          console.warn('Tenant not found');
+          navigate('/play/host');
+          return;
+        }
+
+        setTenant({
+          id: dbTenant.id,
+          name: dbTenant.name,
+          tenant_key: dbTenant.tenant_key,
+          shop_domain: dbTenant.shop_domain,
+          environment: dbTenant.environment,
+          verified: true,
+        });
+        setShopDomain(dbTenant.shop_domain);
+
+        // Fetch customer from database
+        const { data: dbCustomer } = await supabase
+          .from('customers')
+          .select('customer_id, customer_email, customer_name, first_name, last_name')
+          .eq('customer_id', tokenData.customerId)
+          .eq('shop_domain', tokenData.shopDomain)
+          .eq('tenant_id', tokenData.tenantId)
+          .maybeSingle();
+
+        if (dbCustomer) {
+          setCustomer({
+            id: dbCustomer.customer_id,
+            email: dbCustomer.customer_email,
+            name: dbCustomer.customer_name,
+            firstName: dbCustomer.first_name,
+            lastName: dbCustomer.last_name,
+          });
+          console.log('✅ Customer loaded from Supabase:', dbCustomer);
+        } else {
+          console.warn('Customer not found in database');
+          navigate('/play/host');
+          return;
+        }
+      } catch (error) {
+        console.error('Error fetching customer data:', error);
+        navigate('/play/host');
+      } finally {
+        setLoadingAuth(false);
+      }
+    };
+
+    fetchCustomerData();
+  }, [navigate]);
 
   // Load customer's available packs from database
   useEffect(() => {
@@ -135,6 +214,17 @@ export default function CreateLobby() {
     }
   };
 
+  if (loadingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!customer) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -193,7 +283,10 @@ export default function CreateLobby() {
                 </div>
                 <div>
                   <h2 className="text-xl font-semibold">
-                    {customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email}
+                    {customer.name || 
+                     (customer.firstName && customer.lastName 
+                       ? `${customer.firstName} ${customer.lastName}` 
+                       : customer.firstName || customer.lastName || customer.email || 'Guest')}
                   </h2>
                   {customer.email && (
                     <p className="text-sm text-muted-foreground">{customer.email}</p>
@@ -296,7 +389,10 @@ export default function CreateLobby() {
         <Card className="bg-muted/50">
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground space-y-1">
-              <p><strong>Host:</strong> {customer.name || customer.email}</p>
+              <p><strong>Host:</strong> {customer.name || 
+                (customer.firstName && customer.lastName 
+                  ? `${customer.firstName} ${customer.lastName}` 
+                  : customer.firstName || customer.lastName || customer.email || 'Guest')}</p>
               <p><strong>Shop:</strong> {shopDomain}</p>
             </div>
           </CardContent>

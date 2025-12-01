@@ -210,96 +210,65 @@ export default function Lobby() {
     fetchCustomerData();
   }, []);
 
-  // Get current customer ID helper
+  // Get current customer ID helper - ONLY from Supabase, no localStorage fallback
   const getCurrentCustomerId = useCallback(() => {
     console.log("🔍 [GET_ID] Starting getCurrentCustomerId...");
     
-    // If we have customer data in state, use it
+    // Priority 1: Customer data from Supabase state
     if (customerData?.id) {
-      console.log("✅ [GET_ID] Found customer ID in state:", customerData.id);
+      console.log("✅ [GET_ID] Found customer ID from Supabase:", customerData.id);
       return customerData.id;
     }
 
+    // Priority 2: URL params (for iframe/proxy mode)
     const urlParams = getAllUrlParams();
     const urlCustomerId = urlParams.get("customer_id");
     if (urlCustomerId) {
       console.log("✅ [GET_ID] Found customer ID in URL:", urlCustomerId);
       return urlCustomerId;
     }
-
-    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
-    for (const key of storageKeys) {
-      let dataStr = sessionStorage.getItem(key) || localStorage.getItem(key);
-      if (dataStr) {
-        try {
-          const parsed = JSON.parse(dataStr);
-          const customerId = parsed.customer_id || parsed.id || parsed.customerId;
-          if (customerId) {
-            console.log(`✅ [GET_ID] Found customer ID in ${key}:`, customerId);
-            return String(customerId);
-          }
-        } catch (e) {
-          console.error(`Error parsing ${key}:`, e);
-        }
-      }
-    }
     
-    // Check for guest player ID in both sessionStorage and localStorage
+    // Priority 3: Guest player ID (for guest join functionality)
     const guestPlayerIdSession = sessionStorage.getItem("guest_player_id");
     const guestPlayerIdLocal = localStorage.getItem("guest_player_id");
     const guestPlayerId = guestPlayerIdSession || guestPlayerIdLocal;
     
-    console.log("🔍 [GET_ID] Guest player ID (session):", guestPlayerIdSession);
-    console.log("🔍 [GET_ID] Guest player ID (local):", guestPlayerIdLocal);
-    
     if (guestPlayerId) {
       console.log("✅ [GET_ID] Found guest player ID:", guestPlayerId);
-      // Store in both storages for reliability
       if (!guestPlayerIdSession) sessionStorage.setItem("guest_player_id", guestPlayerId);
       if (!guestPlayerIdLocal) localStorage.setItem("guest_player_id", guestPlayerId);
       return guestPlayerId;
     }
     
-    // As a last resort, check if we have guestPlayerData
-    const guestDataStr = sessionStorage.getItem("guestPlayerData") || localStorage.getItem("guestPlayerData");
-    if (guestDataStr) {
-      try {
-        const guestData = JSON.parse(guestDataStr);
-        if (guestData.player_id) {
-          console.log("✅ [GET_ID] Found player ID in guestPlayerData:", guestData.player_id);
-          // Store it for next time
-          sessionStorage.setItem("guest_player_id", guestData.player_id);
-          localStorage.setItem("guest_player_id", guestData.player_id);
-          return guestData.player_id;
-        }
-      } catch (e) {
-        console.error("Error parsing guestPlayerData:", e);
-      }
-    }
-    
-    console.log("❌ [GET_ID] No player ID found anywhere");
+    console.log("❌ [GET_ID] No player ID found");
     return null;
   }, [customerData]);
 
-  // Get current player name
+  // Get current player name - ONLY from Supabase, no localStorage fallback
   const getCurrentPlayerName = useCallback(() => {
-    // If we have customer data in state, use it
+    // Priority 1: Customer data from Supabase state
     if (customerData) {
-      return customerData.name || customerData.email || "Customer";
+      const name = customerData.name || customerData.email || "Customer";
+      console.log("✅ [GET_NAME] Using name from Supabase:", name);
+      return name;
     }
 
-    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
-    for (const key of storageKeys) {
-      let dataStr = sessionStorage.getItem(key) || localStorage.getItem(key);
-      if (dataStr) {
-        try {
-          const parsed = JSON.parse(dataStr);
-          if (parsed.name) return parsed.name;
-          if (parsed.first_name) return parsed.first_name;
-        } catch (e) {}
-      }
+    // Priority 2: URL params (for iframe/proxy mode)
+    const urlParams = getAllUrlParams();
+    const urlCustomerName = urlParams.get("customer_name");
+    if (urlCustomerName) {
+      console.log("✅ [GET_NAME] Using name from URL:", urlCustomerName);
+      return urlCustomerName;
     }
-    return localStorage.getItem("guest_player_name") || "Player";
+
+    // Priority 3: Guest player name
+    const guestPlayerName = localStorage.getItem("guest_player_name");
+    if (guestPlayerName) {
+      console.log("✅ [GET_NAME] Using guest player name:", guestPlayerName);
+      return guestPlayerName;
+    }
+
+    return "Player";
   }, [customerData]);
 
   const currentPlayerId = getCurrentCustomerId();
