@@ -247,40 +247,26 @@ const Login = () => {
           const customerToken = tokenData.token;
           console.log('✅ Customer token generated');
 
-          // Fetch full customer data
-          const { data: customerData, error: customerError } = await supabase.functions.invoke('get-customer-data', {
-            body: { customerId: customerIdParam, shopDomain: resolvedShopDomain },
-          });
+          // Store customer data directly from URL parameters (no Shopify API call needed)
+          const customerData = {
+            customer_id: customerIdParam,
+            id: customerIdParam,
+            email: customerEmail ? decodeURIComponent(customerEmail) : null,
+            name: customerName ? decodeURIComponent(customerName) : null,
+            first_name: null,
+            last_name: null,
+          };
 
-          if (!customerError && customerData) {
-            console.log('📦 Customer Data Retrieved:', {
-              customer_id: customerIdParam,
-              shop: shopParam,
-              customer: customerData.customer,
-            });
+          console.log('📦 Customer Data from URL:', customerData);
 
-            // Store customer data in localStorage
-            localStorage.setItem('customerData', JSON.stringify({
-              customer_id: customerIdParam,
-              id: customerIdParam,
-              email: customerData.customer?.email || null,
-              name: customerData.customer?.name || null,
-              first_name: customerData.customer?.first_name || null,
-              last_name: customerData.customer?.last_name || null,
-            }));
-            localStorage.setItem('shop_domain', shopParam);
-            localStorage.setItem('phraseotomy_customer_token', customerToken);
+          localStorage.setItem('customerData', JSON.stringify(customerData));
+          localStorage.setItem('shop_domain', shopParam);
+          localStorage.setItem('phraseotomy_customer_token', customerToken);
 
-            // Redirect to the app proxy URL with customer token
-            const appProxyUrl = `https://${shopParam}/apps/phraseotomy?customerToken=${customerToken}`;
-            console.log('🚀 Redirecting to app proxy with token');
-            window.location.href = appProxyUrl;
-            return;
-          }
-          
-          setLoading(false);
-          
-          setLoading(false);
+          // Redirect immediately to the app proxy URL with customer token
+          const appProxyUrl = `https://${shopParam}/apps/phraseotomy?customerToken=${customerToken}`;
+          console.log('🚀 Redirecting to app proxy');
+          window.location.href = appProxyUrl;
         } catch (error) {
           console.error('Error in direct login:', error);
           toast({
