@@ -91,6 +91,21 @@ Deno.serve(async (req) => {
     const isCorrect = normalizedGuess === normalizedSecret;
     const pointsEarned = isCorrect ? 10 : 0;
 
+    // Get storyteller ID for scoring wrong answers
+    const { data: currentTurn, error: currentTurnError } = await supabase
+      .from("game_turns")
+      .select("storyteller_id")
+      .eq("id", turnData.id)
+      .single();
+
+    if (currentTurnError || !currentTurn) {
+      console.error("Error fetching current turn:", currentTurnError);
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch turn data" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Insert the guess
     const { error: insertError } = await supabase
       .from("game_guesses")
@@ -109,10 +124,9 @@ Deno.serve(async (req) => {
       );
     }
 
-
-    // If correct, update player score but DON'T complete turn yet
+    // Update scores based on correct/wrong answer
     if (isCorrect) {
-      // Update player score using the increment function
+      // If correct, award player 10 points
       const { error: scoreError } = await supabase.rpc("increment_player_score", {
         p_player_id: playerId,
         p_points: 10,
@@ -120,6 +134,16 @@ Deno.serve(async (req) => {
 
       if (scoreError) {
         console.error("Error updating player score:", scoreError);
+      }
+    } else {
+      // If wrong, award storyteller 10 points
+      const { error: storytellerScoreError } = await supabase.rpc("increment_player_score", {
+        p_player_id: currentTurn.storyteller_id,
+        p_points: 10,
+      });
+
+      if (storytellerScoreError) {
+        console.error("Error updating storyteller score:", storytellerScoreError);
       }
     }
 
@@ -131,16 +155,6 @@ Deno.serve(async (req) => {
 
     if (sessionPlayersError) {
       console.error("Error fetching session players:", sessionPlayersError);
-    }
-
-    const { data: currentTurn, error: currentTurnError } = await supabase
-      .from("game_turns")
-      .select("storyteller_id")
-      .eq("id", turnData.id)
-      .single();
-
-    if (currentTurnError || !currentTurn) {
-      console.error("Error fetching current turn:", currentTurnError);
     }
 
     // Count non-storyteller players who have answered
