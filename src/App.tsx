@@ -60,9 +60,8 @@ const RootRedirect = () => {
     // Check for embedded customer data from iframe
     const customerData = window.__PHRASEOTOMY_CUSTOMER__;
     
-    // Check for existing session in localStorage (standalone mode)
-    const storedCustomerData = localStorage.getItem('customerData');
-    const sessionToken = localStorage.getItem('phraseotomy_session_token');
+    // Check for existing customer token (indicates logged in)
+    const customerToken = localStorage.getItem('phraseotomy_customer_token');
     
     // If host parameter exists, it's from Shopify admin/embedded app
     if (hostParam) {
@@ -74,9 +73,9 @@ const RootRedirect = () => {
       console.log('Customer authenticated via iframe, redirecting to /play/host');
       setRedirectTarget('/play/host');
     }
-    // If session exists in localStorage (standalone mode after iframe login)
-    else if (storedCustomerData && sessionToken) {
-      console.log('Existing session found, redirecting to /play/host');
+    // If customer token exists (logged in user)
+    else if (customerToken) {
+      console.log('Customer token found, redirecting to /play/host');
       setRedirectTarget('/play/host');
     }
     // Otherwise, go to login

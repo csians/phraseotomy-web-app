@@ -105,6 +105,7 @@ export default function Lobby() {
   const [isConnected, setIsConnected] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdownNumber, setCountdownNumber] = useState(3);
+  const [customerData, setCustomerData] = useState<{ id: string; name: string | null; email: string | null } | null>(null);
 
   // Handle guest data from URL params on mount
   useEffect(() => {
@@ -159,10 +160,66 @@ export default function Lobby() {
     }
   }, []);
 
+  // Fetch customer data from Supabase
+  useEffect(() => {
+    const fetchCustomerData = async () => {
+      const customerToken = localStorage.getItem('phraseotomy_customer_token');
+      if (!customerToken) {
+        console.log('ℹ️ No customer token, skipping customer data fetch');
+        return;
+      }
+
+      try {
+        // Validate token and get customer data
+        const { data: tokenData, error: tokenError } = await supabase.functions.invoke('validate-customer-token', {
+          body: { token: customerToken },
+        });
+
+        if (tokenError || !tokenData?.valid) {
+          console.warn('⚠️ Invalid customer token');
+          return;
+        }
+
+        // Fetch customer from database
+        const { data: dbCustomer, error: customerError } = await supabase
+          .from('customers')
+          .select('customer_id, customer_email, customer_name, first_name, last_name')
+          .eq('customer_id', tokenData.customerId)
+          .eq('shop_domain', tokenData.shopDomain)
+          .eq('tenant_id', tokenData.tenantId)
+          .maybeSingle();
+
+        if (customerError) {
+          console.error('Error fetching customer:', customerError);
+          return;
+        }
+
+        if (dbCustomer) {
+          setCustomerData({
+            id: dbCustomer.customer_id,
+            name: dbCustomer.customer_name || dbCustomer.first_name || null,
+            email: dbCustomer.customer_email || null,
+          });
+          console.log('✅ Customer data loaded from Supabase:', dbCustomer);
+        }
+      } catch (error) {
+        console.error('Error fetching customer data:', error);
+      }
+    };
+
+    fetchCustomerData();
+  }, []);
+
   // Get current customer ID helper
   const getCurrentCustomerId = useCallback(() => {
     console.log("🔍 [GET_ID] Starting getCurrentCustomerId...");
     
+    // If we have customer data in state, use it
+    if (customerData?.id) {
+      console.log("✅ [GET_ID] Found customer ID in state:", customerData.id);
+      return customerData.id;
+    }
+
     const urlParams = getAllUrlParams();
     const urlCustomerId = urlParams.get("customer_id");
     if (urlCustomerId) {
@@ -222,10 +279,15 @@ export default function Lobby() {
     
     console.log("❌ [GET_ID] No player ID found anywhere");
     return null;
-  }, []);
+  }, [customerData]);
 
   // Get current player name
   const getCurrentPlayerName = useCallback(() => {
+    // If we have customer data in state, use it
+    if (customerData) {
+      return customerData.name || customerData.email || "Customer";
+    }
+
     const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
     for (const key of storageKeys) {
       let dataStr = sessionStorage.getItem(key) || localStorage.getItem(key);
@@ -238,7 +300,7 @@ export default function Lobby() {
       }
     }
     return localStorage.getItem("guest_player_name") || "Player";
-  }, []);
+  }, [customerData]);
 
   const currentPlayerId = getCurrentCustomerId();
   const currentPlayerName = getCurrentPlayerName();
@@ -951,9 +1013,8 @@ export default function Lobby() {
       return;
     }
 
-    // Get customer name from storage if available
-    const customerData = localStorage.getItem("customerData");
-    const customerName = customerData ? JSON.parse(customerData).name : null;
+    // Get customer name from state (fetched from Supabase)
+    const customerName = getCurrentPlayerName();
 
     // Update session with selected theme via edge function
     try {
