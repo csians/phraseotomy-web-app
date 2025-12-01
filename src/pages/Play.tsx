@@ -63,6 +63,8 @@ const Play = () => {
         setTenant(window.__PHRASEOTOMY_CONFIG__);
         setShopDomain(window.__PHRASEOTOMY_SHOP__);
 
+        console.log("hhhhhhhhh", window.__PHRASEOTOMY_CUSTOMER__);
+
         if (window.__PHRASEOTOMY_CUSTOMER__) {
           console.log("👤 Customer Data from proxy:", {
             id: window.__PHRASEOTOMY_CUSTOMER__.id,
