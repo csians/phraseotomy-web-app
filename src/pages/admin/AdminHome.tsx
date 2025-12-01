@@ -34,13 +34,17 @@ const AdminHome = () => {
     const shopFromAll = allParams.get('shop');
     if (shopFromAll) return shopFromAll;
     
+    // Try from sessionStorage (stored during URL cleanup in App.tsx)
+    const storedShop = sessionStorage.getItem('shopify_admin_shop');
+    if (storedShop) return storedShop;
+    
     // Try to extract from host param (Shopify Admin embedded app)
-    const hostParam = allParams.get('host');
+    const hostParam = allParams.get('host') || sessionStorage.getItem('shopify_host');
     const shopFromHost = extractShopFromHost(hostParam);
     if (shopFromHost) return shopFromHost;
     
-    // Fallback to staging for development
-    return 'testing-cs-store.myshopify.com';
+    // Fallback to production domain
+    return 'phraseotomy.com';
   }, [searchParams]);
   
   const { tenant, loading, error } = useTenant(shop);
