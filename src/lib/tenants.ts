@@ -5,6 +5,29 @@ export interface TenantConfig {
   themeColor?: string;
   appDomains?: string[]; // Custom app domains for this tenant
   customShopDomains?: string[]; // Custom Shopify domains that map to shopDomain
+  proxyPath?: string; // Shopify App Proxy path (e.g., "/apps/phraseotomy")
+}
+
+/**
+ * Get the full app URL for a tenant (Shopify proxy URL for production)
+ * @param shopDomain - The Shopify shop domain
+ * @returns Full app URL or null
+ */
+export function getAppUrlForShop(shopDomain: string): string | null {
+  const tenant = getTenantConfig(shopDomain);
+  if (!tenant) return null;
+  
+  // For production with custom domains, use the Shopify proxy URL
+  if (tenant.customShopDomains?.length && tenant.proxyPath) {
+    return `https://${tenant.customShopDomains[0]}${tenant.proxyPath}`;
+  }
+  
+  // Fallback to app domain
+  if (tenant.appDomains?.length) {
+    return `https://${tenant.appDomains[0]}`;
+  }
+  
+  return null;
 }
 
 // Tenant configurations for different Shopify stores
@@ -21,8 +44,9 @@ const tenants: TenantConfig[] = [
     shopDomain: "qxqtbf-21.myshopify.com",
     displayName: "Phraseotomy",
     themeColor: "#FBBF24",
-    appDomains: ["app.phraseotomy.com"],
+    appDomains: ["phraseotomy.com"],
     customShopDomains: ["phraseotomy.com"],
+    proxyPath: "/apps/phraseotomy", // Shopify App Proxy path
   },
 ];
 
