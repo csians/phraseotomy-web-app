@@ -122,7 +122,6 @@ Deno.serve(async (req) => {
 
     console.log('✅ [AUTH] Authenticated:', { customerId: validatedCustomerId, shopDomain: validatedShopDomain });
 
-
     // Initialize Supabase client with service role key
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -143,85 +142,110 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch customer details from Shopify Admin API
+    // First, try to fetch customer details from Supabase customers table
+    console.log('🔍 [DB] Fetching customer from Supabase customers table');
+    const { data: dbCustomer, error: dbCustomerError } = await supabase
+      .from('customers')
+      .select('customer_id, customer_email, customer_name, first_name, last_name')
+      .eq('customer_id', validatedCustomerId)
+      .eq('shop_domain', validatedShopDomain)
+      .eq('tenant_id', tenant.id)
+      .maybeSingle();
+
     let customerDetails = null;
-    if (tenant.access_token) {
-      try {
-        const shopifyUrl = `https://${validatedShopDomain}/admin/api/2024-01/customers/${validatedCustomerId}.json`;
-        console.log('🔍 Fetching customer from Shopify:', { shopifyUrl, customerId: validatedCustomerId, shopDomain: validatedShopDomain });
-        
-        const shopifyResponse = await fetch(shopifyUrl, {
-          headers: {
-            'X-Shopify-Access-Token': tenant.access_token,
-            'Content-Type': 'application/json',
-          },
-        });
 
-        console.log('📡 Shopify response status:', shopifyResponse.status);
-        
-        const responseText = await shopifyResponse.text();
-        console.log('📦 Shopify raw response:', responseText.substring(0, 500));
-
-        if (shopifyResponse.ok) {
-          const shopifyData = JSON.parse(responseText);
-          console.log('✅ Shopify customer data:', JSON.stringify(shopifyData.customer, null, 2));
-          
-          const customer = shopifyData.customer;
-          
-            // Auto-enable disabled customer accounts
-            if (customer?.state === "disabled") {
-              console.log("🔧 [AUTO_ENABLE] Customer account is disabled, attempting to enable...");
-              try {
-                const inviteUrl = `https://${validatedShopDomain}/admin/api/2024-01/customers/${validatedCustomerId}/send_invite.json`;
-              const inviteResponse = await fetch(inviteUrl, {
-                method: "POST",
-                headers: {
-                  "X-Shopify-Access-Token": tenant.access_token,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  customer_invite: {
-                    to: customer.email,
-                    from: null,
-                    subject: "Activate your account",
-                    custom_message: "Welcome! Please activate your account to access Phraseotomy.",
-                  },
-                }),
-              });
-
-              if (inviteResponse.ok) {
-                console.log("✅ [AUTO_ENABLE] Account activation email sent successfully");
-              } else {
-                const errorText = await inviteResponse.text();
-                console.warn("⚠️ [AUTO_ENABLE] Failed to send activation email:", errorText);
-              }
-            } catch (enableError) {
-              console.error("❌ [AUTO_ENABLE] Error enabling customer account:", enableError);
-            }
-          }
-          
-          customerDetails = {
-            id: validatedCustomerId,
-            email: shopifyData.customer?.email || null,
-            name: shopifyData.customer?.first_name && shopifyData.customer?.last_name 
-              ? `${shopifyData.customer.first_name} ${shopifyData.customer.last_name}`
-              : shopifyData.customer?.first_name || shopifyData.customer?.last_name || null,
-            first_name: shopifyData.customer?.first_name || null,
-            last_name: shopifyData.customer?.last_name || null,
-          };
-          console.log('✅ Extracted customer details:', customerDetails);
-        } else {
-          console.warn('⚠️ Failed to fetch customer from Shopify:', shopifyResponse.status, responseText);
-        }
-      } catch (error) {
-        console.error('❌ Error fetching customer from Shopify:', error);
-      }
+    if (!dbCustomerError && dbCustomer) {
+      console.log('✅ [DB] Customer found in Supabase:', dbCustomer);
+      customerDetails = {
+        id: dbCustomer.customer_id,
+        email: dbCustomer.customer_email,
+        name: dbCustomer.customer_name,
+        first_name: dbCustomer.first_name,
+        last_name: dbCustomer.last_name,
+      };
     } else {
-      console.warn('⚠️ No access_token found for tenant:', validatedShopDomain);
+      console.log('⚠️ [DB] Customer not found in Supabase, falling back to Shopify API');
+      
+      // Fallback: Fetch customer details from Shopify Admin API
+      if (tenant.access_token) {
+        try {
+          const shopifyUrl = `https://${validatedShopDomain}/admin/api/2024-01/customers/${validatedCustomerId}.json`;
+          console.log('🔍 Fetching customer from Shopify:', { shopifyUrl, customerId: validatedCustomerId, shopDomain: validatedShopDomain });
+          
+          const shopifyResponse = await fetch(shopifyUrl, {
+            headers: {
+              'X-Shopify-Access-Token': tenant.access_token,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          console.log('📡 Shopify response status:', shopifyResponse.status);
+          
+          const responseText = await shopifyResponse.text();
+          console.log('📦 Shopify raw response:', responseText.substring(0, 500));
+
+          if (shopifyResponse.ok) {
+            const shopifyData = JSON.parse(responseText);
+            console.log('✅ Shopify customer data:', JSON.stringify(shopifyData.customer, null, 2));
+            
+            const customer = shopifyData.customer;
+            
+              // Auto-enable disabled customer accounts
+              if (customer?.state === "disabled") {
+                console.log("🔧 [AUTO_ENABLE] Customer account is disabled, attempting to enable...");
+                try {
+                  const inviteUrl = `https://${validatedShopDomain}/admin/api/2024-01/customers/${validatedCustomerId}/send_invite.json`;
+                  const inviteResponse = await fetch(inviteUrl, {
+                    method: "POST",
+                    headers: {
+                      "X-Shopify-Access-Token": tenant.access_token,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      customer_invite: {
+                        to: customer.email,
+                        from: null,
+                        subject: "Activate your account",
+                        custom_message: "Welcome! Please activate your account to access Phraseotomy.",
+                      },
+                    }),
+                  });
+
+                  if (inviteResponse.ok) {
+                    console.log("✅ [AUTO_ENABLE] Account activation email sent successfully");
+                  } else {
+                    const errorText = await inviteResponse.text();
+                    console.warn("⚠️ [AUTO_ENABLE] Failed to send activation email:", errorText);
+                  }
+                } catch (enableError) {
+                  console.error("❌ [AUTO_ENABLE] Error enabling customer account:", enableError);
+                }
+              }
+            
+            customerDetails = {
+              id: validatedCustomerId,
+              email: shopifyData.customer?.email || null,
+              name: shopifyData.customer?.first_name && shopifyData.customer?.last_name 
+                ? `${shopifyData.customer.first_name} ${shopifyData.customer.last_name}`
+                : shopifyData.customer?.first_name || shopifyData.customer?.last_name || null,
+              first_name: shopifyData.customer?.first_name || null,
+              last_name: shopifyData.customer?.last_name || null,
+            };
+            console.log('✅ Extracted customer details from Shopify:', customerDetails);
+          } else {
+            console.warn('⚠️ Failed to fetch customer from Shopify:', shopifyResponse.status, responseText);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching customer from Shopify:', error);
+        }
+      } else {
+        console.warn('⚠️ No access_token found for tenant:', validatedShopDomain);
+      }
     }
 
-    // Fallback if Shopify API call failed
+    // Final fallback if both Supabase and Shopify failed
     if (!customerDetails) {
+      console.warn('⚠️ No customer data found, using minimal fallback');
       customerDetails = {
         id: validatedCustomerId,
         email: null,
