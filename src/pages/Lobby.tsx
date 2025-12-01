@@ -106,12 +106,21 @@ export default function Lobby() {
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdownNumber, setCountdownNumber] = useState(3);
   const [isLockedOut, setIsLockedOut] = useState(false);
+  const [playerAnswers, setPlayerAnswers] = useState<Array<{
+    playerId: string;
+    playerName: string;
+    guess: string;
+    isCorrect: boolean;
+  }>>([]);
+  const [showResults, setShowResults] = useState(false);
 
   // Reset lockout state when round changes
   useEffect(() => {
     if (session?.current_round) {
       setIsLockedOut(false);
       setGuessInput("");
+      setPlayerAnswers([]);
+      setShowResults(false);
     }
   }, [session?.current_round]);
 
@@ -379,6 +388,17 @@ export default function Lobby() {
           });
         }
         fetchLobbyData();
+      })
+      .on("broadcast", { event: "player_answered" }, (payload) => {
+        console.log("📢 [BROADCAST] player_answered received:", payload);
+        const { playerId, playerName, guess, isCorrect } = payload.payload;
+        
+        // Add answer to local state (avoid duplicates)
+        setPlayerAnswers(prev => {
+          const exists = prev.find(a => a.playerId === playerId);
+          if (exists) return prev;
+          return [...prev, { playerId, playerName, guess, isCorrect }];
+        });
       })
       .on("broadcast", { event: "refresh_state" }, (payload) => {
         console.log("📢 [BROADCAST] refresh_state received:", payload);
@@ -871,39 +891,59 @@ export default function Lobby() {
 
       const data = await response.json();
 
-      if (data.already_answered) {
+      // Lock player after submission (correct or wrong)
+      setIsLockedOut(true);
+      
+      // Get player name for display
+      const currentPlayer = players.find(p => p.player_id === getCurrentCustomerId());
+      const playerName = currentPlayer?.name || "Unknown";
+      
+      // Broadcast answer to all players
+      broadcastEvent("player_answered", {
+        playerId: getCurrentCustomerId(),
+        playerName,
+        guess: guessInput,
+        isCorrect: data.correct,
+      });
+      
+      // Add to local answers
+      setPlayerAnswers(prev => [...prev, {
+        playerId: getCurrentCustomerId()!,
+        playerName,
+        guess: guessInput,
+        isCorrect: data.correct,
+      }]);
+      
+      setGuessInput("");
+      
+      // If all players answered, show results
+      if (data.all_players_answered) {
+        setShowResults(true);
+        fetchLobbyData(); // Refresh scores
+        
         toast({
-          title: "Round Complete",
-          description: "Someone already answered correctly!",
-        });
-        setGuessInput("");
-        return;
-      }
-
-      if (data.correct) {
-        // Broadcast correct_answer to all players via Supabase Broadcast
-        broadcastEvent("guess_submitted", {
-          isCorrect: true,
-          pointsEarned: data.points_earned,
-          secretElement: data.secret_element,
+          title: "Round Complete!",
+          description: "All players have answered. See results below.",
         });
         
-        // If there's next round info, broadcast it
-        if (data.next_round && !data.game_completed) {
+        // Advance to next round after showing results
+        if (data.next_round) {
           setTimeout(() => {
             broadcastEvent("refresh_state", {
               roundNumber: data.next_round.roundNumber,
               newStorytellerId: data.next_round.newStorytellerId,
-              newStorytellerName: data.next_round.newStorytellerName,
             });
-            // Reset local state for new turn
+            setGuessInput("");
             setSelectedTheme("");
             setSelectedElementId("");
             setHasRecording(false);
-          }, 2000); // Give players time to see the correct answer
+            setPlayerAnswers([]);
+            setShowResults(false);
+            fetchLobbyData();
+          }, 5000); // Show results for 5 seconds
         }
         
-        // If game is completed, broadcast it
+        // If game completed
         if (data.game_completed && data.next_round) {
           setTimeout(() => {
             broadcastEvent("refresh_state", {
@@ -911,32 +951,17 @@ export default function Lobby() {
               winnerId: data.next_round.winnerId,
               winnerName: data.next_round.winnerName,
             });
-          }, 2000);
+          }, 5000);
         }
-        
-        toast({
-          title: "Correct! 🎉",
-          description: `You earned ${data.points_earned} points!`,
-        });
-        setGuessInput("");
-        // Refresh lobby data to show updated scores
-        fetchLobbyData();
       } else {
-        // Wrong answer - lock out player for this round
-        setIsLockedOut(true);
-        
-        // Broadcast incorrect guess to all players via Supabase Broadcast
-        broadcastEvent("guess_submitted", {
-          isCorrect: false,
-          pointsEarned: 0,
-        });
-        
+        // Not all players answered yet
         toast({
-          title: "Incorrect",
-          description: "You're locked out for this round. Try again in the next round!",
-          variant: "destructive",
+          title: data.correct ? "Correct! ✅" : "Wrong ❌",
+          description: data.correct 
+            ? `You earned ${data.points_earned} points! Waiting for other players...`
+            : "Waiting for other players to answer...",
+          variant: data.correct ? "default" : "destructive",
         });
-        setGuessInput("");
       }
     } catch (error) {
       console.error("Error submitting guess:", error);
@@ -1419,9 +1444,40 @@ export default function Lobby() {
                 </Button>
               </div>
               {isLockedOut && (
-                <p className="text-sm text-destructive font-medium">
-                  ❌ You already gave a wrong answer. Wait for the next round to try again.
+                <p className="text-sm text-muted-foreground font-medium">
+                  ✅ Answer submitted. Waiting for other players...
                 </p>
+              )}
+              
+              {/* Show all player answers when round is complete */}
+              {showResults && playerAnswers.length > 0 && (
+                <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
+                  <h4 className="font-semibold mb-3">Round Results:</h4>
+                  <div className="space-y-2">
+                    {playerAnswers.map((answer, idx) => (
+                      <div 
+                        key={idx}
+                        className={`flex items-center justify-between p-2 rounded ${
+                          answer.isCorrect ? "bg-green-500/10 border border-green-500/30" : "bg-red-500/10 border border-red-500/30"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{answer.playerName}</span>
+                          <span className="text-sm text-muted-foreground">guessed:</span>
+                          <span className="font-semibold">{answer.guess}</span>
+                        </div>
+                        <span className="text-lg">
+                          {answer.isCorrect ? "✅" : "❌"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-3 text-center">
+                    Correct answer: <span className="font-semibold">{currentTurn?.secret_element?.startsWith("custom:") 
+                      ? currentTurn.secret_element.substring(7) 
+                      : currentTurn?.secret_element}</span>
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>

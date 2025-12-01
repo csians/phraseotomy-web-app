@@ -49,21 +49,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if there's already a correct guess for this turn
-    const { data: existingGuesses, error: guessCheckError } = await supabase
-      .from("game_guesses")
-      .select("id")
-      .eq("turn_id", turnData.id)
-      .gt("points_earned", 0)
-      .limit(1);
-
-    if (guessCheckError) {
-      console.error("Error checking existing guesses:", guessCheckError);
-    }
-
-    const alreadyAnswered = existingGuesses && existingGuesses.length > 0;
-
-    // Check how many attempts this player has made for this turn
+    // Check if player has already answered this turn
     const { data: playerGuesses, error: playerGuessError } = await supabase
       .from("game_guesses")
       .select("id")
@@ -74,10 +60,13 @@ Deno.serve(async (req) => {
       console.error("Error checking player guesses:", playerGuessError);
     }
 
-    const attemptNumber = (playerGuesses?.length || 0) + 1;
-    const maxAttempts = 3;
-
-    console.log(`Player ${playerId} attempt ${attemptNumber}/${maxAttempts} for turn ${turnData.id}`);
+    // If player already answered, don't allow another guess
+    if (playerGuesses && playerGuesses.length > 0) {
+      return new Response(
+        JSON.stringify({ error: "You have already answered this round" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Check if secret element exists
     if (!turnData.secret_element) {
@@ -99,7 +88,7 @@ Deno.serve(async (req) => {
       normalizedSecret = turnData.secret_element.toLowerCase();
     }
 
-    const isCorrect = normalizedGuess === normalizedSecret && !alreadyAnswered;
+    const isCorrect = normalizedGuess === normalizedSecret;
     const pointsEarned = isCorrect ? 10 : 0;
 
     // Insert the guess
@@ -120,16 +109,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if player has reached max attempts and failed all
-    const isLastAttempt = attemptNumber >= maxAttempts;
-    const shouldFailPlayer = isLastAttempt && !isCorrect;
 
-    if (shouldFailPlayer) {
-      console.log(`Player ${playerId} failed after ${maxAttempts} attempts`);
-      // Don't complete the turn yet - let other players continue guessing
-    }
-
-    // If correct and first to answer, update player score and complete turn
+    // If correct, update player score but DON'T complete turn yet
     if (isCorrect) {
       // Update player score using the increment function
       const { error: scoreError } = await supabase.rpc("increment_player_score", {
@@ -140,6 +121,54 @@ Deno.serve(async (req) => {
       if (scoreError) {
         console.error("Error updating player score:", scoreError);
       }
+    }
+
+    // Check if all non-storyteller players have answered
+    const { data: sessionPlayers, error: sessionPlayersError } = await supabase
+      .from("game_players")
+      .select("player_id")
+      .eq("session_id", sessionId);
+
+    if (sessionPlayersError) {
+      console.error("Error fetching session players:", sessionPlayersError);
+    }
+
+    const { data: currentTurn, error: currentTurnError } = await supabase
+      .from("game_turns")
+      .select("storyteller_id")
+      .eq("id", turnData.id)
+      .single();
+
+    if (currentTurnError || !currentTurn) {
+      console.error("Error fetching current turn:", currentTurnError);
+    }
+
+    // Count non-storyteller players who have answered
+    const { data: allGuesses, error: allGuessesError } = await supabase
+      .from("game_guesses")
+      .select("player_id")
+      .eq("turn_id", turnData.id);
+
+    if (allGuessesError) {
+      console.error("Error fetching all guesses:", allGuessesError);
+    }
+
+    const nonStorytellerPlayers = sessionPlayers?.filter(
+      p => p.player_id !== currentTurn?.storyteller_id
+    ) || [];
+    
+    const uniquePlayerAnswers = new Set(allGuesses?.map(g => g.player_id) || []);
+    const allPlayersAnswered = nonStorytellerPlayers.length > 0 && 
+                               uniquePlayerAnswers.size >= nonStorytellerPlayers.length;
+
+    console.log(`Players answered: ${uniquePlayerAnswers.size}/${nonStorytellerPlayers.length}`);
+
+    let nextRoundInfo = null;
+    let gameCompleted = false;
+
+    // If all players have answered, complete the turn and advance
+    if (allPlayersAnswered) {
+      console.log("✅ All players have answered - completing turn");
 
       // Mark turn as completed
       const { error: completeError } = await supabase
@@ -157,9 +186,6 @@ Deno.serve(async (req) => {
         .select("current_round, total_rounds, id")
         .eq("id", sessionId)
         .single();
-
-      let nextRoundInfo = null;
-      let gameCompleted = false;
 
       if (sessionError || !sessionData) {
         console.error("Error fetching session for round advancement:", sessionError);
@@ -249,20 +275,6 @@ Deno.serve(async (req) => {
           }
         }
       }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          correct: isCorrect,
-          points_earned: pointsEarned,
-          already_answered: alreadyAnswered,
-          secret_element: turnData.secret_element,
-          next_round: nextRoundInfo,
-          game_completed: gameCompleted,
-          attempts_remaining: 0,
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
     }
 
     return new Response(
@@ -270,12 +282,14 @@ Deno.serve(async (req) => {
         success: true,
         correct: isCorrect,
         points_earned: pointsEarned,
-        already_answered: alreadyAnswered,
-        attempts_remaining: Math.max(0, maxAttempts - attemptNumber),
-        max_attempts_reached: shouldFailPlayer,
+        secret_element: turnData.secret_element,
+        all_players_answered: allPlayersAnswered,
+        next_round: nextRoundInfo,
+        game_completed: gameCompleted,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (error) {
     console.error("Error in submit-guess:", error);
     return new Response(
