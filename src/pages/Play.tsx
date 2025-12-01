@@ -30,29 +30,51 @@ const Play = () => {
   const [redemptionCode, setRedemptionCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
 
-  // Store customer in database on first login
-  const storeCustomerInDatabase = async (customerData: ShopifyCustomer, shopDomain: string, tenantId: string) => {
-    try {
-      const { error } = await supabase.functions.invoke("store-customer", {
-        body: {
-          customer_id: customerData.id,
-          customer_email: customerData.email,
-          customer_name: customerData.name,
-          first_name: customerData.firstName,
-          last_name: customerData.lastName,
-          shop_domain: shopDomain,
-          tenant_id: tenantId,
-        },
-      });
+  // Fetch customer from database with retry logic
+  const fetchCustomerFromDatabase = async (customerId: string, shopDomain: string, tenantId: string, retries = 3): Promise<ShopifyCustomer | null> => {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const { data: dbCustomer, error: dbError } = await supabase
+          .from("customers")
+          .select("customer_id, customer_email, customer_name, first_name, last_name")
+          .eq("customer_id", customerId)
+          .eq("shop_domain", shopDomain)
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
 
-      if (error) {
-        console.error("Error storing customer:", error);
-      } else {
-        console.log("✅ Customer stored/verified in database");
+        if (dbError) {
+          console.error(`Attempt ${attempt + 1}: Error fetching customer from database:`, dbError);
+          if (attempt < retries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+            continue;
+          }
+          return null;
+        }
+
+        if (dbCustomer) {
+          console.log(`✅ Customer found in database on attempt ${attempt + 1}:`, dbCustomer);
+          return {
+            id: dbCustomer.customer_id,
+            email: dbCustomer.customer_email || null,
+            firstName: dbCustomer.first_name || null,
+            lastName: dbCustomer.last_name || null,
+            name: dbCustomer.customer_name || null,
+          };
+        }
+        
+        console.log(`⚠️ Attempt ${attempt + 1}: Customer not found in database`);
+        if (attempt < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500)); // Wait before retry
+        }
+      } catch (error) {
+        console.error(`Attempt ${attempt + 1}: Exception fetching customer:`, error);
+        if (attempt < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
-    } catch (error) {
-      console.error("Error calling store-customer:", error);
     }
+    
+    return null;
   };
 
   // Initialize from customer token and fetch from Supabase
@@ -64,41 +86,21 @@ const Play = () => {
         setShopDomain(window.__PHRASEOTOMY_SHOP__);
 
         if (window.__PHRASEOTOMY_CUSTOMER__) {
-          console.log("👤 Customer from proxy, storing and fetching from database...");
+          console.log("👤 Customer from proxy, fetching from database...");
           
-          // Store customer in database first
-          await storeCustomerInDatabase(
-            window.__PHRASEOTOMY_CUSTOMER__,
+          // Fetch customer data from Supabase (proxy already stored it)
+          const dbCustomer = await fetchCustomerFromDatabase(
+            window.__PHRASEOTOMY_CUSTOMER__.id,
             window.__PHRASEOTOMY_SHOP__,
             window.__PHRASEOTOMY_CONFIG__.id,
           );
 
-          // Fetch customer data from Supabase to ensure we have the latest
-          const { data: dbCustomer, error: dbError } = await supabase
-            .from("customers")
-            .select("customer_id, customer_email, customer_name, first_name, last_name")
-            .eq("customer_id", window.__PHRASEOTOMY_CUSTOMER__.id)
-            .eq("shop_domain", window.__PHRASEOTOMY_SHOP__)
-            .eq("tenant_id", window.__PHRASEOTOMY_CONFIG__.id)
-            .maybeSingle();
-
-          if (dbError) {
-            console.error("Error fetching customer from database:", dbError);
-          }
-
           if (dbCustomer) {
-            const customerObj: ShopifyCustomer = {
-              id: dbCustomer.customer_id,
-              email: dbCustomer.customer_email || null,
-              firstName: dbCustomer.first_name || null,
-              lastName: dbCustomer.last_name || null,
-              name: dbCustomer.customer_name || null,
-            };
-            console.log("✅ Customer data loaded from Supabase:", customerObj);
-            setCustomer(customerObj);
+            console.log("✅ Customer data loaded from Supabase:", dbCustomer);
+            setCustomer(dbCustomer);
           } else {
-            // Fallback to proxy data if not in DB yet
-            console.log("⚠️ Customer not found in DB, using proxy data");
+            // Fallback to proxy data if still not in DB
+            console.log("⚠️ Customer not found in DB after retries, using proxy data");
             setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
           }
         }
@@ -124,34 +126,18 @@ const Play = () => {
           setShopDomain(shopParam);
 
           if (customerData) {
-            // Store customer in database
-            await storeCustomerInDatabase(customerData, shopParam, tenantConfig.id);
-
-            // Fetch customer data from Supabase
-            const { data: dbCustomer, error: dbError } = await supabase
-              .from("customers")
-              .select("customer_id, customer_email, customer_name, first_name, last_name")
-              .eq("customer_id", customerData.id)
-              .eq("shop_domain", shopParam)
-              .eq("tenant_id", tenantConfig.id)
-              .maybeSingle();
-
-            if (dbError) {
-              console.error("Error fetching customer from database:", dbError);
-            }
+            // Fetch customer data from Supabase (already stored by proxy)
+            const dbCustomer = await fetchCustomerFromDatabase(
+              customerData.id,
+              shopParam,
+              tenantConfig.id,
+            );
 
             if (dbCustomer) {
-              const customerObj: ShopifyCustomer = {
-                id: dbCustomer.customer_id,
-                email: dbCustomer.customer_email || null,
-                firstName: dbCustomer.first_name || null,
-                lastName: dbCustomer.last_name || null,
-                name: dbCustomer.customer_name || null,
-              };
-              console.log("✅ Customer data loaded from Supabase:", customerObj);
-              setCustomer(customerObj);
+              console.log("✅ Customer data loaded from Supabase:", dbCustomer);
+              setCustomer(dbCustomer);
             } else {
-              console.log("⚠️ Customer not found in DB, using URL data");
+              console.log("⚠️ Customer not found in DB after retries, using URL data");
               setCustomer(customerData);
             }
           }

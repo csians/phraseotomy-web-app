@@ -261,6 +261,31 @@ Deno.serve(async (req) => {
         console.log("🔍 [CUSTOMER_ID] Extracted customerId:", customerId);
         console.log("🔍 [CUSTOMER_ID] Will fetch from Shopify API with this ID:", customerId);
         
+        // Store customer BEFORE generating token
+        console.log("💾 [CUSTOMER_STORE] Storing customer in database first");
+        try {
+          const { data: storeResult, error: storeError } = await supabase.functions.invoke(
+            "store-customer",
+            {
+              body: {
+                customer_id: customerId,
+                customer_email: null, // Will be fetched from Shopify API later
+                customer_name: null,
+                shop_domain: shop,
+                tenant_id: tenant.id,
+              },
+            }
+          );
+
+          if (storeError) {
+            console.error("❌ [CUSTOMER_STORE] Error storing customer:", storeError);
+          } else {
+            console.log("✅ [CUSTOMER_STORE] Customer stored/verified in database");
+          }
+        } catch (error) {
+          console.error("❌ [CUSTOMER_STORE] Exception storing customer:", error);
+        }
+        
         // Generate a new token for this customer
         console.log("🔐 [TOKEN_GEN] Generating new token for customer");
         try {
@@ -417,6 +442,33 @@ Deno.serve(async (req) => {
             lastName: customerData.lastName,
           });
           console.log("🔍 [CUSTOMER_DATA] Full customerData object being passed to app:", JSON.stringify(customerData));
+          
+          // Update customer data in database with Shopify details
+          console.log("💾 [CUSTOMER_UPDATE] Updating customer with Shopify data");
+          try {
+            const { error: updateError } = await supabase.functions.invoke(
+              "store-customer",
+              {
+                body: {
+                  customer_id: customerId,
+                  customer_email: customer.email || null,
+                  customer_name: customerData.name,
+                  first_name: customer.first_name || null,
+                  last_name: customer.last_name || null,
+                  shop_domain: shop,
+                  tenant_id: tenant.id,
+                },
+              }
+            );
+
+            if (updateError) {
+              console.error("❌ [CUSTOMER_UPDATE] Error updating customer:", updateError);
+            } else {
+              console.log("✅ [CUSTOMER_UPDATE] Customer data updated with Shopify details");
+            }
+          } catch (error) {
+            console.error("❌ [CUSTOMER_UPDATE] Exception updating customer:", error);
+          }
         } else {
           const errorText = await shopifyResponse.text();
           console.warn("❌ Failed to fetch customer from Shopify. Status:", shopifyResponse.status);
