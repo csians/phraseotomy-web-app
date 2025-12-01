@@ -32,6 +32,16 @@ const queryClient = new QueryClient();
   const customer_email = manualParams.get('customer_email') || url.searchParams.get('customer_email');
   const customer_name = manualParams.get('customer_name') || url.searchParams.get('customer_name');
   const rToken = manualParams.get('r') || url.searchParams.get('r');
+  const hostParam = manualParams.get('host') || url.searchParams.get('host');
+  
+  // Check if we're in Shopify Admin context
+  const isShopifyAdmin = hostParam || window.location.href.includes('admin.shopify.com');
+  if (isShopifyAdmin) {
+    sessionStorage.setItem('shopify_admin_context', 'true');
+    if (hostParam) sessionStorage.setItem('shopify_host', hostParam);
+    if (shop) sessionStorage.setItem('shopify_admin_shop', shop);
+    console.log('🔐 Shopify Admin context detected');
+  }
   
   const hasLoginParams = shop || customer_id || customer_email || customer_name || rToken;
   
@@ -87,8 +97,11 @@ const RootRedirect = () => {
       }
     }
 
-    // Check if accessed from Shopify admin (has 'host' parameter for embedded app)
+    // Check if accessed from Shopify admin (has 'host' parameter or stored admin context)
     const hostParam = urlParams.get('host');
+    const isShopifyAdmin = hostParam || 
+      sessionStorage.getItem('shopify_admin_context') === 'true' ||
+      window.location.href.includes('admin.shopify.com');
     
     // Check for embedded customer data from iframe
     const customerData = window.__PHRASEOTOMY_CUSTOMER__;
@@ -97,11 +110,11 @@ const RootRedirect = () => {
     const storedCustomerData = localStorage.getItem('customerData');
     const sessionToken = localStorage.getItem('phraseotomy_session_token');
     
-    // If host parameter exists, it's from Shopify admin/embedded app
-    if (hostParam) {
+    // If in Shopify admin context, go to admin panel
+    if (isShopifyAdmin) {
       console.log('Accessed from Shopify admin, redirecting to /admin');
       setRedirectTarget('/admin');
-    } 
+    }
     // If customer is authenticated via iframe, go to play page
     else if (customerData) {
       console.log('Customer authenticated via iframe, redirecting to /play/host');
