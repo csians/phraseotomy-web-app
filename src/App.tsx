@@ -18,6 +18,35 @@ import Packs from "./pages/admin/Packs";
 
 const queryClient = new QueryClient();
 
+// Clean URL parameters immediately on app load
+(function cleanUrlParams() {
+  const url = new URL(window.location.href);
+  const hasLoginParams = url.searchParams.has('shop') || 
+                         url.searchParams.has('customer_id') || 
+                         url.searchParams.has('customer_email') ||
+                         url.searchParams.has('customer_name');
+  
+  if (hasLoginParams) {
+    // Store params before removing (if needed elsewhere)
+    const params = {
+      shop: url.searchParams.get('shop'),
+      customer_id: url.searchParams.get('customer_id'),
+      customer_email: url.searchParams.get('customer_email'),
+      customer_name: url.searchParams.get('customer_name')
+    };
+    
+    // Store in sessionStorage for Login.tsx to process
+    if (params.customer_id) {
+      sessionStorage.setItem('pending_login_params', JSON.stringify(params));
+    }
+    
+    // Clean URL immediately
+    const cleanUrl = url.origin + url.pathname + (url.hash || '');
+    window.history.replaceState({}, '', cleanUrl);
+    console.log('🧹 Cleaned URL params at app level:', params);
+  }
+})();
+
 const RootRedirect = () => {
   const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
 

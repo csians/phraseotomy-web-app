@@ -180,22 +180,35 @@ const Login = () => {
 
     // Check for signed token in URL (from Shopify app-login page)
     const token = urlParams.get("r");
-    const shopParam = urlParams.get("shop");
-    const customerIdParam = urlParams.get("customer_id");
-    const customerNameParam = urlParams.get("customer_name");
+    
+    // Check sessionStorage first for params (cleaned at app level), then fall back to URL params
+    const pendingLoginParams = sessionStorage.getItem('pending_login_params');
+    let shopParam = urlParams.get("shop");
+    let customerIdParam = urlParams.get("customer_id");
+    let customerNameParam = urlParams.get("customer_name");
+    let customerEmailParam = urlParams.get("customer_email");
+    
+    // Use pending params from sessionStorage if available (URL was cleaned at app level)
+    if (pendingLoginParams) {
+      try {
+        const parsed = JSON.parse(pendingLoginParams);
+        shopParam = parsed.shop || shopParam;
+        customerIdParam = parsed.customer_id || customerIdParam;
+        customerNameParam = parsed.customer_name || customerNameParam;
+        customerEmailParam = parsed.customer_email || customerEmailParam;
+        console.log("📦 Using pending login params from sessionStorage:", parsed);
+        // Clear after use
+        sessionStorage.removeItem('pending_login_params');
+      } catch (e) {
+        console.error("Failed to parse pending login params:", e);
+      }
+    }
 
     console.log(customerNameParam);
-    
-    const customerEmailParam = urlParams.get("customer_email");
 
     // Handle direct login with shop and customer_id (no token)
     if (shopParam && customerIdParam && !token) {
       console.log("🔄 Direct login detected with shop and customer_id");
-      
-      // Clean URL immediately by removing all query parameters
-      const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash ? window.location.hash.split('?')[0] : '');
-      window.history.replaceState({}, document.title, cleanUrl);
-      console.log("🧹 URL cleaned to:", cleanUrl);
       
       const handleDirectLogin = async () => {
         try {
