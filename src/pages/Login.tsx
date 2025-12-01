@@ -143,16 +143,29 @@ const Login = () => {
           last_name: customerData.lastName,
         }));
         
-        // Generate session token and break out of iframe
+        // Generate session token and redirect appropriately
         generateAndStoreSessionToken(customerData.id, window.__PHRASEOTOMY_SHOP__)
-          .then(() => {
-            // Check if we're in an iframe
-            if (window.self !== window.top) {
-              // Break out of iframe to standalone app
-              window.top!.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+          .then(async () => {
+            // Import tenant utilities
+            const { getAppUrlForShop, getTenantConfig } = await import("@/lib/tenants");
+            const tenant = getTenantConfig(window.__PHRASEOTOMY_SHOP__);
+            
+            // For production with Shopify proxy, redirect to proxy URL
+            if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
+              const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
+              console.log('🚀 Redirecting to Shopify proxy URL:', proxyUrl);
+              if (window.self !== window.top) {
+                window.top!.location.href = proxyUrl;
+              } else {
+                window.location.href = proxyUrl;
+              }
             } else {
-              // Already standalone, just navigate
-              navigate('/play/host', { replace: true });
+              // Staging or no proxy - stay on current domain
+              if (window.self !== window.top) {
+                window.top!.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+              } else {
+                navigate('/play/host', { replace: true });
+              }
             }
           })
           .finally(() => {
@@ -261,9 +274,20 @@ const Login = () => {
               }));
               localStorage.setItem('shop_domain', shopParam);
 
-              // Navigate to play page on current domain (stay on staging/production deployment)
-              console.log('🚀 Navigating to play page on current domain');
-              navigate('/play/host', { replace: true });
+              // Get tenant config to determine redirect URL
+              const { getTenantConfig } = await import("@/lib/tenants");
+              const tenant = getTenantConfig(shopParam);
+              
+              // For production with Shopify proxy, redirect to proxy URL
+              if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
+                const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
+                console.log('🚀 Redirecting to Shopify proxy URL:', proxyUrl);
+                window.location.href = proxyUrl;
+              } else {
+                // Staging or no proxy - stay on current domain
+                console.log('🚀 Navigating to play page on current domain');
+                navigate('/play/host', { replace: true });
+              }
               return;
             }
           }
@@ -403,11 +427,26 @@ const Login = () => {
                       last_name: customerData.customer?.last_name || null,
                     }));
 
-                    // Break out of iframe if embedded
-                    if (window.self !== window.top) {
-                      window.top!.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+                    // Get tenant config to determine redirect URL
+                    const { getTenantConfig } = await import("@/lib/tenants");
+                    const tenant = getTenantConfig(verifiedShop);
+                    
+                    // For production with Shopify proxy, redirect to proxy URL
+                    if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
+                      const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
+                      console.log('🚀 Redirecting to Shopify proxy URL:', proxyUrl);
+                      if (window.self !== window.top) {
+                        window.top!.location.href = proxyUrl;
+                      } else {
+                        window.location.href = proxyUrl;
+                      }
                     } else {
-                      navigate('/play/host', { replace: true });
+                      // Staging or no proxy - stay on current domain
+                      if (window.self !== window.top) {
+                        window.top!.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+                      } else {
+                        navigate('/play/host', { replace: true });
+                      }
                     }
                   }
                   
