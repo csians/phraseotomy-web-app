@@ -117,6 +117,29 @@ export function autoDetectTenant(searchParams?: URLSearchParams | string): Tenan
 }
 
 /**
+ * Get the primary app domain for a tenant based on shop domain
+ * @param shopDomain - The Shopify shop domain (e.g., "phraseotomy.com")
+ * @returns The primary app domain (e.g., "app.phraseotomy.com") or null
+ */
+export function getAppDomainForShop(shopDomain: string): string | null {
+  const tenant = getTenantConfig(shopDomain);
+  return tenant?.appDomains?.[0] || null;
+}
+
+/**
+ * Check if current hostname matches the correct app domain for the shop
+ * @param shopDomain - The Shopify shop domain
+ * @returns true if we're on the correct domain for this shop
+ */
+export function isCorrectAppDomain(shopDomain: string): boolean {
+  const tenant = getTenantConfig(shopDomain);
+  if (!tenant?.appDomains) return true; // No restriction
+  
+  const currentHost = window.location.hostname.toLowerCase();
+  return tenant.appDomains.some(domain => currentHost.includes(domain.toLowerCase()));
+}
+
+/**
  * Extract shop domain from URL query parameters
  * @param searchParams - URLSearchParams object or search string
  * @returns Shop domain or null
