@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +51,15 @@ export function GuessingInterface({
   const [hasFailedAllAttempts, setHasFailedAllAttempts] = useState(false);
   const [wrongGuesses, setWrongGuesses] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Reset guessing state when round changes (allows players to answer in new rounds)
+  useEffect(() => {
+    console.log("Round changed to:", roundNumber, "- Resetting guessing state");
+    setSelectedElements([]);
+    setAttemptsRemaining(3);
+    setHasFailedAllAttempts(false);
+    setWrongGuesses([]);
+  }, [roundNumber]);
 
   const toggleElement = (elementId: string) => {
     // Only allow selecting ONE element
@@ -111,12 +120,12 @@ export function GuessingInterface({
       } else if (max_attempts_reached) {
         toast({
           title: "❌ Out of Attempts",
-          description: "You've used all 3 attempts. Waiting for other players...",
+          description: "You cannot answer in this round. Wait for the next round!",
           variant: "destructive",
         });
         setSelectedElements([]); // Clear selection
       } else {
-        // Add the wrong guess to the disabled list
+        // Add the wrong guess to the disabled list for this round only
         setWrongGuesses([...wrongGuesses, selectedElements[0]]);
         toast({
           title: "❌ Wrong Guess",
@@ -165,7 +174,7 @@ export function GuessingInterface({
                   attemptsRemaining === 1 ? 'bg-orange-500/10 text-orange-600' :
                   'bg-red-500/10 text-red-600'
                 }`}>
-                  {hasFailedAllAttempts ? 'No attempts left' : `${attemptsRemaining}/3 attempts`}
+                  {hasFailedAllAttempts ? 'Locked this round' : `${attemptsRemaining}/3 attempts`}
                 </div>
               </div>
               <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
@@ -199,7 +208,7 @@ export function GuessingInterface({
               size="lg"
               className="w-full"
             >
-              {isSubmitting ? "Submitting..." : hasFailedAllAttempts ? "No Attempts Left" : "Submit Guess"}
+              {isSubmitting ? "Submitting..." : hasFailedAllAttempts ? "Wait for Next Round" : "Submit Guess"}
             </Button>
           </CardContent>
         </Card>
