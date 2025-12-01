@@ -9,13 +9,13 @@ export interface TenantConfig {
 
 // Tenant configurations for different Shopify stores
 const tenants: TenantConfig[] = [
-  {
-    id: 'staging',
-    shopDomain: 'testing-cs-store.myshopify.com',
-    displayName: 'Phraseotomy Staging',
-    themeColor: '#FCD34D',
-    appDomains: ['phraseotomy.ourstagingserver.com', 'localhost'],
-  },
+  // {
+  //   id: 'staging',
+  //   shopDomain: 'testing-cs-store.myshopify.com',
+  //   displayName: 'Phraseotomy Staging',
+  //   themeColor: '#FCD34D',
+  //   appDomains: ['phraseotomy.ourstagingserver.com', 'localhost'],
+  // },
   {
     id: 'prod',
     shopDomain: 'qxqtbf-21.myshopify.com',
