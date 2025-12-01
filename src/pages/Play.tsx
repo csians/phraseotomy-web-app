@@ -420,8 +420,8 @@ const Play = () => {
       // Use current origin to stay on staging/production as appropriate
       const currentAppUrl = `${window.location.origin}${window.location.pathname}#/login`;
       const returnUrl = encodeURIComponent(currentAppUrl);
-      // window.top!.location.href = `https://${logoutDomain}/account/logout?return_to=${returnUrl}`;
-      window.top!.location.href = `https://${logoutDomain}/apps/phraseotomy`;
+      window.top!.location.href = `https://${logoutDomain}/account/logout?return_to=${returnUrl}`;
+      // window.top!.location.href = `https://${logoutDomain}/apps/phraseotomy`;
     } else {
       // Fallback for standalone mode
       navigate("/login");
