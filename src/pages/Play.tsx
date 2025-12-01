@@ -404,15 +404,23 @@ const Play = () => {
   };
 
   const handleLogout = () => {
+    // Get the custom domain from localStorage (e.g., phraseotomy.com) before clearing
+    const storedShopDomain = localStorage.getItem("shop_domain");
+    
     // Clear local storage
     localStorage.removeItem("phraseotomy_session_token");
     localStorage.removeItem("customerData");
+    localStorage.removeItem("shop_domain");
 
-    // If running in Shopify app proxy (has shop domain), logout from Shopify
-    if (shopDomain) {
-      // Redirect to Shopify logout with return_to parameter to come back to app proxy
-      const returnUrl = encodeURIComponent(`https://${shopDomain}/apps/phraseotomy`);
-      window.top!.location.href = `https://${shopDomain}/account/logout?return_to=${returnUrl}`;
+    // Use the stored custom domain for Shopify logout, or fallback to shopDomain
+    const logoutDomain = storedShopDomain || shopDomain;
+    
+    if (logoutDomain) {
+      // Redirect to Shopify logout with return_to pointing back to current deployment domain
+      // Use current origin to stay on staging/production as appropriate
+      const currentAppUrl = `${window.location.origin}${window.location.pathname}#/login`;
+      const returnUrl = encodeURIComponent(currentAppUrl);
+      window.top!.location.href = `https://${logoutDomain}/account/logout?return_to=${returnUrl}`;
     } else {
       // Fallback for standalone mode
       navigate("/login");
