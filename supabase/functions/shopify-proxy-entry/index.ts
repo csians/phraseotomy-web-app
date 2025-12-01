@@ -706,9 +706,16 @@ function generateAppHtml(
   // Encode configuration as URL parameters (before hash for HashRouter)
   const configParams = new URLSearchParams({
     config: JSON.stringify(tenantConfig),
-    shop: shop,
-    customer: customer ? JSON.stringify(customer) : "",
+    shop: tenant.shop_domain, // Use tenant's shop_domain (phraseotomy.com)
   });
+
+  // Add individual customer params for frontend compatibility
+  if (customer) {
+    configParams.set("customer", JSON.stringify(customer));
+    if (customer.id) configParams.set("customer_id", customer.id);
+    if (customer.email) configParams.set("customer_email", customer.email);
+    if (customer.name) configParams.set("customer_name", customer.name);
+  }
 
   // If guest session provided, add it to params
   if (guestSession) {
