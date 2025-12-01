@@ -410,8 +410,9 @@ const Play = () => {
 
     // If running in Shopify app proxy (has shop domain), logout from Shopify
     if (shopDomain) {
-      // Redirect to Shopify logout, which will return to app proxy and show login page
-      window.top!.location.href = `https://${shopDomain}/account/logout`;
+      // Redirect to Shopify logout with return_to parameter to come back to app proxy
+      const returnUrl = encodeURIComponent(`https://${shopDomain}/apps/phraseotomy`);
+      window.top!.location.href = `https://${shopDomain}/account/logout?return_to=${returnUrl}`;
     } else {
       // Fallback for standalone mode
       navigate("/login");
