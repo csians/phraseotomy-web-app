@@ -30,7 +30,8 @@ async function generateSignedToken(shopDomain: string): Promise<string> {
 function createShopLoginUrl(shopDomain: string, token: string): string {
   const returnTo = `/pages/app-redirect?r=${encodeURIComponent(token)}`;
   console.log("hiiii");
-  return `https://phraseotomy.com/customer_authentication/login?return_to=${encodeURIComponent(returnTo)}`;
+  console.log("shopDomainshopDomain", shopDomain);
+  return `https://${shopDomain}/customer_authentication/login?return_to=${encodeURIComponent(returnTo)}`;
 }
 
 Deno.serve(async (req) => {
