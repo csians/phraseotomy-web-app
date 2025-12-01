@@ -1451,7 +1451,7 @@ export default function Lobby() {
                   {isLockedOut ? "Locked" : isSubmittingGuess ? "Submitting..." : "Submit Guess"}
                 </Button>
               </div>
-              {isLockedOut && (
+              {isLockedOut && !showResults && (
                 <p className="text-sm text-muted-foreground font-medium">
                   ✅ Answer submitted. Waiting for other players...
                 </p>
