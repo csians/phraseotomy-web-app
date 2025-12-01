@@ -78,17 +78,49 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Custom domain mapping: Shopify always sends the .myshopify.com domain
+  // Map known Shopify domains to custom domains used in tenant table
+  const shopDomainMapping: Record<string, string> = {
+    "qxqtbf-21.myshopify.com": "phraseotomy.com",
+    "testing-cs-store.myshopify.com": "testing-cs-store.myshopify.com", // staging stays as-is
+  };
+
+  const effectiveShopDomain = shopDomainMapping[shop] || shop;
+  console.log("🔍 [DOMAIN_MAPPING] shop:", shop, "-> effectiveShopDomain:", effectiveShopDomain);
+
   try {
     // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch tenant configuration (excluding secrets)
-    const { data: tenant, error: tenantError } = await supabase
+    // Fetch tenant configuration - try effective domain first, then original
+    let tenant = null;
+    let tenantError = null;
+
+    // Try with mapped domain first
+    const { data: tenantData, error: error1 } = await supabase
       .from("tenants")
       .select("id, name, tenant_key, shop_domain, environment, is_active")
-      .eq("shop_domain", shop)
+      .eq("shop_domain", effectiveShopDomain)
       .eq("is_active", true)
       .maybeSingle();
+
+    if (tenantData) {
+      tenant = tenantData;
+    } else if (effectiveShopDomain !== shop) {
+      // Fallback to original shop domain if mapping didn't work
+      console.log("🔍 [DOMAIN_MAPPING] Trying original shop domain as fallback");
+      const { data: fallbackData, error: error2 } = await supabase
+        .from("tenants")
+        .select("id, name, tenant_key, shop_domain, environment, is_active")
+        .eq("shop_domain", shop)
+        .eq("is_active", true)
+        .maybeSingle();
+      
+      tenant = fallbackData;
+      tenantError = error2;
+    } else {
+      tenantError = error1;
+    }
 
     if (tenantError) {
       console.error("Error fetching tenant:", tenantError);
@@ -99,7 +131,7 @@ Deno.serve(async (req) => {
     }
 
     if (!tenant) {
-      console.log("Tenant not found for shop:", shop);
+      console.log("Tenant not found for shop:", shop, "or", effectiveShopDomain);
       return new Response(
         generateErrorHtml(
           "Tenant Not Found",
@@ -112,11 +144,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch client secret and access token separately for HMAC verification and API calls
+    // Use tenant's shop_domain for subsequent queries (the one from DB)
+    const tenantShopDomain = tenant.shop_domain;
+    console.log("🔍 [TENANT_FOUND] Using tenant shop_domain:", tenantShopDomain);
+
+    // Fetch client secret and access token using the tenant's actual shop_domain
     const { data: secretData, error: secretError } = await supabase
       .from("tenants")
       .select("shopify_client_secret, access_token")
-      .eq("shop_domain", shop)
+      .eq("shop_domain", tenantShopDomain)
       .single();
 
     if (secretError || !secretData) {
