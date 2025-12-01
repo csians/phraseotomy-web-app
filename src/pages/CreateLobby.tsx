@@ -9,14 +9,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getCustomerLicenses } from '@/lib/customerAccess';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { Tables } from '@/integrations/supabase/types';
 
-
-const ALL_PACKS = [
-  { id: 'base', name: 'Base Pack', description: 'Core game cards' },
-  { id: 'expansion1', name: 'Expansion 1', description: 'Additional themed cards' },
-  { id: 'expansion2', name: 'Expansion 2', description: 'More variety' },
-  { id: 'premium', name: 'Premium Pack', description: 'Exclusive content' },
-];
+type Pack = Tables<'packs'>;
 
 export default function CreateLobby() {
   const navigate = useNavigate();
@@ -24,21 +19,50 @@ export default function CreateLobby() {
   const { toast } = useToast();
   
   const [lobbyName, setLobbyName] = useState('');
-  const [selectedPacks, setSelectedPacks] = useState<string[]>(['base']);
+  const [selectedPacks, setSelectedPacks] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
-  const [availablePacks, setAvailablePacks] = useState<string[]>(['base']); // Default to base pack
+  const [availablePacks, setAvailablePacks] = useState<string[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(true);
+  const [allPacks, setAllPacks] = useState<Pack[]>([]);
 
   // Get customer and shop info from location state or window
   const customer = location.state?.customer || window.__PHRASEOTOMY_CUSTOMER__;
   const shopDomain = location.state?.shopDomain || window.__PHRASEOTOMY_SHOP__;
   const tenant = location.state?.tenant || window.__PHRASEOTOMY_CONFIG__;
 
+  // Load all packs from database for this tenant
+  useEffect(() => {
+    const loadAllPacks = async () => {
+      if (!tenant?.id) {
+        setLoadingPacks(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('packs')
+          .select('*')
+          .eq('tenant_id', tenant.id)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        setAllPacks(data || []);
+      } catch (error) {
+        console.error('Error loading packs:', error);
+        setAllPacks([]);
+      }
+    };
+
+    loadAllPacks();
+  }, [tenant?.id]);
+
   // Load customer's available packs from redeemed codes
   useEffect(() => {
     const loadCustomerPacks = async () => {
-      if (!customer || !shopDomain) {
-        setLoadingPacks(false);
+      if (!customer || !shopDomain || allPacks.length === 0) {
+        if (allPacks.length > 0) {
+          setLoadingPacks(false);
+        }
         return;
       }
 
@@ -48,33 +72,27 @@ export default function CreateLobby() {
         // Get customer licenses (redeemed codes)
         const licenses = await getCustomerLicenses(customer.id, shopDomain);
         
-        // Extract all unique packs from all licenses
-        const allPacks = new Set<string>();
+        // Extract all unique pack names from all licenses
+        const licensePackNames = new Set<string>();
         licenses.forEach(license => {
           if (license.packs_unlocked && Array.isArray(license.packs_unlocked)) {
-            license.packs_unlocked.forEach(pack => allPacks.add(pack));
+            license.packs_unlocked.forEach(pack => licensePackNames.add(pack));
           }
         });
         
-        const packsArray = Array.from(allPacks);
-        setAvailablePacks(packsArray.length > 0 ? packsArray : []);
+        // Map pack names to pack IDs from database
+        const availablePackIds = allPacks
+          .filter(pack => licensePackNames.has(pack.name))
+          .map(pack => pack.id);
         
-        // Update selected packs to only include available ones
-        setSelectedPacks(prev => {
-          const filtered = prev.filter(packId => packsArray.includes(packId));
-          
-          // If no packs selected after filtering, select the first available pack
-          if (filtered.length === 0 && packsArray.length > 0) {
-            // Select base pack if available, otherwise first pack
-            const packToSelect = packsArray.includes('base') ? 'base' : packsArray[0];
-            return [packToSelect];
-          }
-          
-          return filtered;
-        });
+        setAvailablePacks(availablePackIds);
+        
+        // Auto-select first available pack if none selected
+        if (availablePackIds.length > 0 && selectedPacks.length === 0) {
+          setSelectedPacks([availablePackIds[0]]);
+        }
       } catch (error) {
         console.error('Error loading customer packs:', error);
-        // On error, no packs available
         setAvailablePacks([]);
       } finally {
         setLoadingPacks(false);
@@ -82,7 +100,7 @@ export default function CreateLobby() {
     };
 
     loadCustomerPacks();
-  }, [customer, shopDomain]);
+  }, [customer, shopDomain, allPacks]);
 
   const handlePackToggle = (packId: string) => {
     setSelectedPacks(prev => 
@@ -261,9 +279,13 @@ export default function CreateLobby() {
                   <Skeleton className="h-16 w-full" />
                   <Skeleton className="h-16 w-full" />
                 </div>
+              ) : allPacks.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  <p>No packs have been created yet. Contact your administrator to create packs.</p>
+                </div>
               ) : (
                 <div className="space-y-3">
-                  {ALL_PACKS.map((pack) => {
+                  {allPacks.map((pack) => {
                     const isAvailable = availablePacks.includes(pack.id);
                     const isSelected = selectedPacks.includes(pack.id);
                     
@@ -294,22 +316,24 @@ export default function CreateLobby() {
                             </Label>
                             {!isAvailable && (
                               <span className="text-xs text-muted-foreground italic">
-                                (Not available)
+                                (Not unlocked)
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {pack.description}
-                          </p>
+                          {pack.description && (
+                            <p className="text-sm text-muted-foreground">
+                              {pack.description}
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               )}
-              {!loadingPacks && availablePacks.length === 0 && (
+              {!loadingPacks && availablePacks.length === 0 && allPacks.length > 0 && (
                 <div className="text-center py-4 text-muted-foreground">
-                  <p>No packs available. Please contact support to assign packs to your account.</p>
+                  <p>No packs unlocked. Redeem a code to unlock game packs.</p>
                 </div>
               )}
             </div>
