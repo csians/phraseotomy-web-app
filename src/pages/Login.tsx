@@ -275,8 +275,8 @@ const Login = () => {
             localStorage.setItem("customerData", JSON.stringify(immediateCustomerData));
             localStorage.setItem("shop_domain", shopParam);
 
-            // Clean URL by removing sensitive query parameters
-            const cleanUrl = window.location.origin + window.location.pathname + window.location.hash.split('?')[0];
+            // Clean URL by removing all query parameters
+            const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash ? window.location.hash.split('?')[0] : '');
             window.history.replaceState({}, document.title, cleanUrl);
 
             // Fetch full customer data in background for additional info
