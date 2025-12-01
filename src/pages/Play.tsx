@@ -69,6 +69,7 @@ const Play = () => {
             email: window.__PHRASEOTOMY_CUSTOMER__.email,
             name: window.__PHRASEOTOMY_CUSTOMER__.name,
           });
+          connsole.log("customer date in live", window.__PHRASEOTOMY_CUSTOMER__);
           setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
 
           // Store customer data in localStorage for Lobby page
@@ -458,7 +459,8 @@ const Play = () => {
         <div className="text-center flex items-center justify-between">
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-white">
-              Welcome, {customer?.name || `${customer?.firstName || ''} ${customer?.lastName || ''}`.trim() || customer?.email}!
+              Welcome,{" "}
+              {customer?.name || `${customer?.firstName || ""} ${customer?.lastName || ""}`.trim() || customer?.email}!
             </h2>
           </div>
           <Button variant="outline" size="sm" onClick={handleLogout} className="ml-4">
