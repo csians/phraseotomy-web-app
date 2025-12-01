@@ -173,6 +173,11 @@ const Login = () => {
     // Handle direct login with shop and customer_id (no token)
     if (shopParam && customerIdParam && !token) {
       console.log('🔄 Direct login detected with shop and customer_id');
+      
+      // Extract customer name and email from URL if provided
+      const customerName = urlParams.get('customer_name');
+      const customerEmail = urlParams.get('customer_email');
+      
       const handleDirectLogin = async () => {
         try {
           // Resolve custom domain to .myshopify.com domain
@@ -223,6 +228,8 @@ const Login = () => {
               customerId: customerIdParam, 
               shopDomain: resolvedShopDomain,
               userAgent: navigator.userAgent,
+              customerName: customerName ? decodeURIComponent(customerName) : undefined,
+              customerEmail: customerEmail ? decodeURIComponent(customerEmail) : undefined,
             },
           });
 

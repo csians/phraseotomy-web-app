@@ -10,6 +10,8 @@ interface RequestBody {
   shopDomain: string;
   userAgent?: string;
   ipAddress?: string;
+  customerName?: string;
+  customerEmail?: string;
 }
 
 // Generate a secure random token
@@ -30,7 +32,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { customerId, shopDomain, userAgent, ipAddress }: RequestBody = await req.json();
+    const { customerId, shopDomain, userAgent, ipAddress, customerName, customerEmail }: RequestBody = await req.json();
 
     if (!customerId || !shopDomain) {
       return new Response(
@@ -39,7 +41,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`🔐 [TOKEN_GEN] Generating token for customer: ${customerId}`);
+    console.log(`🔐 [TOKEN_GEN] Generating token for customer: ${customerId}`, {
+      hasName: !!customerName,
+      hasEmail: !!customerEmail,
+    });
 
     // Get tenant_id for the shop
     const { data: tenantData, error: tenantError } = await supabase
@@ -94,6 +99,25 @@ Deno.serve(async (req) => {
     }
 
     console.log(`✅ [TOKEN_GEN] Token generated successfully for customer: ${customerId}`);
+
+    // Store/update customer data if name or email provided (production only)
+    if (customerName || customerEmail) {
+      try {
+        await supabase.functions.invoke('store-customer', {
+          body: {
+            customer_id: customerId,
+            customer_email: customerEmail,
+            customer_name: customerName,
+            shop_domain: shopDomain,
+            tenant_id: tenantData.id,
+          },
+        });
+        console.log(`📝 [TOKEN_GEN] Customer data stored/updated`);
+      } catch (storeError) {
+        console.warn('⚠️ [TOKEN_GEN] Failed to store customer data:', storeError);
+        // Don't fail the token generation if customer storage fails
+      }
+    }
 
     return new Response(
       JSON.stringify({
