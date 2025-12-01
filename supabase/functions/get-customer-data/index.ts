@@ -129,6 +129,40 @@ Deno.serve(async (req) => {
           const shopifyData = JSON.parse(responseText);
           console.log('✅ Shopify customer data:', JSON.stringify(shopifyData.customer, null, 2));
           
+          const customer = shopifyData.customer;
+          
+          // Auto-enable disabled customer accounts
+          if (customer?.state === "disabled") {
+            console.log("🔧 [AUTO_ENABLE] Customer account is disabled, attempting to enable...");
+            try {
+              const inviteUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/send_invite.json`;
+              const inviteResponse = await fetch(inviteUrl, {
+                method: "POST",
+                headers: {
+                  "X-Shopify-Access-Token": tenant.access_token,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  customer_invite: {
+                    to: customer.email,
+                    from: null,
+                    subject: "Activate your account",
+                    custom_message: "Welcome! Please activate your account to access Phraseotomy.",
+                  },
+                }),
+              });
+
+              if (inviteResponse.ok) {
+                console.log("✅ [AUTO_ENABLE] Account activation email sent successfully");
+              } else {
+                const errorText = await inviteResponse.text();
+                console.warn("⚠️ [AUTO_ENABLE] Failed to send activation email:", errorText);
+              }
+            } catch (enableError) {
+              console.error("❌ [AUTO_ENABLE] Error enabling customer account:", enableError);
+            }
+          }
+          
           customerDetails = {
             id: customerId,
             email: shopifyData.customer?.email || null,
