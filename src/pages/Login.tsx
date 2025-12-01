@@ -217,13 +217,17 @@ const Login = () => {
           setTenant(mappedTenant);
           setShopDomain(dbTenant.shop_domain);
 
-          // Generate session token for this customer (use resolved shop domain)
-          const { data: sessionData, error: sessionError } = await supabase.functions.invoke('generate-session-token', {
-            body: { customerId: customerIdParam, shopDomain: resolvedShopDomain },
+          // Generate customer token (30-day token for custom domain access)
+          const { data: tokenData, error: tokenError } = await supabase.functions.invoke('generate-customer-token', {
+            body: { 
+              customerId: customerIdParam, 
+              shopDomain: resolvedShopDomain,
+              userAgent: navigator.userAgent,
+            },
           });
 
-          if (sessionError) {
-            console.error('Error generating session token:', sessionError);
+          if (tokenError || !tokenData?.token) {
+            console.error('Error generating customer token:', tokenError);
             toast({
               title: 'Login Failed',
               description: 'Could not authenticate. Please try again.',
@@ -233,40 +237,41 @@ const Login = () => {
             return;
           }
 
-          if (sessionData?.sessionToken) {
-            localStorage.setItem('phraseotomy_session_token', sessionData.sessionToken);
-            console.log('✅ Session token generated and stored');
+          const customerToken = tokenData.token;
+          console.log('✅ Customer token generated');
 
-            // Fetch full customer data
-            const { data: customerData, error: customerError } = await supabase.functions.invoke('get-customer-data', {
-              body: { sessionToken: sessionData.sessionToken },
+          // Fetch full customer data
+          const { data: customerData, error: customerError } = await supabase.functions.invoke('get-customer-data', {
+            body: { customerId: customerIdParam, shopDomain: resolvedShopDomain },
+          });
+
+          if (!customerError && customerData) {
+            console.log('📦 Customer Data Retrieved:', {
+              customer_id: customerIdParam,
+              shop: shopParam,
+              customer: customerData.customer,
             });
 
-            if (!customerError && customerData) {
-              console.log('📦 Customer Data Retrieved:', {
-                customer_id: customerIdParam,
-                shop: shopParam,
-                customer: customerData.customer,
-              });
+            // Store customer data in localStorage
+            localStorage.setItem('customerData', JSON.stringify({
+              customer_id: customerIdParam,
+              id: customerIdParam,
+              email: customerData.customer?.email || null,
+              name: customerData.customer?.name || null,
+              first_name: customerData.customer?.first_name || null,
+              last_name: customerData.customer?.last_name || null,
+            }));
+            localStorage.setItem('shop_domain', shopParam);
+            localStorage.setItem('phraseotomy_customer_token', customerToken);
 
-              // Store customer data in localStorage
-              localStorage.setItem('customerData', JSON.stringify({
-                customer_id: customerIdParam,
-                id: customerIdParam,
-                email: customerData.customer?.email || null,
-                name: customerData.customer?.name || null,
-                first_name: customerData.customer?.first_name || null,
-                last_name: customerData.customer?.last_name || null,
-              }));
-              localStorage.setItem('shop_domain', shopParam);
-
-              // Redirect to the production app proxy URL
-              const appProxyUrl = `https://${shopParam}/apps/phraseotomy`;
-              console.log('🚀 Redirecting to app proxy:', appProxyUrl);
-              window.location.href = appProxyUrl;
-              return;
-            }
+            // Redirect to the app proxy URL with customer token
+            const appProxyUrl = `https://${shopParam}/apps/phraseotomy?customerToken=${customerToken}`;
+            console.log('🚀 Redirecting to app proxy with token');
+            window.location.href = appProxyUrl;
+            return;
           }
+          
+          setLoading(false);
           
           setLoading(false);
         } catch (error) {

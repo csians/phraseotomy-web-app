@@ -428,6 +428,7 @@ Deno.serve(async (req) => {
             firstName: null,
             lastName: null,
             name: null,
+            token: customerToken,
           };
         }
       } catch (error) {
@@ -440,6 +441,7 @@ Deno.serve(async (req) => {
           firstName: null,
           lastName: null,
           name: null,
+          token: customerToken,
         };
       }
     }
