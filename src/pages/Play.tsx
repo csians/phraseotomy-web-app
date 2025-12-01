@@ -406,7 +406,7 @@ const Play = () => {
   const handleLogout = () => {
     // Get the custom domain from localStorage (e.g., phraseotomy.com) before clearing
     const storedShopDomain = localStorage.getItem("shop_domain");
-    
+
     // Clear local storage
     localStorage.removeItem("phraseotomy_session_token");
     localStorage.removeItem("customerData");
@@ -414,13 +414,14 @@ const Play = () => {
 
     // Use the stored custom domain for Shopify logout, or fallback to shopDomain
     const logoutDomain = storedShopDomain || shopDomain;
-    
+
     if (logoutDomain) {
       // Redirect to Shopify logout with return_to pointing back to current deployment domain
       // Use current origin to stay on staging/production as appropriate
       const currentAppUrl = `${window.location.origin}${window.location.pathname}#/login`;
       const returnUrl = encodeURIComponent(currentAppUrl);
-      window.top!.location.href = `https://${logoutDomain}/account/logout?return_to=${returnUrl}`;
+      // window.top!.location.href = `https://${logoutDomain}/account/logout?return_to=${returnUrl}`;
+      window.top!.location.href = `https://${logoutDomain}/apps/phraseotomy`;
     } else {
       // Fallback for standalone mode
       navigate("/login");
@@ -467,7 +468,8 @@ const Play = () => {
         <div className="text-center flex items-center justify-between">
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-white">
-              Welcome, {customer?.name || `${customer?.firstName || ''} ${customer?.lastName || ''}`.trim() || customer?.email}!
+              Welcome,{" "}
+              {customer?.name || `${customer?.firstName || ""} ${customer?.lastName || ""}`.trim() || customer?.email}!
             </h2>
           </div>
           <Button variant="outline" size="sm" onClick={handleLogout} className="ml-4">
