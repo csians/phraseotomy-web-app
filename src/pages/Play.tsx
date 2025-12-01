@@ -60,7 +60,7 @@ const Play = () => {
             JSON.stringify({
               ...existing,
               db_id: data.customer.id,
-              customer_email: data.customer.customer_email,
+              email: data?..customer?.customer_email,
               staging_customer_id: data.customer.staging_customer_id,
               prod_customer_id: data.customer.prod_customer_id,
               is_new: data.is_new,
