@@ -176,21 +176,7 @@ const Login = () => {
       const handleDirectLogin = async () => {
         try {
           // Resolve custom domain to .myshopify.com domain
-          const { resolveShopDomain, isCorrectAppDomain, getAppDomainForShop } = await import("@/lib/tenants");
-          
-          // Check if we're on the correct app domain for this shop
-          if (!isCorrectAppDomain(shopParam)) {
-            const correctDomain = getAppDomainForShop(shopParam);
-            if (correctDomain) {
-              console.log('🔄 Redirecting to correct app domain:', correctDomain);
-              // Redirect to correct domain with same params
-              const customerName = urlParams.get('customer_name') || '';
-              const customerEmail = urlParams.get('customer_email') || '';
-              const redirectUrl = `https://${correctDomain}/login?shop=${encodeURIComponent(shopParam)}&customer_id=${encodeURIComponent(customerIdParam)}&customer_name=${encodeURIComponent(customerName)}&customer_email=${encodeURIComponent(customerEmail)}#/login`;
-              window.location.href = redirectUrl;
-              return;
-            }
-          }
+          const { resolveShopDomain } = await import("@/lib/tenants");
           
           const resolvedShopDomain = resolveShopDomain(shopParam);
           
