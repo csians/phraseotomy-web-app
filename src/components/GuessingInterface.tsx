@@ -48,6 +48,7 @@ export function GuessingInterface({
   const [selectedElements, setSelectedElements] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLockedOut, setIsLockedOut] = useState(false);
+  console.log("isLock", isLockedOut)
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Reset guessing state when round changes (allows players to answer in new rounds)
