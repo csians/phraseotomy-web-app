@@ -311,8 +311,16 @@ const Login = () => {
             const { getTenantConfig } = await import("@/lib/tenants");
             const tenant = getTenantConfig(shopParam);
 
-            // For production with Shopify proxy, redirect to proxy URL
-            if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
+            // Check if we're already on the target domain
+            const currentHost = window.location.hostname;
+            const isOnProxyDomain = tenant?.customShopDomains?.some(d => currentHost.includes(d.replace('https://', '')));
+
+            if (isOnProxyDomain) {
+              // Already on the proxy domain, use React Router navigation (no page reload)
+              console.log("🚀 Already on proxy domain, using React Router navigation");
+              navigate("/play/host", { replace: true });
+            } else if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
+              // Different domain, need full redirect
               const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
               console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
               window.location.href = proxyUrl;
