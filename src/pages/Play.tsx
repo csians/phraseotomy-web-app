@@ -49,18 +49,18 @@ const Play = () => {
         console.error("Error storing customer:", error);
       } else {
         console.log("✅ Customer stored/verified in database", data);
-        
+
         // Store the API response customer data in localStorage
         if (data?.customer) {
           const existingData = localStorage.getItem("customerData");
           const existing = existingData ? JSON.parse(existingData) : {};
-          
+
           localStorage.setItem(
             "customerData",
             JSON.stringify({
               ...existing,
               db_id: data.customer.id,
-              email: data?..customer?.customer_email,
+              email: data?.customer?.customer_email,
               staging_customer_id: data.customer.staging_customer_id,
               prod_customer_id: data.customer.prod_customer_id,
               is_new: data.is_new,
