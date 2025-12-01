@@ -225,6 +225,19 @@ Deno.serve(async (req) => {
             console.log("🎉 Game completed - all rounds finished");
             gameCompleted = true;
             
+            // Schedule automatic cleanup in 35 seconds
+            console.log('🧹 Scheduling game cleanup in 35 seconds...');
+            fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/cleanup-game-session`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+              },
+              body: JSON.stringify({ sessionId, delaySeconds: 35 })
+            }).catch(err => {
+              console.error('Failed to schedule cleanup:', err);
+            });
+            
             if (winners && winners.length > 0) {
               nextRoundInfo = {
                 gameCompleted: true,
