@@ -178,15 +178,13 @@ const Login = () => {
       return;
     }
 
-    // Check for signed token in URL (from Shopify app-login page)
-    const token = urlParams.get("r");
-    
     // Check sessionStorage first for params (cleaned at app level), then fall back to URL params
     const pendingLoginParams = sessionStorage.getItem('pending_login_params');
     let shopParam = urlParams.get("shop");
     let customerIdParam = urlParams.get("customer_id");
     let customerNameParam = urlParams.get("customer_name");
     let customerEmailParam = urlParams.get("customer_email");
+    let token = urlParams.get("r");
     
     // Use pending params from sessionStorage if available (URL was cleaned at app level)
     if (pendingLoginParams) {
@@ -196,6 +194,7 @@ const Login = () => {
         customerIdParam = parsed.customer_id || customerIdParam;
         customerNameParam = parsed.customer_name || customerNameParam;
         customerEmailParam = parsed.customer_email || customerEmailParam;
+        token = parsed.r || token;
         console.log("📦 Using pending login params from sessionStorage:", parsed);
         // Clear after use
         sessionStorage.removeItem('pending_login_params');

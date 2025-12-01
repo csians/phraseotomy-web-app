@@ -20,30 +20,38 @@ const queryClient = new QueryClient();
 
 // Clean URL parameters immediately on app load
 (function cleanUrlParams() {
-  const url = new URL(window.location.href);
-  const hasLoginParams = url.searchParams.has('shop') || 
-                         url.searchParams.has('customer_id') || 
-                         url.searchParams.has('customer_email') ||
-                         url.searchParams.has('customer_name');
+  const fullUrl = window.location.href;
+  const url = new URL(fullUrl);
+  
+  // Check both searchParams and also parse manually in case of hash issues
+  const searchStr = window.location.search;
+  const manualParams = new URLSearchParams(searchStr);
+  
+  const shop = manualParams.get('shop') || url.searchParams.get('shop');
+  const customer_id = manualParams.get('customer_id') || url.searchParams.get('customer_id');
+  const customer_email = manualParams.get('customer_email') || url.searchParams.get('customer_email');
+  const customer_name = manualParams.get('customer_name') || url.searchParams.get('customer_name');
+  const rToken = manualParams.get('r') || url.searchParams.get('r');
+  
+  const hasLoginParams = shop || customer_id || customer_email || customer_name || rToken;
   
   if (hasLoginParams) {
-    // Store params before removing (if needed elsewhere)
     const params = {
-      shop: url.searchParams.get('shop'),
-      customer_id: url.searchParams.get('customer_id'),
-      customer_email: url.searchParams.get('customer_email'),
-      customer_name: url.searchParams.get('customer_name')
+      shop,
+      customer_id,
+      customer_email,
+      customer_name,
+      r: rToken
     };
     
-    // Store in sessionStorage for Login.tsx to process
-    if (params.customer_id) {
-      sessionStorage.setItem('pending_login_params', JSON.stringify(params));
-    }
-    
-    // Clean URL immediately
-    const cleanUrl = url.origin + url.pathname + (url.hash || '');
-    window.history.replaceState({}, '', cleanUrl);
     console.log('🧹 Cleaned URL params at app level:', params);
+    
+    // Store in sessionStorage for Login.tsx to process
+    sessionStorage.setItem('pending_login_params', JSON.stringify(params));
+    
+    // Clean URL immediately - remove all query params
+    const cleanUrl = url.origin + url.pathname + (url.hash ? url.hash.split('?')[0] : '');
+    window.history.replaceState({}, '', cleanUrl);
   }
 })();
 
