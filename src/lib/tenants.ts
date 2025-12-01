@@ -16,17 +16,17 @@ export interface TenantConfig {
 export function getAppUrlForShop(shopDomain: string): string | null {
   const tenant = getTenantConfig(shopDomain);
   if (!tenant) return null;
-  
+
   // For production with custom domains, use the Shopify proxy URL
   if (tenant.customShopDomains?.length && tenant.proxyPath) {
     return `https://${tenant.customShopDomains[0]}${tenant.proxyPath}`;
   }
-  
+
   // Fallback to app domain
   if (tenant.appDomains?.length) {
     return `https://${tenant.appDomains[0]}`;
   }
-  
+
   return null;
 }
 
@@ -34,10 +34,16 @@ export function getAppUrlForShop(shopDomain: string): string | null {
 const tenants: TenantConfig[] = [
   {
     id: "staging",
-    shopDomain: "testing-cs-store.myshopify.com",
-    displayName: "Phraseotomy Staging",
-    themeColor: "#FCD34D",
-    appDomains: ["phraseotomy.ourstagingserver.com", "localhost"],
+    // shopDomain: "testing-cs-store.myshopify.com",
+    // displayName: "Phraseotomy Staging",
+    // themeColor: "#FCD34D",
+    // appDomains: ["phraseotomy.ourstagingserver.com", "localhost"],
+    shopDomain: "qxqtbf-21.myshopify.com",
+    displayName: "Phraseotomy",
+    themeColor: "#FBBF24",
+    appDomains: ["phraseotomy.com"],
+    customShopDomains: ["phraseotomy.com"],
+    proxyPath: "/apps/phraseotomy",
   },
   {
     id: "prod",
