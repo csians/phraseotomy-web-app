@@ -30,21 +30,14 @@ export function getAppUrlForShop(shopDomain: string): string | null {
   return null;
 }
 
-// Tenant configurations for different Shopify stores
+// Tenant configurations - Production only
 const tenants: TenantConfig[] = [
-  {
-    id: "staging",
-    shopDomain: "testing-cs-store.myshopify.com",
-    displayName: "Phraseotomy Staging",
-    themeColor: "#FCD34D",
-    appDomains: ["phraseotomy.ourstagingserver.com", "localhost"],
-  },
   {
     id: "prod",
     shopDomain: "phraseotomy.com",
     displayName: "Phraseotomy",
     themeColor: "#FBBF24",
-    appDomains: ["phraseotomy.com"],
+    appDomains: ["phraseotomy.com", "phraseotomy.ourstagingserver.com", "localhost"],
     customShopDomains: ["qxqtbf-21.myshopify.com"], // Shopify sends this domain
     proxyPath: "/apps/phraseotomy", // Shopify App Proxy path
   },
