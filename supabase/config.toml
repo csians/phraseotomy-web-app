@@ -94,3 +94,9 @@ verify_jwt = false
 
 [functions.generate-whisp]
 verify_jwt = false
+
+[functions.generate-customer-token]
+verify_jwt = false
+
+[functions.validate-customer-token]
+verify_jwt = false
