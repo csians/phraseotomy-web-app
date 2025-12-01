@@ -64,26 +64,63 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { sessionToken } = await req.json();
+    const { sessionToken, customerToken, customerId, shopDomain } = await req.json();
 
-    // Validate session token
-    if (!sessionToken) {
+    // Support both old sessionToken and new customerToken
+    // Priority: customerToken > sessionToken > direct customerId+shopDomain
+    let validatedCustomerId: string | null = null;
+    let validatedShopDomain: string | null = null;
+
+    // Try new customer token first
+    if (customerToken) {
+      console.log('🔍 [AUTH] Using customer token for authentication');
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      const { data: validationResult, error: validationError } = await supabase.functions.invoke(
+        'validate-customer-token',
+        { body: { token: customerToken } }
+      );
+
+      if (!validationError && validationResult?.valid) {
+        validatedCustomerId = validationResult.customerId;
+        validatedShopDomain = validationResult.shopDomain;
+        console.log('✅ [AUTH] Customer token valid');
+      } else {
+        console.log('❌ [AUTH] Customer token invalid');
+      }
+    }
+
+    // Fall back to session token
+    if (!validatedCustomerId && sessionToken) {
+      console.log('🔍 [AUTH] Using session token for authentication');
+      const payload = await verifySessionToken(sessionToken);
+      if (payload) {
+        validatedCustomerId = payload.customer_id;
+        validatedShopDomain = payload.shop;
+        console.log('✅ [AUTH] Session token valid');
+      } else {
+        console.log('❌ [AUTH] Session token invalid');
+      }
+    }
+
+    // Direct customerId/shopDomain (least secure, for backward compatibility)
+    if (!validatedCustomerId && customerId && shopDomain) {
+      console.log('⚠️ [AUTH] Using direct customerId/shopDomain (not recommended)');
+      validatedCustomerId = customerId;
+      validatedShopDomain = shopDomain;
+    }
+
+    // Require authentication
+    if (!validatedCustomerId || !validatedShopDomain) {
       return new Response(
-        JSON.stringify({ error: 'Missing session token' }),
+        JSON.stringify({ error: 'Invalid or missing authentication' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const payload = await verifySessionToken(sessionToken);
-    if (!payload) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired session token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Extract validated customer ID and shop domain from token
-    const { customer_id: customerId, shop: shopDomain } = payload;
+    console.log('✅ [AUTH] Authenticated:', { customerId: validatedCustomerId, shopDomain: validatedShopDomain });
 
 
     // Initialize Supabase client with service role key
@@ -95,7 +132,7 @@ Deno.serve(async (req) => {
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
       .select('id, access_token, shop_domain')
-      .eq('shop_domain', shopDomain)
+      .eq('shop_domain', validatedShopDomain)
       .eq('is_active', true)
       .single();
 
@@ -110,8 +147,8 @@ Deno.serve(async (req) => {
     let customerDetails = null;
     if (tenant.access_token) {
       try {
-        const shopifyUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}.json`;
-        console.log('🔍 Fetching customer from Shopify:', { shopifyUrl, customerId, shopDomain });
+        const shopifyUrl = `https://${validatedShopDomain}/admin/api/2024-01/customers/${validatedCustomerId}.json`;
+        console.log('🔍 Fetching customer from Shopify:', { shopifyUrl, customerId: validatedCustomerId, shopDomain: validatedShopDomain });
         
         const shopifyResponse = await fetch(shopifyUrl, {
           headers: {
@@ -131,11 +168,11 @@ Deno.serve(async (req) => {
           
           const customer = shopifyData.customer;
           
-          // Auto-enable disabled customer accounts
-          if (customer?.state === "disabled") {
-            console.log("🔧 [AUTO_ENABLE] Customer account is disabled, attempting to enable...");
-            try {
-              const inviteUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/send_invite.json`;
+            // Auto-enable disabled customer accounts
+            if (customer?.state === "disabled") {
+              console.log("🔧 [AUTO_ENABLE] Customer account is disabled, attempting to enable...");
+              try {
+                const inviteUrl = `https://${validatedShopDomain}/admin/api/2024-01/customers/${validatedCustomerId}/send_invite.json`;
               const inviteResponse = await fetch(inviteUrl, {
                 method: "POST",
                 headers: {
@@ -164,7 +201,7 @@ Deno.serve(async (req) => {
           }
           
           customerDetails = {
-            id: customerId,
+            id: validatedCustomerId,
             email: shopifyData.customer?.email || null,
             name: shopifyData.customer?.first_name && shopifyData.customer?.last_name 
               ? `${shopifyData.customer.first_name} ${shopifyData.customer.last_name}`
@@ -180,13 +217,13 @@ Deno.serve(async (req) => {
         console.error('❌ Error fetching customer from Shopify:', error);
       }
     } else {
-      console.warn('⚠️ No access_token found for tenant:', shopDomain);
+      console.warn('⚠️ No access_token found for tenant:', validatedShopDomain);
     }
 
     // Fallback if Shopify API call failed
     if (!customerDetails) {
       customerDetails = {
-        id: customerId,
+        id: validatedCustomerId,
         email: null,
         name: null,
         first_name: null,
@@ -205,8 +242,8 @@ Deno.serve(async (req) => {
           expires_at
         )
       `)
-      .eq('customer_id', customerId)
-      .eq('shop_domain', shopDomain)
+      .eq('customer_id', validatedCustomerId)
+      .eq('shop_domain', validatedShopDomain)
       .eq('status', 'active');
     
     // Transform the data to include packs_unlocked at the license level
@@ -229,8 +266,8 @@ Deno.serve(async (req) => {
     const { data: sessions, error: sessionsError } = await supabase
       .from('game_sessions')
       .select('*')
-      .eq('host_customer_id', customerId)
-      .eq('shop_domain', shopDomain)
+      .eq('host_customer_id', validatedCustomerId)
+      .eq('shop_domain', validatedShopDomain)
       .order('created_at', { ascending: false })
       .limit(10);
 
