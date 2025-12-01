@@ -22,6 +22,7 @@ import {
   WifiOff,
   Trophy,
   PartyPopper,
+  Eye,
 } from "lucide-react";
 import { LobbyAudioRecording } from "@/components/LobbyAudioRecording";
 import { getAllUrlParams } from "@/lib/urlUtils";
@@ -1361,6 +1362,35 @@ export default function Lobby() {
                 onElementSelect={handleSecretElementSelect}
                 selectedElementId={selectedElementId}
               />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Show Selected Secret Element to Storyteller */}
+        {isStoryteller && session.status === "active" && selectedTheme && selectedElementId && (
+          <Card className="border-yellow-500/50 bg-yellow-500/5">
+            <CardHeader>
+              <CardTitle className="flex items-center text-yellow-600">
+                <Eye className="mr-2 h-5 w-5" />
+                Your Secret Element
+              </CardTitle>
+              <CardDescription>Only you can see this - use it as inspiration for your clue</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="p-3 bg-background rounded-lg border">
+                <p className="text-sm text-muted-foreground">Secret Element:</p>
+                <p className="text-lg font-bold text-primary">
+                  {selectedElementId?.startsWith("custom:") 
+                    ? selectedElementId.substring(7) 
+                    : selectedElementId}
+                </p>
+              </div>
+              {currentTurn?.whisp && (
+                <div className="p-3 bg-background rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Whisp (Hint):</p>
+                  <p className="text-lg font-semibold text-primary">{currentTurn.whisp}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
