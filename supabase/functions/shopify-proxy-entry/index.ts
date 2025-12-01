@@ -549,7 +549,7 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: 
   <div class="logo">P</div>
   <h1>PHRASEOTOMY</h1>
   <p>Log in to your account to host a game</p>
-  <a href="${loginUrl}" class="login-btn">Log In</a>
+  <button class="login-btn" onclick="loginRedirect()">Log In</button>
   
   <div class="divider"><span>or</span></div>
   
@@ -578,6 +578,15 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: 
   </div>
 </div>
 <script>
+  function loginRedirect() {
+    // Break out of iframe and redirect parent window to Shopify login
+    if (window.top) {
+      window.top.location.href = '${loginUrl}';
+    } else {
+      window.location.href = '${loginUrl}';
+    }
+  }
+
   function toggleGuestForm() {
     const form = document.getElementById('guestForm');
     form.classList.toggle('active');
