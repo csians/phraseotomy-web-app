@@ -39,7 +39,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    // Verify customer has active licenses
+    // Note: License verification removed to allow all authenticated users to create game sessions
+    // If you need to re-enable license checks in the future, uncomment the code below:
+    /*
     const { data: licenses, error: licenseError } = await supabaseAdmin
       .from("customer_licenses")
       .select("*")
@@ -68,6 +70,7 @@ Deno.serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    */
 
     // Create game session
     const { data: session, error: sessionError } = await supabaseAdmin
