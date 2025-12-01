@@ -1367,7 +1367,7 @@ export default function Lobby() {
         )}
 
         {/* Show Selected Secret Element to Storyteller */}
-        {isStoryteller && session.status === "active" && selectedTheme && selectedElementId && (
+        {isStoryteller && session.status === "active" && currentTurn?.secret_element && (
           <Card className="border-yellow-500/50 bg-yellow-500/5">
             <CardHeader>
               <CardTitle className="flex items-center text-yellow-600">
@@ -1380,9 +1380,9 @@ export default function Lobby() {
               <div className="p-3 bg-background rounded-lg border">
                 <p className="text-sm text-muted-foreground">Secret Element:</p>
                 <p className="text-lg font-bold text-primary">
-                  {selectedElementId?.startsWith("custom:") 
-                    ? selectedElementId.substring(7) 
-                    : selectedElementId}
+                  {currentTurn.secret_element.startsWith("custom:") 
+                    ? currentTurn.secret_element.substring(7) 
+                    : currentTurn.secret_element}
                 </p>
               </div>
               {currentTurn?.whisp && (
