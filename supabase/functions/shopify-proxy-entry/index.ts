@@ -414,6 +414,7 @@ Deno.serve(async (req) => {
  * Generate login redirect HTML for unauthenticated users
  */
 function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: string): string {
+  console.log("redirect 11111");
   // Use staging domain for both environments until production CSP is configured
   const baseUrl = "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
@@ -677,6 +678,7 @@ function generateAppHtml(
   };
 
   // Use staging domain for both environments until production CSP is configured
+  console.log("redirect 2222");
   const baseUrl = "https://phraseotomy.ourstagingserver.com";
 
   // Encode configuration as URL parameters (before hash for HashRouter)
