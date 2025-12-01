@@ -402,6 +402,12 @@ export default function Lobby() {
       })
       .on("broadcast", { event: "refresh_state" }, (payload) => {
         console.log("📢 [BROADCAST] refresh_state received:", payload);
+        // Reset local state for new round
+        setGuessInput("");
+        setPlayerAnswers([]);
+        setShowResults(false);
+        setIsLockedOut(false);
+        // Then fetch updated data
         fetchLobbyData();
       })
       // Also listen for postgres changes as backup
@@ -919,7 +925,6 @@ export default function Lobby() {
       // If all players answered, show results
       if (data.all_players_answered) {
         setShowResults(true);
-        fetchLobbyData(); // Refresh scores
         
         toast({
           title: "Round Complete!",
@@ -933,12 +938,15 @@ export default function Lobby() {
               roundNumber: data.next_round.roundNumber,
               newStorytellerId: data.next_round.newStorytellerId,
             });
+            // Reset states for next round
             setGuessInput("");
             setSelectedTheme("");
             setSelectedElementId("");
             setHasRecording(false);
             setPlayerAnswers([]);
             setShowResults(false);
+            setIsLockedOut(false); // Allow guessing in new round
+            // Fetch updated data after state reset
             fetchLobbyData();
           }, 5000); // Show results for 5 seconds
         }
