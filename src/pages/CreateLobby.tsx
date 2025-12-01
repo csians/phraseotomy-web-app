@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getCustomerLicenses } from '@/lib/customerAccess';
@@ -19,7 +19,7 @@ export default function CreateLobby() {
   const { toast } = useToast();
   
   const [lobbyName, setLobbyName] = useState('');
-  const [selectedPacks, setSelectedPacks] = useState<string[]>([]);
+  const [selectedPack, setSelectedPack] = useState<string>('');
   const [isCreating, setIsCreating] = useState(false);
   const [availablePacks, setAvailablePacks] = useState<string[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(true);
@@ -88,8 +88,8 @@ export default function CreateLobby() {
         setAvailablePacks(availablePackIds);
         
         // Auto-select first available pack if none selected
-        if (availablePackIds.length > 0 && selectedPacks.length === 0) {
-          setSelectedPacks([availablePackIds[0]]);
+        if (availablePackIds.length > 0 && !selectedPack) {
+          setSelectedPack(availablePackIds[0]);
         }
       } catch (error) {
         console.error('Error loading customer packs:', error);
@@ -101,14 +101,6 @@ export default function CreateLobby() {
 
     loadCustomerPacks();
   }, [customer, shopDomain, allPacks]);
-
-  const handlePackToggle = (packId: string) => {
-    setSelectedPacks(prev => 
-      prev.includes(packId) 
-        ? prev.filter(id => id !== packId)
-        : [...prev, packId]
-    );
-  };
 
   const generateLobbyCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -129,10 +121,10 @@ export default function CreateLobby() {
       return;
     }
 
-    if (selectedPacks.length === 0) {
+    if (!selectedPack) {
       toast({
-        title: 'Select Packs',
-        description: 'Please select at least one pack',
+        title: 'Select Pack',
+        description: 'Please select a pack',
         variant: 'destructive',
       });
       return;
@@ -151,7 +143,7 @@ export default function CreateLobby() {
           hostCustomerName: customer.name || customer.email,
           shopDomain,
           tenantId: tenant.id,
-          packsUsed: selectedPacks,
+          packsUsed: [selectedPack],
         },
       });
 
@@ -273,7 +265,7 @@ export default function CreateLobby() {
             </div>
 
             <div className="space-y-4">
-              <Label>Select Packs</Label>
+              <Label>Select Pack</Label>
               {loadingPacks ? (
                 <div className="space-y-3">
                   <Skeleton className="h-16 w-full" />
@@ -284,52 +276,54 @@ export default function CreateLobby() {
                   <p>No packs have been created yet. Contact your administrator to create packs.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {allPacks.map((pack) => {
-                    const isAvailable = availablePacks.includes(pack.id);
-                    const isSelected = selectedPacks.includes(pack.id);
-                    
-                    return (
-                      <div 
-                        key={pack.id} 
-                        className={`flex items-start space-x-3 p-3 rounded-lg border ${
-                          isAvailable 
-                            ? 'border-border bg-card' 
-                            : 'border-muted bg-muted/30 opacity-60'
-                        }`}
-                      >
-                        <Checkbox
-                          id={pack.id}
-                          checked={isSelected}
-                          disabled={!isAvailable}
-                          onCheckedChange={() => isAvailable && handlePackToggle(pack.id)}
-                        />
-                        <div className="space-y-1 leading-none flex-1">
-                          <div className="flex items-center gap-2">
-                            <Label
-                              htmlFor={pack.id}
-                              className={`text-sm font-medium leading-none ${
-                                !isAvailable ? 'cursor-not-allowed opacity-70' : ''
-                              }`}
-                            >
-                              {pack.name}
-                            </Label>
-                            {!isAvailable && (
-                              <span className="text-xs text-muted-foreground italic">
-                                (Not unlocked)
-                              </span>
+                <RadioGroup value={selectedPack} onValueChange={setSelectedPack}>
+                  <div className="space-y-3">
+                    {allPacks.map((pack) => {
+                      const isAvailable = availablePacks.includes(pack.id);
+                      
+                      return (
+                        <div 
+                          key={pack.id} 
+                          className={`flex items-start space-x-3 p-3 rounded-lg border ${
+                            isAvailable 
+                              ? 'border-border bg-card hover:bg-accent cursor-pointer' 
+                              : 'border-muted bg-muted/30 opacity-60 cursor-not-allowed'
+                          }`}
+                          onClick={() => isAvailable && setSelectedPack(pack.id)}
+                        >
+                          <RadioGroupItem
+                            value={pack.id}
+                            id={pack.id}
+                            disabled={!isAvailable}
+                            className="mt-0.5"
+                          />
+                          <div className="space-y-1 leading-none flex-1">
+                            <div className="flex items-center gap-2">
+                              <Label
+                                htmlFor={pack.id}
+                                className={`text-sm font-medium leading-none ${
+                                  isAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'
+                                }`}
+                              >
+                                {pack.name}
+                              </Label>
+                              {!isAvailable && (
+                                <span className="text-xs text-muted-foreground italic">
+                                  (Not unlocked)
+                                </span>
+                              )}
+                            </div>
+                            {pack.description && (
+                              <p className="text-sm text-muted-foreground">
+                                {pack.description}
+                              </p>
                             )}
                           </div>
-                          {pack.description && (
-                            <p className="text-sm text-muted-foreground">
-                              {pack.description}
-                            </p>
-                          )}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                </RadioGroup>
               )}
               {!loadingPacks && availablePacks.length === 0 && allPacks.length > 0 && (
                 <div className="text-center py-4 text-muted-foreground">
@@ -348,7 +342,7 @@ export default function CreateLobby() {
               </Button>
               <Button
                 onClick={handleCreateLobby}
-                disabled={isCreating || selectedPacks.length === 0}
+                disabled={isCreating || !selectedPack}
                 className="flex-1 bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 size="lg"
               >
