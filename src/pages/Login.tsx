@@ -260,10 +260,9 @@ const Login = () => {
               }));
               localStorage.setItem('shop_domain', shopParam);
 
-              // Redirect to the production app proxy URL
-              const appProxyUrl = `https://${shopParam}/apps/phraseotomy`;
-              console.log('🚀 Redirecting to app proxy:', appProxyUrl);
-              window.location.href = appProxyUrl;
+              // Navigate to play page on current domain (stay on staging/production deployment)
+              console.log('🚀 Navigating to play page on current domain');
+              navigate('/play/host', { replace: true });
               return;
             }
           }
