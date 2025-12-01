@@ -383,7 +383,7 @@ Deno.serve(async (req) => {
 function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: string): string {
   console.log("hiiii");
   // Use staging domain for both environments
-  const baseUrl = "https://phraseotomy.com";
+  const baseUrl = "https://phraseotomy.com/apps/phraseotomy";
   // const baseUrl = "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
   #header-group,.header-group, footer, header {
@@ -637,7 +637,7 @@ function generateAppHtml(
   };
 
   // Use staging domain for both environments
-  const baseUrl = "https://phraseotomy.com";
+  const baseUrl = "https://phraseotomy.com/apps/phraseotomy";
   // const baseUrl = "https://phraseotomy.ourstagingserver.com";
 
   // Encode configuration as URL parameters (before hash for HashRouter)
