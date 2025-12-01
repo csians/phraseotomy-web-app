@@ -183,6 +183,9 @@ const Login = () => {
     const shopParam = urlParams.get("shop");
     const customerIdParam = urlParams.get("customer_id");
     const customerNameParam = urlParams.get("customer_name");
+
+    console.log(customerNameParam);
+    
     const customerEmailParam = urlParams.get("customer_email");
 
     // Handle direct login with shop and customer_id (no token)
