@@ -41,11 +41,11 @@ const tenants: TenantConfig[] = [
   },
   {
     id: "prod",
-    shopDomain: "qxqtbf-21.myshopify.com",
+    shopDomain: "phraseotomy.com",
     displayName: "Phraseotomy",
     themeColor: "#FBBF24",
     appDomains: ["phraseotomy.com"],
-    customShopDomains: ["phraseotomy.com"],
+    customShopDomains: ["qxqtbf-21.myshopify.com"], // Shopify sends this domain
     proxyPath: "/apps/phraseotomy", // Shopify App Proxy path
   },
 ];
