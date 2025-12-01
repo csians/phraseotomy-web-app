@@ -50,11 +50,12 @@ Deno.serve(async (req) => {
 
   console.log("🔍 [PROXY_PARAMS] All query parameters:");
   for (const [key, value] of queryParams.entries()) {
-    if (key !== "signature") {  // Don't log the signature itself
+    if (key !== "signature") {
+      // Don't log the signature itself
       console.log(`  ${key}: ${value}`);
     }
   }
-  
+
   const loggedInCustomerId = queryParams.get("logged_in_customer_id");
   console.log("🔍 [CUSTOMER_ID] logged_in_customer_id from Shopify:", loggedInCustomerId);
 
@@ -277,7 +278,7 @@ Deno.serve(async (req) => {
         const apiUrl = `https://${shop}/admin/api/2024-01/customers/${customerId}.json`;
         console.log("🔍 [SHOPIFY_API] Fetching customer from:", apiUrl);
         console.log("🔍 [SHOPIFY_API] Has access token:", !!secretData.access_token);
-        
+
         const shopifyResponse = await fetch(apiUrl, {
           headers: {
             "X-Shopify-Access-Token": secretData.access_token,
@@ -291,10 +292,10 @@ Deno.serve(async (req) => {
         if (shopifyResponse.ok) {
           const responseText = await shopifyResponse.text();
           console.log("🔍 [SHOPIFY_API] Raw response (first 500 chars):", responseText.substring(0, 500));
-          
+
           const shopifyData = JSON.parse(responseText);
           const customer = shopifyData.customer;
-          
+
           console.log("🔍 [SHOPIFY_API] Parsed customer object:", {
             id: customer?.id,
             email: customer?.email,
@@ -380,8 +381,10 @@ Deno.serve(async (req) => {
  * Generate login redirect HTML for unauthenticated users
  */
 function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: string): string {
+  console.log("hiiii");
   // Use staging domain for both environments
-  const baseUrl = "https://phraseotomy.ourstagingserver.com";
+  const baseUrl = "https://phraseotomy.com";
+  // const baseUrl = "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
   #header-group,.header-group, footer, header {
     display: none !important;
@@ -634,7 +637,8 @@ function generateAppHtml(
   };
 
   // Use staging domain for both environments
-  const baseUrl = "https://phraseotomy.ourstagingserver.com";
+  const baseUrl = "https://phraseotomy.com";
+  // const baseUrl = "https://phraseotomy.ourstagingserver.com";
 
   // Encode configuration as URL parameters (before hash for HashRouter)
   const configParams = new URLSearchParams({
