@@ -10,8 +10,12 @@ const corsHeaders = {
 
 // Map of related shop domains (staging <-> production)
 const RELATED_SHOP_DOMAINS: Record<string, string[]> = {
-  'phraseotomy.com': ['phraseotomy.com', 'phraseotomy.myshopify.com'],
-  'phraseotomy.myshopify.com': ['phraseotomy.com', 'phraseotomy.myshopify.com'],
+  // Production domains
+  'phraseotomy.com': ['phraseotomy.com', 'qxqtbf-21.myshopify.com'],
+  'qxqtbf-21.myshopify.com': ['phraseotomy.com', 'qxqtbf-21.myshopify.com'],
+  // Staging domains
+  'testing-cs-store.myshopify.com': ['testing-cs-store.myshopify.com'],
+  'phraseotomy.ourstagingserver.com': ['testing-cs-store.myshopify.com', 'phraseotomy.ourstagingserver.com'],
 };
 
 function getRelatedDomains(shopDomain: string): string[] {
