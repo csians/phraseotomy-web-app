@@ -64,7 +64,7 @@ const Play = () => {
         setShopDomain(window.__PHRASEOTOMY_SHOP__);
 
         if (window.__PHRASEOTOMY_CUSTOMER__) {
-          console.log("👤 Customer from proxy, fetching from database...");
+          console.log("👤 Customer from proxy, storing and fetching from database...");
           
           // Store customer in database first
           await storeCustomerInDatabase(
@@ -74,13 +74,17 @@ const Play = () => {
           );
 
           // Fetch customer data from Supabase to ensure we have the latest
-          const { data: dbCustomer } = await supabase
+          const { data: dbCustomer, error: dbError } = await supabase
             .from("customers")
             .select("customer_id, customer_email, customer_name, first_name, last_name")
             .eq("customer_id", window.__PHRASEOTOMY_CUSTOMER__.id)
             .eq("shop_domain", window.__PHRASEOTOMY_SHOP__)
             .eq("tenant_id", window.__PHRASEOTOMY_CONFIG__.id)
             .maybeSingle();
+
+          if (dbError) {
+            console.error("Error fetching customer from database:", dbError);
+          }
 
           if (dbCustomer) {
             const customerObj: ShopifyCustomer = {
@@ -90,10 +94,11 @@ const Play = () => {
               lastName: dbCustomer.last_name || null,
               name: dbCustomer.customer_name || null,
             };
-            setCustomer(customerObj);
             console.log("✅ Customer data loaded from Supabase:", customerObj);
+            setCustomer(customerObj);
           } else {
             // Fallback to proxy data if not in DB yet
+            console.log("⚠️ Customer not found in DB, using proxy data");
             setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
           }
         }
@@ -123,13 +128,17 @@ const Play = () => {
             await storeCustomerInDatabase(customerData, shopParam, tenantConfig.id);
 
             // Fetch customer data from Supabase
-            const { data: dbCustomer } = await supabase
+            const { data: dbCustomer, error: dbError } = await supabase
               .from("customers")
               .select("customer_id, customer_email, customer_name, first_name, last_name")
               .eq("customer_id", customerData.id)
               .eq("shop_domain", shopParam)
               .eq("tenant_id", tenantConfig.id)
               .maybeSingle();
+
+            if (dbError) {
+              console.error("Error fetching customer from database:", dbError);
+            }
 
             if (dbCustomer) {
               const customerObj: ShopifyCustomer = {
@@ -139,9 +148,10 @@ const Play = () => {
                 lastName: dbCustomer.last_name || null,
                 name: dbCustomer.customer_name || null,
               };
-              setCustomer(customerObj);
               console.log("✅ Customer data loaded from Supabase:", customerObj);
+              setCustomer(customerObj);
             } else {
+              console.log("⚠️ Customer not found in DB, using URL data");
               setCustomer(customerData);
             }
           }
@@ -180,6 +190,7 @@ const Play = () => {
         if (tokenError || !tokenData?.valid) {
           console.warn("⚠️ Invalid customer token, redirecting to login");
           localStorage.removeItem("phraseotomy_customer_token");
+          localStorage.removeItem("phraseotomy_token_expiry");
           navigate("/login", { replace: true });
           return;
         }
@@ -187,15 +198,15 @@ const Play = () => {
         console.log("✅ Token validated, fetching customer from database...");
 
         // Fetch tenant
-        const { data: dbTenant } = await supabase
+        const { data: dbTenant, error: tenantError } = await supabase
           .from("tenants")
           .select("id, name, tenant_key, shop_domain, environment")
           .eq("id", tokenData.tenantId)
           .eq("is_active", true)
           .maybeSingle();
 
-        if (!dbTenant) {
-          console.warn("⚠️ Tenant not found, redirecting to login");
+        if (tenantError || !dbTenant) {
+          console.warn("⚠️ Tenant not found or error:", tenantError);
           navigate("/login", { replace: true });
           return;
         }
@@ -212,13 +223,17 @@ const Play = () => {
         setShopDomain(dbTenant.shop_domain);
 
         // Fetch customer from database
-        const { data: dbCustomer } = await supabase
+        const { data: dbCustomer, error: customerError } = await supabase
           .from("customers")
           .select("customer_id, customer_email, customer_name, first_name, last_name")
           .eq("customer_id", tokenData.customerId)
           .eq("shop_domain", tokenData.shopDomain)
           .eq("tenant_id", tokenData.tenantId)
           .maybeSingle();
+
+        if (customerError) {
+          console.error("Error fetching customer from database:", customerError);
+        }
 
         if (dbCustomer) {
           const customerObj: ShopifyCustomer = {
@@ -228,10 +243,12 @@ const Play = () => {
             lastName: dbCustomer.last_name || null,
             name: dbCustomer.customer_name || null,
           };
-          setCustomer(customerObj);
           console.log("✅ Customer data loaded from Supabase:", customerObj);
+          setCustomer(customerObj);
         } else {
           console.warn("⚠️ Customer not found in database");
+          localStorage.removeItem("phraseotomy_customer_token");
+          localStorage.removeItem("phraseotomy_token_expiry");
           navigate("/login", { replace: true });
           return;
         }
@@ -240,6 +257,7 @@ const Play = () => {
       } catch (error) {
         console.error("Error restoring session:", error);
         localStorage.removeItem("phraseotomy_customer_token");
+        localStorage.removeItem("phraseotomy_token_expiry");
         navigate("/login", { replace: true });
         return;
       }
@@ -464,9 +482,16 @@ const Play = () => {
         <div className="text-center flex items-center justify-between">
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-white">
-              Welcome,{" "}
-              {customer?.name || `${customer?.firstName || ""} ${customer?.lastName || ""}`.trim() || customer?.email}!
+              Welcome, {
+                customer?.name || 
+                (customer?.firstName && customer?.lastName 
+                  ? `${customer.firstName} ${customer.lastName}` 
+                  : customer?.firstName || customer?.lastName || customer?.email || "Guest")
+              }!
             </h2>
+            {customer?.email && customer?.name !== customer?.email && (
+              <p className="text-sm text-muted-foreground mt-1">{customer.email}</p>
+            )}
           </div>
           <Button variant="outline" size="sm" onClick={handleLogout} className="ml-4">
             Logout
