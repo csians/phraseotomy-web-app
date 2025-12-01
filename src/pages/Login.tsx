@@ -323,25 +323,26 @@ const Login = () => {
             const { getTenantConfig } = await import("@/lib/tenants");
             const tenant = getTenantConfig(shopParam);
 
-            // Check if we're already on the target domain
+            // Check if we're already on the target domain (phraseotomy.com or its proxy)
             const currentHost = window.location.hostname;
-            const isOnProxyDomain = tenant?.customShopDomains?.some(d => currentHost.includes(d.replace('https://', '')));
+            const currentUrl = window.location.href;
+            const isOnProxyDomain = tenant?.customShopDomains?.some(d => currentHost.includes(d.replace('https://', ''))) ||
+              currentHost.includes('phraseotomy.com') ||
+              currentUrl.includes('phraseotomy.com');
 
-            if (isOnProxyDomain) {
-              // Already on the proxy domain, use React Router navigation (no page reload)
-              console.log("🚀 Already on proxy domain, using React Router navigation");
+            // Always use React Router navigation when we have customer data and are on the right domain
+            // This avoids cross-origin iframe navigation issues
+            if (isOnProxyDomain || shopParam === 'phraseotomy.com' || shopParam?.includes('phraseotomy')) {
+              // Already on the proxy domain or targeting it, use React Router navigation (no page reload)
+              console.log("🚀 Using React Router navigation (already authenticated on target domain)");
               navigate("/play/host", { replace: true });
-            } else if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
-              // Different domain, need full redirect - use top for iframe context
+            } else if (tenant?.proxyPath && tenant?.customShopDomains?.length && window.self === window.top) {
+              // Only redirect if we're NOT in an iframe (to avoid cross-origin issues)
               const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
               console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
-              if (window.self !== window.top) {
-                window.top!.location.href = proxyUrl;
-              } else {
-                window.location.href = proxyUrl;
-              }
+              window.location.href = proxyUrl;
             } else {
-              // Staging or no proxy - stay on current domain
+              // Default: use React Router navigation
               console.log("🚀 Navigating to play page on current domain");
               navigate("/play/host", { replace: true });
             }
