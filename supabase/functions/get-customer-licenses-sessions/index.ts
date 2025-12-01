@@ -8,8 +8,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Map of related shop domains (staging <-> production)
+const RELATED_SHOP_DOMAINS: Record<string, string[]> = {
+  'phraseotomy.com': ['phraseotomy.com', 'phraseotomy.myshopify.com'],
+  'phraseotomy.myshopify.com': ['phraseotomy.com', 'phraseotomy.myshopify.com'],
+};
+
+function getRelatedDomains(shopDomain: string): string[] {
+  return RELATED_SHOP_DOMAINS[shopDomain] || [shopDomain];
+}
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -27,12 +36,38 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('Fetching data for customer:', { customerId, shopDomain });
+    const domainsToSearch = getRelatedDomains(shopDomain);
+    
+    console.log('Fetching data for customer:', { customerId, shopDomain, domainsToSearch });
 
-    // Initialize Supabase with service role (bypasses RLS)
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch customer licenses
+    // First, try to find the customer record to get linked IDs (staging/prod)
+    const { data: customerRecord } = await supabase
+      .from('customers')
+      .select('customer_id, staging_customer_id, prod_customer_id')
+      .or(`customer_id.eq.${customerId},staging_customer_id.eq.${customerId},prod_customer_id.eq.${customerId}`)
+      .in('shop_domain', domainsToSearch)
+      .limit(1)
+      .single();
+
+    // Build list of all customer IDs to search (original + linked)
+    const customerIdsToSearch = [customerId];
+    if (customerRecord) {
+      if (customerRecord.customer_id && !customerIdsToSearch.includes(customerRecord.customer_id)) {
+        customerIdsToSearch.push(customerRecord.customer_id);
+      }
+      if (customerRecord.staging_customer_id && !customerIdsToSearch.includes(customerRecord.staging_customer_id)) {
+        customerIdsToSearch.push(customerRecord.staging_customer_id);
+      }
+      if (customerRecord.prod_customer_id && !customerIdsToSearch.includes(customerRecord.prod_customer_id)) {
+        customerIdsToSearch.push(customerRecord.prod_customer_id);
+      }
+    }
+
+    console.log('Searching with customer IDs:', customerIdsToSearch);
+
+    // Fetch customer licenses - search across all related domains and customer IDs
     const { data: licenses, error: licensesError } = await supabase
       .from('customer_licenses')
       .select(`
@@ -51,8 +86,8 @@ Deno.serve(async (req) => {
           expires_at
         )
       `)
-      .eq('customer_id', customerId)
-      .eq('shop_domain', shopDomain)
+      .in('customer_id', customerIdsToSearch)
+      .in('shop_domain', domainsToSearch)
       .eq('status', 'active');
 
     if (licensesError) {
@@ -66,7 +101,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch customer game sessions
+    // Fetch customer game sessions - search across all related domains and customer IDs
     const { data: sessions, error: sessionsError } = await supabase
       .from('game_sessions')
       .select(`
@@ -82,8 +117,8 @@ Deno.serve(async (req) => {
         shop_domain,
         tenant_id
       `)
-      .eq('host_customer_id', customerId)
-      .eq('shop_domain', shopDomain)
+      .in('host_customer_id', customerIdsToSearch)
+      .in('shop_domain', domainsToSearch)
       .order('created_at', { ascending: false })
       .limit(10);
 
@@ -122,6 +157,8 @@ Deno.serve(async (req) => {
     console.log('Successfully fetched data:', {
       licenses: formattedLicenses.length,
       sessions: sessions?.length || 0,
+      searchedDomains: domainsToSearch,
+      searchedCustomerIds: customerIdsToSearch,
     });
 
     return new Response(
