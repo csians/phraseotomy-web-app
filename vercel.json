@@ -15,7 +15,9 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store" }
+        { "key": "Cache-Control", "value": "no-store" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self' https://*.myshopify.com" },
+        { "key": "X-Frame-Options", "value": "ALLOWALL" }
       ]
     }
   ]
