@@ -105,6 +105,15 @@ export default function Lobby() {
   const [isConnected, setIsConnected] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdownNumber, setCountdownNumber] = useState(3);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+
+  // Reset lockout state when round changes
+  useEffect(() => {
+    if (session?.current_round) {
+      setIsLockedOut(false);
+      setGuessInput("");
+    }
+  }, [session?.current_round]);
 
   // Handle guest data from URL params on mount
   useEffect(() => {
@@ -913,6 +922,9 @@ export default function Lobby() {
         // Refresh lobby data to show updated scores
         fetchLobbyData();
       } else {
+        // Wrong answer - lock out player for this round
+        setIsLockedOut(true);
+        
         // Broadcast incorrect guess to all players via Supabase Broadcast
         broadcastEvent("guess_submitted", {
           isCorrect: false,
@@ -921,7 +933,7 @@ export default function Lobby() {
         
         toast({
           title: "Incorrect",
-          description: "That's not the right answer. Try again!",
+          description: "You're locked out for this round. Try again in the next round!",
           variant: "destructive",
         });
         setGuessInput("");
@@ -1388,20 +1400,29 @@ export default function Lobby() {
               <div className="flex gap-2">
                 <Input
                   type="text"
-                  placeholder="Type your guess or click an element above..."
+                  placeholder={isLockedOut ? "You're locked out this round" : "Type your guess or click an element above..."}
                   value={guessInput}
                   onChange={(e) => setGuessInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !isSubmittingGuess) {
+                    if (e.key === "Enter" && !isSubmittingGuess && !isLockedOut) {
                       handleSubmitGuess();
                     }
                   }}
-                  disabled={isSubmittingGuess}
+                  disabled={isSubmittingGuess || isLockedOut}
+                  className={isLockedOut ? "opacity-50 cursor-not-allowed" : ""}
                 />
-                <Button onClick={handleSubmitGuess} disabled={!guessInput.trim() || isSubmittingGuess}>
-                  {isSubmittingGuess ? "Submitting..." : "Submit Guess"}
+                <Button 
+                  onClick={handleSubmitGuess} 
+                  disabled={!guessInput.trim() || isSubmittingGuess || isLockedOut}
+                >
+                  {isLockedOut ? "Locked" : isSubmittingGuess ? "Submitting..." : "Submit Guess"}
                 </Button>
               </div>
+              {isLockedOut && (
+                <p className="text-sm text-destructive font-medium">
+                  ❌ You already gave a wrong answer. Wait for the next round to try again.
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
