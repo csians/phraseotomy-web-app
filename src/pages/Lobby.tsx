@@ -1552,7 +1552,7 @@ export default function Lobby() {
           )}
         </div>
         
-      {isHost && (
+      {isHost ? (
         {/* Game Details Card - Visible to ALL players */}
         <Card>
           <CardHeader>
