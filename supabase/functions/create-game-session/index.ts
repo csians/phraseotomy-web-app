@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { lobbyCode, hostCustomerId, hostCustomerName, shopDomain, tenantId, packsUsed } = await req.json();
+    const { lobbyCode, hostCustomerId, hostCustomerName, shopDomain, tenantId, packsUsed, gameName } = await req.json();
 
     // Validate required fields
     if (!lobbyCode || !hostCustomerId || !shopDomain || !tenantId || !packsUsed) {
@@ -83,6 +83,7 @@ Deno.serve(async (req) => {
         tenant_id: tenantId,
         packs_used: packsUsed,
         status: "waiting",
+        game_name: gameName || null,
       })
       .select()
       .single();
