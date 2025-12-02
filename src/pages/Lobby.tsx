@@ -369,21 +369,18 @@ export default function Lobby() {
       [shuffledPlayers[i], shuffledPlayers[j]] = [shuffledPlayers[j], shuffledPlayers[i]];
     }
 
-    // Update turn_order for each player
-    const updates = shuffledPlayers.map((player, index) => ({
-      id: player.id,
-      turn_order: index + 1,
+    // Call edge function to update turn order with service role permissions
+    const updatePayload = shuffledPlayers.map((player, idx) => ({
+      playerId: player.player_id,
+      turnOrder: idx + 1,
     }));
 
     try {
-      for (const update of updates) {
-        const { error } = await supabase
-          .from("game_players")
-          .update({ turn_order: update.turn_order })
-          .eq("id", update.id);
+      const { error } = await supabase.functions.invoke("update-turn-order", {
+        body: { sessionId, updates: updatePayload },
+      });
 
-        if (error) throw error;
-      }
+      if (error) throw error;
 
       // Update local state
       setPlayers(shuffledPlayers.map((p, idx) => ({ ...p, turn_order: idx + 1 })));
@@ -417,21 +414,18 @@ export default function Lobby() {
 
     const reorderedPlayers = arrayMove(players, oldIndex, newIndex);
 
-    // Update turn_order for each player based on new position
-    const updates = reorderedPlayers.map((player, index) => ({
-      id: player.id,
-      turn_order: index + 1,
-    }));
-
     try {
-      for (const update of updates) {
-        const { error } = await supabase
-          .from("game_players")
-          .update({ turn_order: update.turn_order })
-          .eq("id", update.id);
+      // Call edge function to update turn order with service role permissions
+      const updatePayload = reorderedPlayers.map((player, idx) => ({
+        playerId: player.player_id,
+        turnOrder: idx + 1,
+      }));
 
-        if (error) throw error;
-      }
+      const { error } = await supabase.functions.invoke("update-turn-order", {
+        body: { sessionId, updates: updatePayload },
+      });
+
+      if (error) throw error;
 
       // Update local state
       setPlayers(reorderedPlayers.map((p, idx) => ({ ...p, turn_order: idx + 1 })));
