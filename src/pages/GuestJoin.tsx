@@ -38,8 +38,10 @@ const GuestJoin = () => {
         
         // Store guest data in BOTH storages for Shopify context
         sessionStorage.setItem("guest_player_id", guestData.player_id);
+        sessionStorage.setItem("guest_player_name", guestData.name);
         sessionStorage.setItem("guestPlayerData", JSON.stringify(guestData));
         localStorage.setItem("guest_player_id", guestData.player_id);
+        localStorage.setItem("guest_player_name", guestData.name);
         localStorage.setItem("guestPlayerData", JSON.stringify(guestData));
         if (shop) {
           localStorage.setItem("shop_domain", shop);
@@ -120,8 +122,10 @@ const GuestJoin = () => {
         name: playerName.trim(),
       };
       sessionStorage.setItem("guest_player_id", guestPlayerId);
+      sessionStorage.setItem("guest_player_name", playerName.trim());
       sessionStorage.setItem("guestPlayerData", JSON.stringify(guestData));
       localStorage.setItem("guest_player_id", guestPlayerId);
+      localStorage.setItem("guest_player_name", playerName.trim());
       localStorage.setItem("guestPlayerData", JSON.stringify(guestData));
 
       const { data: joinData, error: joinError } = await supabase.functions.invoke(
