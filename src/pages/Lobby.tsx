@@ -1150,11 +1150,28 @@ export default function Lobby() {
         description: "You have successfully left the game.",
       });
 
+      // Wait a moment for the broadcast and realtime events to propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       // Clear session storage
       sessionStorage.removeItem("current_lobby_session");
-
-      // Navigate to guest join page
-      navigate("/guest-join");
+      
+      // Check if this is a guest player and clear their data
+      const guestPlayerId = localStorage.getItem("guest_player_id");
+      const isGuest = guestPlayerId === playerId;
+      
+      if (isGuest) {
+        // Clear guest-specific data
+        localStorage.removeItem("guest_player_id");
+        localStorage.removeItem("guestPlayerData");
+        sessionStorage.removeItem("guest_player_id");
+        sessionStorage.removeItem("guestPlayerData");
+        // Navigate to guest join page
+        navigate("/guest-join", { replace: true });
+      } else {
+        // Authenticated user - go to their play page
+        navigate("/play/host", { replace: true });
+      }
     } catch (error) {
       console.error("Error in handleLeaveGame:", error);
       toast({
@@ -1162,6 +1179,53 @@ export default function Lobby() {
         description: "An unexpected error occurred.",
         variant: "destructive",
       });
+    }
+  };
+
+  // Handler for "Join Another Game" - leaves current game and goes to join page
+  const handleJoinAnotherGame = async () => {
+    const playerId = getCurrentCustomerId();
+    if (!sessionId || !playerId) {
+      navigate("/guest-join");
+      return;
+    }
+
+    try {
+      console.log("Leaving to join another game:", { sessionId, playerId });
+
+      // Broadcast that player is leaving
+      const currentPlayer = players.find(p => p.player_id === playerId);
+      const playerNameToSend = currentPlayer?.name || currentPlayerName || "A player";
+      broadcastEvent("player_left", { playerId, senderName: playerNameToSend, timestamp: Date.now() });
+
+      const { error } = await supabase.functions.invoke("leave-lobby", {
+        body: { sessionId, playerId },
+      });
+
+      if (error) {
+        console.error("Error leaving lobby:", error);
+      }
+
+      // Clear session storage
+      sessionStorage.removeItem("current_lobby_session");
+      
+      // Clear guest data if applicable
+      const guestPlayerId = localStorage.getItem("guest_player_id");
+      if (guestPlayerId === playerId) {
+        localStorage.removeItem("guest_player_id");
+        localStorage.removeItem("guestPlayerData");
+        sessionStorage.removeItem("guest_player_id");
+        sessionStorage.removeItem("guestPlayerData");
+      }
+
+      // Wait a moment for the broadcast and realtime events to propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Always navigate to guest join page for joining another game
+      navigate("/guest-join", { replace: true });
+    } catch (error) {
+      console.error("Error in handleJoinAnotherGame:", error);
+      navigate("/guest-join", { replace: true });
     }
   };
 
@@ -1676,7 +1740,7 @@ export default function Lobby() {
                 </AlertDialogContent>
               </AlertDialog>
 
-              <Button variant="outline" size="sm" onClick={() => navigate("/guest-join")}>
+              <Button variant="outline" size="sm" onClick={handleJoinAnotherGame}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Join Another Game
               </Button>
