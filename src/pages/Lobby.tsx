@@ -616,6 +616,8 @@ export default function Lobby() {
       })
       .on("broadcast", { event: "turn_order_changed" }, (payload) => {
         console.log("📢 [BROADCAST] turn_order_changed received:", payload);
+        // Refetch lobby data to update turn order for all players
+        fetchLobbyData();
         toast({
           title: "Turn Order Updated",
           description: "The host has reordered the players",
@@ -1568,7 +1570,7 @@ export default function Lobby() {
         </Card>
 
         {/* Start Game button for host */}
-        {isStoryteller && session.status === "waiting" && (
+        {isHost && session.status === "waiting" && (
           <Card>
             <CardHeader>
               <CardTitle>Ready to Start?</CardTitle>
