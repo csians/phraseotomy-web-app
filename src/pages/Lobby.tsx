@@ -1514,43 +1514,78 @@ export default function Lobby() {
         </div>
 
         <div className="flex items-center justify-between mb-4">
-          <Button variant="ghost" onClick={() => navigate("/play/host")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Play
-          </Button>
+          {isHost ? (
+            <>
+              <Button variant="ghost" onClick={() => navigate("/play/host")}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Play
+              </Button>
 
-          {isHost && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" disabled={isEndingLobby}>
-                  <XCircle className="mr-2 h-4 w-4" />
-                  {isEndingLobby
-                    ? session?.status === "waiting"
-                      ? "Deleting..."
-                      : "Ending..."
-                    : session?.status === "waiting"
-                      ? "Delete Game"
-                      : "End Game"}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{session?.status === "waiting" ? "Delete Game?" : "End Game?"}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will close the lobby and remove all players. This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleEndLobby}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    {session?.status === "waiting" ? "Delete Game" : "End Game"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" disabled={isEndingLobby}>
+                    <XCircle className="mr-2 h-4 w-4" />
+                    {isEndingLobby
+                      ? session?.status === "waiting"
+                        ? "Deleting..."
+                        : "Ending..."
+                      : session?.status === "waiting"
+                        ? "Delete Game"
+                        : "End Game"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{session?.status === "waiting" ? "Delete Game?" : "End Game?"}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will close the lobby and remove all players. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleEndLobby}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {session?.status === "waiting" ? "Delete Game" : "End Game"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Leave Game
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Leave Game?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to leave this game? You can rejoin later with the lobby code.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => navigate("/guest-join")}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Leave Game
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <Button variant="outline" size="sm" onClick={() => navigate("/guest-join")}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Join Another Game
+              </Button>
+            </div>
           )}
         </div>
 
