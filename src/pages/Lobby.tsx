@@ -493,10 +493,24 @@ export default function Lobby() {
       })
       .on("broadcast", { event: "player_left" }, (payload) => {
         console.log("📢 [BROADCAST] player_left received:", payload);
+        const leftPlayerId = payload.payload?.playerId;
+        const leftPlayerName = payload.payload?.senderName || "A player";
+        
+        // Immediately remove player from local state
+        if (leftPlayerId) {
+          setPlayers((prev) => {
+            const filtered = prev.filter((p) => p.player_id !== leftPlayerId);
+            console.log("📢 [BROADCAST] Removed player from state, remaining:", filtered.length);
+            return filtered;
+          });
+        }
+        
         toast({
           title: "Player Left",
-          description: `${payload.payload?.senderName || "A player"} left the lobby`,
+          description: `${leftPlayerName} left the lobby`,
         });
+        
+        // Also refresh from database to ensure consistency
         fetchLobbyData();
       })
       .on("broadcast", { event: "game_started" }, (payload) => {
@@ -1127,12 +1141,13 @@ export default function Lobby() {
     try {
       console.log("Leaving lobby:", { sessionId, playerId, playerName: playerNameToSend });
 
-      // Broadcast that player is leaving (include name for toast message)
-      broadcastEvent("player_left", { playerId, senderName: playerNameToSend, timestamp: Date.now() });
-
+      // First delete from database
       const { data, error } = await supabase.functions.invoke("leave-lobby", {
         body: { sessionId, playerId },
       });
+      
+      // Broadcast AFTER successful deletion so other players see updated data
+      broadcastEvent("player_left", { playerId, senderName: playerNameToSend, timestamp: Date.now() });
 
       if (error) {
         console.error("Error leaving lobby:", error);
@@ -1193,11 +1208,10 @@ export default function Lobby() {
     try {
       console.log("Leaving to join another game:", { sessionId, playerId });
 
-      // Broadcast that player is leaving
       const currentPlayer = players.find(p => p.player_id === playerId);
       const playerNameToSend = currentPlayer?.name || currentPlayerName || "A player";
-      broadcastEvent("player_left", { playerId, senderName: playerNameToSend, timestamp: Date.now() });
 
+      // First delete from database
       const { error } = await supabase.functions.invoke("leave-lobby", {
         body: { sessionId, playerId },
       });
@@ -1205,6 +1219,9 @@ export default function Lobby() {
       if (error) {
         console.error("Error leaving lobby:", error);
       }
+      
+      // Broadcast AFTER deletion so other players see updated data
+      broadcastEvent("player_left", { playerId, senderName: playerNameToSend, timestamp: Date.now() });
 
       // Clear session storage
       sessionStorage.removeItem("current_lobby_session");
