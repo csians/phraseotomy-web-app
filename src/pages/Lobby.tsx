@@ -408,6 +408,9 @@ export default function Lobby() {
         setPlayerAnswers([]);
         setShowResults(false);
         setIsLockedOut(false);
+        setSelectedTheme("");
+        setSelectedElementId("");
+        setHasRecording(false);
         // Then fetch updated data
         fetchLobbyData();
       })
@@ -650,20 +653,35 @@ export default function Lobby() {
       setAudioFiles(data.audioFiles || []);
       console.log("Audio files from response:", data.audioFiles?.length || 0);
 
-      // Set selected theme if it exists in session
-      if (data.session.selected_theme_id) {
-        setSelectedTheme(data.session.selected_theme_id);
-      }
-
       // Check if there's already a turn with secret element and recording from currentTurn data
       if (data.currentTurn) {
         setCurrentTurn(data.currentTurn);
+        
+        // Only set theme/element/recording if they exist in the CURRENT turn
+        // This prevents showing previous round's data
+        if (data.currentTurn.theme_id) {
+          setSelectedTheme(data.currentTurn.theme_id);
+        } else {
+          // New round - clear theme selection
+          setSelectedTheme("");
+        }
+        
         if (data.currentTurn.secret_element) {
           setSelectedElementId(data.currentTurn.secret_element);
+        } else {
+          setSelectedElementId("");
         }
+        
         if (data.currentTurn.recording_url) {
           setHasRecording(true);
+        } else {
+          setHasRecording(false);
         }
+      } else {
+        // No current turn data - reset everything
+        setSelectedTheme("");
+        setSelectedElementId("");
+        setHasRecording(false);
       }
 
       // Fetch themes
