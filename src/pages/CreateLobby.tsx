@@ -119,15 +119,6 @@ export default function CreateLobby() {
       return;
     }
 
-    if (!lobbyName.trim()) {
-      toast({
-        title: "Game Name Required",
-        description: "Please enter a game name",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!selectedPack) {
       toast({
         title: "Select Pack",
@@ -334,7 +325,7 @@ export default function CreateLobby() {
                 className="flex-1 bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 size="lg"
               >
-                {isCreating ? "Creating..." : "Create Lobby"}
+                {isCreating ? "Creating..." : "Create Game"}
               </Button>
             </div>
           </CardContent>
