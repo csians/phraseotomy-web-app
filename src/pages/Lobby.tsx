@@ -23,7 +23,26 @@ import {
   Trophy,
   PartyPopper,
   Eye,
+  Shuffle,
+  GripVertical,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { LobbyAudioRecording } from "@/components/LobbyAudioRecording";
 import { getAllUrlParams } from "@/lib/urlUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -48,6 +67,63 @@ interface Player {
   session_id: string;
   turn_order: number;
   score?: number;
+}
+
+// Sortable Player Item Component
+function SortablePlayerItem({ 
+  player, 
+  isHost, 
+  currentStorytellerId, 
+  hostCustomerId,
+  isDraggable 
+}: { 
+  player: Player; 
+  isHost: boolean;
+  currentStorytellerId: string | undefined;
+  hostCustomerId: string;
+  isDraggable: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: player.id, disabled: !isDraggable });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+    >
+      <div className="flex items-center gap-2">
+        {isDraggable && (
+          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </div>
+        )}
+        <span className="font-medium">{player.name}</span>
+        {player.player_id === hostCustomerId && (
+          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Host</span>
+        )}
+        {player.player_id === currentStorytellerId && (
+          <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">Storyteller</span>
+        )}
+      </div>
+      <div className="flex items-center gap-4">
+        <span className="text-lg font-bold text-primary">{player.score ?? 0} pts</span>
+        <span className="text-sm text-muted-foreground">Turn {player.turn_order}</span>
+      </div>
+    </li>
+  );
 }
 
 interface AudioFile {
@@ -282,6 +358,107 @@ export default function Lobby() {
     }
   }, [currentPlayerId, currentPlayerName]);
 
+  // Shuffle turn order
+  const handleShuffleTurns = async () => {
+    if (!sessionId || !isHost) return;
+
+    const shuffledPlayers = [...players];
+    // Fisher-Yates shuffle
+    for (let i = shuffledPlayers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledPlayers[i], shuffledPlayers[j]] = [shuffledPlayers[j], shuffledPlayers[i]];
+    }
+
+    // Update turn_order for each player
+    const updates = shuffledPlayers.map((player, index) => ({
+      id: player.id,
+      turn_order: index + 1,
+    }));
+
+    try {
+      for (const update of updates) {
+        const { error } = await supabase
+          .from("game_players")
+          .update({ turn_order: update.turn_order })
+          .eq("id", update.id);
+
+        if (error) throw error;
+      }
+
+      // Update local state
+      setPlayers(shuffledPlayers.map((p, idx) => ({ ...p, turn_order: idx + 1 })));
+
+      // Broadcast to other players
+      broadcastEvent("turn_order_changed", { shuffled: true });
+
+      toast({
+        title: "Turn Order Shuffled",
+        description: "Players have been randomly reordered",
+      });
+    } catch (error) {
+      console.error("Error shuffling turns:", error);
+      toast({
+        title: "Error",
+        description: "Failed to shuffle turn order",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle drag end for reordering
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = players.findIndex((p) => p.id === active.id);
+    const newIndex = players.findIndex((p) => p.id === over.id);
+
+    const reorderedPlayers = arrayMove(players, oldIndex, newIndex);
+
+    // Update turn_order for each player based on new position
+    const updates = reorderedPlayers.map((player, index) => ({
+      id: player.id,
+      turn_order: index + 1,
+    }));
+
+    try {
+      for (const update of updates) {
+        const { error } = await supabase
+          .from("game_players")
+          .update({ turn_order: update.turn_order })
+          .eq("id", update.id);
+
+        if (error) throw error;
+      }
+
+      // Update local state
+      setPlayers(reorderedPlayers.map((p, idx) => ({ ...p, turn_order: idx + 1 })));
+
+      // Broadcast to other players
+      broadcastEvent("turn_order_changed", { dragged: true });
+
+      toast({
+        title: "Turn Order Updated",
+        description: "Players have been reordered",
+      });
+    } catch (error) {
+      console.error("Error updating turn order:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update turn order",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     console.log("🚀 [LOBBY] useEffect running - sessionId:", sessionId);
     console.log("🚀 [LOBBY] Supabase client:", supabase);
@@ -435,6 +612,15 @@ export default function Lobby() {
         setSelectedElementId("");
         setHasRecording(false);
         // Then fetch updated data
+        fetchLobbyData();
+      })
+      .on("broadcast", { event: "turn_order_changed" }, (payload) => {
+        console.log("📢 [BROADCAST] turn_order_changed received:", payload);
+        toast({
+          title: "Turn Order Updated",
+          description: "The host has reordered the players",
+        });
+        // Refresh player list
         fetchLobbyData();
       })
       // Also listen for postgres changes as backup
@@ -1326,35 +1512,57 @@ export default function Lobby() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Users className="mr-2 h-5 w-5" />
-              Players ({players.length})
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Users className="mr-2 h-5 w-5" />
+                <CardTitle>Players ({players.length})</CardTitle>
+              </div>
+              {isHost && session.status === "waiting" && players.length > 1 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleShuffleTurns}
+                  className="gap-2"
+                >
+                  <Shuffle className="h-4 w-4" />
+                  Shuffle Turns
+                </Button>
+              )}
+            </div>
             <CardDescription>{isHost ? "You are the host" : "You are a player in this lobby"}</CardDescription>
+            {isHost && session.status === "waiting" && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Drag and drop players to reorder turns
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             {players.length === 0 ? (
               <p className="text-sm text-muted-foreground">No players have joined yet</p>
             ) : (
-              <ul className="space-y-2">
-                {players.map((player) => (
-                  <li key={player.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{player.name}</span>
-                      {player.player_id === session.host_customer_id && (
-                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Host</span>
-                      )}
-                      {player.player_id === session.current_storyteller_id && (
-                        <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">Storyteller</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-lg font-bold text-primary">{player.score ?? 0} pts</span>
-                      <span className="text-sm text-muted-foreground">Turn {player.turn_order}</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={players.map((p) => p.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <ul className="space-y-2">
+                    {players.map((player) => (
+                      <SortablePlayerItem
+                        key={player.id}
+                        player={player}
+                        isHost={isHost}
+                        currentStorytellerId={session.current_storyteller_id}
+                        hostCustomerId={session.host_customer_id}
+                        isDraggable={isHost && session.status === "waiting"}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
             )}
           </CardContent>
         </Card>
