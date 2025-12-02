@@ -598,22 +598,24 @@ const Play = () => {
               <div className="space-y-2">
                 <Skeleton className="h-16 w-full" />
               </div>
-            ) : sessions.length > 0 ? (
+            ) : sessions.filter(s => s.status !== 'completed').length > 0 ? (
               <div className="space-y-3">
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-4 bg-game-gray/30 rounded-lg border border-game-yellow/20"
-                  >
-                    <div>
-                      <p className="font-mono text-lg text-game-yellow font-bold">{session.lobby_code}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{session.status}</p>
+                {sessions
+                  .filter(session => session.status !== 'completed')
+                  .map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between p-4 bg-game-gray/30 rounded-lg border border-game-yellow/20"
+                    >
+                      <div>
+                        <p className="font-mono text-lg text-game-yellow font-bold">{session.lobby_code}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{session.status}</p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/lobby/${session.id}`)}>
+                        Rejoin
+                      </Button>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/lobby/${session.id}`)}>
-                      Rejoin
-                    </Button>
-                  </div>
-                ))}
+                  ))}
               </div>
             ) : (
               <div className="text-center py-6 text-muted-foreground">
