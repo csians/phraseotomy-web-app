@@ -173,8 +173,13 @@ export default function CreateLobby() {
       localStorage.setItem("customerData", JSON.stringify(customerData));
       sessionStorage.setItem("customerData", JSON.stringify(customerData));
       
+      // Store player ID specifically for lobby refresh recovery
+      localStorage.setItem("lobby_player_id", customer.id);
+      sessionStorage.setItem("lobby_player_id", customer.id);
+      
       // Store session ID for refresh persistence
       sessionStorage.setItem("current_lobby_session", newSession.id);
+      localStorage.setItem("current_lobby_session", newSession.id);
 
       toast({
         title: "Lobby Created!",
