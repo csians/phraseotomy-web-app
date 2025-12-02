@@ -1524,16 +1524,18 @@ export default function Lobby() {
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm" disabled={isEndingLobby}>
                   <XCircle className="mr-2 h-4 w-4" />
-                  {isEndingLobby 
-                    ? (session?.status === 'waiting' ? "Deleting..." : "Ending...") 
-                    : (session?.status === 'waiting' ? "Delete Game" : "End Game")}
+                  {isEndingLobby
+                    ? session?.status === "waiting"
+                      ? "Deleting..."
+                      : "Ending..."
+                    : session?.status === "waiting"
+                      ? "Delete Game"
+                      : "End Game"}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    {session?.status === 'waiting' ? "Delete Game?" : "End Game?"}
-                  </AlertDialogTitle>
+                  <AlertDialogTitle>{session?.status === "waiting" ? "Delete Game?" : "End Game?"}</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will close the lobby and remove all players. This action cannot be undone.
                   </AlertDialogDescription>
@@ -1544,15 +1546,14 @@ export default function Lobby() {
                     onClick={handleEndLobby}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    {session?.status === 'waiting' ? "Delete Game" : "End Game"}
+                    {session?.status === "waiting" ? "Delete Game" : "End Game"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           )}
         </div>
-        
-      {isHost ? (
+
         {/* Game Details Card - Visible to ALL players */}
         <Card>
           <CardHeader>
@@ -1584,7 +1585,6 @@ export default function Lobby() {
             </div>
           </CardContent>
         </Card>
-      )}
 
         <Card>
           <CardHeader>
