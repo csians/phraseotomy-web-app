@@ -388,7 +388,11 @@ export default function Lobby() {
       // Update local state
       setPlayers(shuffledPlayers.map((p, idx) => ({ ...p, turn_order: idx + 1 })));
 
+      // Wait a moment for database to propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       // Broadcast to other players
+      console.log("📤 [HOST] Broadcasting turn_order_changed after shuffle");
       broadcastEvent("turn_order_changed", { shuffled: true });
 
       toast({
@@ -435,7 +439,11 @@ export default function Lobby() {
       // Update local state
       setPlayers(reorderedPlayers.map((p, idx) => ({ ...p, turn_order: idx + 1 })));
 
+      // Wait a moment for database to propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       // Broadcast to other players
+      console.log("📤 [HOST] Broadcasting turn_order_changed after drag");
       broadcastEvent("turn_order_changed", { dragged: true });
 
       toast({
@@ -615,15 +623,13 @@ export default function Lobby() {
         fetchLobbyData();
       })
       .on("broadcast", { event: "turn_order_changed" }, (payload) => {
-        console.log("📢 [BROADCAST] turn_order_changed received:", payload);
+        console.log("📢 [BROADCAST] turn_order_changed received by non-host player:", payload);
         // Refetch lobby data to update turn order for all players
         fetchLobbyData();
         toast({
           title: "Turn Order Updated",
           description: "The host has reordered the players",
         });
-        // Refresh player list
-        fetchLobbyData();
       })
       // Also listen for postgres changes as backup
       .on(
@@ -750,7 +756,11 @@ export default function Lobby() {
           }
         },
       )
-      .subscribe((status, err) => {
+      
+    // Store channel ref for broadcasting immediately (before subscribe completes)
+    broadcastChannelRef.current = channel;
+    
+    channel.subscribe((status, err) => {
         console.log("🔌 [REALTIME] Subscription status:", status, "error:", err);
         if (err) {
           console.error("❌ [REALTIME] Subscription error:", err);
@@ -783,9 +793,6 @@ export default function Lobby() {
           setIsConnected(false);
         }
       });
-
-    // Store channel ref for broadcasting
-    broadcastChannelRef.current = channel;
 
     return () => {
       console.log("🧹 [LOBBY] Cleaning up subscription");
