@@ -1506,12 +1506,12 @@ export default function Lobby() {
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm" disabled={isEndingLobby}>
                   <XCircle className="mr-2 h-4 w-4" />
-                  {isEndingLobby ? "Ending..." : "End Lobby"}
+                  {isEndingLobby ? "Ending..." : "End Game"}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>End Lobby?</AlertDialogTitle>
+                  <AlertDialogTitle>End Game?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will close the lobby and remove all players. This action cannot be undone.
                   </AlertDialogDescription>
@@ -1522,7 +1522,7 @@ export default function Lobby() {
                     onClick={handleEndLobby}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    End Lobby
+                    End Game
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
