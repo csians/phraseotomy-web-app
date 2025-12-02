@@ -29,6 +29,7 @@ const Play = () => {
   const [lobbyCode, setLobbyCode] = useState("");
   const [redemptionCode, setRedemptionCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
+  const [availablePacks, setAvailablePacks] = useState<{ id: string; name: string; description: string | null }[]>([]);
 
   // Store customer in database on first login
   const storeCustomerInDatabase = async (customerData: ShopifyCustomer, shopDomain: string, tenantId: string) => {
@@ -271,10 +272,20 @@ const Play = () => {
       const fetchCustomerData = async () => {
         setDataLoading(true);
         try {
-          const [customerLicenses, customerSessions] = await Promise.all([
+          // Get tenant_id for fetching packs
+          const tenantId = tenant?.id;
+          
+          const [customerLicenses, customerSessions, packsData] = await Promise.all([
             getCustomerLicenses(customer.id, shopDomain),
             getCustomerSessions(customer.id, shopDomain),
+            tenantId 
+              ? supabase.from('packs').select('id, name, description').eq('tenant_id', tenantId)
+              : Promise.resolve({ data: [], error: null }),
           ]);
+          
+          if (packsData.data) {
+            setAvailablePacks(packsData.data);
+          }
 
           setLicenses(customerLicenses);
           setSessions(customerSessions);
@@ -529,20 +540,22 @@ const Play = () => {
                 </div>
 
                 {/* Locked Packs */}
-                <div className="pt-3 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-2">Available to Unlock</p>
-                  <div className="flex flex-wrap gap-2">
-                    {["Premium", "Holiday", "Party Plus", "Family Fun"].filter(p => !allPacks.includes(p)).map((pack) => (
-                      <Badge
-                        key={pack}
-                        variant="outline"
-                        className="bg-muted/30 text-muted-foreground border-muted px-3 py-1 opacity-60"
-                      >
-                        🔒 {pack}
-                      </Badge>
-                    ))}
+                {availablePacks.filter(p => !allPacks.includes(p.name)).length > 0 && (
+                  <div className="pt-3 border-t border-border">
+                    <p className="text-xs text-muted-foreground mb-2">Available to Unlock</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availablePacks.filter(p => !allPacks.includes(p.name)).map((pack) => (
+                        <Badge
+                          key={pack.id}
+                          variant="outline"
+                          className="bg-muted/30 text-muted-foreground border-muted px-3 py-1 opacity-60"
+                        >
+                          🔒 {pack.name}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Buy Additional Packs Promo */}
                 <div className="pt-4 border-t border-border">
