@@ -161,6 +161,21 @@ export default function CreateLobby() {
 
       const newSession = data.session;
 
+      // Store customer data in localStorage for session persistence across refreshes
+      const customerData = {
+        customer_id: customer.id,
+        id: customer.id,
+        name: customer.name || customer.email,
+        email: customer.email,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+      };
+      localStorage.setItem("customerData", JSON.stringify(customerData));
+      sessionStorage.setItem("customerData", JSON.stringify(customerData));
+      
+      // Store session ID for refresh persistence
+      sessionStorage.setItem("current_lobby_session", newSession.id);
+
       toast({
         title: "Lobby Created!",
         description: `Lobby Code: ${lobbyCode}`,
