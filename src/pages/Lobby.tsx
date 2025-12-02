@@ -401,6 +401,29 @@ export default function Lobby() {
           return [...prev, { playerId, playerName, guess, isCorrect }];
         });
       })
+      .on("broadcast", { event: "all_answers_received" }, (payload) => {
+        console.log("📢 [BROADCAST] all_answers_received received:", payload);
+        const { secretElement, allAnswers } = payload.payload;
+        
+        // Update currentTurn with secret element
+        setCurrentTurn(prev => ({
+          ...prev,
+          secret_element: secretElement,
+        }));
+        
+        // Set all player answers if provided
+        if (allAnswers && allAnswers.length > 0) {
+          setPlayerAnswers(allAnswers);
+        }
+        
+        // Show results to all players
+        setShowResults(true);
+        
+        toast({
+          title: "Round Complete!",
+          description: "All players have answered. See results below.",
+        });
+      })
       .on("broadcast", { event: "refresh_state" }, (payload) => {
         console.log("📢 [BROADCAST] refresh_state received:", payload);
         // Reset local state for new round
@@ -944,6 +967,20 @@ export default function Lobby() {
       // If all players answered, show results
       if (data.all_players_answered) {
         setShowResults(true);
+        
+        // Update currentTurn with secret element from response
+        if (data.secret_element) {
+          setCurrentTurn(prev => ({
+            ...prev,
+            secret_element: data.secret_element,
+          }));
+        }
+        
+        // Broadcast to all other players that all answers are received
+        broadcastEvent("all_answers_received", {
+          secretElement: data.secret_element,
+          allAnswers: playerAnswers, // Send accumulated answers
+        });
         
         toast({
           title: "Round Complete!",
