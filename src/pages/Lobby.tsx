@@ -1551,7 +1551,8 @@ export default function Lobby() {
             </AlertDialog>
           )}
         </div>
-
+        
+      {isHost && (
         {/* Game Details Card - Visible to ALL players */}
         <Card>
           <CardHeader>
@@ -1583,6 +1584,7 @@ export default function Lobby() {
             </div>
           </CardContent>
         </Card>
+      )}
 
         <Card>
           <CardHeader>
