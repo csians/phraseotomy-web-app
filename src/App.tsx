@@ -152,6 +152,7 @@ const App = () => (
           <Route path="/apps/phraseotomy" element={<Play />} />
           <Route path="/create-lobby" element={<CreateLobby />} />
           <Route path="/lobby/join" element={<GuestJoin />} />
+          <Route path="/guest-join" element={<GuestJoin />} />
           <Route path="/lobby/:sessionId" element={<Lobby />} />
           <Route path="/game/:sessionId" element={<Game />} />
           <Route path="/admin" element={<AdminHome />} />

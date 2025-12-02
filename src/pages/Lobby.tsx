@@ -642,6 +642,44 @@ export default function Lobby() {
           }
         },
       )
+      // Listen for game_players DELETE (player left)
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "game_players",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        async (payload) => {
+          console.log("🔄 [DB CHANGE] game_players DELETE - player left:", payload);
+          const deletedPlayer = payload.old as { name?: string; player_id?: string };
+          toast({
+            title: "Player Left",
+            description: `${deletedPlayer?.name || "A player"} has left the game`,
+          });
+          await fetchLobbyData();
+        },
+      )
+      // Listen for game_players INSERT (player joined)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "game_players",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        async (payload) => {
+          console.log("🔄 [DB CHANGE] game_players INSERT - player joined:", payload);
+          const newPlayer = payload.new as { name?: string };
+          toast({
+            title: "Player Joined! 🎮",
+            description: `${newPlayer?.name || "A player"} joined the lobby`,
+          });
+          await fetchLobbyData();
+        },
+      )
       // Listen for game_sessions changes
       .on(
         "postgres_changes",
@@ -1082,11 +1120,15 @@ export default function Lobby() {
       return;
     }
 
-    try {
-      console.log("Leaving lobby:", { sessionId, playerId });
+    // Get the player name for the broadcast
+    const currentPlayer = players.find(p => p.player_id === playerId);
+    const playerNameToSend = currentPlayer?.name || currentPlayerName || "A player";
 
-      // Broadcast that player is leaving
-      broadcastEvent("player_left", { playerId, timestamp: Date.now() });
+    try {
+      console.log("Leaving lobby:", { sessionId, playerId, playerName: playerNameToSend });
+
+      // Broadcast that player is leaving (include name for toast message)
+      broadcastEvent("player_left", { playerId, senderName: playerNameToSend, timestamp: Date.now() });
 
       const { data, error } = await supabase.functions.invoke("leave-lobby", {
         body: { sessionId, playerId },
