@@ -70,27 +70,23 @@ interface Player {
 }
 
 // Sortable Player Item Component
-function SortablePlayerItem({ 
-  player, 
-  isHost, 
-  currentStorytellerId, 
+function SortablePlayerItem({
+  player,
+  isHost,
+  currentStorytellerId,
   hostCustomerId,
-  isDraggable 
-}: { 
-  player: Player; 
+  isDraggable,
+}: {
+  player: Player;
   isHost: boolean;
   currentStorytellerId: string | undefined;
   hostCustomerId: string;
   isDraggable: boolean;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: player.id, disabled: !isDraggable });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: player.id,
+    disabled: !isDraggable,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -99,11 +95,7 @@ function SortablePlayerItem({
   };
 
   return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className="flex items-center justify-between p-2 rounded-md bg-muted/50"
-    >
+    <li ref={setNodeRef} style={style} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
       <div className="flex items-center gap-2">
         {isDraggable && (
           <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
@@ -183,12 +175,14 @@ export default function Lobby() {
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdownNumber, setCountdownNumber] = useState(3);
   const [isLockedOut, setIsLockedOut] = useState(false);
-  const [playerAnswers, setPlayerAnswers] = useState<Array<{
-    playerId: string;
-    playerName: string;
-    guess: string;
-    isCorrect: boolean;
-  }>>([]);
+  const [playerAnswers, setPlayerAnswers] = useState<
+    Array<{
+      playerId: string;
+      playerName: string;
+      guess: string;
+      isCorrect: boolean;
+    }>
+  >([]);
   const [showResults, setShowResults] = useState(false);
 
   // Reset lockout state when round changes
@@ -205,51 +199,51 @@ export default function Lobby() {
   useEffect(() => {
     console.log("🚀 [GUEST] Checking for guest data in URL...");
     const urlParams = new URLSearchParams(window.location.search);
-    const guestDataStr = urlParams.get('guestData');
-    const guestSession = urlParams.get('guestSession');
-    
+    const guestDataStr = urlParams.get("guestData");
+    const guestSession = urlParams.get("guestSession");
+
     console.log("🔍 [GUEST] guestData param:", guestDataStr);
     console.log("🔍 [GUEST] guestSession param:", guestSession);
-    
+
     if (guestDataStr) {
       try {
         const guestData = JSON.parse(guestDataStr);
-        console.log('✅ [GUEST] Guest data from URL:', guestData);
-        
+        console.log("✅ [GUEST] Guest data from URL:", guestData);
+
         // Store guest data in BOTH storages for reliability in Shopify context
-        sessionStorage.setItem('guest_player_id', guestData.player_id);
-        sessionStorage.setItem('guestPlayerData', JSON.stringify(guestData));
-        localStorage.setItem('guest_player_id', guestData.player_id);
-        localStorage.setItem('guestPlayerData', JSON.stringify(guestData));
-        console.log('✅ [GUEST] Stored guest_player_id in both storages:', guestData.player_id);
-        
+        sessionStorage.setItem("guest_player_id", guestData.player_id);
+        sessionStorage.setItem("guestPlayerData", JSON.stringify(guestData));
+        localStorage.setItem("guest_player_id", guestData.player_id);
+        localStorage.setItem("guestPlayerData", JSON.stringify(guestData));
+        console.log("✅ [GUEST] Stored guest_player_id in both storages:", guestData.player_id);
+
         if (guestSession) {
-          sessionStorage.setItem('current_lobby_session', guestSession);
-          console.log('✅ [GUEST] Stored guestSession:', guestSession);
+          sessionStorage.setItem("current_lobby_session", guestSession);
+          console.log("✅ [GUEST] Stored guestSession:", guestSession);
         }
-        
+
         // Clean up URL params
         const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
-        window.history.replaceState({}, '', cleanUrl);
-        console.log('✅ [GUEST] Cleaned URL');
+        window.history.replaceState({}, "", cleanUrl);
+        console.log("✅ [GUEST] Cleaned URL");
       } catch (e) {
-        console.error('❌ [GUEST] Error parsing guest data:', e);
+        console.error("❌ [GUEST] Error parsing guest data:", e);
       }
     } else {
-      console.log('ℹ️ [GUEST] No guest data in URL');
+      console.log("ℹ️ [GUEST] No guest data in URL");
       // Check if we already have guest data stored
-      const storedGuestIdSession = sessionStorage.getItem('guest_player_id');
-      const storedGuestIdLocal = localStorage.getItem('guest_player_id');
-      console.log('🔍 [GUEST] Existing guest_player_id in sessionStorage:', storedGuestIdSession);
-      console.log('🔍 [GUEST] Existing guest_player_id in localStorage:', storedGuestIdLocal);
-      
+      const storedGuestIdSession = sessionStorage.getItem("guest_player_id");
+      const storedGuestIdLocal = localStorage.getItem("guest_player_id");
+      console.log("🔍 [GUEST] Existing guest_player_id in sessionStorage:", storedGuestIdSession);
+      console.log("🔍 [GUEST] Existing guest_player_id in localStorage:", storedGuestIdLocal);
+
       // Sync between storages if one has it
       if (storedGuestIdSession && !storedGuestIdLocal) {
-        localStorage.setItem('guest_player_id', storedGuestIdSession);
-        console.log('✅ [GUEST] Synced from session to local storage');
+        localStorage.setItem("guest_player_id", storedGuestIdSession);
+        console.log("✅ [GUEST] Synced from session to local storage");
       } else if (storedGuestIdLocal && !storedGuestIdSession) {
-        sessionStorage.setItem('guest_player_id', storedGuestIdLocal);
-        console.log('✅ [GUEST] Synced from local to session storage');
+        sessionStorage.setItem("guest_player_id", storedGuestIdLocal);
+        console.log("✅ [GUEST] Synced from local to session storage");
       }
     }
   }, []);
@@ -257,7 +251,7 @@ export default function Lobby() {
   // Get current customer ID helper
   const getCurrentCustomerId = useCallback(() => {
     console.log("🔍 [GET_ID] Starting getCurrentCustomerId...");
-    
+
     const urlParams = getAllUrlParams();
     const urlCustomerId = urlParams.get("customer_id");
     if (urlCustomerId) {
@@ -281,15 +275,15 @@ export default function Lobby() {
         }
       }
     }
-    
+
     // Check for guest player ID in both sessionStorage and localStorage
     const guestPlayerIdSession = sessionStorage.getItem("guest_player_id");
     const guestPlayerIdLocal = localStorage.getItem("guest_player_id");
     const guestPlayerId = guestPlayerIdSession || guestPlayerIdLocal;
-    
+
     console.log("🔍 [GET_ID] Guest player ID (session):", guestPlayerIdSession);
     console.log("🔍 [GET_ID] Guest player ID (local):", guestPlayerIdLocal);
-    
+
     if (guestPlayerId) {
       console.log("✅ [GET_ID] Found guest player ID:", guestPlayerId);
       // Store in both storages for reliability
@@ -297,7 +291,7 @@ export default function Lobby() {
       if (!guestPlayerIdLocal) localStorage.setItem("guest_player_id", guestPlayerId);
       return guestPlayerId;
     }
-    
+
     // As a last resort, check if we have guestPlayerData
     const guestDataStr = sessionStorage.getItem("guestPlayerData") || localStorage.getItem("guestPlayerData");
     if (guestDataStr) {
@@ -314,7 +308,7 @@ export default function Lobby() {
         console.error("Error parsing guestPlayerData:", e);
       }
     }
-    
+
     console.log("❌ [GET_ID] No player ID found anywhere");
     return null;
   }, []);
@@ -342,21 +336,24 @@ export default function Lobby() {
   const broadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Function to broadcast events to all players in the lobby
-  const broadcastEvent = useCallback((event: string, payload: any) => {
-    if (broadcastChannelRef.current) {
-      console.log("📤 [BROADCAST] Sending event:", event, payload);
-      broadcastChannelRef.current.send({
-        type: "broadcast",
-        event,
-        payload: {
-          ...payload,
-          senderId: currentPlayerId,
-          senderName: currentPlayerName,
-          timestamp: new Date().toISOString(),
-        },
-      });
-    }
-  }, [currentPlayerId, currentPlayerName]);
+  const broadcastEvent = useCallback(
+    (event: string, payload: any) => {
+      if (broadcastChannelRef.current) {
+        console.log("📤 [BROADCAST] Sending event:", event, payload);
+        broadcastChannelRef.current.send({
+          type: "broadcast",
+          event,
+          payload: {
+            ...payload,
+            senderId: currentPlayerId,
+            senderName: currentPlayerName,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
+    },
+    [currentPlayerId, currentPlayerName],
+  );
 
   // Shuffle turn order
   const handleShuffleTurns = async () => {
@@ -452,13 +449,13 @@ export default function Lobby() {
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   useEffect(() => {
     console.log("🚀 [LOBBY] useEffect running - sessionId:", sessionId);
     console.log("🚀 [LOBBY] Supabase client:", supabase);
-    
+
     if (!sessionId) {
       console.log("⚠️ [LOBBY] No sessionId available");
       setLoading(false);
@@ -466,16 +463,16 @@ export default function Lobby() {
     }
 
     // Store sessionId in sessionStorage to persist across refreshes
-    sessionStorage.setItem('current_lobby_session', sessionId);
+    sessionStorage.setItem("current_lobby_session", sessionId);
     console.log("✅ [LOBBY] Stored session in sessionStorage:", sessionId);
-    
+
     console.log("📡 [LOBBY] Calling fetchLobbyData...");
     fetchLobbyData();
 
     // Set up real-time subscription for lobby updates using Supabase Realtime Broadcast
     console.log("🔄 [REALTIME] Setting up Supabase Realtime subscription for session:", sessionId);
     console.log("🔄 [REALTIME] Channel name will be: lobby-broadcast-" + sessionId);
-    
+
     const channel = supabase
       .channel(`lobby-broadcast-${sessionId}`, {
         config: {
@@ -487,7 +484,7 @@ export default function Lobby() {
         console.log("📢 [BROADCAST] player_joined received:", payload);
         toast({
           title: "Player Joined! 🎮",
-          description: `${payload.payload?.senderName || 'A player'} joined the lobby`,
+          description: `${payload.payload?.senderName || "A player"} joined the lobby`,
         });
         // Refresh player list
         fetchLobbyData();
@@ -496,7 +493,7 @@ export default function Lobby() {
         console.log("📢 [BROADCAST] player_left received:", payload);
         toast({
           title: "Player Left",
-          description: `${payload.payload?.senderName || 'A player'} left the lobby`,
+          description: `${payload.payload?.senderName || "A player"} left the lobby`,
         });
         fetchLobbyData();
       })
@@ -504,7 +501,7 @@ export default function Lobby() {
         console.log("📢 [BROADCAST] game_started received:", payload);
         toast({
           title: "Game Started! 🎮",
-          description: `${payload.payload?.senderName || 'Host'} started the game`,
+          description: `${payload.payload?.senderName || "Host"} started the game`,
         });
         setIsGameStarted(true);
         // Show countdown for all players
@@ -529,7 +526,7 @@ export default function Lobby() {
         console.log("📢 [BROADCAST] theme_selected received:", payload);
         toast({
           title: "Theme Selected",
-          description: `${payload.payload?.senderName || 'Host'} chose a theme`,
+          description: `${payload.payload?.senderName || "Host"} chose a theme`,
         });
         if (payload.payload?.themeId) {
           setSelectedTheme(payload.payload.themeId);
@@ -540,7 +537,7 @@ export default function Lobby() {
         console.log("📢 [BROADCAST] secret_selected received:", payload);
         toast({
           title: "Secret Element Selected",
-          description: `${payload.payload?.senderName || 'Storyteller'} has selected their secret element`,
+          description: `${payload.payload?.senderName || "Storyteller"} has selected their secret element`,
         });
         fetchLobbyData();
       })
@@ -558,7 +555,7 @@ export default function Lobby() {
         if (payload.payload?.isCorrect) {
           toast({
             title: "Correct Answer! 🎉",
-            description: `${payload.payload?.senderName || 'A player'} guessed correctly!`,
+            description: `${payload.payload?.senderName || "A player"} guessed correctly!`,
           });
         }
         fetchLobbyData();
@@ -566,10 +563,10 @@ export default function Lobby() {
       .on("broadcast", { event: "player_answered" }, (payload) => {
         console.log("📢 [BROADCAST] player_answered received:", payload);
         const { playerId, playerName, guess, isCorrect } = payload.payload;
-        
+
         // Add answer to local state (avoid duplicates)
-        setPlayerAnswers(prev => {
-          const exists = prev.find(a => a.playerId === playerId);
+        setPlayerAnswers((prev) => {
+          const exists = prev.find((a) => a.playerId === playerId);
           if (exists) return prev;
           return [...prev, { playerId, playerName, guess, isCorrect }];
         });
@@ -577,21 +574,21 @@ export default function Lobby() {
       .on("broadcast", { event: "all_answers_received" }, (payload) => {
         console.log("📢 [BROADCAST] all_answers_received received:", payload);
         const { secretElement, allAnswers } = payload.payload;
-        
+
         // Update currentTurn with secret element
-        setCurrentTurn(prev => ({
+        setCurrentTurn((prev) => ({
           ...prev,
           secret_element: secretElement,
         }));
-        
+
         // Set all player answers if provided
         if (allAnswers && allAnswers.length > 0) {
           setPlayerAnswers(allAnswers);
         }
-        
+
         // Show results to all players
         setShowResults(true);
-        
+
         toast({
           title: "Round Complete!",
           description: "All players have answered. See results below.",
@@ -613,7 +610,7 @@ export default function Lobby() {
       .on("broadcast", { event: "turn_order_changed" }, async (payload) => {
         console.log("📢 [BROADCAST] turn_order_changed received by non-host player:", payload);
         // Wait a bit then refetch to ensure database has propagated
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 200));
         await fetchLobbyData();
         toast({
           title: "Turn Order Updated",
@@ -632,7 +629,7 @@ export default function Lobby() {
         async (payload) => {
           console.log("🔄 [DB CHANGE] game_players turn_order updated:", payload);
           // Refetch lobby data when turn_order changes
-          if (payload.new && 'turn_order' in payload.new) {
+          if (payload.new && "turn_order" in payload.new) {
             await fetchLobbyData();
             if (!isHost) {
               toast({
@@ -666,7 +663,12 @@ export default function Lobby() {
 
           if (payload.eventType === "UPDATE") {
             const updatedSession = payload.new as GameSession;
-            console.log("📢 [REALTIME] Session UPDATE - status:", updatedSession.status, "theme:", updatedSession.selected_theme_id);
+            console.log(
+              "📢 [REALTIME] Session UPDATE - status:",
+              updatedSession.status,
+              "theme:",
+              updatedSession.selected_theme_id,
+            );
             setSession(updatedSession);
 
             if (updatedSession.selected_theme_id) {
@@ -698,7 +700,7 @@ export default function Lobby() {
           if (newPlayer.session_id === sessionId) {
             console.log("✅ [REALTIME] Player joined this session:", newPlayer.name);
             setPlayers((prev) => {
-              const exists = prev.some(p => p.id === newPlayer.id || p.player_id === newPlayer.player_id);
+              const exists = prev.some((p) => p.id === newPlayer.id || p.player_id === newPlayer.player_id);
               if (exists) return prev;
               return [...prev, newPlayer];
             });
@@ -763,48 +765,55 @@ export default function Lobby() {
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
             const turnData = payload.new as any;
             console.log("📢 [REALTIME] Turn data changed - refreshing lobby data");
-            console.log("📢 [REALTIME] Turn details - theme:", turnData.theme_id, "secret:", turnData.secret_element, "recording:", turnData.recording_url);
+            console.log(
+              "📢 [REALTIME] Turn details - theme:",
+              turnData.theme_id,
+              "secret:",
+              turnData.secret_element,
+              "recording:",
+              turnData.recording_url,
+            );
             fetchLobbyData();
           }
         },
-      )
-      
+      );
+
     // Store channel ref for broadcasting immediately (before subscribe completes)
     broadcastChannelRef.current = channel;
-    
+
     channel.subscribe((status, err) => {
-        console.log("🔌 [REALTIME] Subscription status:", status, "error:", err);
-        if (err) {
-          console.error("❌ [REALTIME] Subscription error:", err);
-          setIsConnected(false);
-        }
-        if (status === "SUBSCRIBED") {
-          console.log("✅ [REALTIME] Successfully subscribed to channel lobby-broadcast-" + sessionId);
-          setIsConnected(true);
-          
-          // Announce our presence after subscribing
-          setTimeout(() => {
-            console.log("📤 [BROADCAST] Announcing player joined to all");
-            channel.send({
-              type: "broadcast",
-              event: "player_joined",
-              payload: {
-                senderId: currentPlayerId,
-                senderName: currentPlayerName,
-                timestamp: new Date().toISOString(),
-              },
-            });
-          }, 500);
-        }
-        if (status === "CHANNEL_ERROR") {
-          console.error("❌ [REALTIME] Channel error - realtime will not work");
-          setIsConnected(false);
-        }
-        if (status === "TIMED_OUT") {
-          console.error("❌ [REALTIME] Subscription timed out");
-          setIsConnected(false);
-        }
-      });
+      console.log("🔌 [REALTIME] Subscription status:", status, "error:", err);
+      if (err) {
+        console.error("❌ [REALTIME] Subscription error:", err);
+        setIsConnected(false);
+      }
+      if (status === "SUBSCRIBED") {
+        console.log("✅ [REALTIME] Successfully subscribed to channel lobby-broadcast-" + sessionId);
+        setIsConnected(true);
+
+        // Announce our presence after subscribing
+        setTimeout(() => {
+          console.log("📤 [BROADCAST] Announcing player joined to all");
+          channel.send({
+            type: "broadcast",
+            event: "player_joined",
+            payload: {
+              senderId: currentPlayerId,
+              senderName: currentPlayerName,
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }, 500);
+      }
+      if (status === "CHANNEL_ERROR") {
+        console.error("❌ [REALTIME] Channel error - realtime will not work");
+        setIsConnected(false);
+      }
+      if (status === "TIMED_OUT") {
+        console.error("❌ [REALTIME] Subscription timed out");
+        setIsConnected(false);
+      }
+    });
 
     return () => {
       console.log("🧹 [LOBBY] Cleaning up subscription");
@@ -886,7 +895,7 @@ export default function Lobby() {
       // Check if there's already a turn with secret element and recording from currentTurn data
       if (data.currentTurn) {
         setCurrentTurn(data.currentTurn);
-        
+
         // Only set theme/element/recording if they exist in the CURRENT turn
         // This prevents showing previous round's data
         if (data.currentTurn.theme_id) {
@@ -895,13 +904,13 @@ export default function Lobby() {
           // New round - clear theme selection
           setSelectedTheme("");
         }
-        
+
         if (data.currentTurn.secret_element) {
           setSelectedElementId(data.currentTurn.secret_element);
         } else {
           setSelectedElementId("");
         }
-        
+
         if (data.currentTurn.recording_url) {
           setHasRecording(true);
         } else {
@@ -958,14 +967,14 @@ export default function Lobby() {
       }
 
       console.log("Game started successfully:", data);
-      
+
       // Broadcast game_started to all players via Supabase Broadcast
       broadcastEvent("game_started", {});
 
       // Show countdown animation
       setShowCountdown(true);
       setCountdownNumber(3);
-      
+
       // Countdown sequence
       setTimeout(() => setCountdownNumber(2), 1000);
       setTimeout(() => setCountdownNumber(1), 2000);
@@ -977,7 +986,7 @@ export default function Lobby() {
         }
         fetchLobbyData();
       }, 3000);
-      
+
       toast({
         title: "Game Started!",
         description: "Get ready to play!",
@@ -1052,7 +1061,7 @@ export default function Lobby() {
       console.log("🔍 [UPLOAD] Current customer ID:", currentCustomerId);
       console.log("🔍 [UPLOAD] Guest player ID from localStorage:", localStorage.getItem("guest_player_id"));
       console.log("🔍 [UPLOAD] All localStorage keys:", Object.keys(localStorage));
-      
+
       if (!currentCustomerId) {
         console.error("❌ [UPLOAD] No customer ID found!");
         toast({
@@ -1089,10 +1098,10 @@ export default function Lobby() {
       if (data.success && data.audio_id) {
         console.log("Recording complete, audio ID:", data.audio_id);
         setHasRecording(true);
-        
+
         // Broadcast recording_uploaded to all players via Supabase Broadcast
         broadcastEvent("recording_uploaded", { audioUrl: data.audio_url });
-        
+
         // Refresh lobby data to get updated recording URL from game_turns
         await fetchLobbyData();
         toast({
@@ -1148,11 +1157,11 @@ export default function Lobby() {
 
       // Lock player after submission (correct or wrong)
       setIsLockedOut(true);
-      
+
       // Get player name for display
-      const currentPlayer = players.find(p => p.player_id === getCurrentCustomerId());
+      const currentPlayer = players.find((p) => p.player_id === getCurrentCustomerId());
       const playerName = currentPlayer?.name || "Unknown";
-      
+
       // Broadcast answer to all players
       broadcastEvent("player_answered", {
         playerId: getCurrentCustomerId(),
@@ -1160,40 +1169,43 @@ export default function Lobby() {
         guess: guessInput,
         isCorrect: data.correct,
       });
-      
+
       // Add to local answers
-      setPlayerAnswers(prev => [...prev, {
-        playerId: getCurrentCustomerId()!,
-        playerName,
-        guess: guessInput,
-        isCorrect: data.correct,
-      }]);
-      
+      setPlayerAnswers((prev) => [
+        ...prev,
+        {
+          playerId: getCurrentCustomerId()!,
+          playerName,
+          guess: guessInput,
+          isCorrect: data.correct,
+        },
+      ]);
+
       setGuessInput("");
-      
+
       // If all players answered, show results
       if (data.all_players_answered) {
         setShowResults(true);
-        
+
         // Update currentTurn with secret element from response
         if (data.secret_element) {
-          setCurrentTurn(prev => ({
+          setCurrentTurn((prev) => ({
             ...prev,
             secret_element: data.secret_element,
           }));
         }
-        
+
         // Broadcast to all other players that all answers are received
         broadcastEvent("all_answers_received", {
           secretElement: data.secret_element,
           allAnswers: playerAnswers, // Send accumulated answers
         });
-        
+
         toast({
           title: "Round Complete!",
           description: "All players have answered. See results below.",
         });
-        
+
         // Advance to next round after showing results
         if (data.next_round) {
           setTimeout(() => {
@@ -1213,7 +1225,7 @@ export default function Lobby() {
             fetchLobbyData();
           }, 5000); // Show results for 5 seconds
         }
-        
+
         // If game completed
         if (data.game_completed && data.next_round) {
           setTimeout(() => {
@@ -1228,7 +1240,7 @@ export default function Lobby() {
         // Not all players answered yet
         toast({
           title: data.correct ? "Correct! ✅" : "Wrong ❌",
-          description: data.correct 
+          description: data.correct
             ? `You earned ${data.points_earned} points! Waiting for other players...`
             : "Waiting for other players to answer...",
           variant: data.correct ? "default" : "destructive",
@@ -1283,11 +1295,11 @@ export default function Lobby() {
         });
       } else {
         console.log("Theme saved successfully:", data);
-        
+
         // Broadcast theme_selected to all players via Supabase Broadcast
-        const themeName = themes.find(t => t.id === themeId)?.name || "Unknown";
+        const themeName = themes.find((t) => t.id === themeId)?.name || "Unknown";
         broadcastEvent("theme_selected", { themeId, themeName });
-        
+
         toast({
           title: "Theme Selected",
           description: "Now select your secret element",
@@ -1335,10 +1347,10 @@ export default function Lobby() {
         });
       } else {
         console.log("Secret element saved successfully:", data);
-        
+
         // Broadcast secret_selected to all players via Supabase Broadcast
         broadcastEvent("secret_selected", { elementId: elementName });
-        
+
         toast({
           title: "Secret Element Selected",
           description: "Now record your audio clue",
@@ -1381,7 +1393,7 @@ export default function Lobby() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading lobby...</p>
+        <p className="text-muted-foreground">Loading Game...</p>
       </div>
     );
   }
@@ -1407,9 +1419,7 @@ export default function Lobby() {
       {showCountdown && (
         <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm flex items-center justify-center">
           <div className="text-center animate-pulse">
-            <div className="text-[150px] md:text-[200px] font-bold text-primary animate-bounce">
-              {countdownNumber}
-            </div>
+            <div className="text-[150px] md:text-[200px] font-bold text-primary animate-bounce">{countdownNumber}</div>
             <p className="text-2xl text-muted-foreground mt-4">Get Ready!</p>
           </div>
         </div>
@@ -1434,23 +1444,25 @@ export default function Lobby() {
                   Final Scores
                 </h3>
                 <div className="space-y-2">
-                  {[...players].sort((a, b) => (b.score || 0) - (a.score || 0)).map((player, index) => (
-                    <div
-                      key={player.id}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        index === 0 ? "bg-yellow-500/20 border border-yellow-500/50" : "bg-muted"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {index === 0 && <Trophy className="h-4 w-4 text-yellow-500" />}
-                        <span className={index === 0 ? "font-bold" : ""}>{player.name}</span>
+                  {[...players]
+                    .sort((a, b) => (b.score || 0) - (a.score || 0))
+                    .map((player, index) => (
+                      <div
+                        key={player.id}
+                        className={`flex items-center justify-between p-3 rounded-lg ${
+                          index === 0 ? "bg-yellow-500/20 border border-yellow-500/50" : "bg-muted"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {index === 0 && <Trophy className="h-4 w-4 text-yellow-500" />}
+                          <span className={index === 0 ? "font-bold" : ""}>{player.name}</span>
+                        </div>
+                        <span className="font-bold text-primary">{player.score || 0} pts</span>
                       </div>
-                      <span className="font-bold text-primary">{player.score || 0} pts</span>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
-              
+
               <Button onClick={() => navigate("/play/host")} className="w-full">
                 Back to Home
               </Button>
@@ -1462,11 +1474,13 @@ export default function Lobby() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Connection Status Indicator */}
         <div className="fixed top-4 right-4 z-50">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
-            isConnected 
-              ? "bg-green-500/10 text-green-600 border border-green-500/20" 
-              : "bg-red-500/10 text-red-600 border border-red-500/20"
-          }`}>
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+              isConnected
+                ? "bg-green-500/10 text-green-600 border border-green-500/20"
+                : "bg-red-500/10 text-red-600 border border-red-500/20"
+            }`}
+          >
             {isConnected ? (
               <>
                 <Wifi className="h-3 w-3" />
@@ -1539,12 +1553,7 @@ export default function Lobby() {
                 <CardTitle>Players ({players.length})</CardTitle>
               </div>
               {isHost && session.status === "waiting" && players.length > 1 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleShuffleTurns}
-                  className="gap-2"
-                >
+                <Button variant="outline" size="sm" onClick={handleShuffleTurns} className="gap-2">
                   <Shuffle className="h-4 w-4" />
                   Shuffle Turns
                 </Button>
@@ -1552,24 +1561,15 @@ export default function Lobby() {
             </div>
             <CardDescription>{isHost ? "You are the host" : "You are a player in this lobby"}</CardDescription>
             {isHost && session.status === "waiting" && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Drag and drop players to reorder turns
-              </p>
+              <p className="text-xs text-muted-foreground mt-2">Drag and drop players to reorder turns</p>
             )}
           </CardHeader>
           <CardContent>
             {players.length === 0 ? (
               <p className="text-sm text-muted-foreground">No players have joined yet</p>
             ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={players.map((p) => p.id)}
-                  strategy={verticalListSortingStrategy}
-                >
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={players.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                   <ul className="space-y-2">
                     {players.map((player) => (
                       <SortablePlayerItem
@@ -1664,8 +1664,8 @@ export default function Lobby() {
               <div className="p-3 bg-background rounded-lg border">
                 <p className="text-sm text-muted-foreground">Secret Element:</p>
                 <p className="text-lg font-bold text-primary">
-                  {currentTurn.secret_element.startsWith("custom:") 
-                    ? currentTurn.secret_element.substring(7) 
+                  {currentTurn.secret_element.startsWith("custom:")
+                    ? currentTurn.secret_element.substring(7)
                     : currentTurn.secret_element}
                 </p>
               </div>
@@ -1701,8 +1701,8 @@ export default function Lobby() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {(() => {
-                  const theme = themes.find(t => t.id === currentTurn.theme_id);
-                  const IconComponent = theme ? (iconMap[theme.icon.toLowerCase()] || Sparkles) : Sparkles;
+                  const theme = themes.find((t) => t.id === currentTurn.theme_id);
+                  const IconComponent = theme ? iconMap[theme.icon.toLowerCase()] || Sparkles : Sparkles;
                   return <IconComponent className="h-5 w-5" />;
                 })()}
                 Current Theme
@@ -1711,7 +1711,7 @@ export default function Lobby() {
             </CardHeader>
             <CardContent>
               <p className="text-lg font-semibold text-primary">
-                {themes.find(t => t.id === currentTurn.theme_id)?.name || "Loading..."}
+                {themes.find((t) => t.id === currentTurn.theme_id)?.name || "Loading..."}
               </p>
             </CardContent>
           </Card>
@@ -1729,7 +1729,7 @@ export default function Lobby() {
             </CardHeader>
             <CardContent className="space-y-4">
               <audio controls src={currentTurn.recording_url} className="w-full" />
-              
+
               {/* Show elements for guessing */}
               {(selectedTheme || session.selected_theme_id) && (
                 <div className="space-y-2">
@@ -1742,11 +1742,13 @@ export default function Lobby() {
                   />
                 </div>
               )}
-              
+
               <div className="flex gap-2">
                 <Input
                   type="text"
-                  placeholder={isLockedOut ? "You're locked out this round" : "Type your guess or click an element above..."}
+                  placeholder={
+                    isLockedOut ? "You're locked out this round" : "Type your guess or click an element above..."
+                  }
                   value={guessInput}
                   onChange={(e) => setGuessInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -1757,10 +1759,7 @@ export default function Lobby() {
                   disabled={isSubmittingGuess || isLockedOut}
                   className={isLockedOut ? "opacity-50 cursor-not-allowed" : ""}
                 />
-                <Button 
-                  onClick={handleSubmitGuess} 
-                  disabled={!guessInput.trim() || isSubmittingGuess || isLockedOut}
-                >
+                <Button onClick={handleSubmitGuess} disabled={!guessInput.trim() || isSubmittingGuess || isLockedOut}>
                   {isLockedOut ? "Locked" : isSubmittingGuess ? "Submitting..." : "Submit Guess"}
                 </Button>
               </div>
@@ -1769,17 +1768,19 @@ export default function Lobby() {
                   ✅ Answer submitted. Waiting for other players...
                 </p>
               )}
-              
+
               {/* Show all player answers when round is complete */}
               {showResults && playerAnswers.length > 0 && (
                 <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
                   <h4 className="font-semibold mb-3">Round Results:</h4>
                   <div className="space-y-2">
                     {playerAnswers.map((answer, idx) => (
-                      <div 
+                      <div
                         key={idx}
                         className={`flex items-center justify-between p-2 rounded ${
-                          answer.isCorrect ? "bg-green-500/10 border border-green-500/30" : "bg-red-500/10 border border-red-500/30"
+                          answer.isCorrect
+                            ? "bg-green-500/10 border border-green-500/30"
+                            : "bg-red-500/10 border border-red-500/30"
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -1787,16 +1788,17 @@ export default function Lobby() {
                           <span className="text-sm text-muted-foreground">guessed:</span>
                           <span className="font-semibold">{answer.guess}</span>
                         </div>
-                        <span className="text-lg">
-                          {answer.isCorrect ? "✅" : "❌"}
-                        </span>
+                        <span className="text-lg">{answer.isCorrect ? "✅" : "❌"}</span>
                       </div>
                     ))}
                   </div>
                   <p className="text-sm text-muted-foreground mt-3 text-center">
-                    Correct answer: <span className="font-semibold">{currentTurn?.secret_element?.startsWith("custom:") 
-                      ? currentTurn.secret_element.substring(7) 
-                      : currentTurn?.secret_element}</span>
+                    Correct answer:{" "}
+                    <span className="font-semibold">
+                      {currentTurn?.secret_element?.startsWith("custom:")
+                        ? currentTurn.secret_element.substring(7)
+                        : currentTurn?.secret_element}
+                    </span>
                   </p>
                 </div>
               )}
