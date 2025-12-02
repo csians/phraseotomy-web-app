@@ -261,6 +261,13 @@ export default function Lobby() {
       return urlCustomerId;
     }
 
+    // Check for lobby-specific stored player ID first (most reliable for refresh)
+    const lobbyPlayerId = sessionStorage.getItem("lobby_player_id") || localStorage.getItem("lobby_player_id");
+    if (lobbyPlayerId) {
+      console.log("✅ [GET_ID] Found lobby_player_id:", lobbyPlayerId);
+      return lobbyPlayerId;
+    }
+
     const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
     for (const key of storageKeys) {
       let dataStr = sessionStorage.getItem(key) || localStorage.getItem(key);
@@ -941,6 +948,14 @@ export default function Lobby() {
 
       setSession(data.session);
       setPlayers(data.players || []);
+
+      // Store the current player's ID for refresh recovery
+      // This ensures we can always find the player on refresh
+      if (currentPlayerId) {
+        sessionStorage.setItem("lobby_player_id", currentPlayerId);
+        localStorage.setItem("lobby_player_id", currentPlayerId);
+        console.log("✅ Stored lobby_player_id for refresh recovery:", currentPlayerId);
+      }
 
       // Set audio files from the response (edge function fetches them if user is host)
       setAudioFiles(data.audioFiles || []);
