@@ -1430,13 +1430,12 @@ export default function Lobby() {
         )}
 
         {/* Show Selected Theme to non-storyteller players */}
-        {!isStoryteller && session.status === "active" && (selectedTheme || session.selected_theme_id) && (
+        {!isStoryteller && session.status === "active" && currentTurn?.theme_id && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {(() => {
-                  const themeId = selectedTheme || session.selected_theme_id;
-                  const theme = themes.find(t => t.id === themeId);
+                  const theme = themes.find(t => t.id === currentTurn.theme_id);
                   const IconComponent = theme ? (iconMap[theme.icon.toLowerCase()] || Sparkles) : Sparkles;
                   return <IconComponent className="h-5 w-5" />;
                 })()}
@@ -1446,7 +1445,7 @@ export default function Lobby() {
             </CardHeader>
             <CardContent>
               <p className="text-lg font-semibold text-primary">
-                {themes.find(t => t.id === (selectedTheme || session.selected_theme_id))?.name || "Loading..."}
+                {themes.find(t => t.id === currentTurn.theme_id)?.name || "Loading..."}
               </p>
             </CardContent>
           </Card>
