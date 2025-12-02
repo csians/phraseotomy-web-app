@@ -35,7 +35,25 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Update each player's turn order
+    // Two-pass update to avoid unique constraint violations
+    // Pass 1: Set all to temporary negative values (offset by 1000)
+    for (const update of updates) {
+      const { error } = await supabase
+        .from("game_players")
+        .update({ turn_order: -(update.turnOrder + 1000) })
+        .eq("session_id", sessionId)
+        .eq("player_id", update.playerId);
+
+      if (error) {
+        console.error(`Error in pass 1 for player ${update.playerId}:`, error);
+        return new Response(
+          JSON.stringify({ error: error.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Pass 2: Set to actual turn order values
     for (const update of updates) {
       const { error } = await supabase
         .from("game_players")
@@ -44,7 +62,7 @@ Deno.serve(async (req) => {
         .eq("player_id", update.playerId);
 
       if (error) {
-        console.error(`Error updating player ${update.playerId}:`, error);
+        console.error(`Error in pass 2 for player ${update.playerId}:`, error);
         return new Response(
           JSON.stringify({ error: error.message }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
