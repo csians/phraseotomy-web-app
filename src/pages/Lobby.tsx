@@ -1071,6 +1071,58 @@ export default function Lobby() {
     }
   };
 
+  const handleLeaveGame = async () => {
+    const playerId = getCurrentCustomerId();
+    if (!sessionId || !playerId) {
+      toast({
+        title: "Error",
+        description: "Unable to leave game - missing session or player information",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      console.log("Leaving lobby:", { sessionId, playerId });
+
+      // Broadcast that player is leaving
+      broadcastEvent("player_left", { playerId, timestamp: Date.now() });
+
+      const { data, error } = await supabase.functions.invoke("leave-lobby", {
+        body: { sessionId, playerId },
+      });
+
+      if (error) {
+        console.error("Error leaving lobby:", error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to leave the lobby",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("Left lobby successfully:", data);
+      toast({
+        title: "Left Game",
+        description: "You have successfully left the game.",
+      });
+
+      // Clear session storage
+      sessionStorage.removeItem("current_lobby_session");
+
+      // Navigate to guest join page
+      navigate("/guest-join");
+    } catch (error) {
+      console.error("Error in handleLeaveGame:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleRecordingComplete = async (audioBlob: Blob) => {
     console.log("Recording complete, uploading audio...");
     setIsUploading(true);
@@ -1573,7 +1625,7 @@ export default function Lobby() {
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={() => navigate("/guest-join")}
+                      onClick={handleLeaveGame}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                       Leave Game

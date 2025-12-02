@@ -94,3 +94,6 @@ verify_jwt = false
 
 [functions.admin-cleanup-sessions]
 verify_jwt = false
+
+[functions.leave-lobby]
+verify_jwt = false
