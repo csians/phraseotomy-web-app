@@ -408,6 +408,7 @@ export type Database = {
           current_round: number | null
           current_storyteller_id: string | null
           ended_at: string | null
+          game_name: string | null
           host_customer_id: string
           host_customer_name: string | null
           id: string
@@ -427,6 +428,7 @@ export type Database = {
           current_round?: number | null
           current_storyteller_id?: string | null
           ended_at?: string | null
+          game_name?: string | null
           host_customer_id: string
           host_customer_name?: string | null
           id?: string
@@ -446,6 +448,7 @@ export type Database = {
           current_round?: number | null
           current_storyteller_id?: string | null
           ended_at?: string | null
+          game_name?: string | null
           host_customer_id?: string
           host_customer_name?: string | null
           id?: string

@@ -129,6 +129,7 @@ interface AudioFile {
 interface GameSession {
   id: string;
   lobby_code: string;
+  game_name: string | null;
   host_customer_id: string;
   host_customer_name: string;
   status: string;
@@ -1593,7 +1594,7 @@ export default function Lobby() {
         {isHost && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">Game: {session?.lobby_code || "Loading..."}</CardTitle>
+              <CardTitle className="text-xl">Game: {session?.game_name || session?.lobby_code || "Loading..."}</CardTitle>
               <CardDescription className="text-base">
                 Host: {session?.host_customer_name || "Unknown"} • Status: {session?.status || "waiting"}
               </CardDescription>
@@ -1663,11 +1664,20 @@ export default function Lobby() {
           <Card>
             <CardHeader>
               <CardTitle>Ready to Start?</CardTitle>
-              <CardDescription>Start the game when all players have joined</CardDescription>
+              <CardDescription>
+                {players.length < 2 
+                  ? "Minimum 2 players required to start the game" 
+                  : "Start the game when all players have joined"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={handleStartGame} className="w-full" size="lg">
-                Start Game
+              <Button 
+                onClick={handleStartGame} 
+                className="w-full" 
+                size="lg"
+                disabled={players.length < 2}
+              >
+                Start Game {players.length < 2 && `(${players.length}/2 players)`}
               </Button>
             </CardContent>
           </Card>

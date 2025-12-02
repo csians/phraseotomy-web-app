@@ -151,6 +151,7 @@ export default function CreateLobby() {
           shopDomain,
           tenantId: tenant.id,
           packsUsed: [selectedPack],
+          gameName: lobbyName.trim(),
         },
       });
 
