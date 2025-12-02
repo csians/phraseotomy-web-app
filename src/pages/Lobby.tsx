@@ -1538,9 +1538,18 @@ export default function Lobby() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Packs:</p>
-              <p className="text-sm">{session.packs_used.join(", ") || "None"}</p>
+            <div className="space-y-3">
+              {isHost && (
+                <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                  <p className="text-sm font-semibold text-primary">
+                    Share this code with other players to join: <span className="text-lg font-bold">{session.lobby_code}</span>
+                  </p>
+                </div>
+              )}
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Packs:</p>
+                <p className="text-sm">{session.packs_used.join(", ") || "None"}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
