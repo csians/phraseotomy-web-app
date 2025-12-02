@@ -495,10 +495,10 @@ const Play = () => {
           </Button>
         </div>
 
-        {/* Access Status Card */}
+        {/* Your Packs Card */}
         <Card className="bg-card border-game-gray">
           <CardHeader>
-            <CardTitle className="text-lg">Access Status</CardTitle>
+            <CardTitle className="text-lg">Your Packs</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {dataLoading ? (
@@ -506,38 +506,66 @@ const Play = () => {
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-3/4" />
               </div>
-            ) : hasActiveLicenses ? (
+            ) : (
               <>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Access:</span>
-                  <span className="text-game-yellow font-semibold">
-                    Active {earliestExpiry ? `until ${earliestExpiry.toLocaleDateString()}` : ""}
-                  </span>
-                </div>
-                {allPacks.length > 0 && (
-                  <div className="pt-2 border-t border-border">
-                    <p className="text-xs text-muted-foreground mb-2">Packs unlocked:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {allPacks.map((pack) => (
+                {/* Unlocked Packs */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Unlocked</p>
+                  <div className="flex flex-wrap gap-2">
+                    {allPacks.length > 0 ? (
+                      allPacks.map((pack) => (
                         <Badge
                           key={pack}
                           variant="secondary"
-                          className="bg-game-yellow/20 text-game-yellow border-game-yellow/30"
+                          className="bg-game-yellow/20 text-game-yellow border-game-yellow/30 px-3 py-1"
                         >
-                          {pack}
+                          ✓ {pack}
                         </Badge>
-                      ))}
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No packs unlocked yet</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Locked Packs */}
+                <div className="pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2">Available to Unlock</p>
+                  <div className="flex flex-wrap gap-2">
+                    {["Premium", "Holiday", "Party Plus", "Family Fun"].filter(p => !allPacks.includes(p)).map((pack) => (
+                      <Badge
+                        key={pack}
+                        variant="outline"
+                        className="bg-muted/30 text-muted-foreground border-muted px-3 py-1 opacity-60"
+                      >
+                        🔒 {pack}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Buy Additional Packs Promo */}
+                <div className="pt-4 border-t border-border">
+                  <div className="bg-gradient-to-r from-game-yellow/10 to-game-yellow/5 rounded-lg p-4 border border-game-yellow/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-game-yellow text-sm">🎁 Want more themes?</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Unlock additional packs for more fun!
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-game-yellow text-game-yellow hover:bg-game-yellow hover:text-game-black"
+                        onClick={() => window.open("https://phraseotomy.com", "_blank")}
+                      >
+                        Shop Packs
+                      </Button>
                     </div>
                   </div>
-                )}
+                </div>
               </>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-muted-foreground mb-2">You don't have any active packs yet.</p>
-                <p className="text-sm text-muted-foreground">
-                  Redeem a code from your Phraseotomy game to unlock themes and host games.
-                </p>
-              </div>
             )}
 
             {/* Redeem Code Section */}
