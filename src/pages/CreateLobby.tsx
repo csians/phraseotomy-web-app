@@ -119,6 +119,15 @@ export default function CreateLobby() {
       return;
     }
 
+    if (!lobbyName.trim()) {
+      toast({
+        title: "Game Name Required",
+        description: "Please enter a game name",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!selectedPack) {
       toast({
         title: "Select Pack",
