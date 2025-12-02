@@ -1532,7 +1532,7 @@ export default function Lobby() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Lobby: {session.lobby_code}</CardTitle>
+            <CardTitle>Game: {session.lobby_code}</CardTitle>
             <CardDescription>
               Host: {session.host_customer_name || "Unknown"} • Status: {session.status}
             </CardDescription>
@@ -1542,7 +1542,8 @@ export default function Lobby() {
               {isHost && (
                 <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
                   <p className="text-sm font-semibold text-primary">
-                    Share this code with other players to join: <span className="text-lg font-bold">{session.lobby_code}</span>
+                    Share this code with other players to join:{" "}
+                    <span className="text-lg font-bold">{session.lobby_code}</span>
                   </p>
                 </div>
               )}
