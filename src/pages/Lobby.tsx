@@ -388,12 +388,9 @@ export default function Lobby() {
       // Update local state
       setPlayers(shuffledPlayers.map((p, idx) => ({ ...p, turn_order: idx + 1 })));
 
-      // Wait a moment for database to propagate
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Broadcast to other players
+      // Broadcast immediately (database changes will also trigger listeners)
       console.log("📤 [HOST] Broadcasting turn_order_changed after shuffle");
-      broadcastEvent("turn_order_changed", { shuffled: true });
+      broadcastEvent("turn_order_changed", { shuffled: true, timestamp: Date.now() });
 
       toast({
         title: "Turn Order Shuffled",
@@ -439,12 +436,9 @@ export default function Lobby() {
       // Update local state
       setPlayers(reorderedPlayers.map((p, idx) => ({ ...p, turn_order: idx + 1 })));
 
-      // Wait a moment for database to propagate
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Broadcast to other players
+      // Broadcast immediately (database changes will also trigger listeners)
       console.log("📤 [HOST] Broadcasting turn_order_changed after drag");
-      broadcastEvent("turn_order_changed", { dragged: true });
+      broadcastEvent("turn_order_changed", { dragged: true, timestamp: Date.now() });
 
       toast({
         title: "Turn Order Updated",
@@ -622,16 +616,40 @@ export default function Lobby() {
         // Then fetch updated data
         fetchLobbyData();
       })
-      .on("broadcast", { event: "turn_order_changed" }, (payload) => {
+      .on("broadcast", { event: "turn_order_changed" }, async (payload) => {
         console.log("📢 [BROADCAST] turn_order_changed received by non-host player:", payload);
-        // Refetch lobby data to update turn order for all players
-        fetchLobbyData();
+        // Wait a bit then refetch to ensure database has propagated
+        await new Promise(resolve => setTimeout(resolve, 200));
+        await fetchLobbyData();
         toast({
           title: "Turn Order Updated",
           description: "The host has reordered the players",
         });
       })
-      // Also listen for postgres changes as backup
+      // Listen for game_players changes (turn order updates)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "game_players",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        async (payload) => {
+          console.log("🔄 [DB CHANGE] game_players turn_order updated:", payload);
+          // Refetch lobby data when turn_order changes
+          if (payload.new && 'turn_order' in payload.new) {
+            await fetchLobbyData();
+            if (!isHost) {
+              toast({
+                title: "Turn Order Updated",
+                description: "The host has reordered the players",
+              });
+            }
+          }
+        },
+      )
+      // Listen for game_sessions changes
       .on(
         "postgres_changes",
         {
