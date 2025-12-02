@@ -184,6 +184,7 @@ export default function Lobby() {
     }>
   >([]);
   const [showResults, setShowResults] = useState(false);
+  const [packNames, setPackNames] = useState<string[]>([]);
 
   // Reset lockout state when round changes
   useEffect(() => {
@@ -892,6 +893,23 @@ export default function Lobby() {
       setAudioFiles(data.audioFiles || []);
       console.log("Audio files from response:", data.audioFiles?.length || 0);
 
+      // Fetch pack names if packs_used has IDs
+      if (data.session?.packs_used && data.session.packs_used.length > 0) {
+        const { data: packsData, error: packsError } = await supabase
+          .from("packs")
+          .select("name")
+          .in("id", data.session.packs_used);
+
+        if (!packsError && packsData) {
+          setPackNames(packsData.map((p) => p.name));
+        } else {
+          console.error("Error fetching pack names:", packsError);
+          setPackNames([]);
+        }
+      } else {
+        setPackNames([]);
+      }
+
       // Check if there's already a turn with secret element and recording from currentTurn data
       if (data.currentTurn) {
         setCurrentTurn(data.currentTurn);
@@ -1549,7 +1567,7 @@ export default function Lobby() {
               )}
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Packs:</p>
-                <p className="text-sm">{session.packs_used.join(", ") || "None"}</p>
+                <p className="text-sm">{packNames.length > 0 ? packNames.join(", ") : "None"}</p>
               </div>
             </div>
           </CardContent>
