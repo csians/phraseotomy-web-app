@@ -81,6 +81,7 @@ function SortablePlayerItem({
   onKick,
   isKicking,
   sessionStatus,
+  currentUserId,
 }: {
   player: Player;
   isHost: boolean;
@@ -90,6 +91,7 @@ function SortablePlayerItem({
   onKick?: (playerId: string, playerName: string) => void;
   isKicking?: boolean;
   sessionStatus?: string;
+  currentUserId?: string | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: player.id,
@@ -103,10 +105,11 @@ function SortablePlayerItem({
   };
 
   const isPlayerHost = player.player_id === hostCustomerId;
-  const canKick = isHost && !isPlayerHost && sessionStatus === "waiting";
+  const isCurrentUser = currentUserId && player.player_id === currentUserId;
+  const canKick = isHost && !isPlayerHost && !isCurrentUser && sessionStatus === "waiting";
 
   return (
-    <li ref={setNodeRef} style={style} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+    <li ref={setNodeRef} style={style} className={`flex items-center justify-between p-2 rounded-md ${isCurrentUser ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}>
       <div className="flex items-center gap-2">
         {isDraggable && (
           <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
@@ -114,6 +117,9 @@ function SortablePlayerItem({
           </div>
         )}
         <span className="font-medium">{player.name}</span>
+        {isCurrentUser && (
+          <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded font-semibold">You</span>
+        )}
         {isPlayerHost && (
           <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Host</span>
         )}
@@ -1972,6 +1978,7 @@ export default function Lobby() {
                         onKick={handleKickPlayer}
                         isKicking={isKickingPlayer}
                         sessionStatus={session.status}
+                        currentUserId={currentPlayerId}
                       />
                     ))}
                   </ul>
