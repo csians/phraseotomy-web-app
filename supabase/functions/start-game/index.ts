@@ -72,51 +72,59 @@ Deno.serve(async (req) => {
     const firstPlayer = allPlayers[0];
     const totalRounds = allPlayers.length;
 
-    // Generate whisp for first turn using AI
-    console.log("Generating whisp for theme:", theme.name);
+    // Generate whisps for ALL turns using AI
+    console.log("Generating whisps for all turns, theme:", theme.name);
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    let firstWhisp = "Mystery"; // fallback
+    const whisps: string[] = [];
     
-    if (LOVABLE_API_KEY) {
-      try {
-        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "system",
-                content: `You are a creative word generator for a storytelling party game. Generate a single word related to the theme "${theme.name}" that players can create stories about. The word should be:
+    // Generate a unique whisp for each round
+    for (let i = 0; i < totalRounds; i++) {
+      let whisp = "Mystery"; // fallback
+      
+      if (LOVABLE_API_KEY) {
+        try {
+          const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [
+                {
+                  role: "system",
+                  content: `You are a creative word generator for a storytelling party game. Generate a single word related to the theme "${theme.name}" that players can create stories about. The word should be:
 - A common, family-friendly word (noun, verb, or adjective)
 - Related to the theme but not too obvious
 - Easy to describe through storytelling
 - Suitable for all ages
+${whisps.length > 0 ? `\nDo NOT use any of these words that were already used: ${whisps.join(", ")}` : ""}
 
 IMPORTANT: Respond with ONLY the single word, nothing else. No punctuation, no explanation.`
-              },
-              {
-                role: "user",
-                content: `Generate a creative word related to the theme "${theme.name}" for a storytelling game.`
-              }
-            ],
-          }),
-        });
+                },
+                {
+                  role: "user",
+                  content: `Generate a creative word related to the theme "${theme.name}" for a storytelling game.`
+                }
+              ],
+            }),
+          });
 
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          firstWhisp = aiData.choices?.[0]?.message?.content?.trim() || "Mystery";
-          console.log("Generated whisp:", firstWhisp);
-        } else {
-          console.error("AI API error:", await aiResponse.text());
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            whisp = aiData.choices?.[0]?.message?.content?.trim() || "Mystery";
+            console.log(`Generated whisp for round ${i + 1}:`, whisp);
+          } else {
+            console.error(`AI API error for round ${i + 1}:`, await aiResponse.text());
+          }
+        } catch (aiError) {
+          console.error(`Error generating whisp for round ${i + 1}:`, aiError);
         }
-      } catch (aiError) {
-        console.error("Error generating whisp:", aiError);
       }
+      
+      whisps.push(whisp);
     }
 
     // Update game session to start the game
@@ -133,30 +141,30 @@ IMPORTANT: Respond with ONLY the single word, nothing else. No punctuation, no e
       updateData.selected_audio_id = selectedAudioId;
     }
 
-    const { data, error } = await supabase
+    const { data: updatedSession, error: updateError } = await supabase
       .from("game_sessions")
       .update(updateData)
       .eq("id", sessionId)
       .select()
       .single();
 
-    if (error) {
-      console.error("Error starting game:", error);
+    if (updateError) {
+      console.error("Error starting game:", updateError);
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ error: updateError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Game started successfully:", data);
+    console.log("Game started successfully:", updatedSession);
 
-    // Create all turns for all rounds upfront, with whisp for first turn
+    // Create all turns for all rounds upfront, each with their own whisp
     const turnsToCreate = allPlayers.map((player, index) => ({
       session_id: sessionId,
       round_number: index + 1,
       storyteller_id: player.player_id,
       theme_id: sessionData.selected_theme_id,
-      whisp: index === 0 ? firstWhisp : null, // Only first turn gets whisp now
+      whisp: whisps[index] || "Mystery",
     }));
 
     const { data: createdTurns, error: turnsError } = await supabase
@@ -173,7 +181,7 @@ IMPORTANT: Respond with ONLY the single word, nothing else. No punctuation, no e
     const turn = createdTurns?.[0] || null;
 
     return new Response(
-      JSON.stringify({ session: data, turn }),
+      JSON.stringify({ session: updatedSession, turn }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
