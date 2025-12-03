@@ -104,8 +104,13 @@ export function NamePromptDialog({
   };
 
   return (
-    <Dialog open={open}>
-      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent 
+        className="sm:max-w-md [&>button]:hidden" 
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl text-center">What should we call you?</DialogTitle>
           <DialogDescription className="text-center">
