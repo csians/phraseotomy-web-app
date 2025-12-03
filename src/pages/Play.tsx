@@ -363,6 +363,11 @@ const Play = () => {
       }
 
       if (data?.session) {
+        // Store player ID for lobby identification (critical for "(You)" display)
+        sessionStorage.setItem("lobby_player_id", playerId);
+        localStorage.setItem("lobby_player_id", playerId);
+        sessionStorage.setItem("current_lobby_session", data.session.id);
+
         toast({
           title: "Joined Lobby!",
           description: `You've joined lobby ${validatedLobbyCode}`,
