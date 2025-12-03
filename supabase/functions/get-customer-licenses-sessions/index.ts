@@ -105,8 +105,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch customer game sessions - search across all related domains and customer IDs
-    const { data: sessions, error: sessionsError } = await supabase
+    // Fetch hosted game sessions - search across all related domains and customer IDs
+    const { data: hostedSessions, error: hostedError } = await supabase
       .from('game_sessions')
       .select(`
         id,
@@ -119,23 +119,73 @@ Deno.serve(async (req) => {
         started_at,
         ended_at,
         shop_domain,
-        tenant_id
+        tenant_id,
+        game_name
       `)
       .in('host_customer_id', customerIdsToSearch)
       .in('shop_domain', domainsToSearch)
+      .in('status', ['waiting', 'active'])
       .order('created_at', { ascending: false })
       .limit(10);
 
-    if (sessionsError) {
-      console.error('Error fetching sessions:', sessionsError);
-      return new Response(
-        JSON.stringify({ error: sessionsError.message }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    if (hostedError) {
+      console.error('Error fetching hosted sessions:', hostedError);
     }
+
+    // Fetch joined game sessions (where user is a player but not the host)
+    const { data: playerEntries, error: playerError } = await supabase
+      .from('game_players')
+      .select('session_id, player_id')
+      .in('player_id', customerIdsToSearch);
+
+    if (playerError) {
+      console.error('Error fetching player entries:', playerError);
+    }
+
+    // Get unique session IDs where user is a player
+    const joinedSessionIds = [...new Set((playerEntries || []).map(p => p.session_id))];
+    
+    // Fetch joined sessions (exclude hosted ones)
+    let joinedSessions: any[] = [];
+    if (joinedSessionIds.length > 0) {
+      const hostedIds = (hostedSessions || []).map(s => s.id);
+      const nonHostedSessionIds = joinedSessionIds.filter(id => !hostedIds.includes(id));
+      
+      if (nonHostedSessionIds.length > 0) {
+        const { data: joinedData, error: joinedError } = await supabase
+          .from('game_sessions')
+          .select(`
+            id,
+            lobby_code,
+            host_customer_id,
+            host_customer_name,
+            status,
+            packs_used,
+            created_at,
+            started_at,
+            ended_at,
+            shop_domain,
+            tenant_id,
+            game_name
+          `)
+          .in('id', nonHostedSessionIds)
+          .in('status', ['waiting', 'active'])
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (joinedError) {
+          console.error('Error fetching joined sessions:', joinedError);
+        } else {
+          joinedSessions = joinedData || [];
+        }
+      }
+    }
+
+    // Combine and mark sessions
+    const allSessions = [
+      ...(hostedSessions || []).map(s => ({ ...s, is_host: true })),
+      ...joinedSessions.map(s => ({ ...s, is_host: false })),
+    ];
 
     // Transform licenses to match expected format
     const formattedLicenses = (licenses || []).map(license => {
@@ -160,7 +210,7 @@ Deno.serve(async (req) => {
 
     console.log('Successfully fetched data:', {
       licenses: formattedLicenses.length,
-      sessions: sessions?.length || 0,
+      sessions: allSessions.length,
       searchedDomains: domainsToSearch,
       searchedCustomerIds: customerIdsToSearch,
     });
@@ -168,7 +218,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         licenses: formattedLicenses,
-        sessions: sessions || [],
+        sessions: allSessions,
       }),
       {
         status: 200,

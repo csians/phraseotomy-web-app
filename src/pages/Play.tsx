@@ -669,11 +669,11 @@ const Play = () => {
           </CardContent>
         </Card>
 
-        {/* Your Games */}
+        {/* My Games */}
         <Card className="bg-card border-game-gray">
           <CardHeader>
-            <CardTitle className="text-lg">Your Games</CardTitle>
-            <CardDescription>Active game sessions you're hosting</CardDescription>
+            <CardTitle className="text-lg">My Games</CardTitle>
+            <CardDescription>Games you're hosting or have joined</CardDescription>
           </CardHeader>
           <CardContent>
             {dataLoading ? (
@@ -687,13 +687,32 @@ const Play = () => {
                     key={session.id}
                     className="flex items-center justify-between p-4 bg-game-gray/30 rounded-lg border border-game-yellow/20"
                   >
-                    <div>
-                      <p className="font-mono text-lg text-game-yellow font-bold">{session.lobby_code}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{session.status}</p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-lg text-game-yellow font-bold">{session.lobby_code}</p>
+                        <Badge 
+                          variant={session.is_host ? "default" : "secondary"}
+                          className={session.is_host 
+                            ? "bg-game-yellow text-game-black text-xs" 
+                            : "bg-muted text-muted-foreground text-xs"
+                          }
+                        >
+                          {session.is_host ? "Host" : "Joined"}
+                        </Badge>
+                      </div>
+                      {session.game_name && (
+                        <p className="text-sm text-white">{session.game_name}</p>
+                      )}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="capitalize">{session.status}</span>
+                        {!session.is_host && session.host_customer_name && (
+                          <span>• Hosted by {session.host_customer_name}</span>
+                        )}
+                      </div>
                     </div>
                     {session.status === 'completed' ? (
                       <div className="px-3 py-1 bg-destructive/20 text-destructive text-sm font-medium rounded">
-                        Expired
+                        Ended
                       </div>
                     ) : (
                       <Button variant="outline" size="sm" onClick={() => navigate(`/lobby/${session.id}`)}>
