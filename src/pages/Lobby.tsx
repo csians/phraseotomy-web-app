@@ -187,7 +187,6 @@ export default function Lobby() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [session, setSession] = useState<GameSession | null>(null);
-  console.log("session", session);
   const [players, setPlayers] = useState<Player[]>([]);
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
   const [selectedAudio, setSelectedAudio] = useState<string>("");
@@ -200,7 +199,6 @@ export default function Lobby() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [currentTurn, setCurrentTurn] = useState<any>(null);
-  console.log("currentTurn", currentTurn);
   const [guessInput, setGuessInput] = useState("");
   const [isSubmittingGuess, setIsSubmittingGuess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -233,74 +231,47 @@ export default function Lobby() {
 
   // Handle guest data from URL params on mount
   useEffect(() => {
-    console.log("🚀 [GUEST] Checking for guest data in URL...");
     const urlParams = new URLSearchParams(window.location.search);
     const guestDataStr = urlParams.get("guestData");
     const guestSession = urlParams.get("guestSession");
 
-    console.log("🔍 [GUEST] guestData param:", guestDataStr);
-    console.log("🔍 [GUEST] guestSession param:", guestSession);
-
     if (guestDataStr) {
       try {
         const guestData = JSON.parse(guestDataStr);
-        console.log("✅ [GUEST] Guest data from URL:", guestData);
-
-        // Store guest data in BOTH storages for reliability in Shopify context
         sessionStorage.setItem("guest_player_id", guestData.player_id);
         sessionStorage.setItem("guestPlayerData", JSON.stringify(guestData));
         localStorage.setItem("guest_player_id", guestData.player_id);
         localStorage.setItem("guestPlayerData", JSON.stringify(guestData));
-        console.log("✅ [GUEST] Stored guest_player_id in both storages:", guestData.player_id);
 
         if (guestSession) {
           sessionStorage.setItem("current_lobby_session", guestSession);
-          console.log("✅ [GUEST] Stored guestSession:", guestSession);
         }
 
-        // Clean up URL params
         const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
         window.history.replaceState({}, "", cleanUrl);
-        console.log("✅ [GUEST] Cleaned URL");
       } catch (e) {
-        console.error("❌ [GUEST] Error parsing guest data:", e);
+        console.error("Error parsing guest data:", e);
       }
     } else {
-      console.log("ℹ️ [GUEST] No guest data in URL");
-      // Check if we already have guest data stored
       const storedGuestIdSession = sessionStorage.getItem("guest_player_id");
       const storedGuestIdLocal = localStorage.getItem("guest_player_id");
-      console.log("🔍 [GUEST] Existing guest_player_id in sessionStorage:", storedGuestIdSession);
-      console.log("🔍 [GUEST] Existing guest_player_id in localStorage:", storedGuestIdLocal);
 
-      // Sync between storages if one has it
       if (storedGuestIdSession && !storedGuestIdLocal) {
         localStorage.setItem("guest_player_id", storedGuestIdSession);
-        console.log("✅ [GUEST] Synced from session to local storage");
       } else if (storedGuestIdLocal && !storedGuestIdSession) {
         sessionStorage.setItem("guest_player_id", storedGuestIdLocal);
-        console.log("✅ [GUEST] Synced from local to session storage");
       }
     }
   }, []);
 
   // Get current customer ID helper
   const getCurrentCustomerId = useCallback(() => {
-    console.log("🔍 [GET_ID] Starting getCurrentCustomerId...");
-
     const urlParams = getAllUrlParams();
     const urlCustomerId = urlParams.get("customer_id");
-    if (urlCustomerId) {
-      console.log("✅ [GET_ID] Found customer ID in URL:", urlCustomerId);
-      return urlCustomerId;
-    }
+    if (urlCustomerId) return urlCustomerId;
 
-    // Check for lobby-specific stored player ID first (most reliable for refresh)
     const lobbyPlayerId = sessionStorage.getItem("lobby_player_id") || localStorage.getItem("lobby_player_id");
-    if (lobbyPlayerId) {
-      console.log("✅ [GET_ID] Found lobby_player_id:", lobbyPlayerId);
-      return lobbyPlayerId;
-    }
+    if (lobbyPlayerId) return lobbyPlayerId;
 
     const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
     for (const key of storageKeys) {
@@ -309,40 +280,28 @@ export default function Lobby() {
         try {
           const parsed = JSON.parse(dataStr);
           const customerId = parsed.customer_id || parsed.id || parsed.customerId;
-          if (customerId) {
-            console.log(`✅ [GET_ID] Found customer ID in ${key}:`, customerId);
-            return String(customerId);
-          }
+          if (customerId) return String(customerId);
         } catch (e) {
           console.error(`Error parsing ${key}:`, e);
         }
       }
     }
 
-    // Check for guest player ID in both sessionStorage and localStorage
     const guestPlayerIdSession = sessionStorage.getItem("guest_player_id");
     const guestPlayerIdLocal = localStorage.getItem("guest_player_id");
     const guestPlayerId = guestPlayerIdSession || guestPlayerIdLocal;
 
-    console.log("🔍 [GET_ID] Guest player ID (session):", guestPlayerIdSession);
-    console.log("🔍 [GET_ID] Guest player ID (local):", guestPlayerIdLocal);
-
     if (guestPlayerId) {
-      console.log("✅ [GET_ID] Found guest player ID:", guestPlayerId);
-      // Store in both storages for reliability
       if (!guestPlayerIdSession) sessionStorage.setItem("guest_player_id", guestPlayerId);
       if (!guestPlayerIdLocal) localStorage.setItem("guest_player_id", guestPlayerId);
       return guestPlayerId;
     }
 
-    // As a last resort, check if we have guestPlayerData
     const guestDataStr = sessionStorage.getItem("guestPlayerData") || localStorage.getItem("guestPlayerData");
     if (guestDataStr) {
       try {
         const guestData = JSON.parse(guestDataStr);
         if (guestData.player_id) {
-          console.log("✅ [GET_ID] Found player ID in guestPlayerData:", guestData.player_id);
-          // Store it for next time
           sessionStorage.setItem("guest_player_id", guestData.player_id);
           localStorage.setItem("guest_player_id", guestData.player_id);
           return guestData.player_id;
@@ -352,7 +311,6 @@ export default function Lobby() {
       }
     }
 
-    console.log("❌ [GET_ID] No player ID found anywhere");
     return null;
   }, []);
 
@@ -382,7 +340,6 @@ export default function Lobby() {
   const broadcastEvent = useCallback(
     (event: string, payload: any) => {
       if (broadcastChannelRef.current) {
-        console.log("📤 [BROADCAST] Sending event:", event, payload);
         broadcastChannelRef.current.send({
           type: "broadcast",
           event,
@@ -426,7 +383,6 @@ export default function Lobby() {
       setPlayers(shuffledPlayers.map((p, idx) => ({ ...p, turn_order: idx + 1 })));
 
       // Broadcast immediately (database changes will also trigger listeners)
-      console.log("📤 [HOST] Broadcasting turn_order_changed after shuffle");
       broadcastEvent("turn_order_changed", { shuffled: true, timestamp: Date.now() });
 
       toast({
@@ -471,7 +427,6 @@ export default function Lobby() {
       setPlayers(reorderedPlayers.map((p, idx) => ({ ...p, turn_order: idx + 1 })));
 
       // Broadcast immediately (database changes will also trigger listeners)
-      console.log("📤 [HOST] Broadcasting turn_order_changed after drag");
       broadcastEvent("turn_order_changed", { dragged: true, timestamp: Date.now() });
 
       toast({
@@ -496,26 +451,16 @@ export default function Lobby() {
   );
 
   useEffect(() => {
-    console.log("🚀 [LOBBY] useEffect running - sessionId:", sessionId);
-    console.log("🚀 [LOBBY] Supabase client:", supabase);
-
     if (!sessionId) {
-      console.log("⚠️ [LOBBY] No sessionId available");
       setLoading(false);
       return;
     }
 
     // Store sessionId in sessionStorage to persist across refreshes
     sessionStorage.setItem("current_lobby_session", sessionId);
-    console.log("✅ [LOBBY] Stored session in sessionStorage:", sessionId);
-
-    console.log("📡 [LOBBY] Calling fetchLobbyData...");
     fetchLobbyData();
 
     // Set up real-time subscription for lobby updates using Supabase Realtime Broadcast
-    console.log("🔄 [REALTIME] Setting up Supabase Realtime subscription for session:", sessionId);
-    console.log("🔄 [REALTIME] Channel name will be: lobby-broadcast-" + sessionId);
-
     const channel = supabase
       .channel(`lobby-broadcast-${sessionId}`, {
         config: {
@@ -524,7 +469,6 @@ export default function Lobby() {
       })
       // Listen for broadcast events (player joins, game events, etc.)
       .on("broadcast", { event: "player_joining" }, (payload) => {
-        console.log("📢 [BROADCAST] player_joining received:", payload);
         const joiningName = payload.payload?.playerName || "A player";
         setJoiningPlayerName(joiningName);
         toast({
@@ -533,27 +477,19 @@ export default function Lobby() {
         });
       })
       .on("broadcast", { event: "player_joined" }, (payload) => {
-        console.log("📢 [BROADCAST] player_joined received:", payload);
         setJoiningPlayerName(null);
         toast({
           title: "Player Joined! 🎮",
           description: `${payload.payload?.senderName || "A player"} joined the lobby`,
         });
-        // Refresh player list
         fetchLobbyData();
       })
       .on("broadcast", { event: "player_left" }, (payload) => {
-        console.log("📢 [BROADCAST] player_left received:", payload);
         const leftPlayerId = payload.payload?.playerId;
         const leftPlayerName = payload.payload?.senderName || "A player";
         
-        // Immediately remove player from local state
         if (leftPlayerId) {
-          setPlayers((prev) => {
-            const filtered = prev.filter((p) => p.player_id !== leftPlayerId);
-            console.log("📢 [BROADCAST] Removed player from state, remaining:", filtered.length);
-            return filtered;
-          });
+          setPlayers((prev) => prev.filter((p) => p.player_id !== leftPlayerId));
         }
         
         toast({
@@ -561,23 +497,19 @@ export default function Lobby() {
           description: `${leftPlayerName} left the lobby`,
         });
         
-        // Also refresh from database to ensure consistency
         fetchLobbyData();
       })
       .on("broadcast", { event: "player_kicked" }, (payload) => {
-        console.log("📢 [BROADCAST] player_kicked received:", payload);
         const kickedPlayerId = payload.payload?.playerId;
         const kickedPlayerName = payload.payload?.playerName || "A player";
         const currentId = getCurrentCustomerId();
         
-        // If I was kicked, navigate away
         if (kickedPlayerId === currentId) {
           toast({
             title: "You were kicked",
             description: "The host removed you from the lobby",
             variant: "destructive",
           });
-          // Clear storage and navigate
           sessionStorage.removeItem("current_lobby_session");
           localStorage.removeItem("guest_player_id");
           localStorage.removeItem("guestPlayerData");
@@ -587,7 +519,6 @@ export default function Lobby() {
           return;
         }
         
-        // Remove kicked player from local state
         if (kickedPlayerId) {
           setPlayers((prev) => prev.filter((p) => p.player_id !== kickedPlayerId));
         }
@@ -600,13 +531,11 @@ export default function Lobby() {
         fetchLobbyData();
       })
       .on("broadcast", { event: "game_started" }, (payload) => {
-        console.log("📢 [BROADCAST] game_started received:", payload);
         toast({
           title: "Game Started! 🎮",
           description: `${payload.payload?.senderName || "Host"} started the game`,
         });
         setIsGameStarted(true);
-        // Show countdown for all players
         setShowCountdown(true);
         setCountdownNumber(3);
         setTimeout(() => setCountdownNumber(2), 1000);
@@ -617,7 +546,6 @@ export default function Lobby() {
         }, 3000);
       })
       .on("broadcast", { event: "lobby_ended" }, (payload) => {
-        console.log("📢 [BROADCAST] lobby_ended received:", payload);
         toast({
           title: "Lobby Ended",
           description: "The host has ended this lobby",
@@ -625,7 +553,6 @@ export default function Lobby() {
         navigate("/login");
       })
       .on("broadcast", { event: "theme_selected" }, (payload) => {
-        console.log("📢 [BROADCAST] theme_selected received:", payload);
         toast({
           title: "Theme Selected",
           description: `${payload.payload?.senderName || "Host"} chose a theme`,
@@ -636,7 +563,6 @@ export default function Lobby() {
         fetchLobbyData();
       })
       .on("broadcast", { event: "secret_selected" }, (payload) => {
-        console.log("📢 [BROADCAST] secret_selected received:", payload);
         toast({
           title: "Secret Element Selected",
           description: `${payload.payload?.senderName || "Storyteller"} has selected their secret element`,
@@ -644,7 +570,6 @@ export default function Lobby() {
         fetchLobbyData();
       })
       .on("broadcast", { event: "recording_uploaded" }, (payload) => {
-        console.log("📢 [BROADCAST] recording_uploaded received:", payload);
         toast({
           title: "Audio Ready! 🎤",
           description: "Listen to the clue and guess the secret element",
@@ -653,7 +578,6 @@ export default function Lobby() {
         fetchLobbyData();
       })
       .on("broadcast", { event: "guess_submitted" }, (payload) => {
-        console.log("📢 [BROADCAST] guess_submitted received:", payload);
         if (payload.payload?.isCorrect) {
           toast({
             title: "Correct Answer! 🎉",
@@ -663,10 +587,7 @@ export default function Lobby() {
         fetchLobbyData();
       })
       .on("broadcast", { event: "player_answered" }, (payload) => {
-        console.log("📢 [BROADCAST] player_answered received:", payload);
         const { playerId, playerName, guess, isCorrect } = payload.payload;
-
-        // Add answer to local state (avoid duplicates)
         setPlayerAnswers((prev) => {
           const exists = prev.find((a) => a.playerId === playerId);
           if (exists) return prev;
@@ -674,31 +595,21 @@ export default function Lobby() {
         });
       })
       .on("broadcast", { event: "all_answers_received" }, (payload) => {
-        console.log("📢 [BROADCAST] all_answers_received received:", payload);
         const { secretElement, allAnswers } = payload.payload;
-
-        // Update currentTurn with secret element
         setCurrentTurn((prev) => ({
           ...prev,
           secret_element: secretElement,
         }));
-
-        // Set all player answers if provided
         if (allAnswers && allAnswers.length > 0) {
           setPlayerAnswers(allAnswers);
         }
-
-        // Show results to all players
         setShowResults(true);
-
         toast({
           title: "Round Complete!",
           description: "All players have answered. See results below.",
         });
       })
       .on("broadcast", { event: "refresh_state" }, (payload) => {
-        console.log("📢 [BROADCAST] refresh_state received:", payload);
-        // Reset local state for new round
         setGuessInput("");
         setPlayerAnswers([]);
         setShowResults(false);
@@ -706,12 +617,9 @@ export default function Lobby() {
         setSelectedTheme("");
         setSelectedElementId("");
         setHasRecording(false);
-        // Then fetch updated data
         fetchLobbyData();
       })
       .on("broadcast", { event: "turn_order_changed" }, async (payload) => {
-        console.log("📢 [BROADCAST] turn_order_changed received by non-host player:", payload);
-        // Wait a bit then refetch to ensure database has propagated
         await new Promise((resolve) => setTimeout(resolve, 200));
         await fetchLobbyData();
         toast({
@@ -729,8 +637,6 @@ export default function Lobby() {
           filter: `session_id=eq.${sessionId}`,
         },
         async (payload) => {
-          console.log("🔄 [DB CHANGE] game_players turn_order updated:", payload);
-          // Refetch lobby data when turn_order changes
           if (payload.new && "turn_order" in payload.new) {
             await fetchLobbyData();
             if (!isHost) {
@@ -752,7 +658,6 @@ export default function Lobby() {
           filter: `session_id=eq.${sessionId}`,
         },
         async (payload) => {
-          console.log("🔄 [DB CHANGE] game_players DELETE - player left:", payload);
           const deletedPlayer = payload.old as { name?: string; player_id?: string };
           toast({
             title: "Player Left",
@@ -771,7 +676,6 @@ export default function Lobby() {
           filter: `session_id=eq.${sessionId}`,
         },
         async (payload) => {
-          console.log("🔄 [DB CHANGE] game_players INSERT - player joined:", payload);
           const newPlayer = payload.new as { name?: string };
           toast({
             title: "Player Joined! 🎮",
@@ -790,8 +694,6 @@ export default function Lobby() {
           filter: `id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log("📢 [REALTIME] game_sessions changed:", payload.eventType, payload);
-
           if (payload.eventType === "DELETE") {
             toast({
               title: "Lobby Ended",
@@ -803,12 +705,6 @@ export default function Lobby() {
 
           if (payload.eventType === "UPDATE") {
             const updatedSession = payload.new as GameSession;
-            console.log(
-              "📢 [REALTIME] Session UPDATE - status:",
-              updatedSession.status,
-              "theme:",
-              updatedSession.selected_theme_id,
-            );
             setSession(updatedSession);
 
             if (updatedSession.selected_theme_id) {
@@ -820,7 +716,6 @@ export default function Lobby() {
             }
 
             if (updatedSession.status === "active" && !isGameStarted) {
-              console.log("📢 [REALTIME] Game started - status changed to active");
               setIsGameStarted(true);
               fetchLobbyData();
             }
@@ -835,10 +730,8 @@ export default function Lobby() {
           table: "game_players",
         },
         (payload) => {
-          console.log("📢 [REALTIME] game_players INSERT:", payload);
           const newPlayer = payload.new as Player;
           if (newPlayer.session_id === sessionId) {
-            console.log("✅ [REALTIME] Player joined this session:", newPlayer.name);
             setPlayers((prev) => {
               const exists = prev.some((p) => p.id === newPlayer.id || p.player_id === newPlayer.player_id);
               if (exists) return prev;
@@ -859,10 +752,8 @@ export default function Lobby() {
           table: "game_players",
         },
         (payload) => {
-          console.log("📢 [REALTIME] game_players DELETE:", payload);
           const leftPlayer = payload.old as Player;
           if (leftPlayer.session_id === sessionId) {
-            console.log("✅ [REALTIME] Player left this session:", leftPlayer.name);
             setPlayers((prev) => prev.filter((p) => p.id !== leftPlayer.id));
             toast({
               title: "Player Left",
@@ -879,9 +770,7 @@ export default function Lobby() {
           table: "customer_audio",
         },
         async (payload) => {
-          console.log("📢 [REALTIME] customer_audio changed:", payload.eventType, payload);
           const currentCustomerId = getCurrentCustomerId();
-
           if (currentCustomerId && (payload.eventType === "INSERT" || payload.eventType === "DELETE")) {
             await fetchCustomerAudio(currentCustomerId);
             toast({
@@ -900,19 +789,7 @@ export default function Lobby() {
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log("📢 [REALTIME] game_turns changed:", payload.eventType, payload);
-
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-            const turnData = payload.new as any;
-            console.log("📢 [REALTIME] Turn data changed - refreshing lobby data");
-            console.log(
-              "📢 [REALTIME] Turn details - theme:",
-              turnData.theme_id,
-              "secret:",
-              turnData.secret_element,
-              "recording:",
-              turnData.recording_url,
-            );
             fetchLobbyData();
           }
         },
@@ -922,18 +799,13 @@ export default function Lobby() {
     broadcastChannelRef.current = channel;
 
     channel.subscribe((status, err) => {
-      console.log("🔌 [REALTIME] Subscription status:", status, "error:", err);
       if (err) {
-        console.error("❌ [REALTIME] Subscription error:", err);
+        console.error("Realtime subscription error:", err);
         setIsConnected(false);
       }
       if (status === "SUBSCRIBED") {
-        console.log("✅ [REALTIME] Successfully subscribed to channel lobby-broadcast-" + sessionId);
         setIsConnected(true);
-
-        // Announce our presence after subscribing
         setTimeout(() => {
-          console.log("📤 [BROADCAST] Announcing player joined to all");
           channel.send({
             type: "broadcast",
             event: "player_joined",
@@ -946,17 +818,16 @@ export default function Lobby() {
         }, 500);
       }
       if (status === "CHANNEL_ERROR") {
-        console.error("❌ [REALTIME] Channel error - realtime will not work");
+        console.error("Realtime channel error");
         setIsConnected(false);
       }
       if (status === "TIMED_OUT") {
-        console.error("❌ [REALTIME] Subscription timed out");
+        console.error("Realtime subscription timed out");
         setIsConnected(false);
       }
     });
 
     return () => {
-      console.log("🧹 [LOBBY] Cleaning up subscription");
       setIsConnected(false);
       supabase.removeChannel(channel);
     };
@@ -966,9 +837,6 @@ export default function Lobby() {
 
   const fetchCustomerAudio = async (customerId: string) => {
     try {
-      console.log("customer id ", customerId);
-      console.log("Fetching audio for customer:", customerId);
-
       const { data, error } = await supabase.functions.invoke("get-customer-audio", {
         body: { customerId: customerId.toString() },
       });
@@ -978,7 +846,6 @@ export default function Lobby() {
         return;
       }
 
-      console.log("Audio files received:", data?.audioFiles?.length || 0);
       setAudioFiles(data?.audioFiles || []);
     } catch (error) {
       console.error("Error in fetchCustomerAudio:", error);
@@ -989,16 +856,10 @@ export default function Lobby() {
     try {
       setLoading(true);
 
-      console.log("Fetching lobby data for session:", sessionId);
-
-      // Get current customer ID or guest player ID
       const currentCustomerId = getCurrentCustomerId();
       const guestPlayerId = localStorage.getItem("guest_player_id");
       const currentPlayerId = currentCustomerId || guestPlayerId;
 
-      console.log("Current player ID:", currentPlayerId);
-
-      // Call edge function to fetch lobby data with service role permissions
       const { data, error } = await supabase.functions.invoke("get-lobby-data", {
         body: { sessionId, customerId: currentCustomerId },
       });
@@ -1007,8 +868,6 @@ export default function Lobby() {
         console.error("Lobby data fetch error:", error);
         throw error;
       }
-
-      console.log("Lobby data received:", data);
 
       if (!data?.session) {
         console.error("Session not found in response");
@@ -1029,16 +888,13 @@ export default function Lobby() {
       setPlayers(data.players || []);
 
       // Store the current player's ID for refresh recovery
-      // This ensures we can always find the player on refresh
       if (currentPlayerId) {
         sessionStorage.setItem("lobby_player_id", currentPlayerId);
         localStorage.setItem("lobby_player_id", currentPlayerId);
-        console.log("✅ Stored lobby_player_id for refresh recovery:", currentPlayerId);
       }
 
       // Set audio files from the response (edge function fetches them if user is host)
       setAudioFiles(data.audioFiles || []);
-      console.log("Audio files from response:", data.audioFiles?.length || 0);
 
       // Fetch pack names if packs_used has IDs
       if (data.session?.packs_used && data.session.packs_used.length > 0) {
@@ -1111,10 +967,6 @@ export default function Lobby() {
 
   const handleStartGame = async () => {
     try {
-      console.log("Starting game...");
-      console.log("Session ID:", sessionId);
-
-      // Call edge function to start the game with service role permissions
       const { data, error } = await supabase.functions.invoke("start-game", {
         body: {
           sessionId,
@@ -1130,8 +982,6 @@ export default function Lobby() {
         });
         return;
       }
-
-      console.log("Game started successfully:", data);
 
       // Broadcast game_started to all players via Supabase Broadcast
       broadcastEvent("game_started", {});
@@ -1175,8 +1025,6 @@ export default function Lobby() {
     setIsEndingLobby(true);
 
     try {
-      console.log("Ending lobby:", sessionId);
-
       // Broadcast lobby_ended to all players via Supabase Broadcast BEFORE deleting
       broadcastEvent("lobby_ended", {});
 
@@ -1197,7 +1045,6 @@ export default function Lobby() {
         return;
       }
 
-      console.log("Lobby ended successfully:", data);
       toast({
         title: "Lobby Ended",
         description: "The lobby has been closed and deleted.",
@@ -1233,8 +1080,6 @@ export default function Lobby() {
     const playerNameToSend = currentPlayer?.name || currentPlayerName || "A player";
 
     try {
-      console.log("Leaving lobby:", { sessionId, playerId, playerName: playerNameToSend });
-
       // First delete from database
       const { data, error } = await supabase.functions.invoke("leave-lobby", {
         body: { sessionId, playerId },
@@ -1253,7 +1098,6 @@ export default function Lobby() {
         return;
       }
 
-      console.log("Left lobby successfully:", data);
       toast({
         title: "Left Game",
         description: "You have successfully left the game.",
@@ -1300,8 +1144,6 @@ export default function Lobby() {
     }
 
     try {
-      console.log("Leaving to join another game:", { sessionId, playerId });
-
       const currentPlayer = players.find(p => p.player_id === playerId);
       const playerNameToSend = currentPlayer?.name || currentPlayerName || "A player";
 
@@ -1388,17 +1230,13 @@ export default function Lobby() {
   };
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
-    console.log("Recording complete, uploading audio...");
     setIsUploading(true);
 
     try {
       const currentCustomerId = getCurrentCustomerId();
-      console.log("🔍 [UPLOAD] Current customer ID:", currentCustomerId);
-      console.log("🔍 [UPLOAD] Guest player ID from localStorage:", localStorage.getItem("guest_player_id"));
-      console.log("🔍 [UPLOAD] All localStorage keys:", Object.keys(localStorage));
 
       if (!currentCustomerId) {
-        console.error("❌ [UPLOAD] No customer ID found!");
+        console.error("No customer ID found for upload");
         toast({
           title: "Error",
           description: "Unable to identify player. Please refresh the page.",
@@ -1428,16 +1266,10 @@ export default function Lobby() {
       }
 
       const data = await response.json();
-      console.log("data from lobby upload", data);
 
       if (data.success && data.audio_id) {
-        console.log("Recording complete, audio ID:", data.audio_id);
         setHasRecording(true);
-
-        // Broadcast recording_uploaded to all players via Supabase Broadcast
         broadcastEvent("recording_uploaded", { audioUrl: data.audio_url });
-
-        // Refresh lobby data to get updated recording URL from game_turns
         await fetchLobbyData();
         toast({
           title: "Recording saved",
@@ -1629,8 +1461,6 @@ export default function Lobby() {
           variant: "destructive",
         });
       } else {
-        console.log("Theme saved successfully:", data);
-
         // Broadcast theme_selected to all players via Supabase Broadcast
         const themeName = themes.find((t) => t.id === themeId)?.name || "Unknown";
         broadcastEvent("theme_selected", { themeId, themeName });
@@ -1681,8 +1511,6 @@ export default function Lobby() {
           variant: "destructive",
         });
       } else {
-        console.log("Secret element saved successfully:", data);
-
         // Broadcast secret_selected to all players via Supabase Broadcast
         broadcastEvent("secret_selected", { elementId: elementName });
 
@@ -1740,13 +1568,6 @@ export default function Lobby() {
       </div>
     );
   }
-
-  console.log("Host check:", {
-    currentCustomerId,
-    hostCustomerId: session?.host_customer_id,
-    isHost,
-    hasAudioFiles: audioFiles.length > 0,
-  });
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
