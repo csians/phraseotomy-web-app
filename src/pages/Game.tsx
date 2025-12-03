@@ -4,9 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useGameWebSocket } from "@/hooks/useGameWebSocket";
 import { Scoreboard } from "@/components/Scoreboard";
-import { ThemeSelection } from "@/components/ThemeSelection";
 import { StorytellingInterface } from "@/components/StorytellingInterface";
 import { GuessingInterface } from "@/components/GuessingInterface";
+import { Button } from "@/components/ui/button";
 import { Wifi, WifiOff } from "lucide-react";
 
 interface Player {
@@ -40,7 +40,7 @@ interface GameSession {
 interface Turn {
   id: string;
   theme_id: string;
-  selected_elements: string[];
+  whisp: string | null;
   recording_url: string | null;
   completed_at: string | null;
   theme: Theme;
@@ -55,11 +55,10 @@ export default function Game() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [currentTurn, setCurrentTurn] = useState<Turn | null>(null);
-  const [selectedElements, setSelectedElements] = useState<Element[]>([]);
-  const [themeElements, setThemeElements] = useState<Element[]>([]);
-  const [gamePhase, setGamePhase] = useState<"theme_selection" | "storytelling" | "guessing" | "scoring">("theme_selection");
+  const [gamePhase, setGamePhase] = useState<"generating_whisp" | "storytelling" | "guessing" | "scoring">("generating_whisp");
   const [currentPlayerId, setCurrentPlayerId] = useState<string>("");
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
+  const [isGeneratingWhisp, setIsGeneratingWhisp] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
@@ -320,17 +319,15 @@ export default function Game() {
       setPlayers(data.players || []);
       setThemes(data.themes || []);
       setCurrentTurn(data.currentTurn);
-      setSelectedElements(data.selectedElements || []);
-      setThemeElements(data.themeElements || []);
 
-      // Determine game phase
-      let phase: "theme_selection" | "storytelling" | "guessing" | "scoring";
-      if (!data.currentTurn) {
-        phase = "theme_selection";
-        console.log("No current turn - setting phase to theme_selection");
+      // Determine game phase based on turn state
+      let phase: "generating_whisp" | "storytelling" | "guessing" | "scoring";
+      if (!data.currentTurn || !data.currentTurn.whisp) {
+        phase = "generating_whisp";
+        console.log("No turn or no whisp - setting phase to generating_whisp");
       } else if (!data.currentTurn.completed_at) {
         phase = "storytelling";
-        console.log("Turn exists but not completed - setting phase to storytelling");
+        console.log("Turn exists with whisp but not completed - setting phase to storytelling");
       } else {
         phase = "guessing";
         console.log("Turn completed - setting phase to guessing");
@@ -428,11 +425,14 @@ export default function Game() {
     };
   };
 
-  const handleThemeSelect = async (themeId: string) => {
+  // Auto-generate whisp when phase is generating_whisp and storyteller
+  const generateWhisp = async () => {
+    if (isGeneratingWhisp) return;
+    
+    setIsGeneratingWhisp(true);
     try {
-      // Theme and elements are saved to database via start-turn
       const { data, error } = await supabase.functions.invoke("start-turn", {
-        body: { sessionId, themeId },
+        body: { sessionId, turnId: currentTurn?.id },
       });
 
       if (error) throw error;
@@ -445,21 +445,23 @@ export default function Game() {
       
       // Notify other players via WebSocket to refresh their state
       sendWebSocketMessage({
-        type: "theme_selected",
-        themeId,
+        type: "whisp_generated",
+        whisp: data.whisp,
       });
 
       toast({
-        title: "Theme Selected!",
-        description: "Now select your secret element and record your story.",
+        title: "Whisp Generated! ✨",
+        description: `Your word is: "${data.whisp}"`,
       });
     } catch (error) {
-      console.error("Error starting turn:", error);
+      console.error("Error generating whisp:", error);
       toast({
         title: "Error",
-        description: "Failed to start turn.",
+        description: "Failed to generate whisp.",
         variant: "destructive",
       });
+    } finally {
+      setIsGeneratingWhisp(false);
     }
   };
 
@@ -533,36 +535,45 @@ export default function Game() {
 
       {/* Game Content */}
       <div className="ml-96 p-4">
-        {gamePhase === "theme_selection" && isStoryteller && (
-          <>
-            <div className="mb-4 text-sm text-muted-foreground">
-              Debug: Showing theme selection (Phase: {gamePhase}, IsStoryteller: {isStoryteller.toString()}, Themes: {themes.length})
+        {/* Generating Whisp Phase - Storyteller sees generation, others wait */}
+        {gamePhase === "generating_whisp" && isStoryteller && (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center space-y-6">
+              <h2 className="text-2xl font-bold text-foreground mb-2">
+                Your Turn to Tell a Story!
+              </h2>
+              <p className="text-muted-foreground mb-4">
+                Generating your secret whisp word...
+              </p>
+              <Button 
+                onClick={generateWhisp} 
+                disabled={isGeneratingWhisp}
+                size="lg"
+              >
+                {isGeneratingWhisp ? "Generating..." : "Generate Whisp"}
+              </Button>
             </div>
-            <ThemeSelection
-              themes={themes}
-              onThemeSelect={handleThemeSelect}
-              playerName={currentPlayer?.name || "Player"}
-            />
-          </>
+          </div>
         )}
 
-        {gamePhase === "theme_selection" && !isStoryteller && (
+        {gamePhase === "generating_whisp" && !isStoryteller && (
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-foreground mb-2">
                 Waiting for storyteller...
               </h2>
               <p className="text-muted-foreground">
-                {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is choosing a theme
+                {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is preparing their story
               </p>
             </div>
           </div>
         )}
 
+        {/* Storytelling Phase */}
         {gamePhase === "storytelling" && isStoryteller && currentTurn && (
           <StorytellingInterface
             theme={currentTurn.theme}
-            elements={selectedElements}
+            whisp={currentTurn.whisp || ""}
             sessionId={sessionId!}
             playerId={currentPlayerId}
             turnId={currentTurn.id}
@@ -581,7 +592,7 @@ export default function Game() {
                   {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is telling a story
                 </h2>
                 <p className="text-muted-foreground">
-                  Watch the elements below - one of them is the secret!
+                  Listen carefully and try to guess the whisp word!
                 </p>
                 {isReceivingAudio && (
                   <div className="mt-4 flex items-center justify-center gap-2 text-sm text-green-600">
@@ -591,25 +602,6 @@ export default function Game() {
                 )}
               </div>
               
-              {selectedElements.length > 0 && (
-                <div className="bg-card border border-border rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">Elements in Play</h3>
-                  <div className="grid grid-cols-5 gap-4">
-                    {selectedElements.map((element) => (
-                      <div
-                        key={element.id}
-                        className="flex flex-col items-center p-4 bg-muted rounded-lg"
-                      >
-                        <span className="text-3xl mb-2">{element.icon}</span>
-                        <span className="text-sm text-center text-muted-foreground">
-                          {element.name}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
               <div className="text-center text-sm text-muted-foreground">
                 Waiting for {players.find((p) => p.player_id === session.current_storyteller_id)?.name} to record their story...
               </div>
@@ -617,13 +609,12 @@ export default function Game() {
           </div>
         )}
 
+        {/* Guessing Phase */}
         {gamePhase === "guessing" && !isStoryteller && currentTurn?.recording_url && (
           <GuessingInterface
             storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
             theme={currentTurn.theme}
             audioUrl={currentTurn.recording_url}
-            availableElements={selectedElements}
-            correctElements={currentTurn.selected_elements}
             sessionId={sessionId!}
             roundNumber={session.current_round ?? 1}
             playerId={currentPlayerId}
@@ -640,6 +631,11 @@ export default function Game() {
               <p className="text-muted-foreground">
                 Watch the scoreboard to see who gets it right!
               </p>
+              {currentTurn?.whisp && (
+                <p className="mt-4 text-lg">
+                  Your whisp was: <span className="font-bold text-primary">{currentTurn.whisp}</span>
+                </p>
+              )}
             </div>
           </div>
         )}

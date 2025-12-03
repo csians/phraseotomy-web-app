@@ -25,10 +25,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get the turn data including secret element using sessionId and roundNumber
+    // Get the turn data including whisp using sessionId and roundNumber
     const { data: turnData, error: turnError } = await supabase
       .from("game_turns")
-      .select("id, secret_element, session_id, completed_at")
+      .select("id, whisp, session_id, completed_at")
       .eq("session_id", sessionId)
       .eq("round_number", roundNumber)
       .single();
@@ -41,13 +41,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if turn is already completed
-    if (turnData.completed_at) {
-      return new Response(
-        JSON.stringify({ error: "Turn already completed", correct: false }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Check if turn is already completed (story not yet submitted)
+    // Note: completed_at is set when the storyteller submits the audio
+    // We allow guesses after the storyteller has submitted
 
     // Check if player has already answered this turn
     const { data: playerGuesses, error: playerGuessError } = await supabase
@@ -68,27 +64,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if secret element exists
-    if (!turnData.secret_element) {
+    // Check if whisp exists
+    if (!turnData.whisp) {
       return new Response(
-        JSON.stringify({ error: "Secret element not set for this turn", correct: false }),
+        JSON.stringify({ error: "Whisp not set for this turn", correct: false }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Normalize the guess and secret element for comparison
+    // Normalize the guess and whisp for comparison
     const normalizedGuess = guess.trim().toLowerCase();
-    let normalizedSecret = "";
-    
-    // Handle custom elements (format: "custom:text")
-    if (turnData.secret_element.startsWith("custom:")) {
-      normalizedSecret = turnData.secret_element.substring(7).toLowerCase();
-    } else {
-      // Secret element is already the element name, not an ID
-      normalizedSecret = turnData.secret_element.toLowerCase();
-    }
+    const normalizedWhisp = turnData.whisp.trim().toLowerCase();
 
-    const isCorrect = normalizedGuess === normalizedSecret;
+    const isCorrect = normalizedGuess === normalizedWhisp;
+    console.log(`Guess: "${normalizedGuess}" vs Whisp: "${normalizedWhisp}" = ${isCorrect}`);
     const pointsEarned = isCorrect ? 10 : 0;
 
     // Get storyteller ID for scoring wrong answers
@@ -296,7 +285,7 @@ Deno.serve(async (req) => {
         success: true,
         correct: isCorrect,
         points_earned: pointsEarned,
-        secret_element: turnData.secret_element,
+        whisp: turnData.whisp,
         all_players_answered: allPlayersAnswered,
         next_round: nextRoundInfo,
         game_completed: gameCompleted,
