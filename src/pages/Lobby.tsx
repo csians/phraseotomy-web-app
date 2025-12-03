@@ -2012,91 +2012,33 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Theme Selection - Step 1 (Only for current storyteller after game starts) */}
-        {isStoryteller && session.status === "active" && themes.length > 0 && !selectedTheme && (
-          <Card>
+        {/* Show Whisp to Storyteller - Auto-generated based on theme */}
+        {isStoryteller && session.status === "active" && currentTurn?.whisp && (
+          <Card className="border-primary/50 bg-primary/5">
             <CardHeader>
-              <CardTitle>Step 1: Select Theme</CardTitle>
-              <CardDescription>Choose a theme for the game</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedTheme} onValueChange={handleThemeChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Choose a theme..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {themes.map((theme) => {
-                    const IconComponent = iconMap[theme.icon.toLowerCase()] || Sparkles;
-                    return (
-                      <SelectItem key={theme.id} value={theme.id}>
-                        <div className="flex items-center gap-2">
-                          <IconComponent className="h-4 w-4" />
-                          <span>{theme.name}</span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Secret Element Selection - Step 2 (Only for current storyteller after game starts) */}
-        {isStoryteller && session.status === "active" && selectedTheme && !selectedElementId && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Step 2: Select Your Secret Element</CardTitle>
-              <CardDescription>Choose 1 secret element (only you can see this)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ThemeElements
-                themeId={selectedTheme}
-                onElementSelect={handleSecretElementSelect}
-                selectedElementId={selectedElementId}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Show Selected Secret Element to Storyteller */}
-        {isStoryteller && session.status === "active" && currentTurn?.secret_element && (
-          <Card className="border-yellow-500/50 bg-yellow-500/5">
-            <CardHeader>
-              <CardTitle className="flex items-center text-yellow-600">
+              <CardTitle className="flex items-center text-primary">
                 <Eye className="mr-2 h-5 w-5" />
-                Your Secret Element
+                Your Whisp Word
               </CardTitle>
-              <CardDescription>Only you can see this - use it as inspiration for your clue</CardDescription>
+              <CardDescription>Create a story about this word - other players will try to guess it!</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="p-3 bg-background rounded-lg border">
-                <p className="text-sm text-muted-foreground">Secret Element:</p>
-                <p className="text-lg font-bold text-primary">
-                  {currentTurn.secret_element.startsWith("custom:")
-                    ? currentTurn.secret_element.substring(7)
-                    : currentTurn.secret_element}
-                </p>
+            <CardContent>
+              <div className="p-4 bg-background rounded-lg border-2 border-primary/30 text-center">
+                <p className="text-3xl font-bold text-primary">{currentTurn.whisp}</p>
               </div>
-              {currentTurn?.whisp && (
-                <div className="p-3 bg-background rounded-lg border">
-                  <p className="text-sm text-muted-foreground">Whisp (Hint):</p>
-                  <p className="text-lg font-semibold text-primary">{currentTurn.whisp}</p>
-                </div>
-              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Audio Recording - Step 3 (Only for current storyteller after game starts) */}
-        {isStoryteller && session.status === "active" && selectedTheme && selectedElementId && !hasRecording && (
+        {/* Audio Recording - For storyteller after whisp is shown */}
+        {isStoryteller && session.status === "active" && currentTurn?.whisp && !hasRecording && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Music className="mr-2 h-5 w-5" />
-                Step 3: Record Audio Clue
+                Record Your Story
               </CardTitle>
-              <CardDescription>Record a clue about your secret element</CardDescription>
+              <CardDescription>Tell a story about your whisp word - be creative!</CardDescription>
             </CardHeader>
             <CardContent>
               <LobbyAudioRecording onRecordingComplete={handleRecordingComplete} isUploading={isUploading} />
@@ -2104,23 +2046,23 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Show Selected Theme to non-storyteller players */}
-        {!isStoryteller && session.status === "active" && currentTurn?.theme_id && (
+        {/* Show Current Theme to non-storyteller players */}
+        {!isStoryteller && session.status === "active" && session.selected_theme_id && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {(() => {
-                  const theme = themes.find((t) => t.id === currentTurn.theme_id);
+                  const theme = themes.find((t) => t.id === session.selected_theme_id);
                   const IconComponent = theme ? iconMap[theme.icon.toLowerCase()] || Sparkles : Sparkles;
                   return <IconComponent className="h-5 w-5" />;
                 })()}
-                Current Theme
+                Game Theme
               </CardTitle>
-              <CardDescription>The storyteller has selected this theme</CardDescription>
+              <CardDescription>The storyteller is creating a story based on this theme</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-lg font-semibold text-primary">
-                {themes.find((t) => t.id === currentTurn.theme_id)?.name || "Loading..."}
+                {themes.find((t) => t.id === session.selected_theme_id)?.name || "Loading..."}
               </p>
             </CardContent>
           </Card>
@@ -2134,29 +2076,16 @@ export default function Lobby() {
                 <Music className="w-5 h-5" />
                 Listen and Guess
               </CardTitle>
-              <CardDescription>Listen to the audio clue and guess the secret element</CardDescription>
+              <CardDescription>Listen to the story and guess the whisp word!</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <audio controls src={currentTurn.recording_url} className="w-full" />
-
-              {/* Show elements for guessing */}
-              {(selectedTheme || session.selected_theme_id) && (
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Choose from these elements:</p>
-                  <ThemeElements
-                    themeId={selectedTheme || session.selected_theme_id || ""}
-                    onElementSelect={(elementName) => setGuessInput(elementName)}
-                    selectedElementId={guessInput}
-                    isGuessing={true}
-                  />
-                </div>
-              )}
 
               <div className="flex gap-2">
                 <Input
                   type="text"
                   placeholder={
-                    isLockedOut ? "You're locked out this round" : "Type your guess or click an element above..."
+                    isLockedOut ? "You're locked out this round" : "Type your guess..."
                   }
                   value={guessInput}
                   onChange={(e) => setGuessInput(e.target.value)}
@@ -2202,12 +2131,7 @@ export default function Lobby() {
                     ))}
                   </div>
                   <p className="text-sm text-muted-foreground mt-3 text-center">
-                    Correct answer:{" "}
-                    <span className="font-semibold">
-                      {currentTurn?.secret_element?.startsWith("custom:")
-                        ? currentTurn.secret_element.substring(7)
-                        : currentTurn?.secret_element}
-                    </span>
+                    Correct answer: <span className="font-semibold">{currentTurn?.whisp}</span>
                   </p>
                 </div>
               )}
