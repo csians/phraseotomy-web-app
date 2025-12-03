@@ -97,3 +97,6 @@ verify_jwt = false
 
 [functions.leave-lobby]
 verify_jwt = false
+
+[functions.kick-player]
+verify_jwt = false

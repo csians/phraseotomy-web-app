@@ -25,6 +25,8 @@ import {
   Eye,
   Shuffle,
   GripVertical,
+  UserMinus,
+  Loader2,
 } from "lucide-react";
 import {
   DndContext,
@@ -76,12 +78,18 @@ function SortablePlayerItem({
   currentStorytellerId,
   hostCustomerId,
   isDraggable,
+  onKick,
+  isKicking,
+  sessionStatus,
 }: {
   player: Player;
   isHost: boolean;
   currentStorytellerId: string | undefined;
   hostCustomerId: string;
   isDraggable: boolean;
+  onKick?: (playerId: string, playerName: string) => void;
+  isKicking?: boolean;
+  sessionStatus?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: player.id,
@@ -94,6 +102,9 @@ function SortablePlayerItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const isPlayerHost = player.player_id === hostCustomerId;
+  const canKick = isHost && !isPlayerHost && sessionStatus === "waiting";
+
   return (
     <li ref={setNodeRef} style={style} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
       <div className="flex items-center gap-2">
@@ -103,7 +114,7 @@ function SortablePlayerItem({
           </div>
         )}
         <span className="font-medium">{player.name}</span>
-        {player.player_id === hostCustomerId && (
+        {isPlayerHost && (
           <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Host</span>
         )}
         {player.player_id === currentStorytellerId && (
@@ -113,6 +124,21 @@ function SortablePlayerItem({
       <div className="flex items-center gap-4">
         <span className="text-lg font-bold text-primary">{player.score ?? 0} pts</span>
         <span className="text-sm text-muted-foreground">Turn {player.turn_order}</span>
+        {canKick && onKick && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => onKick(player.player_id, player.name)}
+            disabled={isKicking}
+          >
+            {isKicking ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <UserMinus className="h-4 w-4" />
+            )}
+          </Button>
+        )}
       </div>
     </li>
   );
@@ -186,6 +212,8 @@ export default function Lobby() {
   >([]);
   const [showResults, setShowResults] = useState(false);
   const [packNames, setPackNames] = useState<string[]>([]);
+  const [isKickingPlayer, setIsKickingPlayer] = useState(false);
+  const [joiningPlayerName, setJoiningPlayerName] = useState<string | null>(null);
 
   // Reset lockout state when round changes
   useEffect(() => {
@@ -489,8 +517,18 @@ export default function Lobby() {
         },
       })
       // Listen for broadcast events (player joins, game events, etc.)
+      .on("broadcast", { event: "player_joining" }, (payload) => {
+        console.log("📢 [BROADCAST] player_joining received:", payload);
+        const joiningName = payload.payload?.playerName || "A player";
+        setJoiningPlayerName(joiningName);
+        toast({
+          title: "Player Joining...",
+          description: `${joiningName} is joining the lobby`,
+        });
+      })
       .on("broadcast", { event: "player_joined" }, (payload) => {
         console.log("📢 [BROADCAST] player_joined received:", payload);
+        setJoiningPlayerName(null);
         toast({
           title: "Player Joined! 🎮",
           description: `${payload.payload?.senderName || "A player"} joined the lobby`,
@@ -518,6 +556,41 @@ export default function Lobby() {
         });
         
         // Also refresh from database to ensure consistency
+        fetchLobbyData();
+      })
+      .on("broadcast", { event: "player_kicked" }, (payload) => {
+        console.log("📢 [BROADCAST] player_kicked received:", payload);
+        const kickedPlayerId = payload.payload?.playerId;
+        const kickedPlayerName = payload.payload?.playerName || "A player";
+        const currentId = getCurrentCustomerId();
+        
+        // If I was kicked, navigate away
+        if (kickedPlayerId === currentId) {
+          toast({
+            title: "You were kicked",
+            description: "The host removed you from the lobby",
+            variant: "destructive",
+          });
+          // Clear storage and navigate
+          sessionStorage.removeItem("current_lobby_session");
+          localStorage.removeItem("guest_player_id");
+          localStorage.removeItem("guestPlayerData");
+          sessionStorage.removeItem("guest_player_id");
+          sessionStorage.removeItem("guestPlayerData");
+          navigate("/guest-join", { replace: true });
+          return;
+        }
+        
+        // Remove kicked player from local state
+        if (kickedPlayerId) {
+          setPlayers((prev) => prev.filter((p) => p.player_id !== kickedPlayerId));
+        }
+        
+        toast({
+          title: "Player Kicked",
+          description: `${kickedPlayerName} was removed from the lobby`,
+        });
+        
         fetchLobbyData();
       })
       .on("broadcast", { event: "game_started" }, (payload) => {
@@ -1261,6 +1334,53 @@ export default function Lobby() {
     }
   };
 
+  // Handler for host to kick a player
+  const handleKickPlayer = async (playerIdToKick: string, playerName: string) => {
+    const hostId = getCurrentCustomerId();
+    if (!sessionId || !hostId) return;
+
+    setIsKickingPlayer(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("kick-player", {
+        body: { sessionId, playerIdToKick, hostId },
+      });
+
+      if (error) {
+        console.error("Error kicking player:", error);
+        toast({
+          title: "Error",
+          description: "Failed to kick player",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Remove player from local state immediately
+      setPlayers((prev) => prev.filter((p) => p.player_id !== playerIdToKick));
+
+      // Broadcast to all players
+      broadcastEvent("player_kicked", { 
+        playerId: playerIdToKick, 
+        playerName,
+        kickedBy: getCurrentPlayerName()
+      });
+
+      toast({
+        title: "Player Kicked",
+        description: `${playerName} has been removed from the lobby`,
+      });
+    } catch (error) {
+      console.error("Error in handleKickPlayer:", error);
+      toast({
+        title: "Error",
+        description: "Failed to kick player",
+        variant: "destructive",
+      });
+    } finally {
+      setIsKickingPlayer(false);
+    }
+  };
+
   const handleRecordingComplete = async (audioBlob: Blob) => {
     console.log("Recording complete, uploading audio...");
     setIsUploading(true);
@@ -1826,12 +1946,21 @@ export default function Lobby() {
             )}
           </CardHeader>
           <CardContent>
-            {players.length === 0 ? (
+            {players.length === 0 && !joiningPlayerName ? (
               <p className="text-sm text-muted-foreground">No players have joined yet</p>
             ) : (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={players.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                   <ul className="space-y-2">
+                    {joiningPlayerName && (
+                      <li className="flex items-center justify-between p-2 rounded-md bg-muted/30 border border-dashed border-muted-foreground/30 animate-pulse">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          <span className="font-medium text-muted-foreground">{joiningPlayerName}</span>
+                          <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">Joining...</span>
+                        </div>
+                      </li>
+                    )}
                     {players.map((player) => (
                       <SortablePlayerItem
                         key={player.id}
@@ -1840,6 +1969,9 @@ export default function Lobby() {
                         currentStorytellerId={session.current_storyteller_id}
                         hostCustomerId={session.host_customer_id}
                         isDraggable={isHost && session.status === "waiting"}
+                        onKick={handleKickPlayer}
+                        isKicking={isKickingPlayer}
+                        sessionStatus={session.status}
                       />
                     ))}
                   </ul>
