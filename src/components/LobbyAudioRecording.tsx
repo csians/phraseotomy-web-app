@@ -254,10 +254,10 @@ export const LobbyAudioRecording = ({ onRecordingComplete, isUploading, sendWebS
                   className="flex-1"
                   disabled={isSaving || isUploading}
                 >
-                  Re-record
+                  Record Again
                 </Button>
                 <Button onClick={handleSaveRecording} className="flex-1" disabled={isSaving || isUploading}>
-                  {isSaving || isUploading ? "Saving..." : "Save Recording"}
+                  {isSaving || isUploading ? "Sending..." : "Send Story"}
                 </Button>
               </div>
             </div>
