@@ -65,14 +65,11 @@ export default function CreateLobby() {
   useEffect(() => {
     const loadThemes = async () => {
       try {
-        const { data, error } = await supabase
-          .from("themes")
-          .select("*")
-          .order("name", { ascending: true });
+        const { data, error } = await supabase.from("themes").select("*").order("name", { ascending: true });
 
         if (error) throw error;
         setThemes(data || []);
-        
+
         // Auto-select first theme if available
         if (data && data.length > 0 && !selectedTheme) {
           setSelectedTheme(data[0].id);
@@ -214,11 +211,11 @@ export default function CreateLobby() {
       };
       localStorage.setItem("customerData", JSON.stringify(customerData));
       sessionStorage.setItem("customerData", JSON.stringify(customerData));
-      
+
       // Store player ID specifically for lobby refresh recovery
       localStorage.setItem("lobby_player_id", customer.id);
       sessionStorage.setItem("lobby_player_id", customer.id);
-      
+
       // Store session ID for refresh persistence
       sessionStorage.setItem("current_lobby_session", newSession.id);
       localStorage.setItem("current_lobby_session", newSession.id);
@@ -344,15 +341,13 @@ export default function CreateLobby() {
                   <SelectContent>
                     {themes.map((theme) => (
                       <SelectItem key={theme.id} value={theme.id}>
-                        {theme.icon} {theme.name}
+                        {theme.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               )}
-              <p className="text-xs text-muted-foreground">
-                Whisps will be auto-generated based on this theme
-              </p>
+              <p className="text-xs text-muted-foreground">Whisps will be auto-generated based on this theme</p>
             </div>
 
             <div className="space-y-4">
