@@ -40,9 +40,11 @@ const GuestJoin = () => {
         sessionStorage.setItem("guest_player_id", guestData.player_id);
         sessionStorage.setItem("guest_player_name", guestData.name);
         sessionStorage.setItem("guestPlayerData", JSON.stringify(guestData));
+        sessionStorage.setItem("lobby_player_id", guestData.player_id);
         localStorage.setItem("guest_player_id", guestData.player_id);
         localStorage.setItem("guest_player_name", guestData.name);
         localStorage.setItem("guestPlayerData", JSON.stringify(guestData));
+        localStorage.setItem("lobby_player_id", guestData.player_id);
         if (shop) {
           localStorage.setItem("shop_domain", shop);
         }
@@ -124,9 +126,11 @@ const GuestJoin = () => {
       sessionStorage.setItem("guest_player_id", guestPlayerId);
       sessionStorage.setItem("guest_player_name", playerName.trim());
       sessionStorage.setItem("guestPlayerData", JSON.stringify(guestData));
+      sessionStorage.setItem("lobby_player_id", guestPlayerId);
       localStorage.setItem("guest_player_id", guestPlayerId);
       localStorage.setItem("guest_player_name", playerName.trim());
       localStorage.setItem("guestPlayerData", JSON.stringify(guestData));
+      localStorage.setItem("lobby_player_id", guestPlayerId);
 
       // First, lookup the session to broadcast "joining" state
       const { data: sessionLookup } = await supabase
