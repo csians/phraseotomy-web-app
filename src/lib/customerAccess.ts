@@ -16,6 +16,9 @@ export interface GameSession {
   status: string;
   created_at: string;
   packs_used: string[];
+  game_name?: string | null;
+  host_customer_name?: string | null;
+  is_host: boolean;
 }
 
 export async function getCustomerLicenses(
