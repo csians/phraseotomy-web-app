@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { NamePromptDialog } from "@/components/NamePromptDialog";
 
 import type { TenantConfig, ShopifyCustomer } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
@@ -30,6 +31,15 @@ const Play = () => {
   const [redemptionCode, setRedemptionCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [availablePacks, setAvailablePacks] = useState<{ id: string; name: string; description: string | null }[]>([]);
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+
+  // Check if customer needs to enter their name
+  const customerNeedsName = (cust: ShopifyCustomer | null): boolean => {
+    if (!cust) return false;
+    const hasName = cust.name && cust.name.trim().length > 0;
+    const hasFirstName = cust.firstName && cust.firstName.trim().length > 0;
+    return !hasName && !hasFirstName;
+  };
 
   // Store customer in database on first login
   const storeCustomerInDatabase = async (customerData: ShopifyCustomer, shopDomain: string, tenantId: string) => {
@@ -266,6 +276,13 @@ const Play = () => {
     initializeSession();
   }, [navigate]);
 
+  // Show name prompt dialog when customer has no name
+  useEffect(() => {
+    if (!loading && customer && customerNeedsName(customer)) {
+      setShowNamePrompt(true);
+    }
+  }, [loading, customer]);
+
   // Load customer data when logged in
   useEffect(() => {
     if (!loading && customer && shopDomain) {
@@ -483,8 +500,32 @@ const Play = () => {
     null as Date | null,
   );
 
+  const handleNameSaved = (name: string) => {
+    setShowNamePrompt(false);
+    // Update customer state with new name
+    if (customer) {
+      const nameParts = name.split(" ");
+      setCustomer({
+        ...customer,
+        name: name,
+        firstName: nameParts[0],
+        lastName: nameParts.slice(1).join(" ") || null,
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-game-black flex flex-col items-center justify-between px-4 py-8">
+      {/* Name Prompt Dialog */}
+      {customer && shopDomain && (
+        <NamePromptDialog
+          open={showNamePrompt}
+          customerId={customer.id}
+          shopDomain={shopDomain}
+          onNameSaved={handleNameSaved}
+        />
+      )}
+
       {/* Logo and Branding */}
       <div className="w-full max-w-2xl text-center pt-8">
         <div className="w-20 h-20 mx-auto mb-4 bg-game-yellow rounded-2xl flex items-center justify-center shadow-lg">
