@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getCustomerLicenses } from "@/lib/customerAccess";
@@ -12,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Pack = Tables<"packs">;
+type Theme = Tables<"themes">;
 
 export default function CreateLobby() {
   const navigate = useNavigate();
@@ -20,10 +22,13 @@ export default function CreateLobby() {
 
   const [lobbyName, setLobbyName] = useState("");
   const [selectedPack, setSelectedPack] = useState<string>("");
+  const [selectedTheme, setSelectedTheme] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
   const [availablePacks, setAvailablePacks] = useState<string[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(true);
   const [allPacks, setAllPacks] = useState<Pack[]>([]);
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [loadingThemes, setLoadingThemes] = useState(true);
 
   // Get customer and shop info from location state or window
   const customer = location.state?.customer || window.__PHRASEOTOMY_CUSTOMER__;
@@ -55,6 +60,33 @@ export default function CreateLobby() {
 
     loadAllPacks();
   }, [tenant?.id]);
+
+  // Load all themes from database
+  useEffect(() => {
+    const loadThemes = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("themes")
+          .select("*")
+          .order("name", { ascending: true });
+
+        if (error) throw error;
+        setThemes(data || []);
+        
+        // Auto-select first theme if available
+        if (data && data.length > 0 && !selectedTheme) {
+          setSelectedTheme(data[0].id);
+        }
+      } catch (error) {
+        console.error("Error loading themes:", error);
+        setThemes([]);
+      } finally {
+        setLoadingThemes(false);
+      }
+    };
+
+    loadThemes();
+  }, []);
 
   // Load customer's available packs from redeemed codes
   useEffect(() => {
@@ -137,6 +169,15 @@ export default function CreateLobby() {
       return;
     }
 
+    if (!selectedTheme) {
+      toast({
+        title: "Select Theme",
+        description: "Please select a theme for the game",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsCreating(true);
 
     try {
@@ -152,6 +193,7 @@ export default function CreateLobby() {
           tenantId: tenant.id,
           packsUsed: [selectedPack],
           gameName: lobbyName.trim(),
+          themeId: selectedTheme,
         },
       });
 
@@ -286,6 +328,31 @@ export default function CreateLobby() {
                 value={lobbyName}
                 onChange={(e) => setLobbyName(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Select Theme</Label>
+              {loadingThemes ? (
+                <Skeleton className="h-10 w-full" />
+              ) : themes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No themes available</p>
+              ) : (
+                <Select value={selectedTheme} onValueChange={setSelectedTheme}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a theme for whisps" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {themes.map((theme) => (
+                      <SelectItem key={theme.id} value={theme.id}>
+                        {theme.icon} {theme.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Whisps will be auto-generated based on this theme
+              </p>
             </div>
 
             <div className="space-y-4">

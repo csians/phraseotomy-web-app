@@ -3,18 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, Square, Send, Lightbulb, AlertCircle, Brain, Sparkles, Lightbulb as LightbulbIcon, Zap, Heart } from "lucide-react";
+import { Mic, Square, Send, Lightbulb, AlertCircle, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-
-interface Element {
-  id: string;
-  name: string;
-  icon: string;
-}
 
 interface StorytellingInterfaceProps {
   theme: { id: string; name: string };
-  elements: Element[];
+  whisp: string;
   sessionId: string;
   playerId: string;
   turnId: string;
@@ -26,7 +20,7 @@ interface StorytellingInterfaceProps {
 
 export function StorytellingInterface({
   theme,
-  elements,
+  whisp,
   sessionId,
   playerId,
   turnId,
@@ -40,16 +34,9 @@ export function StorytellingInterface({
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [secretElement, setSecretElement] = useState<string | null>(null);
-  const [whisp, setWhisp] = useState<string>("");
-  const [isLoadingWhisp, setIsLoadingWhisp] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const iconMap: Record<string, any> = {
-    Brain, Sparkles, Lightbulb: LightbulbIcon, Zap, Heart
-  };
 
   const MAX_RECORDING_TIME = 180; // 3 minutes in seconds
 
@@ -77,7 +64,7 @@ export function StorytellingInterface({
             const reader = new FileReader();
             reader.onloadend = () => {
               const base64data = reader.result as string;
-              const base64Audio = base64data.split(',')[1]; // Remove data:audio/webm;base64, prefix
+              const base64Audio = base64data.split(',')[1];
               
               sendWebSocketMessage({
                 type: "audio_chunk",
@@ -94,18 +81,15 @@ export function StorytellingInterface({
         setRecordedAudio(blob);
         stream.getTracks().forEach((track) => track.stop());
         
-        // Notify others recording stopped
         sendWebSocketMessage?.({
           type: "recording_stopped",
         });
       };
 
-      // Request data every 100ms for real-time streaming
       mediaRecorder.start(100);
       setIsRecording(true);
       setRecordingTime(0);
 
-      // Notify others recording started
       sendWebSocketMessage?.({
         type: "recording_started",
       });
@@ -149,15 +133,6 @@ export function StorytellingInterface({
       return;
     }
 
-    if (!secretElement) {
-      toast({
-        title: "Select Secret Element",
-        description: "Please choose which element you're describing.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsUploading(true);
     try {
       // Upload audio to storage
@@ -192,7 +167,7 @@ export function StorytellingInterface({
 
       toast({
         title: "Story Submitted!",
-        description: "Other players can now guess your elements.",
+        description: "Other players can now guess your whisp.",
       });
 
       onStoryComplete();
@@ -221,7 +196,7 @@ export function StorytellingInterface({
           <CardHeader>
             <CardTitle className="text-center text-2xl">
               {isStoryteller ? (
-                <span className="text-primary">Tell your story</span>
+                <span className="text-primary">Tell Your Story</span>
               ) : (
                 <span className="text-primary">{storytellerName} is telling a story</span>
               )}
@@ -231,216 +206,113 @@ export function StorytellingInterface({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-3">
-                {isStoryteller ? "Step 1: Select Your Secret Element" : "The 5 Elements"}
-              </h3>
-              <p className="text-sm text-muted-foreground mb-3">
-                {isStoryteller 
-                  ? "Choose ONE element to describe - others will guess which one" 
-                  : "The storyteller will pick one of these elements and give a clue"}
-              </p>
-              <div className="flex gap-3 flex-wrap justify-center">
-                {elements.map((element) => {
-                  const IconComponent = iconMap[element.icon] || Brain;
-                  const isSelected = secretElement === element.id;
-                  return (
-                    <button
-                      key={element.id}
-                      onClick={async () => {
-                        if (isStoryteller) {
-                          setSecretElement(element.id);
-                          setIsLoadingWhisp(true);
-                          
-                          try {
-                            console.log("Generating whisp for element:", element.name, "theme:", theme.name);
-                            
-                            // Generate whisp (one-word hint)
-                            const { data: whispData, error: whispError } = await supabase.functions.invoke("generate-whisp", {
-                              body: { 
-                                elementName: element.name,
-                                themeName: theme.name 
-                              },
-                            });
-
-                            console.log("Whisp response:", whispData, "error:", whispError);
-
-                            if (whispError) {
-                              console.error("Whisp generation error:", whispError);
-                              throw whispError;
-                            }
-
-                            if (!whispData || !whispData.whisp) {
-                              throw new Error("No whisp data returned");
-                            }
-
-                            const generatedWhisp = whispData.whisp;
-                            console.log("Generated whisp:", generatedWhisp);
-                            setWhisp(generatedWhisp);
-
-                            // Update turn with whisp and secret element
-                            const { error: updateError } = await supabase
-                              .from("game_turns")
-                              .update({ 
-                                whisp: generatedWhisp,
-                                secret_element: element.id 
-                              })
-                              .eq("id", turnId);
-
-                            if (updateError) {
-                              console.error("Error updating turn:", updateError);
-                            }
-                            
-                            // Notify others via WebSocket
-                            sendWebSocketMessage?.({
-                              type: "secret_element_selected",
-                              elementId: element.id,
-                            });
-
-                            toast({
-                              title: "Whisp Generated! ✨",
-                              description: `Your hint word is: "${generatedWhisp}"`,
-                            });
-                          } catch (error) {
-                            console.error("Error generating whisp:", error);
-                            toast({
-                              title: "Error",
-                              description: error instanceof Error ? error.message : "Failed to generate hint. Please try again.",
-                              variant: "destructive",
-                            });
-                          } finally {
-                            setIsLoadingWhisp(false);
-                          }
-                        }
-                      }}
-                      disabled={!isStoryteller || recordedAudio !== null}
-                      className={`flex flex-col items-center justify-center w-24 h-24 rounded-lg transition-all ${
-                        isSelected 
-                          ? 'bg-primary text-primary-foreground ring-2 ring-primary' 
-                          : 'bg-muted border-2 border-border hover:bg-muted/80'
-                      } ${(!isStoryteller || recordedAudio) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                    >
-                      <IconComponent className="h-8 w-8 mb-1" />
-                      <p className="text-xs font-medium text-center">{element.name}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {isStoryteller && secretElement && (
-              <div className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <Lightbulb className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold text-primary">Your Secret Element</h3>
+            {/* Whisp display - only visible to storyteller */}
+            {isStoryteller && whisp && (
+              <div className="bg-primary/10 p-6 rounded-lg border-2 border-primary/20">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                  <h3 className="text-xl font-semibold text-primary">Your Secret Whisp</h3>
+                  <Sparkles className="h-6 w-6 text-primary" />
                 </div>
-                <p className="text-xl font-bold text-center text-primary">
-                  {elements.find(el => el.id === secretElement)?.name || 'Selected'}
-                </p>
-                {whisp && (
-                  <>
-                    <div className="my-3 border-t border-primary/20" />
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground mb-1">Your Whisp (Hint):</p>
-                      <p className="text-2xl font-bold text-primary">{whisp}</p>
-                    </div>
-                  </>
-                )}
-                <p className="text-sm text-muted-foreground text-center mt-2">
-                  {whisp ? "Use this word as inspiration for your story!" : "Generating your hint..."}
+                <p className="text-4xl font-bold text-center text-primary mb-3">{whisp}</p>
+                <p className="text-sm text-muted-foreground text-center">
+                  Create a story about this word. Other players will guess what it is!
                 </p>
               </div>
             )}
 
-            <div className="border-t border-border pt-6">
-              <h3 className="text-lg font-semibold mb-3">
-                {isStoryteller ? "Step 2: Record Your Story" : "Waiting for Story"}
-              </h3>
-              {isStoryteller ? (
-                <>
-                  {(!secretElement || isLoadingWhisp) && (
-                    <Alert className="mb-4">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        {isLoadingWhisp ? "Generating your whisp (hint)..." : "Please select your secret element first"}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  {!recordedAudio ? (
-                    <div className="space-y-4">
-                      {isRecording && (
-                        <div className="text-center">
-                          <p className="text-2xl font-bold text-primary">
-                            {formatTime(recordingTime)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Max: {formatTime(MAX_RECORDING_TIME)}
-                          </p>
-                        </div>
+            {/* Non-storyteller waiting view */}
+            {!isStoryteller && (
+              <div className="bg-muted/50 p-6 rounded-lg text-center">
+                <Mic className="h-12 w-12 mx-auto mb-3 text-muted-foreground animate-pulse" />
+                <p className="text-lg font-medium text-muted-foreground">
+                  Waiting for {storytellerName} to record their story...
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Listen carefully and try to guess the whisp word!
+                </p>
+              </div>
+            )}
+
+            {/* Recording section - only for storyteller */}
+            {isStoryteller && (
+              <div className="border-t border-border pt-6">
+                <h3 className="text-lg font-semibold mb-3">Record Your Story</h3>
+                
+                {!whisp && (
+                  <Alert className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Waiting for whisp to be generated...
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {!recordedAudio ? (
+                  <div className="space-y-4">
+                    {isRecording && (
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-primary">
+                          {formatTime(recordingTime)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Max: {formatTime(MAX_RECORDING_TIME)}
+                        </p>
+                      </div>
+                    )}
+                    <Button
+                      onClick={isRecording ? stopRecording : startRecording}
+                      size="lg"
+                      variant={isRecording ? "destructive" : "default"}
+                      className="w-full"
+                      disabled={!whisp}
+                    >
+                      {isRecording ? (
+                        <>
+                          <Square className="mr-2 h-5 w-5" />
+                          Stop Recording
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="mr-2 h-5 w-5" />
+                          Start Recording
+                        </>
                       )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <audio controls src={URL.createObjectURL(recordedAudio)} className="w-full" />
+                    <div className="flex gap-3">
                       <Button
-                        onClick={isRecording ? stopRecording : startRecording}
-                        size="lg"
-                        variant={isRecording ? "destructive" : "default"}
-                        className="w-full"
-                        disabled={!secretElement || isLoadingWhisp}
+                        onClick={() => setRecordedAudio(null)}
+                        variant="outline"
+                        className="flex-1"
                       >
-                        {isRecording ? (
-                          <>
-                            <Square className="mr-2 h-5 w-5" />
-                            Stop Recording
-                          </>
-                        ) : (
-                          <>
-                            <Mic className="mr-2 h-5 w-5" />
-                            Start Recording
-                          </>
-                        )}
+                        Re-record
+                      </Button>
+                      <Button
+                        onClick={handleSubmitStory}
+                        disabled={isUploading}
+                        className="flex-1"
+                      >
+                        <Send className="mr-2 h-4 w-4" />
+                        {isUploading ? "Submitting..." : "Submit Story"}
                       </Button>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <audio controls src={URL.createObjectURL(recordedAudio)} className="w-full" />
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={() => setRecordedAudio(null)}
-                          variant="outline"
-                          className="flex-1"
-                        >
-                          Re-record
-                        </Button>
-                        <Button
-                          onClick={handleSubmitStory}
-                          disabled={isUploading}
-                          className="flex-1"
-                        >
-                          <Send className="mr-2 h-4 w-4" />
-                          {isUploading ? "Submitting..." : "Submit Story"}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-8 space-y-4">
-                  <div className="inline-flex items-center gap-2 text-muted-foreground">
-                    <Mic className="h-5 w-5 animate-pulse" />
-                    <p className="text-lg">Waiting for {storytellerName} to record...</p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    The storyteller is choosing their secret element and will record a clue
-                  </p>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
+            {/* Tips */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <div className="flex items-start gap-2">
                 <Lightbulb className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
                   {isStoryteller 
-                    ? "Use your whisp (hint word) as inspiration! Craft a creative story that describes your secret element. Other players will listen and try to guess which element you used!"
-                    : "Listen carefully when the storyteller records their clue, then you'll have 3 attempts to guess which element they described!"}
+                    ? "Tell a creative story that describes your whisp word without saying it directly. Use metaphors, examples, or describe situations where you might encounter it!"
+                    : "Listen carefully to the story and try to guess the whisp word. Type your answer when it's time to guess!"}
                 </p>
               </div>
             </div>
