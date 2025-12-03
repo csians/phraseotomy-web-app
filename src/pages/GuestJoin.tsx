@@ -128,6 +128,27 @@ const GuestJoin = () => {
       localStorage.setItem("guest_player_name", playerName.trim());
       localStorage.setItem("guestPlayerData", JSON.stringify(guestData));
 
+      // First, lookup the session to broadcast "joining" state
+      const { data: sessionLookup } = await supabase
+        .from("game_sessions")
+        .select("id")
+        .eq("lobby_code", lobbyCode.toUpperCase().trim())
+        .eq("status", "waiting")
+        .maybeSingle();
+
+      // If session found, broadcast player_joining
+      if (sessionLookup?.id) {
+        const channel = supabase.channel(`lobby-broadcast-${sessionLookup.id}`);
+        await channel.subscribe();
+        channel.send({
+          type: "broadcast",
+          event: "player_joining",
+          payload: { playerName: playerName.trim() },
+        });
+        // Cleanup channel after broadcast
+        setTimeout(() => supabase.removeChannel(channel), 500);
+      }
+
       const { data: joinData, error: joinError } = await supabase.functions.invoke(
         "join-lobby",
         {
