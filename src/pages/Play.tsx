@@ -59,9 +59,6 @@ const Play = () => {
       if (error) {
         console.error("Error storing customer:", error);
       } else {
-        console.log("✅ Customer stored/verified in database", data);
-
-        // Store the API response customer data in localStorage
         if (data?.customer) {
           const existingData = localStorage.getItem("customerData");
           const existing = existingData ? JSON.parse(existingData) : {};
@@ -77,7 +74,6 @@ const Play = () => {
               is_new: data.is_new,
             }),
           );
-          console.log("✅ Customer data stored in localStorage from API response");
         }
       }
     } catch (error) {
@@ -93,14 +89,7 @@ const Play = () => {
         setTenant(window.__PHRASEOTOMY_CONFIG__);
         setShopDomain(window.__PHRASEOTOMY_SHOP__);
 
-        console.log("hhhhhhhhh", window.__PHRASEOTOMY_CUSTOMER__);
-
         if (window.__PHRASEOTOMY_CUSTOMER__) {
-          console.log("👤 Customer Data from proxy:", {
-            id: window.__PHRASEOTOMY_CUSTOMER__.id,
-            email: window.__PHRASEOTOMY_CUSTOMER__.email,
-            name: window.__PHRASEOTOMY_CUSTOMER__.name,
-          });
           setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
 
           // Store customer data in localStorage for Lobby page
@@ -140,16 +129,10 @@ const Play = () => {
           const tenantConfig = JSON.parse(configParam);
           const customerData = customerParam ? JSON.parse(customerParam) : null;
 
-          console.log("🎯 Config loaded from URL params (iframe mode)");
           setTenant(tenantConfig);
           setShopDomain(shopParam);
 
           if (customerData) {
-            console.log("👤 Customer Data from iframe params:", {
-              id: customerData.id,
-              email: customerData.email,
-              name: customerData.name,
-            });
             setCustomer(customerData);
 
             // Store customer data in localStorage for Lobby page
@@ -180,17 +163,14 @@ const Play = () => {
       const hostParam = urlParams.get("host");
 
       if (hostParam && shopParam) {
-        console.log("🔗 Embedded app detected, redirecting to login with shop context");
         navigate(`/login?shop=${shopParam}&host=${hostParam}`, { replace: true });
         return;
       }
 
-      // Try to restore session from localStorage
       const sessionToken = localStorage.getItem("phraseotomy_session_token");
       const storedCustomerData = localStorage.getItem("customerData");
 
       if (!sessionToken || !storedCustomerData) {
-        console.log("⚠️ No session found, redirecting to login");
         navigate("/login", { replace: true });
         return;
       }
