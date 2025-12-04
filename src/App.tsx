@@ -89,8 +89,9 @@ const RootRedirect = () => {
     
     // Only check for active lobby session from root path
     if (currentPath === '/' || currentPath === '') {
-      const currentLobbySession = sessionStorage.getItem('current_lobby_session');
-      if (currentLobbySession) {
+      const currentLobbySession = sessionStorage.getItem('current_lobby_session') || localStorage.getItem('current_lobby_session');
+      const lobbyPlayerId = sessionStorage.getItem('lobby_player_id') || localStorage.getItem('lobby_player_id');
+      if (currentLobbySession && lobbyPlayerId) {
         console.log('Active lobby session found, redirecting to lobby');
         setRedirectTarget(`/lobby/${currentLobbySession}`);
         return;
