@@ -456,8 +456,9 @@ export default function Lobby() {
       return;
     }
 
-    // Store sessionId in sessionStorage to persist across refreshes
+    // Store sessionId in both storage types to persist across refreshes and browser restarts
     sessionStorage.setItem("current_lobby_session", sessionId);
+    localStorage.setItem("current_lobby_session", sessionId);
     fetchLobbyData();
 
     // Set up real-time subscription for lobby updates using Supabase Realtime Broadcast
@@ -511,10 +512,13 @@ export default function Lobby() {
             variant: "destructive",
           });
           sessionStorage.removeItem("current_lobby_session");
+          localStorage.removeItem("current_lobby_session");
           localStorage.removeItem("guest_player_id");
           localStorage.removeItem("guestPlayerData");
+          localStorage.removeItem("lobby_player_id");
           sessionStorage.removeItem("guest_player_id");
           sessionStorage.removeItem("guestPlayerData");
+          sessionStorage.removeItem("lobby_player_id");
           navigate("/guest-join", { replace: true });
           return;
         }
@@ -1108,6 +1112,9 @@ export default function Lobby() {
 
       // Clear session storage
       sessionStorage.removeItem("current_lobby_session");
+      localStorage.removeItem("current_lobby_session");
+      sessionStorage.removeItem("lobby_player_id");
+      localStorage.removeItem("lobby_player_id");
       
       // Check if this is a guest player and clear their data
       const guestPlayerId = localStorage.getItem("guest_player_id");
@@ -1161,6 +1168,9 @@ export default function Lobby() {
 
       // Clear session storage
       sessionStorage.removeItem("current_lobby_session");
+      localStorage.removeItem("current_lobby_session");
+      sessionStorage.removeItem("lobby_player_id");
+      localStorage.removeItem("lobby_player_id");
       
       // Clear guest data if applicable
       const guestPlayerId = localStorage.getItem("guest_player_id");

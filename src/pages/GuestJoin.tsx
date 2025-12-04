@@ -77,10 +77,11 @@ const GuestJoin = () => {
           return;
         }
 
-        // Store session for persistence
+        // Store session for persistence in both storages
         const sessionId = joinData?.session?.id;
         if (sessionId) {
           sessionStorage.setItem("current_lobby_session", sessionId);
+          localStorage.setItem("current_lobby_session", sessionId);
         }
 
         setStatus("Success! Redirecting...");
@@ -178,10 +179,11 @@ const GuestJoin = () => {
         return;
       }
 
-      // Store session for persistence
+      // Store session for persistence in both storages
       const sessionId = joinData?.session?.id;
       if (sessionId) {
         sessionStorage.setItem("current_lobby_session", sessionId);
+        localStorage.setItem("current_lobby_session", sessionId);
       }
 
       toast.success("Joined lobby successfully!");
