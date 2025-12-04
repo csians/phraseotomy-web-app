@@ -408,7 +408,9 @@ export type Database = {
           current_round: number | null
           current_storyteller_id: string | null
           ended_at: string | null
+          game_mode: string
           game_name: string | null
+          guess_time_seconds: number | null
           host_customer_id: string
           host_customer_name: string | null
           id: string
@@ -419,7 +421,9 @@ export type Database = {
           shop_domain: string
           started_at: string | null
           status: string
+          story_time_seconds: number | null
           tenant_id: string
+          timer_preset: string | null
           total_rounds: number | null
           updated_at: string
         }
@@ -428,7 +432,9 @@ export type Database = {
           current_round?: number | null
           current_storyteller_id?: string | null
           ended_at?: string | null
+          game_mode?: string
           game_name?: string | null
+          guess_time_seconds?: number | null
           host_customer_id: string
           host_customer_name?: string | null
           id?: string
@@ -439,7 +445,9 @@ export type Database = {
           shop_domain: string
           started_at?: string | null
           status?: string
+          story_time_seconds?: number | null
           tenant_id: string
+          timer_preset?: string | null
           total_rounds?: number | null
           updated_at?: string
         }
@@ -448,7 +456,9 @@ export type Database = {
           current_round?: number | null
           current_storyteller_id?: string | null
           ended_at?: string | null
+          game_mode?: string
           game_name?: string | null
+          guess_time_seconds?: number | null
           host_customer_id?: string
           host_customer_name?: string | null
           id?: string
@@ -459,7 +469,9 @@ export type Database = {
           shop_domain?: string
           started_at?: string | null
           status?: string
+          story_time_seconds?: number | null
           tenant_id?: string
+          timer_preset?: string | null
           total_rounds?: number | null
           updated_at?: string
         }

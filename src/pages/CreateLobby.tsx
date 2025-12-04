@@ -29,6 +29,14 @@ export default function CreateLobby() {
   const [allPacks, setAllPacks] = useState<Pack[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loadingThemes, setLoadingThemes] = useState(true);
+  const [gameMode, setGameMode] = useState<"live" | "async">("live");
+  const [timerPreset, setTimerPreset] = useState<"quick" | "normal" | "extended">("normal");
+
+  const TIMER_PRESETS = {
+    quick: { story: 300, guess: 180, label: "Quick (5/3 min)" },
+    normal: { story: 600, guess: 420, label: "Normal (10/7 min)" },
+    extended: { story: 900, guess: 600, label: "Extended (15/10 min)" },
+  };
 
   // Get customer and shop info from location state or window
   const customer = location.state?.customer || window.__PHRASEOTOMY_CUSTOMER__;
@@ -181,6 +189,7 @@ export default function CreateLobby() {
       const lobbyCode = generateLobbyCode();
 
       // Use edge function to create session (bypasses RLS with service role)
+      const timerSettings = TIMER_PRESETS[timerPreset];
       const { data, error } = await supabase.functions.invoke("create-game-session", {
         body: {
           lobbyCode,
@@ -191,6 +200,10 @@ export default function CreateLobby() {
           packsUsed: [selectedPack],
           gameName: lobbyName.trim(),
           themeId: selectedTheme,
+          gameMode,
+          timerPreset: gameMode === "live" ? timerPreset : null,
+          storyTimeSeconds: gameMode === "live" ? timerSettings.story : null,
+          guessTimeSeconds: gameMode === "live" ? timerSettings.guess : null,
         },
       });
 
@@ -326,6 +339,78 @@ export default function CreateLobby() {
                 onChange={(e) => setLobbyName(e.target.value)}
               />
             </div>
+
+            {/* Game Mode Selection */}
+            <div className="space-y-3">
+              <Label>Game Mode</Label>
+              <RadioGroup value={gameMode} onValueChange={(v) => setGameMode(v as "live" | "async")}>
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                      gameMode === "live" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
+                    }`}
+                    onClick={() => setGameMode("live")}
+                  >
+                    <RadioGroupItem value="live" id="live" className="mt-0.5" />
+                    <div className="space-y-1">
+                      <Label htmlFor="live" className="cursor-pointer font-medium">
+                        ⏱️ Live Mode
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Time-based gameplay with countdown timers
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                      gameMode === "async" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
+                    }`}
+                    onClick={() => setGameMode("async")}
+                  >
+                    <RadioGroupItem value="async" id="async" className="mt-0.5" />
+                    <div className="space-y-1">
+                      <Label htmlFor="async" className="cursor-pointer font-medium">
+                        📬 Async Mode
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Play at your own pace, no time limits
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Timer Presets (only for Live mode) */}
+            {gameMode === "live" && (
+              <div className="space-y-3">
+                <Label>Timer Settings</Label>
+                <RadioGroup value={timerPreset} onValueChange={(v) => setTimerPreset(v as "quick" | "normal" | "extended")}>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(Object.entries(TIMER_PRESETS) as [keyof typeof TIMER_PRESETS, typeof TIMER_PRESETS["quick"]][]).map(([key, preset]) => (
+                      <div
+                        key={key}
+                        className={`flex flex-col items-center p-3 rounded-lg border cursor-pointer transition-colors text-center ${
+                          timerPreset === key ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
+                        }`}
+                        onClick={() => setTimerPreset(key)}
+                      >
+                        <RadioGroupItem value={key} id={key} className="sr-only" />
+                        <Label htmlFor={key} className="cursor-pointer text-sm font-medium capitalize">
+                          {key}
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {Math.floor(preset.story / 60)}/{Math.floor(preset.guess / 60)} min
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground">
+                  Story time / Guess time. Auto-submits when timer expires.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Select Theme</Label>
