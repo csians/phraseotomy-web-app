@@ -181,10 +181,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Combine and mark sessions
+    // Get player counts for all sessions
+    const allSessionIds = [
+      ...(hostedSessions || []).map(s => s.id),
+      ...joinedSessions.map(s => s.id),
+    ];
+
+    let playerCounts: Record<string, number> = {};
+    if (allSessionIds.length > 0) {
+      const { data: playerCountData } = await supabase
+        .from('game_players')
+        .select('session_id')
+        .in('session_id', allSessionIds);
+
+      if (playerCountData) {
+        playerCounts = playerCountData.reduce((acc: Record<string, number>, p) => {
+          acc[p.session_id] = (acc[p.session_id] || 0) + 1;
+          return acc;
+        }, {});
+      }
+    }
+
+    // Combine and mark sessions with player count
     const allSessions = [
-      ...(hostedSessions || []).map(s => ({ ...s, is_host: true })),
-      ...joinedSessions.map(s => ({ ...s, is_host: false })),
+      ...(hostedSessions || []).map(s => ({ ...s, is_host: true, player_count: playerCounts[s.id] || 0 })),
+      ...joinedSessions.map(s => ({ ...s, is_host: false, player_count: playerCounts[s.id] || 0 })),
     ];
 
     // Transform licenses to match expected format
