@@ -352,7 +352,8 @@ Deno.serve(async (req) => {
           const firstName = customer?.first_name || proxyFirstName;
           const lastName = customer?.last_name || proxyLastName;
           const email = customer?.email || customerEmailFromProxy;
-          const name = [firstName, lastName].filter(Boolean).join(" ") || customerNameFromProxy || email || null;
+          // Don't fall back to email for name - name should be null if there's no actual name
+          const name = [firstName, lastName].filter(Boolean).join(" ") || customerNameFromProxy || null;
 
           customerData = {
             id: customerId,
