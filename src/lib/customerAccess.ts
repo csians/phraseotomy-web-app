@@ -19,6 +19,7 @@ export interface GameSession {
   game_name?: string | null;
   host_customer_name?: string | null;
   is_host: boolean;
+  player_count?: number;
 }
 
 export async function getCustomerLicenses(

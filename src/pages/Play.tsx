@@ -691,6 +691,9 @@ const Play = () => {
                       )}
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span className="capitalize">{session.status}</span>
+                        {session.player_count !== undefined && (
+                          <span>• {session.player_count}/12 players</span>
+                        )}
                         {!session.is_host && session.host_customer_name && (
                           <span>• Hosted by {session.host_customer_name}</span>
                         )}
