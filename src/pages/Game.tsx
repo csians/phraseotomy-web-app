@@ -26,6 +26,7 @@ interface Theme {
   isCore?: boolean;
   isUnlocked?: boolean;
   packName?: string;
+  pack_id?: string | null;
 }
 
 interface Element {
@@ -76,6 +77,7 @@ export default function Game() {
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
   const [isGeneratingWhisp, setIsGeneratingWhisp] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<string>("");
+  const [unlockedPackIds, setUnlockedPackIds] = useState<string[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
@@ -337,6 +339,7 @@ export default function Game() {
       setThemes(data.themes || []);
       setCurrentTurn(data.currentTurn);
       setSelectedIcons(data.selectedIcons || []);
+      setUnlockedPackIds(data.unlockedPackIds || []);
 
       // Determine game phase based on turn state
       let phase: "selecting_theme" | "generating_whisp" | "storytelling" | "guessing" | "scoring";
@@ -633,11 +636,13 @@ export default function Game() {
                       isCore: t.isCore || false,
                       isUnlocked: t.isUnlocked !== false,
                       packName: t.packName,
+                      packId: t.pack_id,
                     }))}
                     onThemeSelect={handleThemeSelect}
                     selectedThemeId={selectedThemeId}
                     disabled={isGeneratingWhisp}
                     playerName={players.find(p => p.player_id === currentPlayerId)?.name}
+                    unlockedPackIds={unlockedPackIds}
                   />
                 )}
               </CardContent>
