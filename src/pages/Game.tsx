@@ -6,8 +6,10 @@ import { useGameWebSocket } from "@/hooks/useGameWebSocket";
 import { Scoreboard } from "@/components/Scoreboard";
 import { StorytellingInterface } from "@/components/StorytellingInterface";
 import { GuessingInterface } from "@/components/GuessingInterface";
+import { ThemeSelectionCards, ThemeOption } from "@/components/ThemeSelectionCards";
 import { Button } from "@/components/ui/button";
-import { Wifi, WifiOff } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Wifi, WifiOff, Loader2 } from "lucide-react";
 
 interface Player {
   id: string;
@@ -21,6 +23,9 @@ interface Theme {
   id: string;
   name: string;
   icon: string;
+  isCore?: boolean;
+  isUnlocked?: boolean;
+  packName?: string;
 }
 
 interface Element {
@@ -35,6 +40,7 @@ interface GameSession {
   total_rounds: number;
   current_storyteller_id: string;
   status: string;
+  selected_theme_id?: string;
 }
 
 interface Turn {
@@ -65,10 +71,11 @@ export default function Game() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [currentTurn, setCurrentTurn] = useState<Turn | null>(null);
   const [selectedIcons, setSelectedIcons] = useState<IconItem[]>([]);
-  const [gamePhase, setGamePhase] = useState<"generating_whisp" | "storytelling" | "guessing" | "scoring">("generating_whisp");
+  const [gamePhase, setGamePhase] = useState<"selecting_theme" | "generating_whisp" | "storytelling" | "guessing" | "scoring">("selecting_theme");
   const [currentPlayerId, setCurrentPlayerId] = useState<string>("");
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
   const [isGeneratingWhisp, setIsGeneratingWhisp] = useState(false);
+  const [selectedThemeId, setSelectedThemeId] = useState<string>("");
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
@@ -332,10 +339,13 @@ export default function Game() {
       setSelectedIcons(data.selectedIcons || []);
 
       // Determine game phase based on turn state
-      let phase: "generating_whisp" | "storytelling" | "guessing" | "scoring";
-      if (!data.currentTurn || !data.currentTurn.whisp) {
+      let phase: "selecting_theme" | "generating_whisp" | "storytelling" | "guessing" | "scoring";
+      if (!data.currentTurn || !data.currentTurn.theme_id) {
+        phase = "selecting_theme";
+        console.log("No turn or no theme - setting phase to selecting_theme");
+      } else if (!data.currentTurn.whisp) {
         phase = "generating_whisp";
-        console.log("No turn or no whisp - setting phase to generating_whisp");
+        console.log("Theme selected but no whisp - setting phase to generating_whisp");
       } else if (!data.currentTurn.completed_at) {
         phase = "storytelling";
         console.log("Turn exists with whisp but not completed - setting phase to storytelling");
@@ -344,6 +354,11 @@ export default function Game() {
         console.log("Turn completed - setting phase to guessing");
       }
       setGamePhase(phase);
+      
+      // Set selected theme if exists
+      if (data.currentTurn?.theme_id) {
+        setSelectedThemeId(data.currentTurn.theme_id);
+      }
       
       // Check if current player is storyteller
       const isStoryteller = playerId === data.session?.current_storyteller_id;
@@ -436,14 +451,60 @@ export default function Game() {
     };
   };
 
-  // Auto-generate whisp when phase is generating_whisp and storyteller
+  // Handle theme selection
+  const handleThemeSelect = async (themeId: string) => {
+    setSelectedThemeId(themeId);
+    setIsGeneratingWhisp(true);
+    
+    try {
+      // Call start-turn with the selected theme - this will create/update the turn AND generate whisp
+      const { data, error } = await supabase.functions.invoke("start-turn", {
+        body: { 
+          sessionId, 
+          turnId: currentTurn?.id,
+          selectedThemeId: themeId,
+        },
+      });
+
+      if (error) throw error;
+
+      // Wait for DB to commit
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Refresh local state from database
+      await initializeGame();
+      
+      // Notify other players via WebSocket to refresh their state
+      sendWebSocketMessage({
+        type: "theme_selected",
+        themeId,
+        whisp: data.whisp,
+      });
+
+      toast({
+        title: "Theme Selected & Whisp Generated! ✨",
+        description: `Your word is: "${data.whisp}"`,
+      });
+    } catch (error) {
+      console.error("Error selecting theme:", error);
+      toast({
+        title: "Error",
+        description: "Failed to select theme.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingWhisp(false);
+    }
+  };
+
+  // Legacy whisp generation (fallback if theme already selected)
   const generateWhisp = async () => {
     if (isGeneratingWhisp) return;
     
     setIsGeneratingWhisp(true);
     try {
       const { data, error } = await supabase.functions.invoke("start-turn", {
-        body: { sessionId, turnId: currentTurn?.id },
+        body: { sessionId, turnId: currentTurn?.id, selectedThemeId },
       });
 
       if (error) throw error;
@@ -546,6 +607,57 @@ export default function Game() {
 
       {/* Game Content */}
       <div className="ml-96 p-4">
+        {/* Theme Selection Phase - Storyteller chooses theme */}
+        {gamePhase === "selecting_theme" && isStoryteller && (
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <Card className="w-full max-w-4xl">
+              <CardHeader>
+                <CardTitle className="text-center text-2xl">
+                  Your Turn to Tell a Story!
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isGeneratingWhisp ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    <p className="text-lg text-muted-foreground">
+                      Generating your secret whisp word...
+                    </p>
+                  </div>
+                ) : (
+                  <ThemeSelectionCards
+                    themes={themes.map(t => ({
+                      id: t.id,
+                      name: t.name,
+                      icon: t.icon,
+                      isCore: t.isCore || false,
+                      isUnlocked: t.isUnlocked !== false,
+                      packName: t.packName,
+                    }))}
+                    onThemeSelect={handleThemeSelect}
+                    selectedThemeId={selectedThemeId}
+                    disabled={isGeneratingWhisp}
+                    playerName={players.find(p => p.player_id === currentPlayerId)?.name}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {gamePhase === "selecting_theme" && !isStoryteller && (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-foreground mb-2">
+                Waiting for storyteller...
+              </h2>
+              <p className="text-muted-foreground">
+                {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is selecting a theme
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Generating Whisp Phase - Storyteller sees generation, others wait */}
         {gamePhase === "generating_whisp" && isStoryteller && (
           <div className="min-h-screen flex items-center justify-center">
