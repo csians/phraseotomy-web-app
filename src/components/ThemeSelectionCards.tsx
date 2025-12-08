@@ -68,8 +68,8 @@ export function ThemeSelectionCards({
 
   // Separate base themes and expansion themes
   const baseThemes = visibleThemes.filter((t) => t.isCore);
-  // Only show expansion themes if user has at least one expansion pack
-  const expansionThemes = visibleThemes.filter((t) => !t.isCore && (t.isUnlocked || unlockedPackIds.length > 0));
+  // Only show expansion themes that are unlocked (user has the pack)
+  const expansionThemes = visibleThemes.filter((t) => !t.isCore && t.isUnlocked);
 
   const renderThemeCard = (theme: ThemeOption) => {
     const IconComponent = iconMap[theme.icon] || Sparkles;
