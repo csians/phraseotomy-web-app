@@ -55,22 +55,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get all elements for this theme to use as whisps
-    const { data: themeElements, error: elementsError } = await supabase
-      .from("elements")
-      .select("id, name")
-      .eq("theme_id", sessionData.selected_theme_id);
-
-    if (elementsError || !themeElements || themeElements.length === 0) {
-      console.error("No elements found for theme:", sessionData.selected_theme_id);
-      return new Response(
-        JSON.stringify({ error: "No elements found for this theme. Please add elements first." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log(`Found ${themeElements.length} elements for theme "${theme.name}"`);
-
     // Get all players to determine total rounds and first storyteller
     const { data: allPlayers, error: playerError } = await supabase
       .from("game_players")
@@ -87,32 +71,6 @@ Deno.serve(async (req) => {
 
     const firstPlayer = allPlayers[0];
     const totalRounds = allPlayers.length;
-
-    // Generate whisps for ALL turns by randomly selecting elements from the theme
-    console.log("Selecting whisps from theme elements:", theme.name);
-    
-    const whisps: string[] = [];
-    const usedIndices = new Set<number>();
-    
-    // Select a unique random element for each round
-    for (let i = 0; i < totalRounds; i++) {
-      let randomIndex: number;
-      
-      // Try to get a unique element (if we have enough elements)
-      if (usedIndices.size < themeElements.length) {
-        do {
-          randomIndex = Math.floor(Math.random() * themeElements.length);
-        } while (usedIndices.has(randomIndex));
-        usedIndices.add(randomIndex);
-      } else {
-        // If we've used all elements, allow duplicates
-        randomIndex = Math.floor(Math.random() * themeElements.length);
-      }
-      
-      const whisp = themeElements[randomIndex].name;
-      whisps.push(whisp);
-      console.log(`Selected whisp for round ${i + 1}:`, whisp);
-    }
 
     // Update game session to start the game
     const updateData: any = {
@@ -145,13 +103,13 @@ Deno.serve(async (req) => {
 
     console.log("Game started successfully:", updatedSession);
 
-    // Create all turns for all rounds upfront, each with their own whisp
-    const turnsToCreate = allPlayers.map((player, index) => ({
+    // Create all turns for all rounds upfront WITHOUT whisp (whisp generated after mode selection)
+    const turnsToCreate = allPlayers.map((player: { player_id: string }, index: number) => ({
       session_id: sessionId,
       round_number: index + 1,
       storyteller_id: player.player_id,
       theme_id: sessionData.selected_theme_id,
-      whisp: whisps[index] || "Mystery",
+      // whisp will be generated in start-turn after mode selection
     }));
 
     const { data: createdTurns, error: turnsError } = await supabase
