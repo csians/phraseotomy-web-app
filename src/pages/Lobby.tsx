@@ -1759,6 +1759,23 @@ export default function Lobby() {
                 <p className="text-sm text-muted-foreground">Packs:</p>
                 <p className="text-sm font-medium">{packNames.length > 0 ? packNames.join(", ") : "None"}</p>
               </div>
+              {session?.selected_theme_id && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Theme:</p>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const theme = themes.find((t) => t.id === session.selected_theme_id);
+                      const IconComponent = theme ? iconMap[theme.icon?.toLowerCase()] || Sparkles : Sparkles;
+                      return (
+                        <>
+                          <IconComponent className="h-4 w-4 text-primary" />
+                          <p className="text-sm font-medium">{theme?.name || "Loading..."}</p>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
