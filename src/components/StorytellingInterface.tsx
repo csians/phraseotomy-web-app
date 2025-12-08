@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Mic, Square, Send, Lightbulb, AlertCircle, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { IconSelectionPanel, IconItem } from "@/components/IconSelectionPanel";
 
 interface StorytellingInterfaceProps {
   theme: { id: string; name: string };
@@ -16,6 +17,7 @@ interface StorytellingInterfaceProps {
   isStoryteller: boolean;
   storytellerName: string;
   sendWebSocketMessage?: (message: any) => void;
+  selectedIcons?: IconItem[];
 }
 
 export function StorytellingInterface({
@@ -28,17 +30,23 @@ export function StorytellingInterface({
   isStoryteller,
   storytellerName,
   sendWebSocketMessage,
+  selectedIcons = [],
 }: StorytellingInterfaceProps) {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [orderedIcons, setOrderedIcons] = useState<IconItem[]>(selectedIcons);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const MAX_RECORDING_TIME = 180; // 3 minutes in seconds
+
+  useEffect(() => {
+    setOrderedIcons(selectedIcons);
+  }, [selectedIcons]);
 
   useEffect(() => {
     return () => {
@@ -47,6 +55,26 @@ export function StorytellingInterface({
       }
     };
   }, []);
+
+  const handleIconOrderChange = async (newOrder: IconItem[]) => {
+    setOrderedIcons(newOrder);
+    
+    // Save new order to database
+    const iconOrder = newOrder.map((_, index) => index);
+    try {
+      await supabase.functions.invoke("update-icon-order", {
+        body: { turnId, iconOrder },
+      });
+      
+      // Notify other players
+      sendWebSocketMessage?.({
+        type: "icons_reordered",
+        iconOrder,
+      });
+    } catch (error) {
+      console.error("Error updating icon order:", error);
+    }
+  };
 
   const startRecording = async () => {
     try {
@@ -163,6 +191,7 @@ export function StorytellingInterface({
       sendWebSocketMessage?.({
         type: "story_submitted",
         audioUrl: publicUrl,
+        selectedIcons: orderedIcons,
       });
 
       toast({
@@ -191,7 +220,7 @@ export function StorytellingInterface({
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-3xl space-y-6">
+      <div className="w-full max-w-4xl space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-center text-2xl">
@@ -206,6 +235,18 @@ export function StorytellingInterface({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Icons Display */}
+            {orderedIcons.length > 0 && (
+              <div className="bg-muted/30 p-6 rounded-xl">
+                <IconSelectionPanel
+                  icons={orderedIcons}
+                  onOrderChange={isStoryteller ? handleIconOrderChange : undefined}
+                  isDraggable={isStoryteller}
+                  label={isStoryteller ? "Your Story Icons (drag to reorder)" : "Story Icons"}
+                />
+              </div>
+            )}
+
             {/* Whisp display - only visible to storyteller */}
             {isStoryteller && whisp && (
               <div className="bg-primary/10 p-6 rounded-lg border-2 border-primary/20">
@@ -216,7 +257,7 @@ export function StorytellingInterface({
                 </div>
                 <p className="text-4xl font-bold text-center text-primary mb-3">{whisp}</p>
                 <p className="text-sm text-muted-foreground text-center">
-                  Create a story about this word. Other players will guess what it is!
+                  Use the icons above to help tell a story about this word. Other players will guess what it is!
                 </p>
               </div>
             )}
@@ -229,7 +270,7 @@ export function StorytellingInterface({
                   Waiting for {storytellerName} to record their story...
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Listen carefully and try to guess the whisp word!
+                  Look at the icons above for clues and try to guess the whisp word!
                 </p>
               </div>
             )}
@@ -289,7 +330,7 @@ export function StorytellingInterface({
                         variant="outline"
                         className="flex-1"
                       >
-                        Re-record
+                        Record Again
                       </Button>
                       <Button
                         onClick={handleSubmitStory}
@@ -297,7 +338,7 @@ export function StorytellingInterface({
                         className="flex-1"
                       >
                         <Send className="mr-2 h-4 w-4" />
-                        {isUploading ? "Submitting..." : "Submit Story"}
+                        {isUploading ? "Sending..." : "Send Story"}
                       </Button>
                     </div>
                   </div>
@@ -311,8 +352,8 @@ export function StorytellingInterface({
                 <Lightbulb className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
                   {isStoryteller 
-                    ? "Tell a creative story that describes your whisp word without saying it directly. Use metaphors, examples, or describe situations where you might encounter it!"
-                    : "Listen carefully to the story and try to guess the whisp word. Type your answer when it's time to guess!"}
+                    ? "Use the icons to guide your story! Arrange them in the order you'll reference them, then tell a creative story that describes your whisp word without saying it directly."
+                    : "Watch the icons and listen carefully to the story. Try to guess the whisp word based on the clues!"}
                 </p>
               </div>
             </div>

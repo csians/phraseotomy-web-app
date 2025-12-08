@@ -100,3 +100,6 @@ verify_jwt = false
 
 [functions.kick-player]
 verify_jwt = false
+
+[functions.update-icon-order]
+verify_jwt = false

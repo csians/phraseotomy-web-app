@@ -44,6 +44,15 @@ interface Turn {
   recording_url: string | null;
   completed_at: string | null;
   theme: Theme;
+  selected_icon_ids?: string[];
+  icon_order?: number[];
+}
+
+interface IconItem {
+  id: string;
+  name: string;
+  icon: string;
+  isFromCore: boolean;
 }
 
 export default function Game() {
@@ -55,6 +64,7 @@ export default function Game() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [currentTurn, setCurrentTurn] = useState<Turn | null>(null);
+  const [selectedIcons, setSelectedIcons] = useState<IconItem[]>([]);
   const [gamePhase, setGamePhase] = useState<"generating_whisp" | "storytelling" | "guessing" | "scoring">("generating_whisp");
   const [currentPlayerId, setCurrentPlayerId] = useState<string>("");
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
@@ -319,6 +329,7 @@ export default function Game() {
       setPlayers(data.players || []);
       setThemes(data.themes || []);
       setCurrentTurn(data.currentTurn);
+      setSelectedIcons(data.selectedIcons || []);
 
       // Determine game phase based on turn state
       let phase: "generating_whisp" | "storytelling" | "guessing" | "scoring";
@@ -581,6 +592,7 @@ export default function Game() {
             isStoryteller={isStoryteller}
             storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
             sendWebSocketMessage={sendWebSocketMessage}
+            selectedIcons={selectedIcons}
           />
         )}
 
@@ -619,6 +631,7 @@ export default function Game() {
             roundNumber={session.current_round ?? 1}
             playerId={currentPlayerId}
             onGuessSubmit={handleGuessSubmit}
+            selectedIcons={selectedIcons}
           />
         )}
 

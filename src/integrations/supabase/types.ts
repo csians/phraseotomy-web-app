@@ -503,11 +503,13 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string
+          icon_order: number[] | null
           id: string
           recording_url: string | null
           round_number: number
           secret_element: string | null
           selected_elements: string | null
+          selected_icon_ids: string[] | null
           session_id: string
           storyteller_id: string
           theme_id: string | null
@@ -516,11 +518,13 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           created_at?: string
+          icon_order?: number[] | null
           id?: string
           recording_url?: string | null
           round_number: number
           secret_element?: string | null
           selected_elements?: string | null
+          selected_icon_ids?: string[] | null
           session_id: string
           storyteller_id: string
           theme_id?: string | null
@@ -529,11 +533,13 @@ export type Database = {
         Update: {
           completed_at?: string | null
           created_at?: string
+          icon_order?: number[] | null
           id?: string
           recording_url?: string | null
           round_number?: number
           secret_element?: string | null
           selected_elements?: string | null
+          selected_icon_ids?: string[] | null
           session_id?: string
           storyteller_id?: string
           theme_id?: string | null
@@ -721,21 +727,35 @@ export type Database = {
           created_at: string
           icon: string
           id: string
+          is_core: boolean
           name: string
+          pack_id: string | null
         }
         Insert: {
           created_at?: string
           icon: string
           id?: string
+          is_core?: boolean
           name: string
+          pack_id?: string | null
         }
         Update: {
           created_at?: string
           icon?: string
           id?: string
+          is_core?: boolean
           name?: string
+          pack_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "themes_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
