@@ -7,6 +7,8 @@ import { Scoreboard } from "@/components/Scoreboard";
 import { StorytellingInterface } from "@/components/StorytellingInterface";
 import { GuessingInterface } from "@/components/GuessingInterface";
 import { ThemeSelectionCards, ThemeOption } from "@/components/ThemeSelectionCards";
+import { TurnModeSelection } from "@/components/TurnModeSelection";
+import { ElementsInterface } from "@/components/ElementsInterface";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wifi, WifiOff, Loader2 } from "lucide-react";
@@ -53,6 +55,7 @@ interface Turn {
   theme: Theme;
   selected_icon_ids?: string[];
   icon_order?: number[];
+  turn_mode?: "audio" | "elements";
 }
 
 interface IconItem {
@@ -61,6 +64,8 @@ interface IconItem {
   icon: string;
   isFromCore: boolean;
 }
+
+type GamePhase = "selecting_theme" | "selecting_mode" | "generating_whisp" | "storytelling" | "elements" | "guessing" | "scoring";
 
 export default function Game() {
   const { sessionId } = useParams();
@@ -72,12 +77,13 @@ export default function Game() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [currentTurn, setCurrentTurn] = useState<Turn | null>(null);
   const [selectedIcons, setSelectedIcons] = useState<IconItem[]>([]);
-  const [gamePhase, setGamePhase] = useState<"selecting_theme" | "generating_whisp" | "storytelling" | "guessing" | "scoring">("selecting_theme");
+  const [gamePhase, setGamePhase] = useState<GamePhase>("selecting_theme");
   const [currentPlayerId, setCurrentPlayerId] = useState<string>("");
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
   const [isGeneratingWhisp, setIsGeneratingWhisp] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<string>("");
   const [unlockedPackIds, setUnlockedPackIds] = useState<string[]>([]);
+  const [selectedTurnMode, setSelectedTurnMode] = useState<"audio" | "elements" | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
@@ -342,21 +348,40 @@ export default function Game() {
       setUnlockedPackIds(data.unlockedPackIds || []);
 
       // Determine game phase based on turn state
-      let phase: "selecting_theme" | "generating_whisp" | "storytelling" | "guessing" | "scoring";
+      let phase: GamePhase;
+      const turnMode = data.currentTurn?.turn_mode || selectedTurnMode;
+      
       if (!data.currentTurn || !data.currentTurn.theme_id) {
         phase = "selecting_theme";
         console.log("No turn or no theme - setting phase to selecting_theme");
       } else if (!data.currentTurn.whisp) {
-        phase = "generating_whisp";
-        console.log("Theme selected but no whisp - setting phase to generating_whisp");
+        // After theme selected, need to select mode (if not already set)
+        if (!turnMode) {
+          phase = "selecting_mode";
+          console.log("Theme selected but no mode - setting phase to selecting_mode");
+        } else {
+          phase = "generating_whisp";
+          console.log("Theme & mode selected but no whisp - setting phase to generating_whisp");
+        }
       } else if (!data.currentTurn.completed_at) {
-        phase = "storytelling";
-        console.log("Turn exists with whisp but not completed - setting phase to storytelling");
+        // Use turn_mode to determine which interface to show
+        if (turnMode === "elements") {
+          phase = "elements";
+          console.log("Turn in elements mode - setting phase to elements");
+        } else {
+          phase = "storytelling";
+          console.log("Turn in audio mode - setting phase to storytelling");
+        }
       } else {
         phase = "guessing";
         console.log("Turn completed - setting phase to guessing");
       }
       setGamePhase(phase);
+      
+      // Set turn mode if exists
+      if (data.currentTurn?.turn_mode) {
+        setSelectedTurnMode(data.currentTurn.turn_mode);
+      }
       
       // Set selected theme if exists
       if (data.currentTurn?.theme_id) {
@@ -454,18 +479,55 @@ export default function Game() {
     };
   };
 
-  // Handle theme selection
+  // Handle theme selection - now only saves theme, whisp generated after mode selection
   const handleThemeSelect = async (themeId: string) => {
     setSelectedThemeId(themeId);
+    
+    try {
+      // Save theme selection to game_sessions
+      const { error } = await supabase
+        .from("game_sessions")
+        .update({ selected_theme_id: themeId })
+        .eq("id", sessionId);
+
+      if (error) throw error;
+
+      // Move to mode selection phase
+      setGamePhase("selecting_mode");
+      
+      // Notify other players
+      sendWebSocketMessage({
+        type: "theme_selected",
+        themeId,
+      });
+
+      toast({
+        title: "Theme Selected!",
+        description: "Now choose your clue mode",
+      });
+    } catch (error) {
+      console.error("Error selecting theme:", error);
+      toast({
+        title: "Error",
+        description: "Failed to select theme.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle mode selection
+  const handleModeSelect = async (mode: "audio" | "elements") => {
+    setSelectedTurnMode(mode);
     setIsGeneratingWhisp(true);
     
     try {
-      // Call start-turn with the selected theme - this will create/update the turn AND generate whisp
+      // Call start-turn with the selected theme and mode
       const { data, error } = await supabase.functions.invoke("start-turn", {
         body: { 
           sessionId, 
           turnId: currentTurn?.id,
-          selectedThemeId: themeId,
+          selectedThemeId,
+          turnMode: mode,
         },
       });
 
@@ -479,20 +541,20 @@ export default function Game() {
       
       // Notify other players via WebSocket to refresh their state
       sendWebSocketMessage({
-        type: "theme_selected",
-        themeId,
+        type: "mode_selected",
+        mode,
         whisp: data.whisp,
       });
 
       toast({
-        title: "Theme Selected & Whisp Generated! ✨",
+        title: "Whisp Generated! ✨",
         description: `Your word is: "${data.whisp}"`,
       });
     } catch (error) {
-      console.error("Error selecting theme:", error);
+      console.error("Error selecting mode:", error);
       toast({
         title: "Error",
-        description: "Failed to select theme.",
+        description: "Failed to start turn.",
         variant: "destructive",
       });
     } finally {
@@ -663,23 +725,59 @@ export default function Game() {
           </div>
         )}
 
+        {/* Mode Selection Phase - Storyteller chooses audio or elements */}
+        {gamePhase === "selecting_mode" && isStoryteller && (
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <Card className="w-full max-w-4xl">
+              <CardHeader>
+                <CardTitle className="text-center text-2xl">
+                  Theme Selected: {themes.find(t => t.id === selectedThemeId)?.name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isGeneratingWhisp ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    <p className="text-lg text-muted-foreground">
+                      Generating your secret whisp word...
+                    </p>
+                  </div>
+                ) : (
+                  <TurnModeSelection
+                    onModeSelect={handleModeSelect}
+                    playerName={players.find(p => p.player_id === currentPlayerId)?.name}
+                    disabled={isGeneratingWhisp}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {gamePhase === "selecting_mode" && !isStoryteller && (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-foreground mb-2">
+                Waiting for storyteller...
+              </h2>
+              <p className="text-muted-foreground">
+                {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is choosing their clue mode
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Generating Whisp Phase - Storyteller sees generation, others wait */}
         {gamePhase === "generating_whisp" && isStoryteller && (
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center space-y-6">
+              <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
               <h2 className="text-2xl font-bold text-foreground mb-2">
-                Your Turn to Tell a Story!
+                Preparing Your Turn...
               </h2>
               <p className="text-muted-foreground mb-4">
                 Generating your secret whisp word...
               </p>
-              <Button 
-                onClick={generateWhisp} 
-                disabled={isGeneratingWhisp}
-                size="lg"
-              >
-                {isGeneratingWhisp ? "Generating..." : "Generate Whisp"}
-              </Button>
             </div>
           </div>
         )}
@@ -691,7 +789,7 @@ export default function Game() {
                 Waiting for storyteller...
               </h2>
               <p className="text-muted-foreground">
-                {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is preparing their story
+                {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is preparing their clue
               </p>
             </div>
           </div>
@@ -738,17 +836,53 @@ export default function Game() {
           </div>
         )}
 
+        {/* Elements Phase - Storyteller arranges elements */}
+        {gamePhase === "elements" && isStoryteller && currentTurn && (
+          <ElementsInterface
+            theme={currentTurn.theme}
+            whisp={currentTurn.whisp || ""}
+            sessionId={sessionId!}
+            playerId={currentPlayerId}
+            turnId={currentTurn.id}
+            onSubmit={handleStoryComplete}
+            isStoryteller={isStoryteller}
+            storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
+            sendWebSocketMessage={sendWebSocketMessage}
+            selectedIcons={selectedIcons}
+          />
+        )}
+
+        {gamePhase === "elements" && !isStoryteller && (
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="max-w-2xl w-full space-y-6">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-foreground mb-2">
+                  {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is arranging elements
+                </h2>
+                <p className="text-muted-foreground">
+                  Watch the elements and try to guess the whisp word!
+                </p>
+              </div>
+              
+              <div className="text-center text-sm text-muted-foreground">
+                Waiting for {players.find((p) => p.player_id === session.current_storyteller_id)?.name} to submit their element order...
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Guessing Phase */}
-        {gamePhase === "guessing" && !isStoryteller && currentTurn?.recording_url && (
+        {gamePhase === "guessing" && !isStoryteller && currentTurn && (currentTurn.recording_url || currentTurn.turn_mode === "elements") && (
           <GuessingInterface
             storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
             theme={currentTurn.theme}
-            audioUrl={currentTurn.recording_url}
+            audioUrl={currentTurn.recording_url || undefined}
             sessionId={sessionId!}
             roundNumber={session.current_round ?? 1}
             playerId={currentPlayerId}
             onGuessSubmit={handleGuessSubmit}
             selectedIcons={selectedIcons}
+            turnMode={currentTurn.turn_mode}
           />
         )}
 

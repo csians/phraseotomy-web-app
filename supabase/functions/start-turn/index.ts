@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { sessionId, turnId, selectedThemeId } = await req.json();
+    const { sessionId, turnId, selectedThemeId, turnMode } = await req.json();
 
     if (!sessionId) {
       return new Response(
@@ -29,6 +29,10 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Default to 'audio' mode if not specified
+    const mode = turnMode || 'audio';
+    console.log("Turn mode:", mode);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -150,7 +154,7 @@ Deno.serve(async (req) => {
     // Check if turn exists for this round, if not create it
     let turn;
     if (turnId) {
-      // Update existing turn with whisp and selected icons
+      // Update existing turn with whisp, selected icons, and turn mode
       const { data: updatedTurn, error: updateError } = await supabase
         .from("game_turns")
         .update({ 
@@ -158,6 +162,7 @@ Deno.serve(async (req) => {
           theme_id: themeId,
           selected_icon_ids: selectedIconIds,
           icon_order: iconOrder,
+          turn_mode: mode,
         })
         .eq("id", turnId)
         .select()
@@ -172,7 +177,7 @@ Deno.serve(async (req) => {
       }
       turn = updatedTurn;
     } else {
-      // Create new turn record with whisp and selected icons
+      // Create new turn record with whisp, selected icons, and turn mode
       const { data: newTurn, error: turnError } = await supabase
         .from("game_turns")
         .insert({
@@ -183,6 +188,7 @@ Deno.serve(async (req) => {
           whisp: generatedWhisp,
           selected_icon_ids: selectedIconIds,
           icon_order: iconOrder,
+          turn_mode: mode,
         })
         .select()
         .single();
