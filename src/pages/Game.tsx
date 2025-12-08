@@ -294,9 +294,8 @@ export default function Game() {
           break;
 
         default:
+          // Just log unknown messages, don't refresh to avoid infinite loops
           console.log("Unknown WebSocket message:", message.type);
-          // Refresh on any unknown message type to stay in sync
-          setTimeout(() => initializeGame(), 500);
       }
     },
   });
@@ -353,38 +352,25 @@ export default function Game() {
       const turnMode = data.currentTurn?.turn_mode;
       const hasWhisp = !!data.currentTurn?.whisp;
       
-      console.log("🎮 [GAME DEBUG] Phase determination:");
-      console.log("  - currentTurn exists:", !!data.currentTurn);
-      console.log("  - currentTurn data:", JSON.stringify(data.currentTurn, null, 2));
-      console.log("  - turnMode:", turnMode);
-      console.log("  - hasWhisp:", hasWhisp);
-      console.log("  - whisp value:", data.currentTurn?.whisp);
-      console.log("  - completed_at:", data.currentTurn?.completed_at);
-      
       // Check if turn_mode has been explicitly set (not just the default)
       // We use the presence of whisp to determine if mode was selected
       if (!data.currentTurn) {
         phase = "selecting_theme";
-        console.log("🎮 [GAME DEBUG] No turn - setting phase to selecting_theme");
       } else if (!hasWhisp) {
         // No whisp yet = storyteller needs to select mode first
         phase = "selecting_mode";
-        console.log("🎮 [GAME DEBUG] No whisp - setting phase to selecting_mode");
       } else if (!data.currentTurn.completed_at) {
         // Whisp exists, use turn_mode to determine which interface to show
         if (turnMode === "elements") {
           phase = "elements";
-          console.log("🎮 [GAME DEBUG] Turn in elements mode - setting phase to elements");
         } else {
           phase = "storytelling";
-          console.log("🎮 [GAME DEBUG] Turn in audio mode - setting phase to storytelling");
         }
       } else {
         phase = "guessing";
-        console.log("🎮 [GAME DEBUG] Turn completed - setting phase to guessing");
       }
       
-      console.log("🎮 [GAME DEBUG] Final phase:", phase);
+      console.log("Game phase:", phase);
       setGamePhase(phase);
       
       // Set turn mode if exists
@@ -396,12 +382,6 @@ export default function Game() {
       if (data.currentTurn?.theme_id) {
         setSelectedThemeId(data.currentTurn.theme_id);
       }
-      
-      // Check if current player is storyteller
-      const isStoryteller = playerId === data.session?.current_storyteller_id;
-      console.log("🎮 [GAME DEBUG] isStoryteller:", isStoryteller);
-      console.log("🎮 [GAME DEBUG] playerId:", playerId);
-      console.log("🎮 [GAME DEBUG] storytellerId:", data.session?.current_storyteller_id);
     } catch (error) {
       console.error("Error initializing game:", error);
       toast({
@@ -615,13 +595,8 @@ export default function Game() {
   const isStoryteller = currentPlayerId === session.current_storyteller_id;
   const currentPlayer = players.find((p) => p.player_id === currentPlayerId);
 
-  // Debug render state
-  console.log("🎮 [RENDER DEBUG] gamePhase:", gamePhase);
-  console.log("🎮 [RENDER DEBUG] isStoryteller:", isStoryteller);
-  console.log("🎮 [RENDER DEBUG] currentPlayerId:", currentPlayerId);
-  console.log("🎮 [RENDER DEBUG] session.current_storyteller_id:", session.current_storyteller_id);
-  console.log("🎮 [RENDER DEBUG] currentTurn:", currentTurn);
-  console.log("🎮 [RENDER DEBUG] Should show mode selection:", gamePhase === "selecting_mode" && isStoryteller);
+  // Debug render state (only log once when phase changes)
+  // console.log("🎮 [RENDER DEBUG] gamePhase:", gamePhase, "isStoryteller:", isStoryteller);
 
   return (
     <div className="min-h-screen bg-background">
