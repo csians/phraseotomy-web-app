@@ -70,6 +70,7 @@ export default function CreateLobby() {
   }, [tenant?.id]);
 
   // Load themes filtered by available packs
+  // Logic: 1 pack = only 4 core themes, 2+ packs = core + expansion themes from unlocked packs
   useEffect(() => {
     const loadThemes = async () => {
       if (loadingPacks) return; // Wait for packs to load first
@@ -79,12 +80,19 @@ export default function CreateLobby() {
 
         if (error) throw error;
         
-        // Filter themes: show core themes always, expansion themes only if pack is unlocked
-        const filteredThemes = (data || []).filter((theme) => {
-          if (theme.is_core) return true;
-          // For non-core themes, check if their pack is in availablePacks
-          return theme.pack_id && availablePacks.includes(theme.pack_id);
-        });
+        let filteredThemes: Theme[] = [];
+        
+        if (availablePacks.length === 1) {
+          // Only 1 pack unlocked → show only core themes (4 base themes)
+          filteredThemes = (data || []).filter((theme) => theme.is_core === true);
+        } else if (availablePacks.length >= 2) {
+          // 2+ packs unlocked → show core themes + expansion themes from unlocked packs
+          filteredThemes = (data || []).filter((theme) => {
+            if (theme.is_core) return true;
+            // For non-core themes, check if their pack is in availablePacks
+            return theme.pack_id && availablePacks.includes(theme.pack_id);
+          });
+        }
         
         setThemes(filteredThemes);
 
