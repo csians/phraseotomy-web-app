@@ -999,11 +999,8 @@ export default function Lobby() {
       setTimeout(() => setCountdownNumber(1), 2000);
       setTimeout(() => {
         setShowCountdown(false);
-        // Update session state after countdown
-        if (data.session) {
-          setSession(data.session);
-        }
-        fetchLobbyData();
+        // Navigate to game page after countdown
+        navigate(`/game/${sessionId}`);
       }, 3000);
 
       toast({
