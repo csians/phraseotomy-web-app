@@ -69,18 +69,28 @@ export default function CreateLobby() {
     loadAllPacks();
   }, [tenant?.id]);
 
-  // Load all themes from database
+  // Load themes filtered by available packs
   useEffect(() => {
     const loadThemes = async () => {
+      if (loadingPacks) return; // Wait for packs to load first
+      
       try {
         const { data, error } = await supabase.from("themes").select("*").order("name", { ascending: true });
 
         if (error) throw error;
-        setThemes(data || []);
+        
+        // Filter themes: show core themes always, expansion themes only if pack is unlocked
+        const filteredThemes = (data || []).filter((theme) => {
+          if (theme.is_core) return true;
+          // For non-core themes, check if their pack is in availablePacks
+          return theme.pack_id && availablePacks.includes(theme.pack_id);
+        });
+        
+        setThemes(filteredThemes);
 
         // Auto-select first theme if available
-        if (data && data.length > 0 && !selectedTheme) {
-          setSelectedTheme(data[0].id);
+        if (filteredThemes.length > 0 && !selectedTheme) {
+          setSelectedTheme(filteredThemes[0].id);
         }
       } catch (error) {
         console.error("Error loading themes:", error);
@@ -91,7 +101,7 @@ export default function CreateLobby() {
     };
 
     loadThemes();
-  }, []);
+  }, [loadingPacks, availablePacks]);
 
   // Load customer's available packs from redeemed codes
   useEffect(() => {
