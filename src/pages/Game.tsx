@@ -88,6 +88,23 @@ export default function Game() {
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
 
+  // Get current player ID from storage - must be defined before getCurrentPlayerInfo
+  const getCurrentPlayerId = () => {
+    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
+    for (const key of storageKeys) {
+      const dataStr = sessionStorage.getItem(key) || localStorage.getItem(key);
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(dataStr);
+          return parsed.customer_id || parsed.id || parsed.customerId;
+        } catch (e) {
+          console.error(`Error parsing ${key}:`, e);
+        }
+      }
+    }
+    return localStorage.getItem('guest_player_id') || "";
+  };
+
   // Get current player info for WebSocket
   const getCurrentPlayerInfo = () => {
     const playerId = getCurrentPlayerId();
@@ -299,22 +316,6 @@ export default function Game() {
       if (cleanup) cleanup();
     };
   }, [sessionId]);
-
-  const getCurrentPlayerId = () => {
-    const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
-    for (const key of storageKeys) {
-      const dataStr = sessionStorage.getItem(key) || localStorage.getItem(key);
-      if (dataStr) {
-        try {
-          const parsed = JSON.parse(dataStr);
-          return parsed.customer_id || parsed.id || parsed.customerId;
-        } catch (e) {
-          console.error(`Error parsing ${key}:`, e);
-        }
-      }
-    }
-    return localStorage.getItem('guest_player_id') || "";
-  };
 
   const initializeGame = async () => {
     try {
