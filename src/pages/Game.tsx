@@ -65,7 +65,7 @@ interface IconItem {
   isFromCore: boolean;
 }
 
-type GamePhase = "selecting_theme" | "selecting_mode" | "generating_whisp" | "storytelling" | "elements" | "guessing" | "scoring";
+type GamePhase = "selecting_theme" | "selecting_mode" | "storytelling" | "elements" | "guessing" | "scoring";
 
 export default function Game() {
   const { sessionId } = useParams();
@@ -349,22 +349,18 @@ export default function Game() {
 
       // Determine game phase based on turn state
       let phase: GamePhase;
-      const turnMode = data.currentTurn?.turn_mode || selectedTurnMode;
+      const turnMode = data.currentTurn?.turn_mode;
+      const hasWhisp = !!data.currentTurn?.whisp;
       
       if (!data.currentTurn || !data.currentTurn.theme_id) {
         phase = "selecting_theme";
         console.log("No turn or no theme - setting phase to selecting_theme");
-      } else if (!data.currentTurn.whisp) {
-        // After theme selected, need to select mode (if not already set)
-        if (!turnMode) {
-          phase = "selecting_mode";
-          console.log("Theme selected but no mode - setting phase to selecting_mode");
-        } else {
-          phase = "generating_whisp";
-          console.log("Theme & mode selected but no whisp - setting phase to generating_whisp");
-        }
+      } else if (!hasWhisp) {
+        // Theme selected but no whisp yet = need mode selection first
+        phase = "selecting_mode";
+        console.log("Theme selected but no whisp - setting phase to selecting_mode");
       } else if (!data.currentTurn.completed_at) {
-        // Use turn_mode to determine which interface to show
+        // Whisp exists, use turn_mode to determine which interface to show
         if (turnMode === "elements") {
           phase = "elements";
           console.log("Turn in elements mode - setting phase to elements");
@@ -492,6 +488,14 @@ export default function Game() {
 
       if (error) throw error;
 
+      // Also update the current turn's theme_id (without generating whisp yet)
+      if (currentTurn?.id) {
+        await supabase
+          .from("game_turns")
+          .update({ theme_id: themeId })
+          .eq("id", currentTurn.id);
+      }
+
       // Move to mode selection phase
       setGamePhase("selecting_mode");
       
@@ -555,46 +559,6 @@ export default function Game() {
       toast({
         title: "Error",
         description: "Failed to start turn.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingWhisp(false);
-    }
-  };
-
-  // Legacy whisp generation (fallback if theme already selected)
-  const generateWhisp = async () => {
-    if (isGeneratingWhisp) return;
-    
-    setIsGeneratingWhisp(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("start-turn", {
-        body: { sessionId, turnId: currentTurn?.id, selectedThemeId },
-      });
-
-      if (error) throw error;
-
-      // Wait for DB to commit
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Refresh local state from database
-      await initializeGame();
-      
-      // Notify other players via WebSocket to refresh their state
-      sendWebSocketMessage({
-        type: "whisp_generated",
-        whisp: data.whisp,
-      });
-
-      toast({
-        title: "Whisp Generated! ✨",
-        description: `Your word is: "${data.whisp}"`,
-      });
-    } catch (error) {
-      console.error("Error generating whisp:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate whisp.",
         variant: "destructive",
       });
     } finally {
@@ -767,33 +731,6 @@ export default function Game() {
           </div>
         )}
 
-        {/* Generating Whisp Phase - Storyteller sees generation, others wait */}
-        {gamePhase === "generating_whisp" && isStoryteller && (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center space-y-6">
-              <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-              <h2 className="text-2xl font-bold text-foreground mb-2">
-                Preparing Your Turn...
-              </h2>
-              <p className="text-muted-foreground mb-4">
-                Generating your secret whisp word...
-              </p>
-            </div>
-          </div>
-        )}
-
-        {gamePhase === "generating_whisp" && !isStoryteller && (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">
-                Waiting for storyteller...
-              </h2>
-              <p className="text-muted-foreground">
-                {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is preparing their clue
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Storytelling Phase */}
         {gamePhase === "storytelling" && isStoryteller && currentTurn && (
