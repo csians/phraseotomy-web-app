@@ -31,6 +31,7 @@ export interface ThemeOption {
   isCore: boolean;
   isUnlocked: boolean;
   packName?: string;
+  packId?: string | null;
 }
 
 interface ThemeSelectionCardsProps {
@@ -39,6 +40,7 @@ interface ThemeSelectionCardsProps {
   selectedThemeId?: string;
   disabled?: boolean;
   playerName?: string;
+  unlockedPackIds?: string[]; // Pack IDs the customer has unlocked
 }
 
 export function ThemeSelectionCards({
@@ -47,12 +49,27 @@ export function ThemeSelectionCards({
   selectedThemeId,
   disabled = false,
   playerName,
+  unlockedPackIds = [],
 }: ThemeSelectionCardsProps) {
   const [hoveredTheme, setHoveredTheme] = useState<string | null>(null);
 
+  // Filter themes based on pack ownership
+  // Core themes (is_core=true) are always visible
+  // Expansion themes only visible if their pack is unlocked
+  const visibleThemes = themes.map((theme) => {
+    if (theme.isCore) {
+      // Core themes are always unlocked and visible
+      return { ...theme, isUnlocked: true };
+    }
+    // Expansion themes: check if pack is unlocked
+    const isUnlocked = theme.packId ? unlockedPackIds.includes(theme.packId) : false;
+    return { ...theme, isUnlocked };
+  });
+
   // Separate base themes and expansion themes
-  const baseThemes = themes.filter((t) => t.isCore);
-  const expansionThemes = themes.filter((t) => !t.isCore);
+  const baseThemes = visibleThemes.filter((t) => t.isCore);
+  // Only show expansion themes if user has at least one expansion pack
+  const expansionThemes = visibleThemes.filter((t) => !t.isCore && (t.isUnlocked || unlockedPackIds.length > 0));
 
   const renderThemeCard = (theme: ThemeOption) => {
     const IconComponent = iconMap[theme.icon] || Sparkles;
