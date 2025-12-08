@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useTenant } from "@/hooks/useTenant";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Key, Package } from "lucide-react";
+import { Key, Package, Palette } from "lucide-react";
 import { getAllUrlParams } from "@/lib/urlUtils";
 
 // Map Shopify internal domains to production domains
@@ -130,6 +130,23 @@ const AdminHome = () => {
             <CardContent>
               <Link to={`/admin/codes?shop=${shop}`}>
                 <Button className="w-full">Manage Codes</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                Themes & Elements
+              </CardTitle>
+              <CardDescription>
+                Manage themes and whisp elements with images
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to={`/admin/themes?shop=${shop}`}>
+                <Button className="w-full">Manage Themes</Button>
               </Link>
             </CardContent>
           </Card>

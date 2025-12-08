@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import AdminHome from "./pages/admin/AdminHome";
 import Codes from "./pages/admin/Codes";
 import Packs from "./pages/admin/Packs";
+import Themes from "./pages/admin/Themes";
 
 const queryClient = new QueryClient();
 
@@ -159,6 +160,7 @@ const App = () => (
           <Route path="/admin" element={<AdminHome />} />
           <Route path="/admin/packs" element={<Packs />} />
           <Route path="/admin/codes" element={<Codes />} />
+          <Route path="/admin/themes" element={<Themes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
