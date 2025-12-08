@@ -10,12 +10,13 @@ import { IconSelectionPanel, IconItem } from "@/components/IconSelectionPanel";
 interface GuessingInterfaceProps {
   storytellerName: string;
   theme: { id: string; name: string };
-  audioUrl: string;
+  audioUrl?: string;
   sessionId: string;
   roundNumber: number;
   playerId: string;
   onGuessSubmit: () => void;
   selectedIcons?: IconItem[];
+  turnMode?: "audio" | "elements";
 }
 
 export function GuessingInterface({
@@ -27,6 +28,7 @@ export function GuessingInterface({
   playerId,
   onGuessSubmit,
   selectedIcons = [],
+  turnMode = "audio",
 }: GuessingInterfaceProps) {
   const { toast } = useToast();
   const [guess, setGuess] = useState("");
@@ -123,7 +125,9 @@ export function GuessingInterface({
               Guess the <span className="text-primary">Whisp!</span>
             </CardTitle>
             <CardDescription className="text-center text-lg">
-              Theme: {theme.name} • Listen to {storytellerName}'s story and guess the word
+              Theme: {theme.name} • {turnMode === "elements" 
+                ? `Look at ${storytellerName}'s element order and guess the word`
+                : `Listen to ${storytellerName}'s story and guess the word`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -138,14 +142,28 @@ export function GuessingInterface({
               </div>
             )}
 
-            {/* Audio Player */}
-            <div className="bg-muted/50 p-6 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <Volume2 className="h-5 w-5 text-primary" />
-                <span className="font-medium">Listen to the story:</span>
+            {/* Audio Player - only show in audio mode */}
+            {turnMode === "audio" && audioUrl && (
+              <div className="bg-muted/50 p-6 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Volume2 className="h-5 w-5 text-primary" />
+                  <span className="font-medium">Listen to the story:</span>
+                </div>
+                <audio ref={audioRef} controls src={audioUrl} className="w-full" autoPlay />
               </div>
-              <audio ref={audioRef} controls src={audioUrl} className="w-full" autoPlay />
-            </div>
+            )}
+
+            {/* Elements mode hint */}
+            {turnMode === "elements" && (
+              <div className="bg-primary/10 p-6 rounded-lg text-center">
+                <p className="text-lg font-medium text-primary">
+                  🔍 Study the element order above — it's your clue!
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {storytellerName} arranged these elements to hint at the whisp word.
+                </p>
+              </div>
+            )}
 
             {/* Guess Input */}
             <div>
@@ -205,7 +223,9 @@ export function GuessingInterface({
             {/* Tips */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm text-muted-foreground text-center">
-                💡 Look at the icons and listen to the story. The whisp is a single word related to the theme "{theme.name}".
+                💡 {turnMode === "elements" 
+                  ? `Look at how ${storytellerName} ordered the elements. The sequence is your clue to guess the whisp word!`
+                  : `Look at the icons and listen to the story. The whisp is a single word related to the theme "${theme.name}".`}
               </p>
             </div>
           </CardContent>
