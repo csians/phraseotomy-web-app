@@ -29,35 +29,63 @@ export const useGameWebSocket = ({
   const [isConnected, setIsConnected] = useState(false);
   const heartbeatRef = useRef<NodeJS.Timeout>();
   const isConnectingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const lastConnectionParamsRef = useRef<string>('');
   
-  // Use ref for onMessage to avoid infinite loops
+  // Use refs to avoid dependency changes triggering reconnects
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
 
+  const disconnect = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = undefined;
+    }
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = undefined;
+    }
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.onopen = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    isConnectingRef.current = false;
+    setIsConnected(false);
+  }, []);
+
   const connect = useCallback(() => {
     if (!enabled || !sessionId || !playerId) {
+      console.log('🔌 WebSocket not enabled or missing params:', { enabled, sessionId, playerId });
       return;
     }
 
-    // Prevent multiple simultaneous connection attempts
+    // Create a unique key for current connection params
+    const connectionKey = `${sessionId}-${playerId}`;
+    
+    // Prevent duplicate connections
     if (isConnectingRef.current) {
       return;
     }
 
-    // Don't reconnect if already connected
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+    // Already connected with same params
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && lastConnectionParamsRef.current === connectionKey) {
       return;
     }
 
-    isConnectingRef.current = true;
-
-    // Close existing connection if any
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+    // If params changed, disconnect first
+    if (wsRef.current && lastConnectionParamsRef.current !== connectionKey) {
+      disconnect();
     }
 
-    // Use the full WebSocket URL for the edge function
+    isConnectingRef.current = true;
+    lastConnectionParamsRef.current = connectionKey;
+
+    console.log('🔌 Connecting to WebSocket:', sessionId);
+
     const wsUrl = `wss://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/game-websocket?sessionId=${sessionId}&playerId=${playerId}&playerName=${encodeURIComponent(playerName)}`;
     
     try {
@@ -65,12 +93,12 @@ export const useGameWebSocket = ({
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (!mountedRef.current) return;
         console.log('✅ WebSocket connected');
         reconnectAttemptsRef.current = 0;
         isConnectingRef.current = false;
         setIsConnected(true);
 
-        // Start heartbeat to keep connection alive
         if (heartbeatRef.current) {
           clearInterval(heartbeatRef.current);
         }
@@ -82,13 +110,10 @@ export const useGameWebSocket = ({
       };
 
       ws.onmessage = (event) => {
+        if (!mountedRef.current) return;
         try {
           const message = JSON.parse(event.data);
-          
-          // Ignore pong and connected messages silently
           if (message.type === 'pong' || message.type === 'connected') return;
-          
-          console.log('📨 WebSocket:', message.type);
           onMessageRef.current(message);
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -96,33 +121,38 @@ export const useGameWebSocket = ({
       };
 
       ws.onerror = () => {
+        if (!mountedRef.current) return;
         isConnectingRef.current = false;
         setIsConnected(false);
       };
 
       ws.onclose = (event) => {
-        console.log('🔌 WebSocket closed:', event.code);
+        if (!mountedRef.current) return;
+        
         wsRef.current = null;
         isConnectingRef.current = false;
         setIsConnected(false);
 
-        // Clear heartbeat
         if (heartbeatRef.current) {
           clearInterval(heartbeatRef.current);
+          heartbeatRef.current = undefined;
         }
 
-        // Attempt to reconnect with exponential backoff
-        if (reconnectAttemptsRef.current < maxReconnectAttempts && enabled) {
+        // Only reconnect if still mounted and enabled
+        if (mountedRef.current && reconnectAttemptsRef.current < maxReconnectAttempts && enabled) {
           reconnectAttemptsRef.current++;
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+          console.log(`🔄 Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
+            if (mountedRef.current) {
+              connect();
+            }
           }, delay);
         } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
           toast({
             title: "Connection Lost",
-            description: "Real-time updates disconnected. Refresh the page to reconnect.",
+            description: "Real-time updates disconnected. Refresh to reconnect.",
             variant: "destructive",
           });
         }
@@ -132,22 +162,7 @@ export const useGameWebSocket = ({
       isConnectingRef.current = false;
       setIsConnected(false);
     }
-  }, [enabled, sessionId, playerId, playerName, toast]);
-
-  const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-    if (heartbeatRef.current) {
-      clearInterval(heartbeatRef.current);
-    }
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    isConnectingRef.current = false;
-    setIsConnected(false);
-  }, []);
+  }, [enabled, sessionId, playerId, playerName, toast, disconnect]);
 
   const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -157,12 +172,19 @@ export const useGameWebSocket = ({
     return false;
   }, []);
 
+  // Only run effect when key params change
   useEffect(() => {
-    connect();
+    mountedRef.current = true;
+    
+    if (enabled && sessionId && playerId) {
+      connect();
+    }
+
     return () => {
+      mountedRef.current = false;
       disconnect();
     };
-  }, [connect, disconnect]);
+  }, [sessionId, playerId, enabled]); // Remove connect/disconnect from deps
 
   return { sendMessage, disconnect, isConnected };
 };
