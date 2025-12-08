@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get theme name for whisp generation
+    // Get theme name for logging
     const { data: theme, error: themeError } = await supabase
       .from("themes")
       .select("name")
@@ -54,6 +54,22 @@ Deno.serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Get all elements for this theme to use as whisps
+    const { data: themeElements, error: elementsError } = await supabase
+      .from("elements")
+      .select("id, name")
+      .eq("theme_id", sessionData.selected_theme_id);
+
+    if (elementsError || !themeElements || themeElements.length === 0) {
+      console.error("No elements found for theme:", sessionData.selected_theme_id);
+      return new Response(
+        JSON.stringify({ error: "No elements found for this theme. Please add elements first." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Found ${themeElements.length} elements for theme "${theme.name}"`);
 
     // Get all players to determine total rounds and first storyteller
     const { data: allPlayers, error: playerError } = await supabase
@@ -72,59 +88,30 @@ Deno.serve(async (req) => {
     const firstPlayer = allPlayers[0];
     const totalRounds = allPlayers.length;
 
-    // Generate whisps for ALL turns using AI
-    console.log("Generating whisps for all turns, theme:", theme.name);
+    // Generate whisps for ALL turns by randomly selecting elements from the theme
+    console.log("Selecting whisps from theme elements:", theme.name);
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const whisps: string[] = [];
+    const usedIndices = new Set<number>();
     
-    // Generate a unique whisp for each round
+    // Select a unique random element for each round
     for (let i = 0; i < totalRounds; i++) {
-      let whisp = "Mystery"; // fallback
+      let randomIndex: number;
       
-      if (LOVABLE_API_KEY) {
-        try {
-          const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
-              messages: [
-                {
-                  role: "system",
-                  content: `You are a creative word generator for a storytelling party game. Generate a single word related to the theme "${theme.name}" that players can create stories about. The word should be:
-- A common, family-friendly word (noun, verb, or adjective)
-- Related to the theme but not too obvious
-- Easy to describe through storytelling
-- Suitable for all ages
-${whisps.length > 0 ? `\nDo NOT use any of these words that were already used: ${whisps.join(", ")}` : ""}
-
-IMPORTANT: Respond with ONLY the single word, nothing else. No punctuation, no explanation.`
-                },
-                {
-                  role: "user",
-                  content: `Generate a creative word related to the theme "${theme.name}" for a storytelling game.`
-                }
-              ],
-            }),
-          });
-
-          if (aiResponse.ok) {
-            const aiData = await aiResponse.json();
-            whisp = aiData.choices?.[0]?.message?.content?.trim() || "Mystery";
-            console.log(`Generated whisp for round ${i + 1}:`, whisp);
-          } else {
-            console.error(`AI API error for round ${i + 1}:`, await aiResponse.text());
-          }
-        } catch (aiError) {
-          console.error(`Error generating whisp for round ${i + 1}:`, aiError);
-        }
+      // Try to get a unique element (if we have enough elements)
+      if (usedIndices.size < themeElements.length) {
+        do {
+          randomIndex = Math.floor(Math.random() * themeElements.length);
+        } while (usedIndices.has(randomIndex));
+        usedIndices.add(randomIndex);
+      } else {
+        // If we've used all elements, allow duplicates
+        randomIndex = Math.floor(Math.random() * themeElements.length);
       }
       
+      const whisp = themeElements[randomIndex].name;
       whisps.push(whisp);
+      console.log(`Selected whisp for round ${i + 1}:`, whisp);
     }
 
     // Update game session to start the game
