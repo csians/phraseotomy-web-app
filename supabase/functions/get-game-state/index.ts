@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { sessionId } = await req.json();
+    const { sessionId, playerId } = await req.json();
 
     if (!sessionId) {
       return new Response(
@@ -50,14 +50,47 @@ Deno.serve(async (req) => {
       console.error("Error fetching players:", playersError);
     }
 
-    // Get all themes
+    // Get all themes with pack info and unlock status
     const { data: themes, error: themesError } = await supabase
       .from("themes")
-      .select("*");
+      .select("*, pack:packs(id, name)");
 
     if (themesError) {
       console.error("Error fetching themes:", themesError);
     }
+
+    // Get customer's unlocked packs if playerId provided
+    let unlockedPackIds: string[] = [];
+    if (playerId) {
+      const { data: licenses, error: licensesError } = await supabase
+        .from("customer_licenses")
+        .select("license_code_id")
+        .eq("customer_id", playerId)
+        .eq("status", "active");
+
+      if (!licensesError && licenses) {
+        const licenseCodeIds = licenses.map(l => l.license_code_id);
+        
+        if (licenseCodeIds.length > 0) {
+          const { data: codePacks, error: codePacksError } = await supabase
+            .from("license_code_packs")
+            .select("pack_id")
+            .in("license_code_id", licenseCodeIds);
+
+          if (!codePacksError && codePacks) {
+            unlockedPackIds = codePacks.map(cp => cp.pack_id);
+          }
+        }
+      }
+    }
+
+    // Process themes to add unlock status
+    const processedThemes = (themes || []).map(theme => ({
+      ...theme,
+      isCore: theme.is_core,
+      isUnlocked: theme.is_core || (theme.pack_id && unlockedPackIds.includes(theme.pack_id)),
+      packName: theme.pack?.name || null,
+    }));
 
     // Get current turn if exists
     const { data: currentTurn, error: turnError } = await supabase
@@ -74,16 +107,36 @@ Deno.serve(async (req) => {
       console.error("Error fetching turn:", turnError);
     }
 
-    // If there's a current turn with selected elements, get the element details
-    let selectedElements = null;
-    if (currentTurn?.selected_elements) {
+    // If there's a current turn with selected_icon_ids, get the icon details
+    let selectedIcons: any[] = [];
+    if (currentTurn?.selected_icon_ids && currentTurn.selected_icon_ids.length > 0) {
       const { data: elements, error: elementsError } = await supabase
         .from("elements")
-        .select("*")
-        .in("id", currentTurn.selected_elements);
+        .select("id, name, icon, theme_id")
+        .in("id", currentTurn.selected_icon_ids);
 
-      if (!elementsError) {
-        selectedElements = elements;
+      if (!elementsError && elements) {
+        // Get core theme IDs to determine isFromCore
+        const { data: coreThemes } = await supabase
+          .from("themes")
+          .select("id")
+          .eq("is_core", true);
+
+        const coreThemeIds = new Set((coreThemes || []).map(t => t.id));
+
+        // Order elements according to icon_order if available
+        const iconOrder = currentTurn.icon_order || [0, 1, 2, 3, 4];
+        const elementMap = new Map(elements.map(e => [e.id, e]));
+        
+        selectedIcons = currentTurn.selected_icon_ids.map((id: string, index: number) => {
+          const element = elementMap.get(id);
+          if (!element) return null;
+          return {
+            ...element,
+            isFromCore: element.theme_id !== currentTurn.theme_id,
+            order: iconOrder[index] ?? index,
+          };
+        }).filter(Boolean).sort((a: any, b: any) => a.order - b.order);
       }
     }
 
@@ -104,10 +157,11 @@ Deno.serve(async (req) => {
       JSON.stringify({
         session,
         players: players || [],
-        themes: themes || [],
+        themes: processedThemes,
         currentTurn,
-        selectedElements,
+        selectedIcons,
         themeElements,
+        unlockedPackIds,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

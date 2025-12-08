@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Volume2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { IconSelectionPanel, IconItem } from "@/components/IconSelectionPanel";
 
 interface GuessingInterfaceProps {
   storytellerName: string;
@@ -14,6 +15,7 @@ interface GuessingInterfaceProps {
   roundNumber: number;
   playerId: string;
   onGuessSubmit: () => void;
+  selectedIcons?: IconItem[];
 }
 
 export function GuessingInterface({
@@ -24,6 +26,7 @@ export function GuessingInterface({
   roundNumber,
   playerId,
   onGuessSubmit,
+  selectedIcons = [],
 }: GuessingInterfaceProps) {
   const { toast } = useToast();
   const [guess, setGuess] = useState("");
@@ -113,7 +116,7 @@ export function GuessingInterface({
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-3xl space-y-6">
+      <div className="w-full max-w-4xl space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-center text-2xl">
@@ -124,6 +127,17 @@ export function GuessingInterface({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Icons Display */}
+            {selectedIcons.length > 0 && (
+              <div className="bg-muted/30 p-6 rounded-xl">
+                <IconSelectionPanel
+                  icons={selectedIcons}
+                  isDraggable={false}
+                  label="Story Icons (in order)"
+                />
+              </div>
+            )}
+
             {/* Audio Player */}
             <div className="bg-muted/50 p-6 rounded-lg">
               <div className="flex items-center gap-2 mb-3">
@@ -191,7 +205,7 @@ export function GuessingInterface({
             {/* Tips */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm text-muted-foreground text-center">
-                💡 Think about what the story is describing. The whisp is a single word related to the theme "{theme.name}".
+                💡 Look at the icons and listen to the story. The whisp is a single word related to the theme "{theme.name}".
               </p>
             </div>
           </CardContent>
