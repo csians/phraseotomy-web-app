@@ -217,6 +217,7 @@ export type Database = {
           created_at: string
           icon: string
           id: string
+          image_url: string | null
           name: string
           theme_id: string | null
         }
@@ -224,6 +225,7 @@ export type Database = {
           created_at?: string
           icon: string
           id?: string
+          image_url?: string | null
           name: string
           theme_id?: string | null
         }
@@ -231,6 +233,7 @@ export type Database = {
           created_at?: string
           icon?: string
           id?: string
+          image_url?: string | null
           name?: string
           theme_id?: string | null
         }

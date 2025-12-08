@@ -103,3 +103,18 @@ verify_jwt = false
 
 [functions.update-icon-order]
 verify_jwt = false
+
+[functions.admin-create-theme]
+verify_jwt = false
+
+[functions.admin-delete-theme]
+verify_jwt = false
+
+[functions.admin-create-element]
+verify_jwt = false
+
+[functions.admin-delete-element]
+verify_jwt = false
+
+[functions.admin-update-element]
+verify_jwt = false
