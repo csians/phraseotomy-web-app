@@ -352,13 +352,15 @@ export default function Game() {
       const turnMode = data.currentTurn?.turn_mode;
       const hasWhisp = !!data.currentTurn?.whisp;
       
-      if (!data.currentTurn || !data.currentTurn.theme_id) {
+      // Check if turn_mode has been explicitly set (not just the default)
+      // We use the presence of whisp to determine if mode was selected
+      if (!data.currentTurn) {
         phase = "selecting_theme";
-        console.log("No turn or no theme - setting phase to selecting_theme");
+        console.log("No turn - setting phase to selecting_theme");
       } else if (!hasWhisp) {
-        // Theme selected but no whisp yet = need mode selection first
+        // No whisp yet = storyteller needs to select mode first
         phase = "selecting_mode";
-        console.log("Theme selected but no whisp - setting phase to selecting_mode");
+        console.log("No whisp - setting phase to selecting_mode");
       } else if (!data.currentTurn.completed_at) {
         // Whisp exists, use turn_mode to determine which interface to show
         if (turnMode === "elements") {
@@ -695,7 +697,7 @@ export default function Game() {
             <Card className="w-full max-w-4xl">
               <CardHeader>
                 <CardTitle className="text-center text-2xl">
-                  Theme Selected: {themes.find(t => t.id === selectedThemeId)?.name}
+                  Choose Your Clue Style
                 </CardTitle>
               </CardHeader>
               <CardContent>
