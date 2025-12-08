@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -87,6 +87,26 @@ export default function Game() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
+  const refreshDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastRefreshRef = useRef<number>(0);
+
+  // Debounced refresh to prevent infinite loops
+  const debouncedRefresh = useCallback(() => {
+    const now = Date.now();
+    // Prevent refreshing more than once per second
+    if (now - lastRefreshRef.current < 1000) {
+      return;
+    }
+    
+    if (refreshDebounceRef.current) {
+      clearTimeout(refreshDebounceRef.current);
+    }
+    
+    refreshDebounceRef.current = setTimeout(() => {
+      lastRefreshRef.current = Date.now();
+      initializeGame();
+    }, 300);
+  }, []);
 
   // Get current player ID from storage - must be defined before getCurrentPlayerInfo
   const getCurrentPlayerId = () => {
@@ -158,8 +178,6 @@ export default function Game() {
     playerName: getCurrentPlayerInfo().playerName,
     enabled: !!sessionId && !!currentPlayerId,
     onMessage: (message) => {
-      console.log('🎮 Game WebSocket message:', message.type, message);
-      
       switch (message.type) {
         case "recording_started":
           setIsReceivingAudio(true);
@@ -174,7 +192,6 @@ export default function Game() {
           break;
 
         case "audio_chunk":
-          // Play audio chunk in real-time
           if (message.audioData && message.storytellerId !== currentPlayerId) {
             playAudioChunk(message.audioData);
           }
@@ -185,15 +202,16 @@ export default function Game() {
             title: "Theme Selected",
             description: `${message.storytellerName || 'Storyteller'} chose a theme`,
           });
-          setTimeout(() => initializeGame(), 300);
+          debouncedRefresh();
           break;
 
+        case "mode_selected":
         case "storyteller_ready":
           toast({
-            title: "Secret Element Selected",
-            description: `${message.storytellerName || 'Storyteller'} has selected their secret element`,
+            title: "Mode Selected",
+            description: `${message.storytellerName || 'Storyteller'} is ready`,
           });
-          setTimeout(() => initializeGame(), 300);
+          debouncedRefresh();
           break;
 
         case "recording_uploaded":
@@ -202,7 +220,16 @@ export default function Game() {
             title: "Audio Ready! 🎤",
             description: "Listen to the clue and guess the secret element",
           });
-          setTimeout(() => initializeGame(), 300);
+          debouncedRefresh();
+          break;
+
+        case "elements_submitted":
+        case "icons_reordered":
+          toast({
+            title: "Elements Updated",
+            description: "The storyteller has updated the elements",
+          });
+          debouncedRefresh();
           break;
 
         case "guess_submitted":
@@ -219,7 +246,7 @@ export default function Game() {
               });
             }
           }
-          setTimeout(() => initializeGame(), 300);
+          debouncedRefresh();
           break;
 
         case "correct_answer":
@@ -227,7 +254,7 @@ export default function Game() {
             title: "Round Complete! 🏆",
             description: `${message.winnerName} got it right! The answer was "${message.secretElement}"`,
           });
-          setTimeout(() => initializeGame(), 500);
+          debouncedRefresh();
           break;
 
         case "next_turn":
@@ -235,7 +262,7 @@ export default function Game() {
             title: "Next Turn",
             description: `${message.newStorytellerName}'s turn to tell a story!`,
           });
-          setTimeout(() => initializeGame(), 500);
+          debouncedRefresh();
           break;
 
         case "game_completed":
@@ -245,22 +272,16 @@ export default function Game() {
             duration: 5000,
           });
           
-          // Mark session as expired immediately
           supabase
             .from('game_sessions')
             .update({ status: 'expired' })
             .eq('id', sessionId)
             .then(() => console.log('✅ Session marked as expired'));
           
-          // Schedule automatic cleanup after 35 seconds
-          console.log('🧹 Scheduling game cleanup in 35 seconds...');
           supabase.functions.invoke('cleanup-game-session', {
             body: { sessionId, delaySeconds: 35 }
-          }).catch(err => {
-            console.error('Failed to schedule cleanup:', err);
-          });
+          }).catch(err => console.error('Failed to schedule cleanup:', err));
           
-          // Show countdown warning after 5 seconds (30 seconds before cleanup)
           setTimeout(() => {
             toast({
               title: "⏰ Lobby Cleanup Warning",
@@ -269,7 +290,7 @@ export default function Game() {
             });
           }, 5000);
           
-          setTimeout(() => initializeGame(), 500);
+          debouncedRefresh();
           break;
 
         case "player_joined":
@@ -277,7 +298,7 @@ export default function Game() {
             title: "Player Joined",
             description: `${message.playerName} joined the game`,
           });
-          setTimeout(() => initializeGame(), 300);
+          debouncedRefresh();
           break;
           
         case "player_left":
@@ -285,17 +306,16 @@ export default function Game() {
             title: "Player Left",
             description: `${message.playerName} left the game`,
           });
-          setTimeout(() => initializeGame(), 300);
+          debouncedRefresh();
           break;
 
         case "refresh_game_state":
-          console.log("🔄 Refresh triggered by WebSocket");
-          setTimeout(() => initializeGame(), 300);
+          debouncedRefresh();
           break;
 
         default:
-          // Just log unknown messages, don't refresh to avoid infinite loops
-          console.log("Unknown WebSocket message:", message.type);
+          // Don't refresh on unknown messages
+          break;
       }
     },
   });
@@ -405,11 +425,7 @@ export default function Game() {
           table: 'game_sessions',
           filter: `id=eq.${sessionId}`
         },
-        (payload) => {
-          console.log('🔄 Game session updated:', payload);
-          // Refresh game state when session changes (theme, round, etc.)
-          setTimeout(() => initializeGame(), 100);
-        }
+        () => debouncedRefresh()
       )
       .on(
         'postgres_changes',
@@ -419,11 +435,7 @@ export default function Game() {
           table: 'game_turns',
           filter: `session_id=eq.${sessionId}`
         },
-        (payload) => {
-          console.log('🎯 Game turn updated:', payload);
-          // Refresh when turn is created or updated (elements, recording, etc.)
-          setTimeout(() => initializeGame(), 100);
-        }
+        () => debouncedRefresh()
       )
       .on(
         'postgres_changes',
@@ -433,11 +445,7 @@ export default function Game() {
           table: 'game_players',
           filter: `session_id=eq.${sessionId}`
         },
-        (payload) => {
-          console.log('📊 Player score updated:', payload);
-          // Refresh when player scores change
-          setTimeout(() => initializeGame(), 100);
-        }
+        () => debouncedRefresh()
       )
       .on(
         'postgres_changes',
@@ -446,25 +454,17 @@ export default function Game() {
           schema: 'public',
           table: 'game_guesses',
         },
-        (payload) => {
-          console.log('💡 New guess submitted:', payload);
-          // Show notification when someone guesses
+        () => {
           toast({
             title: "Player Guessed!",
             description: "A player has submitted their guess",
           });
-          setTimeout(() => initializeGame(), 100);
+          debouncedRefresh();
         }
       )
-      .subscribe((status) => {
-        console.log('📡 Realtime subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to real-time updates');
-        }
-      });
+      .subscribe();
 
     return () => {
-      console.log('🔌 Unsubscribing from real-time updates');
       supabase.removeChannel(channel);
     };
   };
