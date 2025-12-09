@@ -92,8 +92,10 @@ Deno.serve(async (req) => {
       packName: theme.pack?.name || null,
     }));
 
-    // Get current turn if exists
-    const { data: currentTurn, error: turnError } = await supabase
+    // Get current turn if exists - get the LATEST one for this round/storyteller
+    console.log("Fetching turn for session:", sessionId, "round:", session.current_round, "storyteller:", session.current_storyteller_id);
+    
+    const { data: turns, error: turnError } = await supabase
       .from("game_turns")
       .select(`
         *,
@@ -101,11 +103,18 @@ Deno.serve(async (req) => {
       `)
       .eq("session_id", sessionId)
       .eq("round_number", session.current_round)
-      .maybeSingle();
+      .eq("storyteller_id", session.current_storyteller_id)
+      .order("created_at", { ascending: false })
+      .limit(1);
 
     if (turnError) {
       console.error("Error fetching turn:", turnError);
     }
+    
+    // Get the latest turn (first in descending order)
+    const currentTurn = turns && turns.length > 0 ? turns[0] : null;
+    
+    console.log("Current turn found:", currentTurn ? currentTurn.id : "null", "turn_mode:", currentTurn?.turn_mode);
 
     // If there's a current turn with selected_icon_ids, get the icon details
     let selectedIcons: any[] = [];

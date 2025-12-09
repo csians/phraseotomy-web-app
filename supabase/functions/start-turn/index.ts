@@ -151,10 +151,52 @@ Deno.serve(async (req) => {
     const generatedWhisp = whispElement.name;
     console.log("Selected whisp from database:", generatedWhisp);
 
-    // Check if turn exists for this round, if not create it
+    // Check if turn exists for this round and storyteller - ALWAYS use existing if found
     let turn;
-    if (turnId) {
+    
+    // First, find any existing turn for this round/storyteller
+    const { data: existingTurns, error: existingError } = await supabase
+      .from("game_turns")
+      .select("*")
+      .eq("session_id", sessionId)
+      .eq("round_number", session.current_round)
+      .eq("storyteller_id", session.current_storyteller_id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    
+    if (existingError) {
+      console.error("Error checking existing turns:", existingError);
+    }
+    
+    const existingTurn = existingTurns && existingTurns.length > 0 ? existingTurns[0] : null;
+    
+    if (existingTurn) {
       // Update existing turn with whisp, selected icons, and turn mode
+      console.log("Updating existing turn:", existingTurn.id);
+      const { data: updatedTurn, error: updateError } = await supabase
+        .from("game_turns")
+        .update({ 
+          whisp: generatedWhisp,
+          theme_id: themeId,
+          selected_icon_ids: selectedIconIds,
+          icon_order: iconOrder,
+          turn_mode: mode,
+        })
+        .eq("id", existingTurn.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error("Error updating turn:", updateError);
+        return new Response(
+          JSON.stringify({ error: updateError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      turn = updatedTurn;
+    } else if (turnId) {
+      // Specific turnId provided - update it
+      console.log("Updating specified turn:", turnId);
       const { data: updatedTurn, error: updateError } = await supabase
         .from("game_turns")
         .update({ 
@@ -177,7 +219,8 @@ Deno.serve(async (req) => {
       }
       turn = updatedTurn;
     } else {
-      // Create new turn record with whisp, selected icons, and turn mode
+      // No existing turn found - create new one
+      console.log("Creating new turn for round:", session.current_round);
       const { data: newTurn, error: turnError } = await supabase
         .from("game_turns")
         .insert({
