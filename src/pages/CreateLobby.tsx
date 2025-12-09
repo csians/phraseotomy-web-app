@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getCustomerLicenses } from "@/lib/customerAccess";
 import { Skeleton } from "@/components/ui/skeleton";
+import Header from "@/components/Header";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Pack = Tables<"packs">;
@@ -315,8 +316,10 @@ export default function CreateLobby() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-2xl mx-auto space-y-6 py-8">
+    <div className="min-h-screen bg-background flex flex-col">
+      <Header />
+      <div className="flex-1 p-4">
+        <div className="max-w-2xl mx-auto space-y-6 py-8">
         {/* Customer Profile Header */}
         {customer && (
           <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
@@ -540,5 +543,6 @@ export default function CreateLobby() {
         </Card>
       </div>
     </div>
+  </div>
   );
 }

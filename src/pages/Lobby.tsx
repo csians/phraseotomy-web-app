@@ -49,6 +49,7 @@ import { LobbyAudioRecording } from "@/components/LobbyAudioRecording";
 import { getAllUrlParams } from "@/lib/urlUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ThemeElements } from "@/components/ThemeElements";
+import Header from "@/components/Header";
 
 import {
   AlertDialog,
@@ -1578,7 +1579,9 @@ export default function Lobby() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <div className="min-h-screen bg-background flex flex-col">
+      <Header />
+      <div className="flex-1 p-4 md:p-8">
       {/* Countdown Overlay */}
       {showCountdown && (
         <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm flex items-center justify-center">
@@ -1986,5 +1989,6 @@ export default function Lobby() {
         )}
       </div>
     </div>
+  </div>
   );
 }
