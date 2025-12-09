@@ -59,17 +59,22 @@ export function StorytellingInterface({
   const handleIconOrderChange = async (newOrder: IconItem[]) => {
     setOrderedIcons(newOrder);
     
-    // Save new order to database
-    const iconOrder = newOrder.map((_, index) => index);
+    // Save reordered icon IDs to database (order is preserved in the array)
+    const reorderedIconIds = newOrder.map((icon) => icon.id);
     try {
       await supabase.functions.invoke("update-icon-order", {
-        body: { turnId, iconOrder },
+        body: { turnId, reorderedIconIds },
+      });
+      
+      toast({
+        title: "Elements Updated",
+        description: "Element order saved",
       });
       
       // Notify other players
       sendWebSocketMessage?.({
         type: "icons_reordered",
-        iconOrder,
+        reorderedIconIds,
       });
     } catch (error) {
       console.error("Error updating icon order:", error);
