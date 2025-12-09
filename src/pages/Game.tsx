@@ -376,26 +376,24 @@ export default function Game() {
       const hasWhisp = !!data.currentTurn?.whisp;
       const hasTheme = !!data.currentTurn?.theme_id;
       
-      // Check if session already has a theme selected (from first round)
-      const sessionHasTheme = !!data.session?.selected_theme_id;
+      // Session theme is the permanent theme for all rounds (selected once in Round 1)
+      const sessionThemeId = data.session?.selected_theme_id;
+      const sessionHasTheme = !!sessionThemeId;
       
-      // Phase determination:
-      // 1. No turn = check if session has theme, if yes skip to mode selection
-      // 2. Turn exists but no theme = use session theme and go to mode selection
-      // 3. Has theme but no whisp = selecting_mode
-      // 4. Has whisp but not completed = storytelling or elements
-      // 5. Completed = guessing
-      if (!data.currentTurn) {
-        // No turn yet - if session has theme, skip to mode selection
-        phase = sessionHasTheme ? "selecting_mode" : "selecting_theme";
-      } else if (!hasTheme) {
-        // Turn exists but no theme - if session has theme, use it and go to mode
-        phase = sessionHasTheme ? "selecting_mode" : "selecting_theme";
+      // Phase determination (simplified):
+      // 1. Session has theme -> NEVER show theme selection again
+      // 2. No whisp yet -> storyteller needs to select mode (mode selection generates whisp)
+      // 3. Has whisp but not completed -> storytelling/elements phase
+      // 4. Completed -> guessing phase
+      
+      if (!sessionHasTheme && !hasTheme) {
+        // Only show theme selection if NO theme exists anywhere (first round only)
+        phase = "selecting_theme";
       } else if (!hasWhisp) {
-        // Theme selected but no whisp yet = storyteller needs to select mode
+        // Theme exists (either on session or turn), but no whisp = need mode selection
         phase = "selecting_mode";
-      } else if (!data.currentTurn.completed_at) {
-        // Whisp exists, use turn_mode to determine which interface to show
+      } else if (!data.currentTurn?.completed_at) {
+        // Whisp exists, show appropriate interface based on turn_mode
         if (turnMode === "elements") {
           phase = "elements";
         } else {
@@ -405,30 +403,21 @@ export default function Game() {
         phase = "guessing";
       }
       
-      console.log("Game phase:", phase, "sessionHasTheme:", sessionHasTheme, "hasTheme:", hasTheme, "hasWhisp:", hasWhisp);
+      console.log("Game phase:", phase, "sessionHasTheme:", sessionHasTheme, "hasTheme:", hasTheme, "hasWhisp:", hasWhisp, "turnMode:", turnMode);
       setGamePhase(phase);
       
-      // Set selected theme from session if exists (for later rounds)
-      if (data.session?.selected_theme_id) {
-        setSelectedThemeId(data.session.selected_theme_id);
+      // Always use session theme (for all rounds)
+      if (sessionThemeId) {
+        setSelectedThemeId(sessionThemeId);
       } else if (data.currentTurn?.theme_id) {
         setSelectedThemeId(data.currentTurn.theme_id);
-      } else {
-        setSelectedThemeId(""); // Reset for new turn
       }
       
-      // Set turn mode if exists
+      // Set turn mode if exists (for current turn)
       if (data.currentTurn?.turn_mode) {
         setSelectedTurnMode(data.currentTurn.turn_mode);
       } else {
-        setSelectedTurnMode(null); // Reset for new turn
-      }
-      
-      // Set selected theme if exists
-      if (data.currentTurn?.theme_id) {
-        setSelectedThemeId(data.currentTurn.theme_id);
-      } else {
-        setSelectedThemeId(""); // Reset for new turn
+        setSelectedTurnMode(null); // Reset for new turn - storyteller will choose
       }
     } catch (error) {
       console.error("Error initializing game:", error);
@@ -562,10 +551,22 @@ export default function Game() {
       
       const turnId = gameState?.currentTurn?.id || currentTurn?.id;
       
-      // Use session's theme (already selected in first round)
-      const themeToUse = selectedThemeId || gameState?.session?.selected_theme_id || session?.selected_theme_id;
+      // Use session's theme (set once in Round 1, used for ALL rounds)
+      const themeToUse = gameState?.session?.selected_theme_id || session?.selected_theme_id || selectedThemeId;
       
-      // Call start-turn with the selected theme and mode
+      if (!themeToUse) {
+        toast({
+          title: "Error",
+          description: "No theme selected for this session.",
+          variant: "destructive",
+        });
+        setIsGeneratingWhisp(false);
+        return;
+      }
+      
+      console.log("Starting turn with mode:", mode, "themeId:", themeToUse, "turnId:", turnId);
+      
+      // Call start-turn with the session's theme and selected mode
       const { data, error } = await supabase.functions.invoke("start-turn", {
         body: { 
           sessionId, 
@@ -577,11 +578,21 @@ export default function Game() {
 
       if (error) throw error;
 
+      console.log("Start-turn response:", data);
+
       // Wait for DB to commit
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Refresh local state from database
-      await initializeGame();
+      // Update local state immediately to show correct phase
+      setCurrentTurn(data.turn);
+      setSelectedIcons(data.selectedIcons || []);
+      
+      // Set phase directly based on mode
+      if (mode === "elements") {
+        setGamePhase("elements");
+      } else {
+        setGamePhase("storytelling");
+      }
       
       // Notify other players via WebSocket to refresh their state
       sendWebSocketMessage({
