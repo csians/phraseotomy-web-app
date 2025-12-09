@@ -353,7 +353,36 @@ export default function Game() {
 
       if (error) {
         console.error("Error from get-game-state:", error);
+        // Check if session was deleted (game completed and cleaned up)
+        if (error.message?.includes("Session not found") || session?.status === 'expired') {
+          console.log("Session was cleaned up, redirecting...");
+          toast({
+            title: "Game Ended",
+            description: "This game session has been cleaned up.",
+          });
+          navigate("/play/host");
+          return;
+        }
         throw error;
+      }
+
+      // If session not found in response, it was deleted
+      if (!data?.session) {
+        console.log("Session not found in response, likely cleaned up");
+        toast({
+          title: "Game Ended",
+          description: "This game session has ended.",
+        });
+        navigate("/play/host");
+        return;
+      }
+
+      // If session is expired/completed, don't show error - just show results
+      if (data.session?.status === 'expired' || data.session?.status === 'completed') {
+        console.log("Game already completed, status:", data.session.status);
+        setSession(data.session);
+        setPlayers(data.players || []);
+        return;
       }
 
       console.log("Game state received:", data);
@@ -421,11 +450,14 @@ export default function Game() {
       }
     } catch (error) {
       console.error("Error initializing game:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load game state.",
-        variant: "destructive",
-      });
+      // Don't show error toast if game is already completed/expired
+      if (session?.status !== 'expired' && session?.status !== 'completed') {
+        toast({
+          title: "Error",
+          description: "Failed to load game state.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
