@@ -124,19 +124,18 @@ Deno.serve(async (req) => {
 
         const coreThemeIds = new Set((coreThemes || []).map(t => t.id));
 
-        // Order elements according to icon_order if available
-        const iconOrder = currentTurn.icon_order || [0, 1, 2, 3, 4];
+        // Create a map for quick lookup
         const elementMap = new Map(elements.map(e => [e.id, e]));
         
-        selectedIcons = currentTurn.selected_icon_ids.map((id: string, index: number) => {
+        // Preserve the order from selected_icon_ids array (which is the reordered order)
+        selectedIcons = currentTurn.selected_icon_ids.map((id: string) => {
           const element = elementMap.get(id);
           if (!element) return null;
           return {
             ...element,
             isFromCore: element.theme_id !== currentTurn.theme_id,
-            order: iconOrder[index] ?? index,
           };
-        }).filter(Boolean).sort((a: any, b: any) => a.order - b.order);
+        }).filter(Boolean);
       }
     }
 

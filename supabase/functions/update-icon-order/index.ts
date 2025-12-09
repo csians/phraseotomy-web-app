@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { turnId, iconOrder } = await req.json();
+    const { turnId, iconOrder, reorderedIconIds } = await req.json();
 
     if (!turnId) {
       return new Response(
@@ -20,9 +20,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!iconOrder || !Array.isArray(iconOrder)) {
+    // Accept either reorderedIconIds (array of UUIDs in new order) or legacy iconOrder
+    if (!reorderedIconIds && (!iconOrder || !Array.isArray(iconOrder))) {
       return new Response(
-        JSON.stringify({ error: "Invalid iconOrder" }),
+        JSON.stringify({ error: "Invalid iconOrder or reorderedIconIds" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -32,10 +33,24 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Update the icon order on the turn
+    // If we have the actual reordered icon IDs, update selected_icon_ids directly
+    // This is the preferred method as it preserves the actual order
+    const updateData: { icon_order?: number[]; selected_icon_ids?: string[] } = {};
+    
+    if (reorderedIconIds && Array.isArray(reorderedIconIds)) {
+      // Store the reordered UUIDs directly - the order is preserved in the array
+      updateData.selected_icon_ids = reorderedIconIds;
+      console.log("Updating selected_icon_ids to:", reorderedIconIds);
+    } else {
+      // Legacy: just update icon_order
+      updateData.icon_order = iconOrder;
+      console.log("Updating icon_order to:", iconOrder);
+    }
+
+    // Update the turn
     const { data: turn, error } = await supabase
       .from("game_turns")
-      .update({ icon_order: iconOrder })
+      .update(updateData)
       .eq("id", turnId)
       .select()
       .single();
@@ -48,7 +63,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log("Updated icon order for turn:", turnId, "to:", iconOrder);
+    console.log("Updated turn:", turnId, "with:", updateData);
 
     return new Response(
       JSON.stringify({ success: true, turn }),

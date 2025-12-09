@@ -42,17 +42,22 @@ export function ElementsInterface({
   const handleIconOrderChange = async (newOrder: IconItem[]) => {
     setOrderedIcons(newOrder);
     
-    // Save new order to database
-    const iconOrder = newOrder.map((_, index) => index);
+    // Save reordered icon IDs to database (order is preserved in the array)
+    const reorderedIconIds = newOrder.map((icon) => icon.id);
     try {
       await supabase.functions.invoke("update-icon-order", {
-        body: { turnId, iconOrder },
+        body: { turnId, reorderedIconIds },
+      });
+      
+      toast({
+        title: "Elements Updated",
+        description: "Element order saved",
       });
       
       // Notify other players
       sendWebSocketMessage?.({
         type: "icons_reordered",
-        iconOrder,
+        reorderedIconIds,
       });
     } catch (error) {
       console.error("Error updating icon order:", error);
@@ -71,13 +76,13 @@ export function ElementsInterface({
 
     setIsSubmitting(true);
     try {
-      // Save final icon order and mark turn as completed
-      const iconOrder = orderedIcons.map((_, index) => index);
+      // Save final reordered icon IDs and mark turn as completed
+      const reorderedIconIds = orderedIcons.map((icon) => icon.id);
       
       const { error: updateError } = await supabase
         .from("game_turns")
         .update({ 
-          icon_order: iconOrder,
+          selected_icon_ids: reorderedIconIds,
           completed_at: new Date().toISOString()
         })
         .eq("id", turnId);
@@ -87,8 +92,7 @@ export function ElementsInterface({
       // Notify others via WebSocket
       sendWebSocketMessage?.({
         type: "elements_submitted",
-        selectedIcons: orderedIcons,
-        iconOrder,
+        reorderedIconIds,
       });
 
       toast({
