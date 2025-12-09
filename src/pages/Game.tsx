@@ -583,8 +583,12 @@ export default function Game() {
       // Wait for DB to commit
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Update local state immediately to show correct phase
-      setCurrentTurn(data.turn);
+      // Update local state immediately - include theme in turn object
+      const turnWithTheme = {
+        ...data.turn,
+        theme: data.theme, // Include theme from response
+      };
+      setCurrentTurn(turnWithTheme);
       setSelectedIcons(data.selectedIcons || []);
       
       // Set phase directly based on mode
