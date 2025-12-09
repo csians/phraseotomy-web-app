@@ -32,7 +32,6 @@ export default function CreateLobby() {
   const [loadingThemes, setLoadingThemes] = useState(true);
   const [gameMode, setGameMode] = useState<"live" | "async">("live");
   const [timerPreset, setTimerPreset] = useState<"quick" | "normal" | "extended">("normal");
-  const [turnMode, setTurnMode] = useState<"audio" | "elements">("audio");
 
   const TIMER_PRESETS = {
     quick: { story: 300, guess: 180, label: "Quick (5/3 min)" },
@@ -224,7 +223,6 @@ export default function CreateLobby() {
           timerPreset: gameMode === "live" ? timerPreset : null,
           storyTimeSeconds: gameMode === "live" ? timerSettings.story : null,
           guessTimeSeconds: gameMode === "live" ? timerSettings.guess : null,
-          turnMode,
         },
       });
 
@@ -434,48 +432,6 @@ export default function CreateLobby() {
                 </p>
               </div>
             )}
-
-            {/* Turn Mode Selection */}
-            <div className="space-y-3">
-              <Label>Story Mode</Label>
-              <RadioGroup value={turnMode} onValueChange={(v) => setTurnMode(v as "audio" | "elements")}>
-                <div className="grid grid-cols-2 gap-3">
-                  <div
-                    className={`flex flex-col items-center p-4 rounded-lg border cursor-pointer transition-colors text-center ${
-                      turnMode === "audio" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
-                    }`}
-                    onClick={() => setTurnMode("audio")}
-                  >
-                    <RadioGroupItem value="audio" id="audio-mode" className="sr-only" />
-                    <span className="text-2xl mb-2">🎤</span>
-                    <Label htmlFor="audio-mode" className="cursor-pointer font-medium">
-                      Audio Recording
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Record voice clues
-                    </p>
-                  </div>
-                  <div
-                    className={`flex flex-col items-center p-4 rounded-lg border cursor-pointer transition-colors text-center ${
-                      turnMode === "elements" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
-                    }`}
-                    onClick={() => setTurnMode("elements")}
-                  >
-                    <RadioGroupItem value="elements" id="elements-mode" className="sr-only" />
-                    <span className="text-2xl mb-2">🎯</span>
-                    <Label htmlFor="elements-mode" className="cursor-pointer font-medium">
-                      Arrange Elements
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Order visual icons
-                    </p>
-                  </div>
-                </div>
-              </RadioGroup>
-              <p className="text-xs text-muted-foreground">
-                All players will use this mode for their turns
-              </p>
-            </div>
 
             <div className="space-y-2">
               <Label>Select Theme</Label>
