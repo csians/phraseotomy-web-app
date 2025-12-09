@@ -806,17 +806,17 @@ export default function Game() {
         )}
 
         {/* Guessing Phase */}
-        {gamePhase === "guessing" && !isStoryteller && currentTurn && (currentTurn.recording_url || currentTurn.turn_mode === "elements") && (
+        {gamePhase === "guessing" && !isStoryteller && currentTurn && (
           <GuessingInterface
             storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
             theme={currentTurn.theme}
-            audioUrl={currentTurn.recording_url || undefined}
+            audioUrl={currentTurn.turn_mode === "audio" ? (currentTurn.recording_url || undefined) : undefined}
             sessionId={sessionId!}
             roundNumber={session.current_round ?? 1}
             playerId={currentPlayerId}
             onGuessSubmit={handleGuessSubmit}
             selectedIcons={selectedIcons}
-            turnMode={currentTurn.turn_mode}
+            turnMode={currentTurn.turn_mode || "audio"}
           />
         )}
 
