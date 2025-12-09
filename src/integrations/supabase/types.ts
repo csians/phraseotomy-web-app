@@ -428,6 +428,7 @@ export type Database = {
           tenant_id: string
           timer_preset: string | null
           total_rounds: number | null
+          turn_mode: string | null
           updated_at: string
         }
         Insert: {
@@ -452,6 +453,7 @@ export type Database = {
           tenant_id: string
           timer_preset?: string | null
           total_rounds?: number | null
+          turn_mode?: string | null
           updated_at?: string
         }
         Update: {
@@ -476,6 +478,7 @@ export type Database = {
           tenant_id?: string
           timer_preset?: string | null
           total_rounds?: number | null
+          turn_mode?: string | null
           updated_at?: string
         }
         Relationships: [

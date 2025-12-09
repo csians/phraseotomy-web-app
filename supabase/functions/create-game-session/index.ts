@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
       timerPreset,
       storyTimeSeconds,
       guessTimeSeconds,
+      turnMode,
     } = await req.json();
 
     // Validate required fields
@@ -102,6 +103,7 @@ Deno.serve(async (req) => {
         timer_preset: timerPreset || null,
         story_time_seconds: storyTimeSeconds || 600,
         guess_time_seconds: guessTimeSeconds || 420,
+        turn_mode: turnMode || null,
       })
       .select()
       .single();

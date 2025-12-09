@@ -46,6 +46,7 @@ interface GameSession {
   current_storyteller_id: string;
   status: string;
   selected_theme_id?: string;
+  turn_mode?: "audio" | "elements" | null;
 }
 
 interface Turn {
@@ -341,6 +342,39 @@ export default function Game() {
     };
   }, [sessionId]);
 
+  // Auto-trigger mode selection when session has preset turn_mode but no whisp yet
+  const autoModeTriggeredRef = useRef(false);
+  useEffect(() => {
+    // Only run once when conditions are met
+    if (autoModeTriggeredRef.current) return;
+    
+    // Conditions for auto-trigger:
+    // 1. Session has preset turn_mode
+    // 2. Current user is the storyteller
+    // 3. We're in storytelling or elements phase (meaning we skipped mode selection)
+    // 4. No whisp generated yet
+    const sessionTurnMode = session?.turn_mode;
+    const hasWhisp = !!currentTurn?.whisp;
+    const isStoryteller = session?.current_storyteller_id === currentPlayerId;
+    
+    if (
+      sessionTurnMode && 
+      isStoryteller && 
+      !hasWhisp && 
+      !isGeneratingWhisp &&
+      (gamePhase === "storytelling" || gamePhase === "elements")
+    ) {
+      console.log("Auto-triggering mode selection with session turn_mode:", sessionTurnMode);
+      autoModeTriggeredRef.current = true;
+      handleModeSelect(sessionTurnMode);
+    }
+    
+    // Reset flag when turn changes
+    if (hasWhisp) {
+      autoModeTriggeredRef.current = false;
+    }
+  }, [session?.turn_mode, session?.current_storyteller_id, currentPlayerId, currentTurn?.whisp, gamePhase, isGeneratingWhisp]);
+
   const initializeGame = async () => {
     try {
       setLoading(true);
@@ -417,9 +451,12 @@ export default function Game() {
       const sessionThemeId = data.session?.selected_theme_id;
       const sessionHasTheme = !!sessionThemeId;
       
+      // Session-level turn mode (set at lobby creation - skips per-turn mode selection)
+      const sessionTurnMode = data.session?.turn_mode;
+      
       // Phase determination (simplified):
       // 1. Session has theme -> NEVER show theme selection again
-      // 2. No whisp yet -> storyteller needs to select mode (mode selection generates whisp)
+      // 2. No whisp yet -> if session has turn_mode, auto-use it; otherwise show mode selection
       // 3. Has whisp but not completed -> storytelling/elements phase
       // 4. Completed -> guessing phase
       
@@ -427,8 +464,15 @@ export default function Game() {
         // Only show theme selection if NO theme exists anywhere (first round only)
         phase = "selecting_theme";
       } else if (!hasWhisp) {
-        // Theme exists (either on session or turn), but no whisp = need mode selection
-        phase = "selecting_mode";
+        // Theme exists but no whisp yet
+        // If session has a preset turn_mode, skip mode selection (will auto-trigger)
+        if (sessionTurnMode) {
+          // Go directly to appropriate phase - mode will be auto-applied
+          phase = sessionTurnMode === "elements" ? "elements" : "storytelling";
+        } else {
+          // No session turn_mode = need to ask storyteller
+          phase = "selecting_mode";
+        }
       } else if (!data.currentTurn?.completed_at) {
         // Whisp exists, show appropriate interface based on turn_mode
         if (turnMode === "elements") {
@@ -440,7 +484,7 @@ export default function Game() {
         phase = "guessing";
       }
       
-      console.log("Game phase:", phase, "sessionHasTheme:", sessionHasTheme, "hasTheme:", hasTheme, "hasWhisp:", hasWhisp, "turnMode:", turnMode);
+      console.log("Game phase:", phase, "sessionHasTheme:", sessionHasTheme, "hasTheme:", hasTheme, "hasWhisp:", hasWhisp, "turnMode:", turnMode, "sessionTurnMode:", sessionTurnMode);
       setGamePhase(phase);
       
       // Always use session theme (for all rounds)
@@ -450,8 +494,10 @@ export default function Game() {
         setSelectedThemeId(data.currentTurn.theme_id);
       }
       
-      // Set turn mode if exists (for current turn)
-      if (data.currentTurn?.turn_mode) {
+      // Set turn mode: prefer session-level, fallback to turn-level
+      if (sessionTurnMode) {
+        setSelectedTurnMode(sessionTurnMode);
+      } else if (data.currentTurn?.turn_mode) {
         setSelectedTurnMode(data.currentTurn.turn_mode);
       } else {
         setSelectedTurnMode(null); // Reset for new turn - storyteller will choose
