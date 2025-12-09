@@ -39,29 +39,9 @@ export function ElementsInterface({
     setOrderedIcons(selectedIcons);
   }, [selectedIcons]);
 
-  const handleIconOrderChange = async (newOrder: IconItem[]) => {
+  // Just update local state on drag - no API call until submit
+  const handleIconOrderChange = (newOrder: IconItem[]) => {
     setOrderedIcons(newOrder);
-    
-    // Save reordered icon IDs to database (order is preserved in the array)
-    const reorderedIconIds = newOrder.map((icon) => icon.id);
-    try {
-      await supabase.functions.invoke("update-icon-order", {
-        body: { turnId, reorderedIconIds },
-      });
-      
-      toast({
-        title: "Elements Updated",
-        description: "Element order saved",
-      });
-      
-      // Notify other players
-      sendWebSocketMessage?.({
-        type: "icons_reordered",
-        reorderedIconIds,
-      });
-    } catch (error) {
-      console.error("Error updating icon order:", error);
-    }
   };
 
   const handleSubmit = async () => {
@@ -135,14 +115,14 @@ export function ElementsInterface({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Icons Display - Draggable for storyteller */}
-            {orderedIcons.length > 0 && (
+            {/* Icons Display - Only show to storyteller during arrangement phase */}
+            {isStoryteller && orderedIcons.length > 0 && (
               <div className="bg-muted/30 p-6 rounded-xl">
                 <IconSelectionPanel
                   icons={orderedIcons}
-                  onOrderChange={isStoryteller ? handleIconOrderChange : undefined}
-                  isDraggable={isStoryteller}
-                  label={isStoryteller ? "Drag elements to create your clue order" : "Element Order"}
+                  onOrderChange={handleIconOrderChange}
+                  isDraggable={true}
+                  label="Drag elements to create your clue order"
                 />
               </div>
             )}
@@ -162,7 +142,7 @@ export function ElementsInterface({
               </div>
             )}
 
-            {/* Non-storyteller waiting view */}
+            {/* Non-storyteller waiting view - DON'T show elements until submitted */}
             {!isStoryteller && (
               <div className="bg-muted/50 p-6 rounded-lg text-center">
                 <Grid3X3 className="h-12 w-12 mx-auto mb-3 text-muted-foreground animate-pulse" />
@@ -170,7 +150,7 @@ export function ElementsInterface({
                   Waiting for {storytellerName} to arrange elements...
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Look at the element order for clues and try to guess the whisp word!
+                  The elements will appear after the storyteller submits.
                 </p>
               </div>
             )}
