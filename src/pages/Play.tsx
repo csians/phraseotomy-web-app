@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { NamePromptDialog } from "@/components/NamePromptDialog";
+import Header from "@/components/Header";
 
 import type { TenantConfig, ShopifyCustomer } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
@@ -501,7 +502,9 @@ const Play = () => {
   };
 
   return (
-    <div className="min-h-screen bg-game-black flex flex-col items-center justify-between px-4 py-8">
+    <div className="min-h-screen bg-game-black flex flex-col">
+      <Header />
+      <div className="flex-1 flex flex-col items-center justify-between px-4 py-8">
       {/* Name Prompt Dialog */}
       {customer && shopDomain && (
         <NamePromptDialog
@@ -772,6 +775,7 @@ const Play = () => {
               </div>
             )}
           </div>
+        </div>
         </div>
       </div>
     </div>
