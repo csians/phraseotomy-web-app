@@ -11,7 +11,8 @@ import { TurnModeSelection } from "@/components/TurnModeSelection";
 import { ElementsInterface } from "@/components/ElementsInterface";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wifi, WifiOff, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Wifi, WifiOff, Loader2, Trophy, ArrowLeft } from "lucide-react";
 
 interface Player {
   id: string;
@@ -84,6 +85,8 @@ export default function Game() {
   const [selectedThemeId, setSelectedThemeId] = useState<string>("");
   const [unlockedPackIds, setUnlockedPackIds] = useState<string[]>([]);
   const [selectedTurnMode, setSelectedTurnMode] = useState<"audio" | "elements" | null>(null);
+  const [gameCompleted, setGameCompleted] = useState(false);
+  const [gameWinner, setGameWinner] = useState<Player | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
@@ -269,11 +272,11 @@ export default function Game() {
           break;
 
         case "game_completed":
-          toast({
-            title: "Game Over! 🎊",
-            description: `${message.winnerName} won the game!`,
-            duration: 5000,
-          });
+          // Find the winner from current players
+          const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+          const winner = sortedPlayers[0] || null;
+          setGameWinner(winner);
+          setGameCompleted(true);
           
           supabase
             .from('game_sessions')
@@ -292,8 +295,6 @@ export default function Game() {
               duration: 30000,
             });
           }, 5000);
-          
-          debouncedRefresh();
           break;
 
         case "player_joined":
@@ -377,11 +378,17 @@ export default function Game() {
         return;
       }
 
-      // If session is expired/completed, don't show error - just show results
+      // If session is expired/completed, show winner dialog
       if (data.session?.status === 'expired' || data.session?.status === 'completed') {
         console.log("Game already completed, status:", data.session.status);
         setSession(data.session);
         setPlayers(data.players || []);
+        
+        // Find winner and show completion dialog
+        const sortedPlayers = [...(data.players || [])].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
+        const winner = sortedPlayers[0] || null;
+        setGameWinner(winner);
+        setGameCompleted(true);
         return;
       }
 
@@ -927,6 +934,53 @@ export default function Game() {
           </div>
         )}
       </div>
+
+      {/* Game Completed Winner Dialog */}
+      <Dialog open={gameCompleted} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <Trophy className="h-8 w-8 text-primary" />
+            </div>
+            <DialogTitle className="text-2xl text-center">Game Over! 🎊</DialogTitle>
+            <DialogDescription className="text-center space-y-4">
+              {gameWinner ? (
+                <div className="space-y-2 pt-4">
+                  <p className="text-lg font-semibold text-foreground">
+                    🏆 {gameWinner.name} wins!
+                  </p>
+                  <p className="text-muted-foreground">
+                    Final Score: {gameWinner.score || 0} points
+                  </p>
+                </div>
+              ) : (
+                <p>Thanks for playing!</p>
+              )}
+              
+              {/* Final Standings */}
+              <div className="mt-6 space-y-2 text-left">
+                <p className="text-sm font-medium text-foreground">Final Standings:</p>
+                {[...players].sort((a, b) => (b.score || 0) - (a.score || 0)).map((player, index) => (
+                  <div key={player.id} className="flex items-center justify-between py-1 px-2 rounded bg-muted/50">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{index + 1}.</span>
+                      <span>{player.name}</span>
+                      {index === 0 && <span>👑</span>}
+                    </span>
+                    <span className="font-semibold">{player.score || 0}</span>
+                  </div>
+                ))}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center pt-4">
+            <Button onClick={() => navigate("/play/host")} className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
