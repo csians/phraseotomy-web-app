@@ -893,6 +893,7 @@ export default function Game() {
             storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
             sendWebSocketMessage={sendWebSocketMessage}
             selectedIcons={selectedIcons}
+            turnMode={selectedTurnMode || currentTurn.turn_mode || "audio"}
           />
         )}
 
