@@ -786,23 +786,19 @@ export default function Game() {
           />
         )}
 
-        {gamePhase === "elements" && !isStoryteller && (
-          <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="max-w-2xl w-full space-y-6">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-foreground mb-2">
-                  {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is arranging elements
-                </h2>
-                <p className="text-muted-foreground">
-                  Watch the elements and try to guess the whisp word!
-                </p>
-              </div>
-              
-              <div className="text-center text-sm text-muted-foreground">
-                Waiting for {players.find((p) => p.player_id === session.current_storyteller_id)?.name} to submit their element order...
-              </div>
-            </div>
-          </div>
+        {gamePhase === "elements" && !isStoryteller && currentTurn && (
+          <ElementsInterface
+            theme={currentTurn.theme}
+            whisp=""
+            sessionId={sessionId!}
+            playerId={currentPlayerId}
+            turnId={currentTurn.id}
+            onSubmit={() => {}}
+            isStoryteller={false}
+            storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
+            sendWebSocketMessage={sendWebSocketMessage}
+            selectedIcons={selectedIcons}
+          />
         )}
 
         {/* Guessing Phase */}
