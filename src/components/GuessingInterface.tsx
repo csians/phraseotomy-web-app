@@ -131,8 +131,8 @@ export function GuessingInterface({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Icons Display */}
-            {selectedIcons.length > 0 && (
+            {/* Icons Display - only show in elements mode */}
+            {turnMode === "elements" && selectedIcons.length > 0 && (
               <div className="bg-muted/30 p-6 rounded-xl">
                 <IconSelectionPanel
                   icons={selectedIcons}
