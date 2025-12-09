@@ -18,6 +18,7 @@ interface StorytellingInterfaceProps {
   storytellerName: string;
   sendWebSocketMessage?: (message: any) => void;
   selectedIcons?: IconItem[];
+  turnMode?: "audio" | "elements";
 }
 
 export function StorytellingInterface({
@@ -31,6 +32,7 @@ export function StorytellingInterface({
   storytellerName,
   sendWebSocketMessage,
   selectedIcons = [],
+  turnMode = "audio",
 }: StorytellingInterfaceProps) {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
@@ -240,8 +242,8 @@ export function StorytellingInterface({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Icons Display */}
-            {orderedIcons.length > 0 && (
+            {/* Icons Display - only show in elements mode */}
+            {turnMode === "elements" && orderedIcons.length > 0 && (
               <div className="bg-muted/30 p-6 rounded-xl">
                 <IconSelectionPanel
                   icons={orderedIcons}
@@ -357,8 +359,12 @@ export function StorytellingInterface({
                 <Lightbulb className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
                   {isStoryteller 
-                    ? "Use the icons to guide your story! Arrange them in the order you'll reference them, then tell a creative story that describes your whisp word without saying it directly."
-                    : "Watch the icons and listen carefully to the story. Try to guess the whisp word based on the clues!"}
+                    ? turnMode === "audio"
+                      ? "Tell a creative story that describes your whisp word without saying it directly. Other players will listen and try to guess!"
+                      : "Use the icons to guide your story! Arrange them in the order you'll reference them, then tell a creative story that describes your whisp word without saying it directly."
+                    : turnMode === "audio"
+                      ? "Listen carefully to the story and try to guess the whisp word based on the clues!"
+                      : "Watch the icons and listen carefully to the story. Try to guess the whisp word based on the clues!"}
                 </p>
               </div>
             </div>
