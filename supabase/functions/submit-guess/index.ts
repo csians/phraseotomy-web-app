@@ -26,20 +26,34 @@ Deno.serve(async (req) => {
     );
 
     // Get the turn data including whisp using sessionId and roundNumber
-    const { data: turnData, error: turnError } = await supabase
+    // Use order + limit to handle multiple turns for same round (get latest)
+    const { data: turns, error: turnError } = await supabase
       .from("game_turns")
-      .select("id, whisp, session_id, completed_at")
+      .select("id, whisp, session_id, completed_at, storyteller_id")
       .eq("session_id", sessionId)
       .eq("round_number", roundNumber)
-      .single();
+      .order("created_at", { ascending: false })
+      .limit(1);
 
-    if (turnError || !turnData) {
+    if (turnError) {
       console.error("Error fetching turn:", turnError);
       return new Response(
         JSON.stringify({ error: "Turn not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const turnData = turns && turns.length > 0 ? turns[0] : null;
+
+    if (!turnData) {
+      console.error("No turn found for session:", sessionId, "round:", roundNumber);
+      return new Response(
+        JSON.stringify({ error: "Turn not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    console.log("Found turn:", turnData.id, "whisp:", turnData.whisp);
 
     // Check if turn is already completed (story not yet submitted)
     // Note: completed_at is set when the storyteller submits the audio
@@ -80,20 +94,8 @@ Deno.serve(async (req) => {
     console.log(`Guess: "${normalizedGuess}" vs Whisp: "${normalizedWhisp}" = ${isCorrect}`);
     const pointsEarned = isCorrect ? 10 : 0;
 
-    // Get storyteller ID for scoring wrong answers
-    const { data: currentTurn, error: currentTurnError } = await supabase
-      .from("game_turns")
-      .select("storyteller_id")
-      .eq("id", turnData.id)
-      .single();
-
-    if (currentTurnError || !currentTurn) {
-      console.error("Error fetching current turn:", currentTurnError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch turn data" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Use storyteller_id from turnData (already fetched above)
+    const storytellerId = turnData.storyteller_id;
 
     // Insert the guess
     const { error: insertError } = await supabase
@@ -127,7 +129,7 @@ Deno.serve(async (req) => {
     } else {
       // If wrong, award storyteller 10 points
       const { error: storytellerScoreError } = await supabase.rpc("increment_player_score", {
-        p_player_id: currentTurn.storyteller_id,
+        p_player_id: storytellerId,
         p_points: 10,
       });
 
@@ -157,7 +159,7 @@ Deno.serve(async (req) => {
     }
 
     const nonStorytellerPlayers = sessionPlayers?.filter(
-      p => p.player_id !== currentTurn?.storyteller_id
+      p => p.player_id !== storytellerId
     ) || [];
     
     const uniquePlayerAnswers = new Set(allGuesses?.map(g => g.player_id) || []);
