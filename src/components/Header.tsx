@@ -14,41 +14,41 @@ const Header = () => {
 
         {/* Navigation */}
         <nav className="hidden md:flex items-center gap-8">
-          <a 
-            href="https://phraseotomy.com/collections/all" 
-            target="_blank" 
+          <a
+            href="https://phraseotomy.com/collections/all"
+            target="_blank"
             rel="noopener noreferrer"
             className="text-white text-sm font-medium tracking-wide hover:text-amber-500 transition-colors"
           >
             PRODUCT LIST
           </a>
-          <a 
-            href="https://phraseotomy.com/pages/retailer-enquiries" 
-            target="_blank" 
+          <a
+            href="https://phraseotomy.com/pages/contact"
+            target="_blank"
             rel="noopener noreferrer"
             className="text-white text-sm font-medium tracking-wide hover:text-amber-500 transition-colors"
           >
             RETAILER ENQUIRIES
           </a>
-          <a 
-            href="https://phraseotomy.com/pages/how-to-play" 
-            target="_blank" 
+          <a
+            href="https://phraseotomy.com/pages/how-to-play"
+            target="_blank"
             rel="noopener noreferrer"
             className="text-white text-sm font-medium tracking-wide hover:text-amber-500 transition-colors"
           >
             HOW TO PLAY
           </a>
-          <a 
-            href="https://phraseotomy.com/pages/game-assist" 
-            target="_blank" 
+          <a
+            href="https://phraseotomy.com/pages/game-assistant"
+            target="_blank"
             rel="noopener noreferrer"
             className="text-white text-sm font-medium tracking-wide hover:text-amber-500 transition-colors"
           >
             GAME ASSIST
           </a>
-          <a 
-            href="https://phraseotomy.com/apps/phraseotomy" 
-            target="_blank" 
+          <a
+            href="https://phraseotomy.com/pages/play-online"
+            target="_blank"
             rel="noopener noreferrer"
             className="text-white text-sm font-medium tracking-wide hover:text-amber-500 transition-colors"
           >
