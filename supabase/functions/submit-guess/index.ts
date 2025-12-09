@@ -211,85 +211,32 @@ Deno.serve(async (req) => {
             const nextStoryteller = allPlayers.find(p => p.turn_order === nextRound);
             
             if (nextStoryteller) {
-              // Get session theme for whisp generation
-              const { data: fullSession } = await supabase
-                .from("game_sessions")
-                .select("selected_theme_id")
-                .eq("id", sessionId)
-                .single();
-
-              let nextWhisp = "Mystery";
-              
-              if (fullSession?.selected_theme_id) {
-                // Get theme name
-                const { data: theme } = await supabase
-                  .from("themes")
-                  .select("name")
-                  .eq("id", fullSession.selected_theme_id)
-                  .single();
-
-                if (theme) {
-                  // Generate new whisp for next round
-                  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-                  if (LOVABLE_API_KEY) {
-                    try {
-                      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-                        method: "POST",
-                        headers: {
-                          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                          model: "google/gemini-2.5-flash",
-                          messages: [
-                            {
-                              role: "system",
-                              content: `You are a creative word generator for a storytelling party game. Generate a single word related to the theme "${theme.name}" that players can create stories about. The word should be:
-- A common, family-friendly word (noun, verb, or adjective)
-- Related to the theme but not too obvious
-- Easy to describe through storytelling
-- Suitable for all ages
-
-IMPORTANT: Respond with ONLY the single word, nothing else. No punctuation, no explanation.`
-                            },
-                            {
-                              role: "user",
-                              content: `Generate a creative word related to the theme "${theme.name}" for a storytelling game.`
-                            }
-                          ],
-                        }),
-                      });
-
-                      if (aiResponse.ok) {
-                        const aiData = await aiResponse.json();
-                        nextWhisp = aiData.choices?.[0]?.message?.content?.trim() || "Mystery";
-                        console.log("Generated whisp for next round:", nextWhisp);
-                      }
-                    } catch (aiError) {
-                      console.error("Error generating whisp for next round:", aiError);
-                    }
-                  }
-                }
-              }
-
-              // Update the next turn with the generated whisp
-              const { error: updateTurnError } = await supabase
+              // Create a new turn record for the next round WITHOUT whisp
+              // Whisp will be generated when the new storyteller selects their mode via start-turn
+              const { error: newTurnError } = await supabase
                 .from("game_turns")
-                .update({ whisp: nextWhisp })
-                .eq("session_id", sessionId)
-                .eq("round_number", nextRound);
+                .insert({
+                  session_id: sessionId,
+                  round_number: nextRound,
+                  storyteller_id: nextStoryteller.player_id,
+                  // No whisp, theme_id, selected_icon_ids, or turn_mode
+                  // These will be set when the new storyteller selects theme and mode
+                });
 
-              if (updateTurnError) {
-                console.error("Error updating next turn whisp:", updateTurnError);
+              if (newTurnError) {
+                console.error("Error creating new turn for next round:", newTurnError);
+              } else {
+                console.log(`✅ Created new turn for round ${nextRound}`);
               }
 
               // Update session to next round and storyteller
+              // Clear selected_theme_id so new storyteller can choose their own theme
               const { error: updateError } = await supabase
                 .from("game_sessions")
                 .update({
                   current_round: nextRound,
                   current_storyteller_id: nextStoryteller.player_id,
-                  // Keep selected_theme_id - theme is set during lobby creation
+                  selected_theme_id: null, // Clear theme for new storyteller to choose
                 })
                 .eq("id", sessionId);
 
