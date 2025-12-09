@@ -371,13 +371,17 @@ export default function Game() {
       let phase: GamePhase;
       const turnMode = data.currentTurn?.turn_mode;
       const hasWhisp = !!data.currentTurn?.whisp;
+      const hasTheme = !!data.currentTurn?.theme_id;
       
-      // Check if turn_mode has been explicitly set (not just the default)
-      // We use the presence of whisp to determine if mode was selected
-      if (!data.currentTurn) {
+      // Phase determination:
+      // 1. No turn OR turn exists but no theme = selecting_theme
+      // 2. Has theme but no whisp = selecting_mode
+      // 3. Has whisp but not completed = storytelling or elements
+      // 4. Completed = guessing
+      if (!data.currentTurn || !hasTheme) {
         phase = "selecting_theme";
       } else if (!hasWhisp) {
-        // No whisp yet = storyteller needs to select mode first
+        // Theme selected but no whisp yet = storyteller needs to select mode
         phase = "selecting_mode";
       } else if (!data.currentTurn.completed_at) {
         // Whisp exists, use turn_mode to determine which interface to show
@@ -390,17 +394,21 @@ export default function Game() {
         phase = "guessing";
       }
       
-      console.log("Game phase:", phase);
+      console.log("Game phase:", phase, "hasTheme:", hasTheme, "hasWhisp:", hasWhisp);
       setGamePhase(phase);
       
       // Set turn mode if exists
       if (data.currentTurn?.turn_mode) {
         setSelectedTurnMode(data.currentTurn.turn_mode);
+      } else {
+        setSelectedTurnMode(null); // Reset for new turn
       }
       
       // Set selected theme if exists
       if (data.currentTurn?.theme_id) {
         setSelectedThemeId(data.currentTurn.theme_id);
+      } else {
+        setSelectedThemeId(""); // Reset for new turn
       }
     } catch (error) {
       console.error("Error initializing game:", error);
@@ -483,11 +491,19 @@ export default function Game() {
       if (error) throw error;
 
       // Also update the current turn's theme_id (without generating whisp yet)
-      if (currentTurn?.id) {
+      // Refresh to get the current turn for the current round
+      const { data: gameState } = await supabase.functions.invoke("get-game-state", {
+        body: { sessionId },
+      });
+      
+      if (gameState?.currentTurn?.id) {
         await supabase
           .from("game_turns")
           .update({ theme_id: themeId })
-          .eq("id", currentTurn.id);
+          .eq("id", gameState.currentTurn.id);
+        
+        // Update local state
+        setCurrentTurn({ ...gameState.currentTurn, theme_id: themeId });
       }
 
       // Move to mode selection phase
@@ -519,11 +535,18 @@ export default function Game() {
     setIsGeneratingWhisp(true);
     
     try {
+      // Get the current turn to ensure we have the latest turn ID
+      const { data: gameState } = await supabase.functions.invoke("get-game-state", {
+        body: { sessionId },
+      });
+      
+      const turnId = gameState?.currentTurn?.id || currentTurn?.id;
+      
       // Call start-turn with the selected theme and mode
       const { data, error } = await supabase.functions.invoke("start-turn", {
         body: { 
           sessionId, 
-          turnId: currentTurn?.id,
+          turnId,
           selectedThemeId,
           turnMode: mode,
         },
