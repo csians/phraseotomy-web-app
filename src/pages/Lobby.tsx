@@ -546,7 +546,8 @@ export default function Lobby() {
         setTimeout(() => setCountdownNumber(1), 2000);
         setTimeout(() => {
           setShowCountdown(false);
-          fetchLobbyData();
+          // Navigate to game page after countdown (for all players)
+          navigate(`/game/${sessionId}`);
         }, 3000);
       })
       .on("broadcast", { event: "lobby_ended" }, (payload) => {
