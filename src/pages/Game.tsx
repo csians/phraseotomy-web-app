@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Wifi, WifiOff, Loader2, Trophy, ArrowLeft } from "lucide-react";
+import Header from "@/components/Header";
 
 interface Player {
   id: string;
@@ -699,7 +700,8 @@ export default function Game() {
   // console.log("🎮 [RENDER DEBUG] gamePhase:", gamePhase, "isStoryteller:", isStoryteller);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
+      <Header />
       {/* Connection Status Indicator */}
       <div className="fixed top-4 right-4 z-50">
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
