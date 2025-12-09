@@ -702,39 +702,42 @@ export default function Game() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      {/* Connection Status Indicator */}
-      <div className="fixed top-4 right-4 z-50">
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
-          isConnected 
-            ? "bg-green-500/10 text-green-600 border border-green-500/20" 
-            : "bg-red-500/10 text-red-600 border border-red-500/20"
-        }`}>
-          {isConnected ? (
-            <>
-              <Wifi className="h-3 w-3" />
-              <span>Live</span>
-            </>
-          ) : (
-            <>
-              <WifiOff className="h-3 w-3" />
-              <span>Connecting...</span>
-            </>
-          )}
+      
+      {/* Main content area with sidebar layout */}
+      <div className="flex-1 flex">
+        {/* Scoreboard Sidebar */}
+        <aside className="w-64 lg:w-80 flex-shrink-0 p-4 sticky top-0 h-[calc(100vh-64px)] overflow-y-auto">
+          <Scoreboard
+            players={players}
+            currentRound={session.current_round}
+            totalRounds={session.total_rounds}
+            currentStorytellerId={session.current_storyteller_id}
+          />
+        </aside>
+
+        {/* Connection Status Indicator */}
+        <div className="fixed top-20 right-4 z-50">
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+            isConnected 
+              ? "bg-green-500/10 text-green-600 border border-green-500/20" 
+              : "bg-red-500/10 text-red-600 border border-red-500/20"
+          }`}>
+            {isConnected ? (
+              <>
+                <Wifi className="h-3 w-3" />
+                <span>Live</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-3 w-3" />
+                <span>Connecting...</span>
+              </>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Scoreboard - Always visible */}
-      <div className="fixed top-4 left-4 w-80 z-50">
-        <Scoreboard
-          players={players}
-          currentRound={session.current_round}
-          totalRounds={session.total_rounds}
-          currentStorytellerId={session.current_storyteller_id}
-        />
-      </div>
-
-      {/* Game Content */}
-      <div className="ml-96 p-4">
+        {/* Game Content */}
+        <main className="flex-1 p-4">
         {/* Theme Selection Phase - Storyteller chooses theme */}
         {gamePhase === "selecting_theme" && isStoryteller && (
           <div className="min-h-screen flex items-center justify-center p-4">
@@ -935,6 +938,7 @@ export default function Game() {
             </div>
           </div>
         )}
+        </main>
       </div>
 
       {/* Game Completed Winner Dialog */}
