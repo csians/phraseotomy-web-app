@@ -1952,8 +1952,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Mode Selection - For storyteller when game is active but no turn_mode set yet */}
-        {isStoryteller && session.status === "active" && !currentTurn?.turn_mode && !currentTurn?.whisp && (
+        {/* Mode Selection - For storyteller when game is active but no whisp generated yet */}
+        {isStoryteller && session.status === "active" && currentTurn && !currentTurn.whisp && (
           <TurnModeSelection
             onModeSelect={handleModeSelect}
             playerName={players.find(p => p.player_id === currentPlayerId)?.name}
@@ -2020,7 +2020,7 @@ export default function Lobby() {
         )}
 
         {/* Waiting for storyteller to select mode - For non-storytellers */}
-        {!isStoryteller && session.status === "active" && !currentTurn?.turn_mode && !currentTurn?.whisp && (
+        {!isStoryteller && session.status === "active" && currentTurn && !currentTurn.whisp && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
