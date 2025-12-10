@@ -50,6 +50,8 @@ import { getAllUrlParams } from "@/lib/urlUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ThemeElements } from "@/components/ThemeElements";
 import Header from "@/components/Header";
+import { ElementsInterface } from "@/components/ElementsInterface";
+import { IconItem } from "@/components/IconSelectionPanel";
 
 import {
   AlertDialog,
@@ -219,6 +221,7 @@ export default function Lobby() {
   const [packNames, setPackNames] = useState<string[]>([]);
   const [isKickingPlayer, setIsKickingPlayer] = useState(false);
   const [joiningPlayerName, setJoiningPlayerName] = useState<string | null>(null);
+  const [turnElements, setTurnElements] = useState<IconItem[]>([]);
 
   // Reset lockout state when round changes
   useEffect(() => {
@@ -943,11 +946,35 @@ export default function Lobby() {
         } else {
           setHasRecording(false);
         }
+
+        // Fetch elements for turn_mode === "elements"
+        if (data.currentTurn?.turn_mode === "elements" && data.currentTurn?.selected_icon_ids?.length > 0) {
+          const { data: elementsData } = await supabase
+            .from("elements")
+            .select("id, name, icon, theme_id")
+            .in("id", data.currentTurn.selected_icon_ids);
+          
+          if (elementsData) {
+            // Get the theme_id for this turn to determine which are core icons
+            const turnThemeId = data.currentTurn.theme_id;
+            const orderedElements = data.currentTurn.selected_icon_ids.map((iconId: string, index: number) => {
+              const element = elementsData.find((e) => e.id === iconId);
+              return {
+                id: iconId,
+                name: element?.name || "",
+                icon: element?.icon || "sparkles",
+                isFromCore: element?.theme_id !== turnThemeId,
+              };
+            });
+            setTurnElements(orderedElements);
+          }
+        }
       } else {
         // No current turn data - reset everything
         setSelectedTheme("");
         setSelectedElementId("");
         setHasRecording(false);
+        setTurnElements([]);
       }
 
       // Fetch themes
@@ -1879,8 +1906,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Audio Recording - For storyteller after whisp is shown */}
-        {isStoryteller && session.status === "active" && currentTurn?.whisp && !hasRecording && (
+        {/* Audio Recording - For storyteller after whisp is shown (only for audio mode) */}
+        {isStoryteller && session.status === "active" && currentTurn?.whisp && !hasRecording && currentTurn?.turn_mode !== "elements" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -1893,6 +1920,30 @@ export default function Lobby() {
               <LobbyAudioRecording onRecordingComplete={handleRecordingComplete} isUploading={isUploading} />
             </CardContent>
           </Card>
+        )}
+
+        {/* Elements Interface - For storyteller when turn_mode is elements */}
+        {isStoryteller && session.status === "active" && currentTurn?.whisp && currentTurn?.turn_mode === "elements" && !currentTurn?.completed_at && (
+          <ElementsInterface
+            theme={{ id: selectedTheme || session.selected_theme_id || "", name: themes.find(t => t.id === (selectedTheme || session.selected_theme_id))?.name || "" }}
+            whisp={currentTurn.whisp}
+            sessionId={sessionId || ""}
+            playerId={currentCustomerId || ""}
+            turnId={currentTurn.id}
+            onSubmit={() => {
+              setCurrentTurn((prev: any) => ({ ...prev, completed_at: new Date().toISOString() }));
+            }}
+            isStoryteller={true}
+            storytellerName={players.find(p => p.player_id === currentTurn.storyteller_id)?.name || "Storyteller"}
+            sendWebSocketMessage={(msg) => {
+              broadcastChannelRef.current?.send({
+                type: "broadcast",
+                event: "elements_submitted",
+                payload: msg,
+              });
+            }}
+            selectedIcons={turnElements}
+          />
         )}
 
         {/* Show Current Theme to non-storyteller players */}
