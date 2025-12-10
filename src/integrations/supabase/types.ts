@@ -519,7 +519,7 @@ export type Database = {
           session_id: string
           storyteller_id: string
           theme_id: string | null
-          turn_mode: string
+          turn_mode: string | null
           whisp: string | null
         }
         Insert: {
@@ -535,7 +535,7 @@ export type Database = {
           session_id: string
           storyteller_id: string
           theme_id?: string | null
-          turn_mode?: string
+          turn_mode?: string | null
           whisp?: string | null
         }
         Update: {
@@ -551,7 +551,7 @@ export type Database = {
           session_id?: string
           storyteller_id?: string
           theme_id?: string | null
-          turn_mode?: string
+          turn_mode?: string | null
           whisp?: string | null
         }
         Relationships: [
