@@ -60,19 +60,19 @@ export function StorytellingInterface({
 
   const handleIconOrderChange = async (newOrder: IconItem[]) => {
     setOrderedIcons(newOrder);
-    
+
     // Save reordered icon IDs to database (order is preserved in the array)
     const reorderedIconIds = newOrder.map((icon) => icon.id);
     try {
       await supabase.functions.invoke("update-icon-order", {
         body: { turnId, reorderedIconIds },
       });
-      
+
       toast({
         title: "Elements Updated",
         description: "Element order saved",
       });
-      
+
       // Notify other players
       sendWebSocketMessage?.({
         type: "icons_reordered",
@@ -93,14 +93,14 @@ export function StorytellingInterface({
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
-          
+
           // Stream audio chunk to other players via WebSocket
           if (sendWebSocketMessage) {
             const reader = new FileReader();
             reader.onloadend = () => {
               const base64data = reader.result as string;
-              const base64Audio = base64data.split(',')[1];
-              
+              const base64Audio = base64data.split(",")[1];
+
               sendWebSocketMessage({
                 type: "audio_chunk",
                 audioData: base64Audio,
@@ -115,7 +115,7 @@ export function StorytellingInterface({
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         setRecordedAudio(blob);
         stream.getTracks().forEach((track) => track.stop());
-        
+
         sendWebSocketMessage?.({
           type: "recording_stopped",
         });
@@ -179,16 +179,16 @@ export function StorytellingInterface({
       if (uploadError) throw uploadError;
 
       // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from("audio_uploads")
-        .getPublicUrl(fileName);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("audio_uploads").getPublicUrl(fileName);
 
       // Update turn with recording URL and mark as completed
       const { error: updateError } = await supabase
         .from("game_turns")
-        .update({ 
+        .update({
           recording_url: publicUrl,
-          completed_at: new Date().toISOString()
+          completed_at: new Date().toISOString(),
         })
         .eq("id", turnId);
 
@@ -237,9 +237,7 @@ export function StorytellingInterface({
                 <span className="text-primary">{storytellerName} is telling a story</span>
               )}
             </CardTitle>
-            <CardDescription className="text-center text-lg">
-              Theme: {theme.name}
-            </CardDescription>
+            <CardDescription className="text-center text-lg">Theme: {theme.name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Icons Display - only show in elements mode */}
@@ -286,13 +284,11 @@ export function StorytellingInterface({
             {isStoryteller && (
               <div className="border-t border-border pt-6">
                 <h3 className="text-lg font-semibold mb-3">Record Your Story</h3>
-                
+
                 {!whisp && (
                   <Alert className="mb-4">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Waiting for whisp to be generated...
-                    </AlertDescription>
+                    <AlertDescription>Waiting for whisp to be generated...</AlertDescription>
                   </Alert>
                 )}
 
@@ -300,12 +296,8 @@ export function StorytellingInterface({
                   <div className="space-y-4">
                     {isRecording && (
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-primary">
-                          {formatTime(recordingTime)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Max: {formatTime(MAX_RECORDING_TIME)}
-                        </p>
+                        <p className="text-2xl font-bold text-primary">{formatTime(recordingTime)}</p>
+                        <p className="text-sm text-muted-foreground">Max: {formatTime(MAX_RECORDING_TIME)}</p>
                       </div>
                     )}
                     <Button
@@ -332,18 +324,10 @@ export function StorytellingInterface({
                   <div className="space-y-4">
                     <audio controls src={URL.createObjectURL(recordedAudio)} className="w-full" />
                     <div className="flex gap-3">
-                      <Button
-                        onClick={() => setRecordedAudio(null)}
-                        variant="outline"
-                        className="flex-1"
-                      >
+                      <Button onClick={() => setRecordedAudio(null)} variant="outline" className="flex-1">
                         Record Again
                       </Button>
-                      <Button
-                        onClick={handleSubmitStory}
-                        disabled={isUploading}
-                        className="flex-1"
-                      >
+                      <Button onClick={handleSubmitStory} disabled={isUploading} className="flex-1">
                         <Send className="mr-2 h-4 w-4" />
                         {isUploading ? "Sending..." : "Send Story"}
                       </Button>
@@ -358,7 +342,7 @@ export function StorytellingInterface({
               <div className="flex items-start gap-2">
                 <Lightbulb className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
-                  {isStoryteller 
+                  {isStoryteller
                     ? turnMode === "audio"
                       ? "Tell a creative story that describes your whisp word without saying it directly. Other players will listen and try to guess!"
                       : "Use the icons to guide your story! Arrange them in the order you'll reference them, then tell a creative story that describes your whisp word without saying it directly."
