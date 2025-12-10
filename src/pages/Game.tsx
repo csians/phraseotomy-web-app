@@ -481,7 +481,9 @@ export default function Game() {
         }
       } else if (!data.currentTurn?.completed_at) {
         // Whisp exists, show appropriate interface based on turn_mode
-        if (turnMode === "elements") {
+        // Prioritize local selectedTurnMode state over DB value to avoid race conditions
+        const effectiveTurnMode = selectedTurnMode || turnMode;
+        if (effectiveTurnMode === "elements") {
           phase = "elements";
         } else {
           phase = "storytelling";
