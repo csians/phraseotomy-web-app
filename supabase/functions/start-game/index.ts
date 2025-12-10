@@ -103,12 +103,14 @@ Deno.serve(async (req) => {
 
     console.log("Game started successfully:", updatedSession);
 
-    // Create all turns for all rounds upfront WITHOUT whisp (whisp generated after mode selection)
+    // Create all turns for all rounds upfront WITHOUT whisp or turn_mode
+    // (mode selection and whisp generation happen in start-turn after storyteller chooses)
     const turnsToCreate = allPlayers.map((player: { player_id: string }, index: number) => ({
       session_id: sessionId,
       round_number: index + 1,
       storyteller_id: player.player_id,
       theme_id: sessionData.selected_theme_id,
+      turn_mode: null, // Explicitly null so storyteller must choose mode
       // whisp will be generated in start-turn after mode selection
     }));
 
