@@ -1888,8 +1888,8 @@ export default function Lobby() {
           </Card>
         )}
 
-        {/* Show Whisp to Storyteller - Auto-generated based on theme */}
-        {isStoryteller && session.status === "active" && currentTurn?.whisp && (
+        {/* Show Whisp to Storyteller - Auto-generated based on theme (only for audio mode) */}
+        {isStoryteller && session.status === "active" && currentTurn?.whisp && currentTurn?.turn_mode !== "elements" && (
           <Card className="border-primary/50 bg-primary/5">
             <CardHeader>
               <CardTitle className="flex items-center text-primary">
