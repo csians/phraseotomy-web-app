@@ -472,6 +472,9 @@ export default function Game() {
         } else if (turnMode) {
           // Turn already has a mode selected (from mode selection), use that
           phase = turnMode === "elements" ? "elements" : "storytelling";
+        } else if (selectedTurnMode) {
+          // User just selected mode locally but DB hasn't synced yet - use local state
+          phase = selectedTurnMode === "elements" ? "elements" : "storytelling";
         } else {
           // No session turn_mode and no turn mode = need to ask storyteller
           phase = "selecting_mode";
