@@ -52,6 +52,7 @@ import { ThemeElements } from "@/components/ThemeElements";
 import Header from "@/components/Header";
 import { ElementsInterface } from "@/components/ElementsInterface";
 import { IconItem } from "@/components/IconSelectionPanel";
+import { TurnModeSelection } from "@/components/TurnModeSelection";
 
 import {
   AlertDialog,
@@ -222,6 +223,7 @@ export default function Lobby() {
   const [isKickingPlayer, setIsKickingPlayer] = useState(false);
   const [joiningPlayerName, setJoiningPlayerName] = useState<string | null>(null);
   const [turnElements, setTurnElements] = useState<IconItem[]>([]);
+  const [isSelectingMode, setIsSelectingMode] = useState(false);
 
   // Reset lockout state when round changes
   useEffect(() => {
@@ -1046,6 +1048,68 @@ export default function Lobby() {
     }
   };
 
+  // Handle mode selection (audio vs elements)
+  const handleModeSelect = async (mode: "audio" | "elements") => {
+    if (!sessionId || !session?.selected_theme_id) {
+      toast({
+        title: "Error",
+        description: "No theme selected for this session.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSelectingMode(true);
+
+    try {
+      const turnId = currentTurn?.id;
+      
+      console.log("Starting turn with mode:", mode, "themeId:", session.selected_theme_id, "turnId:", turnId);
+      
+      // Call start-turn with the session's theme and selected mode
+      const { data, error } = await supabase.functions.invoke("start-turn", {
+        body: { 
+          sessionId, 
+          turnId,
+          selectedThemeId: session.selected_theme_id,
+          turnMode: mode,
+        },
+      });
+
+      if (error) throw error;
+
+      console.log("Start-turn response:", data);
+
+      // Wait for DB to commit
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Update local state immediately
+      setCurrentTurn(data.turn);
+      if (mode === "elements" && data.selectedIcons) {
+        setTurnElements(data.selectedIcons);
+      }
+      
+      // Broadcast mode selected to other players
+      broadcastEvent("mode_selected", { mode, whisp: data.whisp });
+
+      toast({
+        title: "Whisp Generated!",
+        description: `Your word is: "${data.whisp}"`,
+      });
+
+      // Fetch updated data
+      await fetchLobbyData();
+    } catch (error) {
+      console.error("Error selecting mode:", error);
+      toast({
+        title: "Error",
+        description: "Failed to start turn. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSelectingMode(false);
+    }
+  };
   const handleEndLobby = async () => {
     const customerId = getCurrentCustomerId();
     if (!session || !customerId) {
@@ -1888,6 +1952,15 @@ export default function Lobby() {
           </Card>
         )}
 
+        {/* Mode Selection - For storyteller when game is active but no turn_mode set yet */}
+        {isStoryteller && session.status === "active" && !currentTurn?.turn_mode && !currentTurn?.whisp && (
+          <TurnModeSelection
+            onModeSelect={handleModeSelect}
+            playerName={players.find(p => p.player_id === currentPlayerId)?.name}
+            disabled={isSelectingMode}
+          />
+        )}
+
         {/* Show Whisp to Storyteller - Auto-generated based on theme (only for audio mode) */}
         {isStoryteller && session.status === "active" && currentTurn?.whisp && currentTurn?.turn_mode !== "elements" && (
           <Card className="border-primary/50 bg-primary/5">
@@ -1944,6 +2017,21 @@ export default function Lobby() {
             }}
             selectedIcons={turnElements}
           />
+        )}
+
+        {/* Waiting for storyteller to select mode - For non-storytellers */}
+        {!isStoryteller && session.status === "active" && !currentTurn?.turn_mode && !currentTurn?.whisp && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Waiting for Storyteller
+              </CardTitle>
+              <CardDescription>
+                {players.find(p => p.player_id === session.current_storyteller_id)?.name || "The storyteller"} is selecting their mode...
+              </CardDescription>
+            </CardHeader>
+          </Card>
         )}
 
         {/* Show Current Theme to non-storyteller players */}
