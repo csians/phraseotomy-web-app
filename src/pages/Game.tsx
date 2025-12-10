@@ -469,8 +469,11 @@ export default function Game() {
         if (sessionTurnMode) {
           // Go directly to appropriate phase - mode will be auto-applied
           phase = sessionTurnMode === "elements" ? "elements" : "storytelling";
+        } else if (turnMode) {
+          // Turn already has a mode selected (from mode selection), use that
+          phase = turnMode === "elements" ? "elements" : "storytelling";
         } else {
-          // No session turn_mode = need to ask storyteller
+          // No session turn_mode and no turn mode = need to ask storyteller
           phase = "selecting_mode";
         }
       } else if (!data.currentTurn?.completed_at) {
