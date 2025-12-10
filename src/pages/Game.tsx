@@ -465,12 +465,16 @@ export default function Game() {
         phase = "selecting_theme";
       } else if (!hasWhisp) {
         // Theme exists but no whisp yet
-        // If session has a preset turn_mode, skip mode selection (will auto-trigger)
-        if (sessionTurnMode) {
-          // Go directly to appropriate phase - mode will be auto-applied
+        // Check if turn already has a mode set (from previous selection before refresh)
+        // Priority: 1) current turn's turn_mode, 2) session-level turn_mode, 3) ask user
+        if (turnMode) {
+          // Turn already has mode selected - go to appropriate phase
+          phase = turnMode === "elements" ? "elements" : "storytelling";
+        } else if (sessionTurnMode) {
+          // Session has a preset turn_mode - use it
           phase = sessionTurnMode === "elements" ? "elements" : "storytelling";
         } else {
-          // No session turn_mode = need to ask storyteller
+          // No mode set anywhere = need to ask storyteller
           phase = "selecting_mode";
         }
       } else if (!data.currentTurn?.completed_at) {
@@ -494,11 +498,11 @@ export default function Game() {
         setSelectedThemeId(data.currentTurn.theme_id);
       }
       
-      // Set turn mode: prefer session-level, fallback to turn-level
-      if (sessionTurnMode) {
+      // Set turn mode: prefer turn-level (persisted), then session-level, then null
+      if (turnMode) {
+        setSelectedTurnMode(turnMode);
+      } else if (sessionTurnMode) {
         setSelectedTurnMode(sessionTurnMode);
-      } else if (data.currentTurn?.turn_mode) {
-        setSelectedTurnMode(data.currentTurn.turn_mode);
       } else {
         setSelectedTurnMode(null); // Reset for new turn - storyteller will choose
       }
