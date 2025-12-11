@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,85 +39,9 @@ const Login = () => {
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [lobbyCode, setLobbyCode] = useState("");
-  const [guestName, setGuestName] = useState("");
-  const [isJoining, setIsJoining] = useState(false);
-  const [showGuestJoin, setShowGuestJoin] = useState(false);
-
-  // Generate a random guest name suffix
-  const generateRandomSuffix = () => {
-    return Math.floor(Math.random() * 900) + 100; // 100-999
-  };
 
   useEffect(() => {
-    // Check for guest join parameters FIRST - join lobby directly
     const urlParams = getAllUrlParams();
-    const guestParam = urlParams.get("guest");
-    const lobbyCodeParam = urlParams.get("lobbyCode");
-    const guestDataParam = urlParams.get("guestData");
-    const guestShopParam = urlParams.get("shop");
-
-    if (guestParam === "true" && lobbyCodeParam && guestDataParam) {
-      console.log("Guest parameters detected, joining lobby directly");
-
-      const joinLobbyAsGuest = async () => {
-        try {
-          const guestData = JSON.parse(decodeURIComponent(guestDataParam));
-
-          // Store guest data in localStorage
-          localStorage.setItem("guest_player_id", guestData.player_id);
-          localStorage.setItem("guestPlayerData", JSON.stringify(guestData));
-          if (guestShopParam) {
-            localStorage.setItem("shop_domain", guestShopParam);
-          }
-
-          // Join the lobby directly
-          const { data: joinData, error: joinError } = await supabase.functions.invoke("join-lobby", {
-            body: {
-              lobbyCode: lobbyCodeParam.toUpperCase(),
-              playerName: guestData.name,
-              playerId: guestData.player_id,
-            },
-          });
-
-          if (joinError || joinData?.error) {
-            console.error("Error joining lobby:", joinError || joinData?.error);
-            toast({
-              title: "Failed to Join",
-              description: joinData?.error || "Could not join the lobby",
-              variant: "destructive",
-            });
-            setLoading(false);
-            return;
-          }
-
-          // Store session for persistence
-          const sessionId = joinData?.session?.id;
-          if (sessionId) {
-            sessionStorage.setItem("current_lobby_session", sessionId);
-            toast({
-              title: "Success!",
-              description: `Joined as ${guestData.name}`,
-            });
-            navigate(`/lobby/${sessionId}`, { replace: true });
-          } else {
-            setLoading(false);
-          }
-        } catch (error) {
-          console.error("Error in guest join:", error);
-          toast({
-            title: "Failed to Join",
-            description: "Could not join the lobby",
-            variant: "destructive",
-          });
-          setLoading(false);
-        }
-      };
-
-      joinLobbyAsGuest();
-      return;
-    }
-
     // Check for embedded config from proxy (primary method)
     if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
       setTenant(window.__PHRASEOTOMY_CONFIG__);
@@ -621,86 +543,6 @@ const Login = () => {
     }
   };
 
-  const handleGuestJoin = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!guestName.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter your name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!lobbyCode.trim() || lobbyCode.trim().length !== 6) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter a valid 6-digit lobby code",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsJoining(true);
-
-    try {
-      // Generate or retrieve guest player ID
-      let guestPlayerId = localStorage.getItem("guest_player_id");
-      if (!guestPlayerId) {
-        guestPlayerId = `guest_${Math.random().toString(36).substring(2, 15)}`;
-        localStorage.setItem("guest_player_id", guestPlayerId);
-      }
-
-      // Use the entered name with a random suffix for uniqueness
-      const playerName = `${guestName.trim()}${generateRandomSuffix()}`;
-
-      // Store guest data in localStorage for the session
-      localStorage.setItem(
-        "guestPlayerData",
-        JSON.stringify({
-          player_id: guestPlayerId,
-          name: playerName,
-          is_guest: true,
-        }),
-      );
-
-      const { data, error } = await supabase.functions.invoke("join-lobby", {
-        body: {
-          lobbyCode: lobbyCode.toUpperCase(),
-          playerName: playerName,
-          playerId: guestPlayerId,
-        },
-      });
-
-      if (error) {
-        throw new Error(error.message || "Failed to join lobby");
-      }
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
-      toast({
-        title: "Success!",
-        description: `Joined as ${playerName}`,
-      });
-
-      // Store session in sessionStorage for persistence
-      sessionStorage.setItem("current_lobby_session", data.session.id);
-
-      navigate(`/lobby/${data.session.id}`);
-    } catch (error: any) {
-      console.error("Error joining lobby:", error);
-      toast({
-        title: "Failed to Join",
-        description: error.message || "Could not join the lobby. Please check the code.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsJoining(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -741,77 +583,6 @@ const Login = () => {
           {tenant && <p className="text-xs text-center text-muted-foreground">Connected to {tenant.name}</p>}
         </div>
 
-        {/* Divider */}
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">or</span>
-          </div>
-        </div>
-
-        {/* Guest Join Section */}
-        {!showGuestJoin ? (
-          <Button variant="outline" className="w-full py-6 text-lg" size="lg" onClick={() => setShowGuestJoin(true)}>
-            Join Lobby Without Login
-          </Button>
-        ) : (
-          <Card className="border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg text-center">Join as Guest</CardTitle>
-              <CardDescription className="text-center">Enter your name and the lobby code to join</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleGuestJoin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="guestName">Your Name</Label>
-                  <Input
-                    id="guestName"
-                    placeholder="Enter your name"
-                    value={guestName}
-                    onChange={(e) => setGuestName(e.target.value)}
-                    maxLength={50}
-                    className="text-center"
-                    autoFocus
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lobbyCode">Lobby Code</Label>
-                  <Input
-                    id="lobbyCode"
-                    placeholder="Enter 6-digit lobby code"
-                    value={lobbyCode}
-                    onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
-                    maxLength={6}
-                    className="text-center text-xl tracking-widest font-mono"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="flex-1"
-                    onClick={() => {
-                      setShowGuestJoin(false);
-                      setLobbyCode("");
-                      setGuestName("");
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1"
-                    disabled={isJoining || lobbyCode.trim().length !== 6 || !guestName.trim()}
-                  >
-                    {isJoining ? "Joining..." : "Join Game"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
