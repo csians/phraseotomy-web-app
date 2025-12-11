@@ -172,6 +172,7 @@ export type Database = {
           shop_domain: string
           staging_customer_id: string | null
           tenant_id: string
+          total_points: number
           updated_at: string
         }
         Insert: {
@@ -186,6 +187,7 @@ export type Database = {
           shop_domain: string
           staging_customer_id?: string | null
           tenant_id: string
+          total_points?: number
           updated_at?: string
         }
         Update: {
@@ -200,6 +202,7 @@ export type Database = {
           shop_domain?: string
           staging_customer_id?: string | null
           tenant_id?: string
+          total_points?: number
           updated_at?: string
         }
         Relationships: [
@@ -799,6 +802,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_customer_total_points: {
+        Args: { p_customer_id: string; p_points: number }
+        Returns: undefined
       }
       increment_player_score: {
         Args: { p_player_id: string; p_points: number }

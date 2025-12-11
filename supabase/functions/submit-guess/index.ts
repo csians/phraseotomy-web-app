@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
 
     // Update scores based on correct/wrong answer
     if (isCorrect) {
-      // If correct, award player 10 points
+      // If correct, award player 10 points (game score)
       const { error: scoreError } = await supabase.rpc("increment_player_score", {
         p_player_id: playerId,
         p_points: 10,
@@ -126,8 +126,18 @@ Deno.serve(async (req) => {
       if (scoreError) {
         console.error("Error updating player score:", scoreError);
       }
+
+      // Also update customer total points (lifetime score)
+      const { error: totalPointsError } = await supabase.rpc("increment_customer_total_points", {
+        p_customer_id: playerId,
+        p_points: 10,
+      });
+
+      if (totalPointsError) {
+        console.error("Error updating customer total points:", totalPointsError);
+      }
     } else {
-      // If wrong, award storyteller 10 points
+      // If wrong, award storyteller 10 points (game score)
       const { error: storytellerScoreError } = await supabase.rpc("increment_player_score", {
         p_player_id: storytellerId,
         p_points: 10,
@@ -135,6 +145,16 @@ Deno.serve(async (req) => {
 
       if (storytellerScoreError) {
         console.error("Error updating storyteller score:", storytellerScoreError);
+      }
+
+      // Also update storyteller's customer total points (lifetime score)
+      const { error: storytellerTotalPointsError } = await supabase.rpc("increment_customer_total_points", {
+        p_customer_id: storytellerId,
+        p_points: 10,
+      });
+
+      if (storytellerTotalPointsError) {
+        console.error("Error updating storyteller customer total points:", storytellerTotalPointsError);
       }
     }
 
