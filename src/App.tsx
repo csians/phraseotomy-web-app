@@ -10,7 +10,7 @@ import Login from "./pages/Login";
 import CreateLobby from "./pages/CreateLobby";
 import Lobby from "./pages/Lobby";
 import Game from "./pages/Game";
-import GuestJoin from "./pages/GuestJoin";
+
 import NotFound from "./pages/NotFound";
 import AdminHome from "./pages/admin/AdminHome";
 import Codes from "./pages/admin/Codes";
@@ -73,13 +73,6 @@ const RootRedirect = () => {
     const currentPath = window.location.hash.replace('#', '');
     const urlParams = getAllUrlParams();
     
-    // CRITICAL: Check for guest join first - bypass all other logic
-    const guestParam = urlParams.get('guest');
-    if (guestParam === 'true' && currentPath.startsWith('/lobby/join')) {
-      console.log('Guest join detected, staying on /lobby/join');
-      setRedirectTarget('/lobby/join');
-      return;
-    }
     
     // CRITICAL: Don't redirect if already on lobby/game pages
     if (currentPath.startsWith('/lobby/') || currentPath.startsWith('/game/')) {
@@ -153,8 +146,6 @@ const App = () => (
           <Route path="/play/host" element={<Play />} />
           <Route path="/apps/phraseotomy" element={<Play />} />
           <Route path="/create-lobby" element={<CreateLobby />} />
-          <Route path="/lobby/join" element={<GuestJoin />} />
-          <Route path="/guest-join" element={<GuestJoin />} />
           <Route path="/lobby/:sessionId" element={<Lobby />} />
           <Route path="/game/:sessionId" element={<Game />} />
           <Route path="/admin" element={<AdminHome />} />

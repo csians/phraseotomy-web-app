@@ -182,80 +182,6 @@ Deno.serve(async (req) => {
 
     console.log("HMAC verified successfully for tenant:", tenant.tenant_key);
 
-    // Check for guest join parameters FIRST
-    const isGuestJoin = queryParams.get("guest") === "true";
-    const guestLobbyCode = queryParams.get("lobbyCode");
-    const guestDataStr = queryParams.get("guestData");
-
-    if (isGuestJoin && guestLobbyCode && guestDataStr) {
-      console.log("Guest join detected, processing...");
-
-      try {
-        const guestData = JSON.parse(guestDataStr);
-        console.log("Guest data:", guestData);
-
-        // Call join-lobby directly
-        const { data: joinResult, error: joinError } = await supabase.functions.invoke("join-lobby", {
-          body: {
-            lobbyCode: guestLobbyCode.toUpperCase(),
-            playerName: guestData.name,
-            playerId: guestData.player_id,
-          },
-        });
-
-        if (joinError) {
-          console.error("Error joining lobby:", joinError);
-          return new Response(generateErrorHtml("Failed to Join", `Could not join lobby: ${joinError.message}`), {
-            status: 400,
-            headers: { "Content-Type": "text/html" },
-          });
-        }
-
-        if (joinResult?.error) {
-          console.error("Join lobby error:", joinResult.error);
-          return new Response(generateErrorHtml("Failed to Join", joinResult.error), {
-            status: 400,
-            headers: { "Content-Type": "text/html" },
-          });
-        }
-
-        const sessionId = joinResult?.session?.id;
-        if (!sessionId) {
-          return new Response(generateErrorHtml("Failed to Join", "No session ID returned"), {
-            status: 400,
-            headers: { "Content-Type": "text/html" },
-          });
-        }
-
-        console.log("✅ Guest joined successfully, session:", sessionId);
-
-        // Redirect to lobby within the Shopify proxy context (iframe)
-        // The URL stays as the Shopify proxy URL with hash-based routing
-        const params = new URLSearchParams({
-          guestData: guestDataStr,
-          shop: shop,
-          guestSession: sessionId,
-        });
-        const redirectUrl = `https://${shop}/apps/phraseotomy?${params.toString()}#/lobby/${sessionId}`;
-
-        console.log("🔄 Redirecting guest to:", redirectUrl);
-
-        // Use HTTP 302 redirect to stay within Shopify proxy
-        return new Response(null, {
-          status: 302,
-          headers: {
-            Location: redirectUrl,
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-          },
-        });
-      } catch (error) {
-        console.error("Error processing guest join:", error);
-        return new Response(generateErrorHtml("Failed to Join", "Could not process guest join"), {
-          status: 400,
-          headers: { "Content-Type": "text/html" },
-        });
-      }
-    }
 
     // Extract customer ID and other data from Shopify proxy parameters
     const customerId = queryParams.get("logged_in_customer_id") || null;
@@ -267,45 +193,12 @@ Deno.serve(async (req) => {
     console.log("🔍 [CUSTOMER_ID] customer_email from proxy:", customerEmailFromProxy);
     console.log("🔍 [CUSTOMER_ID] Will fetch from Shopify API with this ID:", customerId);
 
-    // Check if this is a returning guest from a successful lobby join
-    const guestSession = queryParams.get("guestSession");
-    const returningGuestData = queryParams.get("guestData");
-
-    // If no customer is logged in and NOT a returning guest, show login page
-    if (!customerId && !guestSession) {
-      console.log("No customer logged in, showing login options");
+    // If no customer is logged in, show login page
+    if (!customerId) {
+      console.log("No customer logged in, showing login page");
       const loginUrl = `https://${shop}/customer_authentication/login?return_to=/pages/app-redirect`;
 
       return new Response(generateLoginRedirectHtml(loginUrl, shop, tenant.environment), {
-        status: 200,
-        headers: { "Content-Type": "application/liquid" },
-      });
-    }
-
-    // Handle returning guest - serve them the app with their guest data
-    if (!customerId && guestSession && returningGuestData) {
-      console.log("✅ Guest returning from lobby join, serving app HTML");
-      console.log("Guest session:", guestSession);
-
-      const nonce = crypto.randomUUID();
-
-      // Parse guest data to create a guest customer object
-      let guestCustomerData = null;
-      try {
-        const parsedGuestData = JSON.parse(decodeURIComponent(returningGuestData));
-        guestCustomerData = {
-          id: parsedGuestData.player_id,
-          email: null,
-          firstName: parsedGuestData.name,
-          lastName: null,
-          name: parsedGuestData.name,
-          isGuest: true,
-        };
-      } catch (e) {
-        console.error("Failed to parse guest data:", e);
-      }
-
-      return new Response(generateAppHtml(tenant, shop, guestCustomerData, nonce, guestSession), {
         status: 200,
         headers: { "Content-Type": "application/liquid" },
       });
@@ -510,174 +403,13 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: 
   .login-btn:hover {
     transform: scale(1.05);
   }
-  .divider {
-    display: flex;
-    align-items: center;
-    margin: 24px 0;
-    color: rgba(251, 191, 36, 0.5);
-  }
-  .divider::before,
-  .divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: rgba(251, 191, 36, 0.3);
-  }
-  .divider span {
-    padding: 0 16px;
-    font-size: 14px;
-  }
-  .guest-section {
-    margin-top: 16px;
-  }
-  .guest-btn {
-    display: inline-block;
-    padding: 14px 28px;
-    background: transparent;
-    color: #fbbf24;
-    text-decoration: none;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 14px;
-    transition: all 0.2s;
-    border: 2px solid rgba(251, 191, 36, 0.5);
-    cursor: pointer;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .guest-btn:hover {
-    background: rgba(251, 191, 36, 0.1);
-    border-color: #fbbf24;
-  }
-  .guest-form {
-    display: none;
-    margin-top: 16px;
-  }
-  .guest-form.active {
-    display: block;
-  }
-  .guest-input {
-    width: 100%;
-    padding: 14px 16px;
-    background: rgba(251, 191, 36, 0.1);
-    border: 2px solid rgba(251, 191, 36, 0.3);
-    border-radius: 8px;
-    color: #fbbf24;
-    font-size: 16px;
-    text-align: center;
-    font-weight: 600;
-    box-sizing: border-box;
-    margin-bottom: 12px;
-  }
-  .guest-input.lobby-code {
-    letter-spacing: 4px;
-  }
-  .guest-input::placeholder {
-    color: rgba(251, 191, 36, 0.5);
-    letter-spacing: normal;
-  }
-  .guest-input:focus {
-    outline: none;
-    border-color: #fbbf24;
-  }
-  .input-label {
-    font-size: 12px;
-    color: rgba(251, 191, 36, 0.7);
-    margin-bottom: 6px;
-    text-align: left;
-  }
-  .join-btn {
-    display: inline-block;
-    padding: 14px 28px;
-    background: #fbbf24;
-    color: #0a0a0a;
-    text-decoration: none;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 14px;
-    transition: transform 0.2s;
-    border: none;
-    cursor: pointer;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .join-btn:hover {
-    transform: scale(1.05);
-  }
-  .join-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-  }
 </style>
 <div class="login-prompt">
   <div class="logo">P</div>
   <h1>PHRASEOTOMY</h1>
-  <p>Log in to your account to host a game</p>
+  <p>Log in to your account to play the game</p>
   <a href="${loginUrl}" class="login-btn">Log In</a>
-  
-  <div class="divider"><span>or</span></div>
-  
-  <div class="guest-section">
-    <button class="guest-btn" onclick="toggleGuestForm()">Join Lobby Without Login</button>
-    <div id="guestForm" class="guest-form">
-      <div class="input-label">Your Name</div>
-      <input 
-        type="text" 
-        id="guestName" 
-        class="guest-input" 
-        placeholder="Enter your name" 
-        maxlength="50"
-      />
-      <div class="input-label">Lobby Code</div>
-      <input 
-        type="text" 
-        id="lobbyCode" 
-        class="guest-input lobby-code" 
-        placeholder="Enter 6-digit lobby code" 
-        maxlength="6"
-        oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '')"
-      />
-      <button class="join-btn" onclick="joinAsGuest()" id="joinBtn" disabled>Join Game</button>
-    </div>
-  </div>
-</div>
-<script>
-  function toggleGuestForm() {
-    const form = document.getElementById('guestForm');
-    form.classList.toggle('active');
-    if (form.classList.contains('active')) {
-      document.getElementById('guestName').focus();
-    }
-  }
-  
-  function validateForm() {
-    const name = document.getElementById('guestName').value.trim();
-    const code = document.getElementById('lobbyCode').value;
-    document.getElementById('joinBtn').disabled = !name || code.length !== 6;
-  }
-  
-  document.getElementById('guestName').addEventListener('input', validateForm);
-  document.getElementById('lobbyCode').addEventListener('input', validateForm);
-  
-  function joinAsGuest() {
-    const name = document.getElementById('guestName').value.trim();
-    const code = document.getElementById('lobbyCode').value;
-    if (name && code.length === 6) {
-      const guestId = 'guest_' + Math.random().toString(36).substring(2, 11);
-      const playerName = name + Math.floor(Math.random() * 900 + 100);
-      const guestData = JSON.stringify({ player_id: guestId, name: playerName, is_guest: true });
-      
-      // Redirect to Shopify proxy with guest params
-      const params = new URLSearchParams({
-        lobbyCode: code,
-        guestData: guestData,
-        shop: '${shop}'
-      });
-      window.top.location.href = 'https://${shop}/apps/phraseotomy?guest=true&' + params.toString() + '#/lobby/join';
-    }
-  }
-</script>`;
+</div>`;
 }
 
 /**
