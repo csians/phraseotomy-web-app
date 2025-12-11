@@ -111,9 +111,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Select 3 random elements from theme and 2 from core set
-    const selectedThemeElements = shuffleArray(themeElements || []).slice(0, 3);
-    const selectedCoreElements = shuffleArray(coreElements).slice(0, 2);
+    // Select 5 elements total: prefer 3 from theme + 2 from core, 
+    // but if core elements are insufficient, take more from theme
+    const shuffledThemeElements = shuffleArray(themeElements || []);
+    const shuffledCoreElements = shuffleArray(coreElements);
+    
+    // Calculate how many we can take from core (max 2)
+    const coreCount = Math.min(2, shuffledCoreElements.length);
+    // Take remaining from theme (minimum 3, up to 5 if no core)
+    const themeCount = 5 - coreCount;
+    
+    const selectedThemeElements = shuffledThemeElements.slice(0, themeCount);
+    const selectedCoreElements = shuffledCoreElements.slice(0, coreCount);
 
     // Combine and get the IDs in order (theme first, then core)
     const selectedIconIds = [
