@@ -9,6 +9,7 @@ import { GuessingInterface } from "@/components/GuessingInterface";
 import { ThemeSelectionCards, ThemeOption } from "@/components/ThemeSelectionCards";
 import { TurnModeSelection } from "@/components/TurnModeSelection";
 import { ElementsInterface } from "@/components/ElementsInterface";
+import { GameTimer } from "@/components/GameTimer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -47,6 +48,8 @@ interface GameSession {
   status: string;
   selected_theme_id?: string;
   turn_mode?: "audio" | "elements" | null;
+  story_time_seconds?: number;
+  guess_time_seconds?: number;
 }
 
 interface Turn {
@@ -55,6 +58,7 @@ interface Turn {
   whisp: string | null;
   recording_url: string | null;
   completed_at: string | null;
+  created_at: string;
   theme: Theme;
   selected_icon_ids?: string[];
   icon_order?: number[];
@@ -764,8 +768,25 @@ export default function Game() {
           />
         </aside>
 
-        {/* Connection Status Indicator */}
-        <div className="fixed top-20 right-4 z-50">
+        {/* Status Indicators - Timer and Connection */}
+        <div className="fixed top-20 right-4 z-50 flex flex-col gap-2 items-end">
+          {/* Game Timer */}
+          {currentTurn && (gamePhase === "storytelling" || gamePhase === "elements") && session.story_time_seconds && (
+            <GameTimer
+              totalSeconds={session.story_time_seconds}
+              startTime={currentTurn.created_at}
+              label="Story Time"
+            />
+          )}
+          {currentTurn && gamePhase === "guessing" && session.guess_time_seconds && (
+            <GameTimer
+              totalSeconds={session.guess_time_seconds}
+              startTime={currentTurn.completed_at}
+              label="Guess Time"
+            />
+          )}
+          
+          {/* Connection Status */}
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
             isConnected 
               ? "bg-green-500/10 text-green-600 border border-green-500/20" 
