@@ -9,12 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Plus, Download, Trash2, ArrowLeft } from "lucide-react";
+import { RefreshCw, Plus, Download, Trash2, ArrowLeft, Palette, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTenant } from "@/hooks/useTenant";
 import type { Tables } from "@/integrations/supabase/types";
 import { PackCSVImport } from "@/components/admin/PackCSVImport";
 import { getAllUrlParams } from "@/lib/urlUtils";
+import { Badge } from "@/components/ui/badge";
 
 // Extract shop domain from Shopify's host parameter (base64 encoded)
 const extractShopFromHost = (host: string | null): string | null => {
@@ -30,6 +31,14 @@ const extractShopFromHost = (host: string | null): string | null => {
 };
 
 type Pack = Tables<"packs">;
+
+interface Theme {
+  id: string;
+  name: string;
+  icon: string;
+  is_core: boolean;
+  pack_id: string | null;
+}
 
 export default function Packs() {
   const [searchParams] = useSearchParams();
@@ -53,6 +62,8 @@ export default function Packs() {
   const { tenant, loading: tenantLoading, error: tenantError } = useTenant(shopDomain);
   
   const [packs, setPacks] = useState<Pack[]>([]);
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [coreThemes, setCoreThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newPack, setNewPack] = useState({ name: "", description: "" });
@@ -69,14 +80,24 @@ export default function Packs() {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("packs")
-        .select("*")
-        .eq("tenant_id", tenant.id)
-        .order("created_at", { ascending: false });
+      const [packsRes, themesRes] = await Promise.all([
+        supabase
+          .from("packs")
+          .select("*")
+          .eq("tenant_id", tenant.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("themes")
+          .select("id, name, icon, is_core, pack_id")
+          .order("name")
+      ]);
 
-      if (error) throw error;
-      setPacks(data || []);
+      if (packsRes.error) throw packsRes.error;
+      if (themesRes.error) throw themesRes.error;
+      
+      setPacks(packsRes.data || []);
+      setThemes((themesRes.data || []).filter(t => t.pack_id));
+      setCoreThemes((themesRes.data || []).filter(t => t.is_core));
     } catch (error) {
       toast({
         title: "Error loading packs",
@@ -86,6 +107,10 @@ export default function Packs() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getThemesForPack = (packId: string) => {
+    return themes.filter(t => t.pack_id === packId);
   };
 
   const handleAddPack = async () => {
@@ -310,11 +335,41 @@ export default function Packs() {
             </Dialog>
           </div>
 
+          {/* Core/Base Themes Section */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                Base Game Themes
+              </h3>
+              <Link to={`/admin/themes?shop=${shopDomain}`}>
+                <Button variant="outline" size="sm">
+                  Manage Themes
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-2 p-4 bg-muted/50 rounded-lg border">
+              {coreThemes.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No core themes configured yet</p>
+              ) : (
+                coreThemes.map(theme => (
+                  <Badge key={theme.id} variant="secondary" className="text-sm py-1 px-3">
+                    <span className="mr-1">{theme.icon}</span>
+                    {theme.name}
+                  </Badge>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Packs Table */}
           <div className="border rounded-md">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Pack Name</TableHead>
+                  <TableHead>Themes</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-24">Actions</TableHead>
@@ -323,33 +378,50 @@ export default function Packs() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center">
+                    <TableCell colSpan={5} className="text-center">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : packs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                       No packs found. Create your first pack above.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  packs.map((pack) => (
-                    <TableRow key={pack.id}>
-                      <TableCell className="font-medium">{pack.name}</TableCell>
-                      <TableCell>{pack.description || "-"}</TableCell>
-                      <TableCell>{new Date(pack.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeletePack(pack.id, pack.name)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  packs.map((pack) => {
+                    const packThemes = getThemesForPack(pack.id);
+                    return (
+                      <TableRow key={pack.id}>
+                        <TableCell className="font-medium">{pack.name}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {packThemes.length === 0 ? (
+                              <span className="text-muted-foreground text-sm">No themes</span>
+                            ) : (
+                              packThemes.map(theme => (
+                                <Badge key={theme.id} variant="outline" className="text-xs">
+                                  <span className="mr-1">{theme.icon}</span>
+                                  {theme.name}
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{pack.description || "-"}</TableCell>
+                        <TableCell>{new Date(pack.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeletePack(pack.id, pack.name)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
