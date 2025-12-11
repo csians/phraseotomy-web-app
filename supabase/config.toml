@@ -118,3 +118,9 @@ verify_jwt = false
 
 [functions.admin-update-element]
 verify_jwt = false
+
+[functions.skip-turn]
+verify_jwt = false
+
+[functions.auto-submit-guess]
+verify_jwt = false
