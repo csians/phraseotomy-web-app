@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { name, icon, pack_id, is_core } = await req.json();
+    const { name, icon, pack_id, is_core, theme_id, update } = await req.json();
 
     if (!name) {
       return new Response(
@@ -25,26 +25,51 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { data, error } = await supabase
-      .from("themes")
-      .insert({
-        name,
-        icon: icon || "🎮",
-        pack_id: pack_id || null,
-        is_core: is_core || false
-      })
-      .select()
-      .single();
+    let data, error;
+
+    if (update && theme_id) {
+      // Update existing theme
+      const result = await supabase
+        .from("themes")
+        .update({
+          name,
+          icon: icon || "🎮",
+          pack_id: pack_id || null,
+          is_core: is_core || false
+        })
+        .eq("id", theme_id)
+        .select()
+        .single();
+      
+      data = result.data;
+      error = result.error;
+      console.log("Theme updated:", data);
+    } else {
+      // Create new theme
+      const result = await supabase
+        .from("themes")
+        .insert({
+          name,
+          icon: icon || "🎮",
+          pack_id: pack_id || null,
+          is_core: is_core || false
+        })
+        .select()
+        .single();
+      
+      data = result.data;
+      error = result.error;
+      console.log("Theme created:", data);
+    }
 
     if (error) {
-      console.error("Error creating theme:", error);
+      console.error("Error creating/updating theme:", error);
       return new Response(
         JSON.stringify({ error: error.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Theme created:", data);
     return new Response(
       JSON.stringify({ success: true, theme: data }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
