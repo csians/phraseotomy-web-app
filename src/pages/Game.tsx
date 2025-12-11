@@ -98,6 +98,9 @@ export default function Game() {
   const isPlayingRef = useRef(false);
   const refreshDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastRefreshRef = useRef<number>(0);
+  // Track if timer callbacks have been triggered for current turn to prevent loops
+  const storyTimeUpTriggeredRef = useRef<string>("");
+  const guessTimeUpTriggeredRef = useRef<string>("");
 
   // Debounced refresh to prevent infinite loops
   const debouncedRefresh = useCallback(() => {
@@ -749,7 +752,15 @@ export default function Game() {
   // Handle storyteller timer expiry - skip the round
   const handleStoryTimeUp = useCallback(async () => {
     const isCurrentStoryteller = currentPlayerId === session?.current_storyteller_id;
-    if (!sessionId || !isCurrentStoryteller) return;
+    const turnId = currentTurn?.id || "";
+    
+    // Prevent multiple triggers for the same turn
+    if (!sessionId || !isCurrentStoryteller || gameCompleted) return;
+    if (storyTimeUpTriggeredRef.current === turnId) {
+      console.log("⏰ Story time already triggered for this turn, skipping");
+      return;
+    }
+    storyTimeUpTriggeredRef.current = turnId;
     
     console.log("⏰ Story time expired - skipping round");
     toast({
@@ -768,6 +779,9 @@ export default function Game() {
       console.log("Skip turn response:", data);
 
       if (data.game_completed) {
+        setGameCompleted(true);
+        const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+        setGameWinner(sortedPlayers[0] || null);
         sendWebSocketMessage({
           type: "game_completed",
           winnerId: data.next_round?.winnerId,
@@ -780,19 +794,26 @@ export default function Game() {
           newStorytellerId: data.next_round.newStorytellerId,
           newStorytellerName: data.next_round.newStorytellerName,
         });
+        // Only refresh if game continues
+        initializeGame();
       }
-
-      // Refresh game state
-      initializeGame();
     } catch (error) {
       console.error("Error skipping turn:", error);
     }
-  }, [sessionId, currentPlayerId, session?.current_storyteller_id, sendWebSocketMessage, toast]);
+  }, [sessionId, currentPlayerId, session?.current_storyteller_id, currentTurn?.id, gameCompleted, players, sendWebSocketMessage, toast]);
 
   // Handle guess timer expiry - auto-submit for players who haven't answered
   const handleGuessTimeUp = useCallback(async () => {
     const isCurrentStoryteller = currentPlayerId === session?.current_storyteller_id;
-    if (!sessionId || !currentTurn || !session || isCurrentStoryteller) return;
+    const turnId = currentTurn?.id || "";
+    
+    // Prevent multiple triggers for the same turn
+    if (!sessionId || !currentTurn || !session || isCurrentStoryteller || gameCompleted) return;
+    if (guessTimeUpTriggeredRef.current === turnId) {
+      console.log("⏰ Guess time already triggered for this turn, skipping");
+      return;
+    }
+    guessTimeUpTriggeredRef.current = turnId;
     
     console.log("⏰ Guess time expired - auto-submitting");
     toast({
@@ -816,6 +837,9 @@ export default function Game() {
       console.log("Auto-submit response:", data);
 
       if (data.game_completed) {
+        setGameCompleted(true);
+        const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+        setGameWinner(sortedPlayers[0] || null);
         sendWebSocketMessage({
           type: "game_completed",
           winnerId: data.next_round?.winnerId,
@@ -828,14 +852,13 @@ export default function Game() {
           newStorytellerId: data.next_round.newStorytellerId,
           newStorytellerName: data.next_round.newStorytellerName,
         });
+        // Only refresh if game continues
+        initializeGame();
       }
-
-      // Refresh game state
-      initializeGame();
     } catch (error) {
       console.error("Error auto-submitting guess:", error);
     }
-  }, [sessionId, currentTurn, session, currentPlayerId, sendWebSocketMessage, toast]);
+  }, [sessionId, currentTurn, session, currentPlayerId, gameCompleted, players, sendWebSocketMessage, toast]);
 
   if (loading) {
     return (
@@ -877,8 +900,8 @@ export default function Game() {
 
         {/* Status Indicators - Timer and Connection */}
         <div className="fixed top-20 right-4 z-50 flex flex-col gap-2 items-end">
-          {/* Game Timer */}
-          {currentTurn && (gamePhase === "storytelling" || gamePhase === "elements") && session.story_time_seconds && (
+          {/* Game Timer - only show when game is not completed */}
+          {!gameCompleted && currentTurn && (gamePhase === "storytelling" || gamePhase === "elements") && session.story_time_seconds && (
             <GameTimer
               totalSeconds={session.story_time_seconds}
               startTime={currentTurn.created_at}
@@ -886,7 +909,7 @@ export default function Game() {
               onTimeUp={isStoryteller ? handleStoryTimeUp : undefined}
             />
           )}
-          {currentTurn && gamePhase === "guessing" && session.guess_time_seconds && (
+          {!gameCompleted && currentTurn && gamePhase === "guessing" && session.guess_time_seconds && (
             <GameTimer
               totalSeconds={session.guess_time_seconds}
               startTime={currentTurn.completed_at}
