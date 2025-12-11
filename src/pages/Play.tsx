@@ -272,15 +272,15 @@ const Play = () => {
         try {
           // Get tenant_id for fetching packs
           const tenantId = tenant?.id;
-          
+
           const [customerLicenses, customerSessions, packsData] = await Promise.all([
             getCustomerLicenses(customer.id, shopDomain),
             getCustomerSessions(customer.id, shopDomain),
-            tenantId 
-              ? supabase.from('packs').select('id, name, description').eq('tenant_id', tenantId)
+            tenantId
+              ? supabase.from("packs").select("id, name, description").eq("tenant_id", tenantId)
               : Promise.resolve({ data: [], error: null }),
           ]);
-          
+
           if (packsData.data) {
             setAvailablePacks(packsData.data);
           }
@@ -505,245 +505,244 @@ const Play = () => {
     <div className="min-h-screen bg-game-black flex flex-col">
       <Header />
       <div className="flex-1 flex flex-col items-center justify-between px-4 py-8">
-      {/* Name Prompt Dialog */}
-      {customer && shopDomain && (
-        <NamePromptDialog
-          open={showNamePrompt}
-          customerId={customer.id}
-          shopDomain={shopDomain}
-          onNameSaved={handleNameSaved}
-        />
-      )}
+        {/* Name Prompt Dialog */}
+        {customer && shopDomain && (
+          <NamePromptDialog
+            open={showNamePrompt}
+            customerId={customer.id}
+            shopDomain={shopDomain}
+            onNameSaved={handleNameSaved}
+          />
+        )}
 
-      {/* Logo and Branding */}
-      <div className="w-full max-w-2xl text-center pt-8">
-        <div className="w-20 h-20 mx-auto mb-4 bg-game-yellow rounded-2xl flex items-center justify-center shadow-lg">
-          <span className="text-5xl font-black text-game-black">P</span>
-        </div>
-        <h1 className="text-4xl font-black text-white mb-2 tracking-wider">PHRASEOTOMY</h1>
-        <p className="text-sm text-game-yellow uppercase tracking-widest font-semibold">The Party Game</p>
-      </div>
-
-      {/* Main Content */}
-      <div className="w-full max-w-2xl space-y-6">
-        {/* Welcome message */}
-        <div className="text-center flex items-center justify-center gap-4">
-          <h2 className="text-2xl font-bold text-white">Welcome, {customer?.name || customer?.email}!</h2>
-          <Button variant="outline" size="sm" onClick={handleLogout}>
-            Logout
-          </Button>
+        {/* Logo and Branding */}
+        <div className="w-full max-w-2xl text-center pt-8">
+          <div className="w-20 h-20 mx-auto mb-4 bg-game-yellow rounded-2xl flex items-center justify-center shadow-lg">
+            <span className="text-5xl font-black text-game-black">P</span>
+          </div>
+          <h1 className="text-4xl font-black text-white mb-2 tracking-wider">PHRASEOTOMY</h1>
+          <p className="text-sm text-game-yellow uppercase tracking-widest font-semibold">The Party Game</p>
         </div>
 
-        {/* Your Packs Card */}
-        <Card className="bg-card border-game-gray">
-          <CardHeader>
-            <CardTitle className="text-lg">Your Packs</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {dataLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-              </div>
-            ) : (
-              <>
-                {/* Unlocked Packs */}
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">Unlocked</p>
-                  <div className="flex flex-wrap gap-2">
-                    {allPacks.length > 0 ? (
-                      allPacks.map((pack) => (
-                        <Badge
-                          key={pack}
-                          variant="secondary"
-                          className="bg-game-yellow/20 text-game-yellow border-game-yellow/30 px-3 py-1"
-                        >
-                          ✓ {pack}
-                        </Badge>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No packs unlocked yet</p>
-                    )}
-                  </div>
+        {/* Main Content */}
+        <div className="w-full max-w-2xl space-y-6">
+          {/* Welcome message */}
+          <div className="text-center flex items-center justify-center gap-4">
+            <h2 className="text-2xl font-bold text-white">Welcome, {customer?.name || customer?.email}!</h2>
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              Logout
+            </Button>
+          </div>
+
+          {/* Your Packs Card */}
+          <Card className="bg-card border-game-gray">
+            <CardHeader>
+              <CardTitle className="text-lg">Your Packs</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {dataLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
                 </div>
-
-                {/* Locked Packs */}
-                {availablePacks.filter(p => !allPacks.includes(p.name)).length > 0 && (
-                  <div className="pt-3 border-t border-border">
-                    <p className="text-xs text-muted-foreground mb-2">Available to Unlock</p>
+              ) : (
+                <>
+                  {/* Unlocked Packs */}
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Unlocked</p>
                     <div className="flex flex-wrap gap-2">
-                      {availablePacks.filter(p => !allPacks.includes(p.name)).map((pack) => (
-                        <Badge
-                          key={pack.id}
-                          variant="outline"
-                          className="bg-muted/30 text-muted-foreground border-muted px-3 py-1 opacity-60"
-                        >
-                          🔒 {pack.name}
-                        </Badge>
-                      ))}
+                      {allPacks.length > 0 ? (
+                        allPacks.map((pack) => (
+                          <Badge
+                            key={pack}
+                            variant="secondary"
+                            className="bg-game-yellow/20 text-game-yellow border-game-yellow/30 px-3 py-1"
+                          >
+                            ✓ {pack}
+                          </Badge>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No packs unlocked yet</p>
+                      )}
                     </div>
                   </div>
-                )}
 
-                {/* Buy Additional Packs Promo */}
-                <div className="pt-4 border-t border-border">
-                  <div className="bg-gradient-to-r from-game-yellow/10 to-game-yellow/5 rounded-lg p-4 border border-game-yellow/20">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-semibold text-game-yellow text-sm">🎁 Want more themes?</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Unlock additional packs for more fun!
-                        </p>
+                  {/* Locked Packs */}
+                  {availablePacks.filter((p) => !allPacks.includes(p.name)).length > 0 && (
+                    <div className="pt-3 border-t border-border">
+                      <p className="text-xs text-muted-foreground mb-2">Available to Unlock</p>
+                      <div className="flex flex-wrap gap-2">
+                        {availablePacks
+                          .filter((p) => !allPacks.includes(p.name))
+                          .map((pack) => (
+                            <Badge
+                              key={pack.id}
+                              variant="outline"
+                              className="bg-muted/30 text-muted-foreground border-muted px-3 py-1 opacity-60"
+                            >
+                              🔒 {pack.name}
+                            </Badge>
+                          ))}
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-game-yellow text-game-yellow hover:bg-game-yellow hover:text-game-black"
-                        onClick={() => window.open("https://phraseotomy.com", "_blank")}
-                      >
-                        Shop Packs
-                      </Button>
+                    </div>
+                  )}
+
+                  {/* Buy Additional Packs Promo */}
+                  <div className="pt-4 border-t border-border">
+                    <div className="bg-gradient-to-r from-game-yellow/10 to-game-yellow/5 rounded-lg p-4 border border-game-yellow/20">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-game-yellow text-sm">🎁 Want more themes?</h4>
+                          <p className="text-xs text-muted-foreground mt-1">Unlock additional packs for more fun!</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-game-yellow text-game-yellow hover:bg-game-yellow hover:text-game-black"
+                          onClick={() => window.open("https://phraseotomy.com", "_blank")}
+                        >
+                          Shop Packs
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </>
-            )}
+                </>
+              )}
 
-            {/* Redeem Code Section */}
-            <div className="pt-4 border-t border-border space-y-3">
-              <label className="text-sm font-medium">
-                {hasActiveLicenses ? "Redeem another code" : "Redeem a code"}
-              </label>
-              <div className="flex gap-2">
+              {/* Redeem Code Section */}
+              <div className="pt-4 border-t border-border space-y-3">
+                <label className="text-sm font-medium">
+                  {hasActiveLicenses ? "Redeem another code" : "Redeem a code"}
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter code"
+                    value={redemptionCode}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setRedemptionCode(e.target.value.toUpperCase())
+                    }
+                    maxLength={6}
+                  />
+                  <Button onClick={handleRedeemCode} disabled={redemptionCode.length !== 6 || isRedeeming}>
+                    {isRedeeming ? "Redeeming..." : "Redeem"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Host New Game */}
+          <Card className="bg-card border-game-gray">
+            <CardHeader>
+              <CardTitle className="text-lg">Host New Game</CardTitle>
+              <CardDescription>
+                {hasActiveLicenses
+                  ? "Start a new game session and invite friends"
+                  : "You're in the right place! Redeem a code above to unlock game packs"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button
+                onClick={handleHostGame}
+                disabled={!hasActiveLicenses}
+                className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                size="lg"
+              >
+                Host New Game
+              </Button>
+              {!hasActiveLicenses && (
+                <div className="bg-muted/50 border border-border rounded-lg p-3 text-center">
+                  <p className="text-sm text-muted-foreground">👆 Enter a code above to get started</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* My Games */}
+          <Card className="bg-card border-game-gray">
+            <CardHeader>
+              <CardTitle className="text-lg">My Games</CardTitle>
+              <CardDescription>Games you're hosting or have joined</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {dataLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : sessions.length > 0 ? (
+                <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                  {sessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between p-4 bg-game-gray/30 rounded-lg border border-game-yellow/20"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-mono text-lg text-game-yellow font-bold">{session.lobby_code}</p>
+                          <Badge
+                            variant={session.is_host ? "default" : "secondary"}
+                            className={
+                              session.is_host
+                                ? "bg-game-yellow text-game-black text-xs"
+                                : "bg-muted text-muted-foreground text-xs"
+                            }
+                          >
+                            {session.is_host ? "Host" : "Joined"}
+                          </Badge>
+                        </div>
+                        {session.game_name && <p className="text-sm text-white">{session.game_name}</p>}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="capitalize">{session.status}</span>
+                          {session.player_count !== undefined && <span>• {session.player_count}/12 players</span>}
+                          {!session.is_host && session.host_customer_name && (
+                            <span>• Hosted by {session.host_customer_name}</span>
+                          )}
+                        </div>
+                      </div>
+                      {session.status === "completed" ? (
+                        <div className="px-3 py-1 bg-destructive/20 text-destructive text-sm font-medium rounded">
+                          Ended
+                        </div>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/lobby/${session.id}`)}>
+                          Rejoin
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <p className="text-sm">No active games</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Join Another Game */}
+          <Card className="bg-card border-game-gray">
+            <CardHeader>
+              <CardTitle className="text-lg">Join Another Game</CardTitle>
+              <CardDescription>Enter a lobby code to join someone else game</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
                 <Input
-                  placeholder="Enter code"
-                  value={redemptionCode}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRedemptionCode(e.target.value.toUpperCase())}
+                  placeholder="Enter lobby code"
+                  value={lobbyCode}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLobbyCode(e.target.value.toUpperCase())}
                   maxLength={6}
                 />
-                <Button onClick={handleRedeemCode} disabled={redemptionCode.length !== 6 || isRedeeming}>
-                  {isRedeeming ? "Redeeming..." : "Redeem"}
-                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+              <Button onClick={handleJoinGame} className="w-full" size="lg">
+                Join Game
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Host New Game */}
-        <Card className="bg-card border-game-gray">
-          <CardHeader>
-            <CardTitle className="text-lg">Host New Game</CardTitle>
-            <CardDescription>
-              {hasActiveLicenses
-                ? "Start a new game session and invite friends"
-                : "You're in the right place! Redeem a code above to unlock game packs"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button
-              onClick={handleHostGame}
-              disabled={!hasActiveLicenses}
-              className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-              size="lg"
-            >
-              Host New Game
-            </Button>
-            {!hasActiveLicenses && (
-              <div className="bg-muted/50 border border-border rounded-lg p-3 text-center">
-                <p className="text-sm text-muted-foreground">👆 Enter a code above to get started</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* My Games */}
-        <Card className="bg-card border-game-gray">
-          <CardHeader>
-            <CardTitle className="text-lg">My Games</CardTitle>
-            <CardDescription>Games you're hosting or have joined</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {dataLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ) : sessions.length > 0 ? (
-              <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-4 bg-game-gray/30 rounded-lg border border-game-yellow/20"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-mono text-lg text-game-yellow font-bold">{session.lobby_code}</p>
-                        <Badge 
-                          variant={session.is_host ? "default" : "secondary"}
-                          className={session.is_host 
-                            ? "bg-game-yellow text-game-black text-xs" 
-                            : "bg-muted text-muted-foreground text-xs"
-                          }
-                        >
-                          {session.is_host ? "Host" : "Joined"}
-                        </Badge>
-                      </div>
-                      {session.game_name && (
-                        <p className="text-sm text-white">{session.game_name}</p>
-                      )}
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="capitalize">{session.status}</span>
-                        {session.player_count !== undefined && (
-                          <span>• {session.player_count}/12 players</span>
-                        )}
-                        {!session.is_host && session.host_customer_name && (
-                          <span>• Hosted by {session.host_customer_name}</span>
-                        )}
-                      </div>
-                    </div>
-                    {session.status === 'completed' ? (
-                      <div className="px-3 py-1 bg-destructive/20 text-destructive text-sm font-medium rounded">
-                        Ended
-                      </div>
-                    ) : (
-                      <Button variant="outline" size="sm" onClick={() => navigate(`/lobby/${session.id}`)}>
-                        Rejoin
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6 text-muted-foreground">
-                <p className="text-sm">No active games</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Join Another Game */}
-        <Card className="bg-card border-game-gray">
-          <CardHeader>
-            <CardTitle className="text-lg">Join Another Game</CardTitle>
-            <CardDescription>Enter a lobby code to join someone else game</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                placeholder="Enter lobby code"
-                value={lobbyCode}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLobbyCode(e.target.value.toUpperCase())}
-                maxLength={6}
-              />
-            </div>
-            <Button onClick={handleJoinGame} className="w-full" size="lg">
-              Join Game
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Footer */}
-      <div className="w-full max-w-2xl pt-12 pb-4">
+        {/* Footer */}
+        {/* <div className="w-full max-w-2xl pt-12 pb-4">
         <div className="bg-game-gray/30 border border-game-yellow/20 rounded-lg p-4">
           <div className="text-xs text-game-yellow/80 space-y-1.5">
             <div className="flex justify-between">
@@ -774,7 +773,7 @@ const Play = () => {
             )}
           </div>
         </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );
