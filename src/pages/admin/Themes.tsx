@@ -305,7 +305,7 @@ export default function Themes() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <Link to={`/admin?shop=${shopDomain}`}>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="hover:bg-accent hover:text-accent-foreground">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
@@ -423,7 +423,7 @@ export default function Themes() {
                       themes.map(theme => (
                         <TableRow 
                           key={theme.id}
-                          className={`cursor-pointer ${selectedTheme?.id === theme.id ? 'bg-accent' : ''}`}
+                          className={`cursor-pointer hover:bg-accent/50 hover:text-accent-foreground ${selectedTheme?.id === theme.id ? 'bg-accent text-accent-foreground' : ''}`}
                           onClick={() => handleSelectTheme(theme)}
                         >
                           <TableCell className="font-medium">
