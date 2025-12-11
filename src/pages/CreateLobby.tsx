@@ -493,8 +493,6 @@ export default function CreateLobby() {
                               disabled={!isAvailable}
                               className="
                               mt-0.5
-                              border-2 border-white 
-                              rounded-full
                               data-[state=checked]:bg-black
                               data-[state=checked]:border-black
                             "
