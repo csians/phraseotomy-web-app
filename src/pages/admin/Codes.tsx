@@ -604,7 +604,7 @@ const Codes = () => {
                   ) : (
                     <div className="space-y-2">
                       {availablePacks.map((pack) => (
-                        <div key={pack.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+                        <div key={pack.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-accent/50 hover:text-accent-foreground transition-colors">
                           <Checkbox
                             id={`pack-${pack.id}`}
                             checked={formData.packs.includes(pack.name)}
