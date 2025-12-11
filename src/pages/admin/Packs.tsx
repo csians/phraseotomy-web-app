@@ -9,11 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Plus, Download, Trash2, ArrowLeft, Palette, ChevronRight } from "lucide-react";
+import { RefreshCw, Plus, Trash2, ArrowLeft, Palette, Settings, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTenant } from "@/hooks/useTenant";
 import type { Tables } from "@/integrations/supabase/types";
-import { PackCSVImport } from "@/components/admin/PackCSVImport";
 import { getAllUrlParams } from "@/lib/urlUtils";
 import { Badge } from "@/components/ui/badge";
 
@@ -185,44 +184,6 @@ export default function Packs() {
     }
   };
 
-  const downloadTemplate = () => {
-    const csv = [
-      "name,description",
-      "base,Base game pack",
-      "expansion1,First expansion pack",
-      "premium,Premium content pack"
-    ].join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "packs-template.csv";
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  const exportPacks = () => {
-    const headers = ["name", "description", "created_at"];
-    const rows = packs.map(pack => [
-      pack.name,
-      pack.description || "",
-      pack.created_at,
-    ]);
-
-    const csv = [
-      headers.join(","),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
-    ].join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `packs-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
 
   if (tenantLoading) {
     return (
@@ -278,20 +239,6 @@ export default function Packs() {
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            
-            <Button onClick={exportPacks} variant="outline" disabled={packs.length === 0}>
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
-
-            <Button onClick={downloadTemplate} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Download Template
-            </Button>
-
-            {tenant?.id && (
-              <PackCSVImport tenantId={tenant.id} onImportComplete={loadPacks} />
-            )}
 
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
@@ -372,7 +319,7 @@ export default function Packs() {
                   <TableHead>Themes</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="w-24">Actions</TableHead>
+                  <TableHead className="w-32">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -411,13 +358,21 @@ export default function Packs() {
                         <TableCell>{pack.description || "-"}</TableCell>
                         <TableCell>{new Date(pack.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeletePack(pack.id, pack.name)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Link to={`/admin/themes?shop=${shopDomain}&pack=${pack.id}`}>
+                              <Button variant="ghost" size="sm" title="Manage Themes">
+                                <Settings className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeletePack(pack.id, pack.name)}
+                              title="Delete Pack"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
