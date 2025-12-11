@@ -527,11 +527,9 @@ const Play = () => {
       {/* Main Content */}
       <div className="w-full max-w-2xl space-y-6">
         {/* Welcome message */}
-        <div className="text-center flex items-center justify-between">
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-white">Welcome, {customer?.name || customer?.email}!</h2>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleLogout} className="ml-4">
+        <div className="text-center flex items-center justify-center gap-4">
+          <h2 className="text-2xl font-bold text-white">Welcome, {customer?.name || customer?.email}!</h2>
+          <Button variant="outline" size="sm" onClick={handleLogout}>
             Logout
           </Button>
         </div>
@@ -670,7 +668,7 @@ const Play = () => {
                 <Skeleton className="h-16 w-full" />
               </div>
             ) : sessions.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
                 {sessions.map((session) => (
                   <div
                     key={session.id}
