@@ -203,7 +203,7 @@ export default function Packs() {
   // Get available themes (not already assigned to this pack)
   const getAvailableThemes = () => {
     if (!selectedPack) return [];
-    return allThemes.filter(t => t.pack_id !== selectedPack.id && !t.is_core);
+    return allThemes.filter(t => t.pack_id !== selectedPack.id);
   };
 
   const handleAssignTheme = async () => {
