@@ -106,11 +106,11 @@ export default function Game() {
     if (now - lastRefreshRef.current < 1000) {
       return;
     }
-    
+
     if (refreshDebounceRef.current) {
       clearTimeout(refreshDebounceRef.current);
     }
-    
+
     refreshDebounceRef.current = setTimeout(() => {
       lastRefreshRef.current = Date.now();
       initializeGame();
@@ -131,23 +131,23 @@ export default function Game() {
         }
       }
     }
-    return localStorage.getItem('guest_player_id') || "";
+    return localStorage.getItem("guest_player_id") || "";
   };
 
   // Get current player info for WebSocket
   const getCurrentPlayerInfo = () => {
     const playerId = getCurrentPlayerId();
-    const player = players.find(p => p.player_id === playerId);
+    const player = players.find((p) => p.player_id === playerId);
     return {
       playerId,
-      playerName: player?.name || "Player"
+      playerName: player?.name || "Player",
     };
   };
 
   // Initialize audio context for real-time playback
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    
+
     return () => {
       if (audioContextRef.current) {
         audioContextRef.current.close();
@@ -169,7 +169,7 @@ export default function Game() {
 
       // Decode audio data
       const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
-      
+
       // Create source and play
       const source = audioContextRef.current.createBufferSource();
       source.buffer = audioBuffer;
@@ -209,7 +209,7 @@ export default function Game() {
         case "theme_selected":
           toast({
             title: "Theme Selected",
-            description: `${message.storytellerName || 'Storyteller'} chose a theme`,
+            description: `${message.storytellerName || "Storyteller"} chose a theme`,
           });
           debouncedRefresh();
           break;
@@ -218,7 +218,7 @@ export default function Game() {
         case "storyteller_ready":
           toast({
             title: "Mode Selected",
-            description: `${message.storytellerName || 'Storyteller'} is ready`,
+            description: `${message.storytellerName || "Storyteller"} is ready`,
           });
           debouncedRefresh();
           break;
@@ -283,17 +283,19 @@ export default function Game() {
           const winner = sortedPlayers[0] || null;
           setGameWinner(winner);
           setGameCompleted(true);
-          
+
           supabase
-            .from('game_sessions')
-            .update({ status: 'expired' })
-            .eq('id', sessionId)
-            .then(() => console.log('✅ Session marked as expired'));
-          
-          supabase.functions.invoke('cleanup-game-session', {
-            body: { sessionId, delaySeconds: 35 }
-          }).catch(err => console.error('Failed to schedule cleanup:', err));
-          
+            .from("game_sessions")
+            .update({ status: "expired" })
+            .eq("id", sessionId)
+            .then(() => console.log("✅ Session marked as expired"));
+
+          supabase.functions
+            .invoke("cleanup-game-session", {
+              body: { sessionId, delaySeconds: 35 },
+            })
+            .catch((err) => console.error("Failed to schedule cleanup:", err));
+
           setTimeout(() => {
             toast({
               title: "⏰ Lobby Cleanup Warning",
@@ -310,7 +312,7 @@ export default function Game() {
           });
           debouncedRefresh();
           break;
-          
+
         case "player_left":
           toast({
             title: "Player Left",
@@ -340,7 +342,7 @@ export default function Game() {
 
     initializeGame();
     const cleanup = setupRealtimeSubscriptions();
-    
+
     return () => {
       if (cleanup) cleanup();
     };
@@ -351,7 +353,7 @@ export default function Game() {
   useEffect(() => {
     // Only run once when conditions are met
     if (autoModeTriggeredRef.current) return;
-    
+
     // Conditions for auto-trigger:
     // 1. Session has preset turn_mode
     // 2. Current user is the storyteller
@@ -360,11 +362,11 @@ export default function Game() {
     const sessionTurnMode = session?.turn_mode;
     const hasWhisp = !!currentTurn?.whisp;
     const isStoryteller = session?.current_storyteller_id === currentPlayerId;
-    
+
     if (
-      sessionTurnMode && 
-      isStoryteller && 
-      !hasWhisp && 
+      sessionTurnMode &&
+      isStoryteller &&
+      !hasWhisp &&
       !isGeneratingWhisp &&
       (gamePhase === "storytelling" || gamePhase === "elements")
     ) {
@@ -372,12 +374,19 @@ export default function Game() {
       autoModeTriggeredRef.current = true;
       handleModeSelect(sessionTurnMode);
     }
-    
+
     // Reset flag when turn changes
     if (hasWhisp) {
       autoModeTriggeredRef.current = false;
     }
-  }, [session?.turn_mode, session?.current_storyteller_id, currentPlayerId, currentTurn?.whisp, gamePhase, isGeneratingWhisp]);
+  }, [
+    session?.turn_mode,
+    session?.current_storyteller_id,
+    currentPlayerId,
+    currentTurn?.whisp,
+    gamePhase,
+    isGeneratingWhisp,
+  ]);
 
   const initializeGame = async () => {
     try {
@@ -394,7 +403,7 @@ export default function Game() {
       if (error) {
         console.error("Error from get-game-state:", error);
         // Check if session was deleted (game completed and cleaned up)
-        if (error.message?.includes("Session not found") || session?.status === 'expired') {
+        if (error.message?.includes("Session not found") || session?.status === "expired") {
           console.log("Session was cleaned up, redirecting...");
           toast({
             title: "Game Ended",
@@ -418,11 +427,11 @@ export default function Game() {
       }
 
       // If session is expired/completed, show winner dialog
-      if (data.session?.status === 'expired' || data.session?.status === 'completed') {
+      if (data.session?.status === "expired" || data.session?.status === "completed") {
         console.log("Game already completed, status:", data.session.status);
         setSession(data.session);
         setPlayers(data.players || []);
-        
+
         // Find winner and show completion dialog
         const sortedPlayers = [...(data.players || [])].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
         const winner = sortedPlayers[0] || null;
@@ -450,20 +459,20 @@ export default function Game() {
       const turnMode = data.currentTurn?.turn_mode;
       const hasWhisp = !!data.currentTurn?.whisp;
       const hasTheme = !!data.currentTurn?.theme_id;
-      
+
       // Session theme is the permanent theme for all rounds (selected once in Round 1)
       const sessionThemeId = data.session?.selected_theme_id;
       const sessionHasTheme = !!sessionThemeId;
-      
+
       // Session-level turn mode (set at lobby creation - skips per-turn mode selection)
       const sessionTurnMode = data.session?.turn_mode;
-      
+
       // Phase determination (simplified):
       // 1. Session has theme -> NEVER show theme selection again
       // 2. No whisp yet -> if session has turn_mode, auto-use it; otherwise show mode selection
       // 3. Has whisp but not completed -> storytelling/elements phase
       // 4. Completed -> guessing phase
-      
+
       if (!sessionHasTheme && !hasTheme) {
         // Only show theme selection if NO theme exists anywhere (first round only)
         phase = "selecting_theme";
@@ -490,17 +499,30 @@ export default function Game() {
       } else {
         phase = "guessing";
       }
-      
-      console.log("Game phase:", phase, "sessionHasTheme:", sessionHasTheme, "hasTheme:", hasTheme, "hasWhisp:", hasWhisp, "turnMode:", turnMode, "sessionTurnMode:", sessionTurnMode);
+
+      console.log(
+        "Game phase:",
+        phase,
+        "sessionHasTheme:",
+        sessionHasTheme,
+        "hasTheme:",
+        hasTheme,
+        "hasWhisp:",
+        hasWhisp,
+        "turnMode:",
+        turnMode,
+        "sessionTurnMode:",
+        sessionTurnMode,
+      );
       setGamePhase(phase);
-      
+
       // Always use session theme (for all rounds)
       if (sessionThemeId) {
         setSelectedThemeId(sessionThemeId);
       } else if (data.currentTurn?.theme_id) {
         setSelectedThemeId(data.currentTurn.theme_id);
       }
-      
+
       // Set turn mode: prefer session-level, fallback to turn-level
       if (sessionTurnMode) {
         setSelectedTurnMode(sessionTurnMode);
@@ -512,7 +534,7 @@ export default function Game() {
     } catch (error) {
       console.error("Error initializing game:", error);
       // Don't show error toast if game is already completed/expired
-      if (session?.status !== 'expired' && session?.status !== 'completed') {
+      if (session?.status !== "expired" && session?.status !== "completed") {
         toast({
           title: "Error",
           description: "Failed to load game state.",
@@ -528,41 +550,41 @@ export default function Game() {
     const channel = supabase
       .channel(`game-${sessionId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'game_sessions',
-          filter: `id=eq.${sessionId}`
+          event: "*",
+          schema: "public",
+          table: "game_sessions",
+          filter: `id=eq.${sessionId}`,
         },
-        () => debouncedRefresh()
+        () => debouncedRefresh(),
       )
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'game_turns',
-          filter: `session_id=eq.${sessionId}`
+          event: "*",
+          schema: "public",
+          table: "game_turns",
+          filter: `session_id=eq.${sessionId}`,
         },
-        () => debouncedRefresh()
+        () => debouncedRefresh(),
       )
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'game_players',
-          filter: `session_id=eq.${sessionId}`
+          event: "UPDATE",
+          schema: "public",
+          table: "game_players",
+          filter: `session_id=eq.${sessionId}`,
         },
-        () => debouncedRefresh()
+        () => debouncedRefresh(),
       )
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'game_guesses',
+          event: "INSERT",
+          schema: "public",
+          table: "game_guesses",
         },
         () => {
           toast({
@@ -570,7 +592,7 @@ export default function Game() {
             description: "A player has submitted their guess",
           });
           debouncedRefresh();
-        }
+        },
       )
       .subscribe();
 
@@ -582,13 +604,10 @@ export default function Game() {
   // Handle theme selection - now only saves theme, whisp generated after mode selection
   const handleThemeSelect = async (themeId: string) => {
     setSelectedThemeId(themeId);
-    
+
     try {
       // Save theme selection to game_sessions
-      const { error } = await supabase
-        .from("game_sessions")
-        .update({ selected_theme_id: themeId })
-        .eq("id", sessionId);
+      const { error } = await supabase.from("game_sessions").update({ selected_theme_id: themeId }).eq("id", sessionId);
 
       if (error) throw error;
 
@@ -597,20 +616,17 @@ export default function Game() {
       const { data: gameState } = await supabase.functions.invoke("get-game-state", {
         body: { sessionId },
       });
-      
+
       if (gameState?.currentTurn?.id) {
-        await supabase
-          .from("game_turns")
-          .update({ theme_id: themeId })
-          .eq("id", gameState.currentTurn.id);
-        
+        await supabase.from("game_turns").update({ theme_id: themeId }).eq("id", gameState.currentTurn.id);
+
         // Update local state
         setCurrentTurn({ ...gameState.currentTurn, theme_id: themeId });
       }
 
       // Move to mode selection phase
       setGamePhase("selecting_mode");
-      
+
       // Notify other players
       sendWebSocketMessage({
         type: "theme_selected",
@@ -635,18 +651,18 @@ export default function Game() {
   const handleModeSelect = async (mode: "audio" | "elements") => {
     setSelectedTurnMode(mode);
     setIsGeneratingWhisp(true);
-    
+
     try {
       // Get the current turn to ensure we have the latest turn ID
       const { data: gameState } = await supabase.functions.invoke("get-game-state", {
         body: { sessionId },
       });
-      
+
       const turnId = gameState?.currentTurn?.id || currentTurn?.id;
-      
+
       // Use session's theme (set once in Round 1, used for ALL rounds)
       const themeToUse = gameState?.session?.selected_theme_id || session?.selected_theme_id || selectedThemeId;
-      
+
       if (!themeToUse) {
         toast({
           title: "Error",
@@ -656,13 +672,13 @@ export default function Game() {
         setIsGeneratingWhisp(false);
         return;
       }
-      
+
       console.log("Starting turn with mode:", mode, "themeId:", themeToUse, "turnId:", turnId);
-      
+
       // Call start-turn with the session's theme and selected mode
       const { data, error } = await supabase.functions.invoke("start-turn", {
-        body: { 
-          sessionId, 
+        body: {
+          sessionId,
           turnId,
           selectedThemeId: themeToUse,
           turnMode: mode,
@@ -674,8 +690,8 @@ export default function Game() {
       console.log("Start-turn response:", data);
 
       // Wait for DB to commit
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
       // Update local state immediately - include theme in turn object
       const turnWithTheme = {
         ...data.turn,
@@ -683,14 +699,14 @@ export default function Game() {
       };
       setCurrentTurn(turnWithTheme);
       setSelectedIcons(data.selectedIcons || []);
-      
+
       // Set phase directly based on mode
       if (mode === "elements") {
         setGamePhase("elements");
       } else {
         setGamePhase("storytelling");
       }
-      
+
       // Notify other players via WebSocket to refresh their state
       sendWebSocketMessage({
         type: "mode_selected",
@@ -755,7 +771,7 @@ export default function Game() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      
+
       {/* Main content area with sidebar layout */}
       <div className="flex-1 flex">
         {/* Scoreboard Sidebar */}
@@ -785,9 +801,9 @@ export default function Game() {
               label="Guess Time"
             />
           )}
-          
+
           {/* Connection Status */}
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+          {/* <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
             isConnected 
               ? "bg-green-500/10 text-green-600 border border-green-500/20" 
               : "bg-red-500/10 text-red-600 border border-red-500/20"
@@ -803,212 +819,195 @@ export default function Game() {
                 <span>Connecting...</span>
               </>
             )}
-          </div>
+          </div> */}
         </div>
 
         {/* Game Content */}
         <main className="flex-1 p-4">
-        {/* Theme Selection Phase - Storyteller chooses theme */}
-        {gamePhase === "selecting_theme" && isStoryteller && (
-          <div className="min-h-screen flex items-center justify-center p-4">
-            <Card className="w-full max-w-4xl">
-              <CardHeader>
-                <CardTitle className="text-center text-2xl">
-                  Your Turn to Tell a Story!
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isGeneratingWhisp ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-4">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                    <p className="text-lg text-muted-foreground">
-                      Generating your secret whisp word...
-                    </p>
-                  </div>
-                ) : (
-                  <ThemeSelectionCards
-                    themes={themes.map(t => ({
-                      id: t.id,
-                      name: t.name,
-                      icon: t.icon,
-                      isCore: t.isCore || false,
-                      isUnlocked: t.isUnlocked !== false,
-                      packName: t.packName,
-                      packId: t.pack_id,
-                    }))}
-                    onThemeSelect={handleThemeSelect}
-                    selectedThemeId={selectedThemeId}
-                    disabled={isGeneratingWhisp}
-                    playerName={players.find(p => p.player_id === currentPlayerId)?.name}
-                    unlockedPackIds={unlockedPackIds}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {gamePhase === "selecting_theme" && !isStoryteller && (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">
-                Waiting for storyteller...
-              </h2>
-              <p className="text-muted-foreground">
-                {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is selecting a theme
-              </p>
+          {/* Theme Selection Phase - Storyteller chooses theme */}
+          {gamePhase === "selecting_theme" && isStoryteller && (
+            <div className="min-h-screen flex items-center justify-center p-4">
+              <Card className="w-full max-w-4xl">
+                <CardHeader>
+                  <CardTitle className="text-center text-2xl">Your Turn to Tell a Story!</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isGeneratingWhisp ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-4">
+                      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                      <p className="text-lg text-muted-foreground">Generating your secret whisp word...</p>
+                    </div>
+                  ) : (
+                    <ThemeSelectionCards
+                      themes={themes.map((t) => ({
+                        id: t.id,
+                        name: t.name,
+                        icon: t.icon,
+                        isCore: t.isCore || false,
+                        isUnlocked: t.isUnlocked !== false,
+                        packName: t.packName,
+                        packId: t.pack_id,
+                      }))}
+                      onThemeSelect={handleThemeSelect}
+                      selectedThemeId={selectedThemeId}
+                      disabled={isGeneratingWhisp}
+                      playerName={players.find((p) => p.player_id === currentPlayerId)?.name}
+                      unlockedPackIds={unlockedPackIds}
+                    />
+                  )}
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Mode Selection Phase - Storyteller chooses audio or elements */}
-        {gamePhase === "selecting_mode" && isStoryteller && (
-          <div className="min-h-screen flex items-center justify-center p-4">
-            <Card className="w-full max-w-4xl">
-              <CardHeader>
-                <CardTitle className="text-center text-2xl">
-                  Choose Your Clue Style
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isGeneratingWhisp ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-4">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                    <p className="text-lg text-muted-foreground">
-                      Generating your secret whisp word...
-                    </p>
-                  </div>
-                ) : (
-                  <TurnModeSelection
-                    onModeSelect={handleModeSelect}
-                    playerName={players.find(p => p.player_id === currentPlayerId)?.name}
-                    disabled={isGeneratingWhisp}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {gamePhase === "selecting_mode" && !isStoryteller && (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">
-                Waiting for storyteller...
-              </h2>
-              <p className="text-muted-foreground">
-                {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is choosing their clue mode
-              </p>
-            </div>
-          </div>
-        )}
-
-
-        {/* Storytelling Phase */}
-        {gamePhase === "storytelling" && isStoryteller && currentTurn && (
-          <StorytellingInterface
-            theme={currentTurn.theme}
-            whisp={currentTurn.whisp || ""}
-            sessionId={sessionId!}
-            playerId={currentPlayerId}
-            turnId={currentTurn.id}
-            onStoryComplete={handleStoryComplete}
-            isStoryteller={isStoryteller}
-            storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
-            sendWebSocketMessage={sendWebSocketMessage}
-            selectedIcons={selectedIcons}
-            turnMode={selectedTurnMode || currentTurn.turn_mode || "audio"}
-          />
-        )}
-
-        {gamePhase === "storytelling" && !isStoryteller && (
-          <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="max-w-2xl w-full space-y-6">
+          {gamePhase === "selecting_theme" && !isStoryteller && (
+            <div className="min-h-screen flex items-center justify-center">
               <div className="text-center">
-                <h2 className="text-2xl font-bold text-foreground mb-2">
-                  {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is telling a story
-                </h2>
+                <h2 className="text-2xl font-bold text-foreground mb-2">Waiting for storyteller...</h2>
                 <p className="text-muted-foreground">
-                  Listen carefully and try to guess the whisp word!
+                  {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is selecting a theme
                 </p>
-                {isReceivingAudio && (
-                  <div className="mt-4 flex items-center justify-center gap-2 text-sm text-green-600">
-                    <div className="h-3 w-3 rounded-full bg-green-600 animate-pulse" />
-                    <span className="font-medium">Listening to live recording...</span>
-                  </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mode Selection Phase - Storyteller chooses audio or elements */}
+          {gamePhase === "selecting_mode" && isStoryteller && (
+            <div className="min-h-screen flex items-center justify-center p-4">
+              <Card className="w-full max-w-4xl">
+                <CardHeader>
+                  <CardTitle className="text-center text-2xl">Choose Your Clue Style</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isGeneratingWhisp ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-4">
+                      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                      <p className="text-lg text-muted-foreground">Generating your secret whisp word...</p>
+                    </div>
+                  ) : (
+                    <TurnModeSelection
+                      onModeSelect={handleModeSelect}
+                      playerName={players.find((p) => p.player_id === currentPlayerId)?.name}
+                      disabled={isGeneratingWhisp}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {gamePhase === "selecting_mode" && !isStoryteller && (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-foreground mb-2">Waiting for storyteller...</h2>
+                <p className="text-muted-foreground">
+                  {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is choosing their clue
+                  mode
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Storytelling Phase */}
+          {gamePhase === "storytelling" && isStoryteller && currentTurn && (
+            <StorytellingInterface
+              theme={currentTurn.theme}
+              whisp={currentTurn.whisp || ""}
+              sessionId={sessionId!}
+              playerId={currentPlayerId}
+              turnId={currentTurn.id}
+              onStoryComplete={handleStoryComplete}
+              isStoryteller={isStoryteller}
+              storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
+              sendWebSocketMessage={sendWebSocketMessage}
+              selectedIcons={selectedIcons}
+              turnMode={selectedTurnMode || currentTurn.turn_mode || "audio"}
+            />
+          )}
+
+          {gamePhase === "storytelling" && !isStoryteller && (
+            <div className="min-h-screen flex items-center justify-center p-4">
+              <div className="max-w-2xl w-full space-y-6">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-foreground mb-2">
+                    {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is telling a story
+                  </h2>
+                  <p className="text-muted-foreground">Listen carefully and try to guess the whisp word!</p>
+                  {isReceivingAudio && (
+                    <div className="mt-4 flex items-center justify-center gap-2 text-sm text-green-600">
+                      <div className="h-3 w-3 rounded-full bg-green-600 animate-pulse" />
+                      <span className="font-medium">Listening to live recording...</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-center text-sm text-muted-foreground">
+                  Waiting for {players.find((p) => p.player_id === session.current_storyteller_id)?.name} to record
+                  their story...
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Elements Phase - Storyteller arranges elements */}
+          {gamePhase === "elements" && isStoryteller && currentTurn && (
+            <ElementsInterface
+              theme={currentTurn.theme}
+              whisp={currentTurn.whisp || ""}
+              sessionId={sessionId!}
+              playerId={currentPlayerId}
+              turnId={currentTurn.id}
+              onSubmit={handleStoryComplete}
+              isStoryteller={isStoryteller}
+              storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
+              sendWebSocketMessage={sendWebSocketMessage}
+              selectedIcons={selectedIcons}
+            />
+          )}
+
+          {gamePhase === "elements" && !isStoryteller && currentTurn && (
+            <ElementsInterface
+              theme={currentTurn.theme}
+              whisp=""
+              sessionId={sessionId!}
+              playerId={currentPlayerId}
+              turnId={currentTurn.id}
+              onSubmit={() => {}}
+              isStoryteller={false}
+              storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
+              sendWebSocketMessage={sendWebSocketMessage}
+              selectedIcons={selectedIcons}
+            />
+          )}
+
+          {/* Guessing Phase */}
+          {gamePhase === "guessing" && !isStoryteller && currentTurn && (
+            <GuessingInterface
+              storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
+              theme={currentTurn.theme}
+              audioUrl={currentTurn.turn_mode === "audio" ? currentTurn.recording_url || undefined : undefined}
+              sessionId={sessionId!}
+              roundNumber={session.current_round ?? 1}
+              playerId={currentPlayerId}
+              onGuessSubmit={handleGuessSubmit}
+              selectedIcons={selectedIcons}
+              turnMode={currentTurn.turn_mode || "audio"}
+            />
+          )}
+
+          {gamePhase === "guessing" && isStoryteller && (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-foreground mb-2">Players are guessing...</h2>
+                <p className="text-muted-foreground">Watch the scoreboard to see who gets it right!</p>
+                {currentTurn?.whisp && (
+                  <p className="mt-4 text-lg">
+                    Your whisp was: <span className="font-bold text-primary">{currentTurn.whisp}</span>
+                  </p>
                 )}
               </div>
-              
-              <div className="text-center text-sm text-muted-foreground">
-                Waiting for {players.find((p) => p.player_id === session.current_storyteller_id)?.name} to record their story...
-              </div>
             </div>
-          </div>
-        )}
-
-        {/* Elements Phase - Storyteller arranges elements */}
-        {gamePhase === "elements" && isStoryteller && currentTurn && (
-          <ElementsInterface
-            theme={currentTurn.theme}
-            whisp={currentTurn.whisp || ""}
-            sessionId={sessionId!}
-            playerId={currentPlayerId}
-            turnId={currentTurn.id}
-            onSubmit={handleStoryComplete}
-            isStoryteller={isStoryteller}
-            storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
-            sendWebSocketMessage={sendWebSocketMessage}
-            selectedIcons={selectedIcons}
-          />
-        )}
-
-        {gamePhase === "elements" && !isStoryteller && currentTurn && (
-          <ElementsInterface
-            theme={currentTurn.theme}
-            whisp=""
-            sessionId={sessionId!}
-            playerId={currentPlayerId}
-            turnId={currentTurn.id}
-            onSubmit={() => {}}
-            isStoryteller={false}
-            storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
-            sendWebSocketMessage={sendWebSocketMessage}
-            selectedIcons={selectedIcons}
-          />
-        )}
-
-        {/* Guessing Phase */}
-        {gamePhase === "guessing" && !isStoryteller && currentTurn && (
-          <GuessingInterface
-            storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
-            theme={currentTurn.theme}
-            audioUrl={currentTurn.turn_mode === "audio" ? (currentTurn.recording_url || undefined) : undefined}
-            sessionId={sessionId!}
-            roundNumber={session.current_round ?? 1}
-            playerId={currentPlayerId}
-            onGuessSubmit={handleGuessSubmit}
-            selectedIcons={selectedIcons}
-            turnMode={currentTurn.turn_mode || "audio"}
-          />
-        )}
-
-        {gamePhase === "guessing" && isStoryteller && (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">
-                Players are guessing...
-              </h2>
-              <p className="text-muted-foreground">
-                Watch the scoreboard to see who gets it right!
-              </p>
-              {currentTurn?.whisp && (
-                <p className="mt-4 text-lg">
-                  Your whisp was: <span className="font-bold text-primary">{currentTurn.whisp}</span>
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+          )}
         </main>
       </div>
 
@@ -1023,30 +1022,28 @@ export default function Game() {
             <DialogDescription className="text-center space-y-4">
               {gameWinner ? (
                 <div className="space-y-2 pt-4">
-                  <p className="text-lg font-semibold text-foreground">
-                    🏆 {gameWinner.name} wins!
-                  </p>
-                  <p className="text-muted-foreground">
-                    Final Score: {gameWinner.score || 0} points
-                  </p>
+                  <p className="text-lg font-semibold text-foreground">🏆 {gameWinner.name} wins!</p>
+                  <p className="text-muted-foreground">Final Score: {gameWinner.score || 0} points</p>
                 </div>
               ) : (
                 <p>Thanks for playing!</p>
               )}
-              
+
               {/* Final Standings */}
               <div className="mt-6 space-y-2 text-left">
                 <p className="text-sm font-medium text-foreground">Final Standings:</p>
-                {[...players].sort((a, b) => (b.score || 0) - (a.score || 0)).map((player, index) => (
-                  <div key={player.id} className="flex items-center justify-between py-1 px-2 rounded bg-muted/50">
-                    <span className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{index + 1}.</span>
-                      <span>{player.name}</span>
-                      {index === 0 && <span>👑</span>}
-                    </span>
-                    <span className="font-semibold">{player.score || 0}</span>
-                  </div>
-                ))}
+                {[...players]
+                  .sort((a, b) => (b.score || 0) - (a.score || 0))
+                  .map((player, index) => (
+                    <div key={player.id} className="flex items-center justify-between py-1 px-2 rounded bg-muted/50">
+                      <span className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{index + 1}.</span>
+                        <span>{player.name}</span>
+                        {index === 0 && <span>👑</span>}
+                      </span>
+                      <span className="font-semibold">{player.score || 0}</span>
+                    </div>
+                  ))}
               </div>
             </DialogDescription>
           </DialogHeader>

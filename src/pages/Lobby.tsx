@@ -1729,8 +1729,8 @@ export default function Lobby() {
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Connection Status Indicator */}
+      {/* <div className="max-w-4xl mx-auto space-y-6">
+      
         <div className="fixed top-4 right-4 z-50">
           <div
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
@@ -1751,7 +1751,7 @@ export default function Lobby() {
               </>
             )}
           </div>
-        </div>
+        </div> */}
 
         <div className="flex items-center justify-between mb-4">
           {isHost ? (
