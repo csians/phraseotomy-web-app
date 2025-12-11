@@ -70,6 +70,17 @@ export default function CreateLobby() {
     loadAllPacks();
   }, [tenant?.id]);
 
+  useEffect(() => {
+    if (!loadingPacks && allPacks.length > 0 && availablePacks.length > 0) {
+      // Find last unlocked pack (highest)
+      const highestUnlocked = [...allPacks].reverse().find((p) => availablePacks.includes(p.id));
+
+      if (highestUnlocked) {
+        setSelectedPack(highestUnlocked.id);
+      }
+    }
+  }, [loadingPacks, allPacks, availablePacks]);
+
   // Load themes filtered by available packs
   // Show all themes whose pack_id matches any of the customer's unlocked packs
   useEffect(() => {
