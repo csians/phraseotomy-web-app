@@ -78,17 +78,15 @@ export default function CreateLobby() {
         if (!loadingPacks) setLoadingThemes(false);
         return;
       }
-      
+
       try {
         const { data, error } = await supabase.from("themes").select("*").order("name", { ascending: true });
 
         if (error) throw error;
-        
+
         // Filter themes to only show those whose pack_id is in availablePacks
-        const filteredThemes = (data || []).filter((theme) => 
-          theme.pack_id && availablePacks.includes(theme.pack_id)
-        );
-        
+        const filteredThemes = (data || []).filter((theme) => theme.pack_id && availablePacks.includes(theme.pack_id));
+
         setThemes(filteredThemes);
 
         // Auto-select first theme if available
@@ -314,231 +312,252 @@ export default function CreateLobby() {
       <Header />
       <div className="flex-1 p-4">
         <div className="max-w-2xl mx-auto space-y-6 py-8">
-        {/* Customer Profile Header */}
-        {customer && (
-          <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xl font-bold">
-                  {customer.firstName?.[0] || customer.name?.[0] || customer.email?.[0] || "?"}
+          {/* Customer Profile Header */}
+          {customer && (
+            <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xl font-bold">
+                    {customer.firstName?.[0] || customer.name?.[0] || customer.email?.[0] || "?"}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      {customer.name ||
+                        `${customer.firstName || ""} ${customer.lastName || ""}`.trim() ||
+                        customer.email}
+                    </h2>
+                    {customer.email && <p className="text-sm text-muted-foreground">{customer.email}</p>}
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-semibold">
-                    {customer.name || `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || customer.email}
-                  </h2>
-                  {customer.email && <p className="text-sm text-muted-foreground">{customer.email}</p>}
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold">Create New Game</h1>
+            <p className="text-muted-foreground">Set up your game and invite players</p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Game Settings</CardTitle>
+              <CardDescription>Choose your game packs</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="lobbyName">Game Name</Label>
+                <Input
+                  id="lobbyName"
+                  required
+                  placeholder="My Awesome Game"
+                  value={lobbyName}
+                  onChange={(e) => setLobbyName(e.target.value)}
+                />
+              </div>
+
+              {/* Game Mode Selection */}
+              <div className="space-y-3">
+                <Label>Game Mode</Label>
+                <RadioGroup value={gameMode} onValueChange={(v) => setGameMode(v as "live" | "async")}>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div
+                      className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                        gameMode === "live"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-accent hover:text-accent-foreground"
+                      }`}
+                      onClick={() => setGameMode("live")}
+                    >
+                      <RadioGroupItem value="live" id="live" className="mt-0.5" />
+                      <div className="space-y-1">
+                        <Label htmlFor="live" className="cursor-pointer font-medium">
+                          ⏱️ Live Mode
+                        </Label>
+                        <p className="text-xs text-muted-foreground">Time-based gameplay with countdown timers</p>
+                      </div>
+                    </div>
+                    <div
+                      className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                        gameMode === "async"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-accent hover:text-accent-foreground"
+                      }`}
+                      onClick={() => setGameMode("async")}
+                    >
+                      <RadioGroupItem value="async" id="async" className="mt-0.5" />
+                      <div className="space-y-1">
+                        <Label htmlFor="async" className="cursor-pointer font-medium">
+                          📬 Async Mode
+                        </Label>
+                        <p className="text-xs text-muted-foreground">Play at your own pace, no time limits</p>
+                      </div>
+                    </div>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Timer Presets (only for Live mode) */}
+              {gameMode === "live" && (
+                <div className="space-y-3">
+                  <Label>Timer Settings</Label>
+                  <RadioGroup
+                    value={timerPreset}
+                    onValueChange={(v) => setTimerPreset(v as "quick" | "normal" | "extended")}
+                  >
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        Object.entries(TIMER_PRESETS) as [keyof typeof TIMER_PRESETS, (typeof TIMER_PRESETS)["quick"]][]
+                      ).map(([key, preset]) => (
+                        <div
+                          key={key}
+                          className={`flex flex-col items-center p-3 rounded-lg border cursor-pointer transition-colors text-center ${
+                            timerPreset === key
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-accent hover:text-accent-foreground"
+                          }`}
+                          onClick={() => setTimerPreset(key)}
+                        >
+                          <RadioGroupItem value={key} id={key} className="sr-only" />
+                          <Label htmlFor={key} className="cursor-pointer text-sm font-medium capitalize">
+                            {key}
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {Math.floor(preset.story / 60)}/{Math.floor(preset.guess / 60)} min
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </RadioGroup>
+                  <p className="text-xs text-muted-foreground">
+                    Story time / Guess time. Auto-submits when timer expires.
+                  </p>
                 </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Select Theme</Label>
+                {loadingThemes ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : themes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No themes available</p>
+                ) : (
+                  <Select value={selectedTheme} onValueChange={setSelectedTheme}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a theme for whisps" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {themes.map((theme) => (
+                        <SelectItem key={theme.id} value={theme.id}>
+                          {theme.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-muted-foreground">Whisps will be auto-generated based on this theme</p>
+              </div>
+
+              <div className="space-y-4">
+                <Label>Select Pack</Label>
+                {loadingPacks ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ) : allPacks.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <p>No packs have been created yet. Contact your administrator to create packs.</p>
+                  </div>
+                ) : (
+                  <RadioGroup value={selectedPack} onValueChange={setSelectedPack}>
+                    <div className="space-y-3">
+                      {allPacks.map((pack) => {
+                        const isAvailable = availablePacks.includes(pack.id);
+
+                        return (
+                          <div
+                            key={pack.id}
+                            className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
+                              selectedPack === pack.id
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : isAvailable
+                                  ? "border-border bg-card hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                                  : "border-muted bg-muted/30 opacity-60 cursor-not-allowed"
+                            }`}
+                            onClick={() => isAvailable && setSelectedPack(pack.id)}
+                          >
+                            {/* <RadioGroupItem value={pack.id} id={pack.id} disabled={!isAvailable} className="mt-0.5" /> */}
+                            <RadioGroupItem
+                              value={pack.id}
+                              id={pack.id}
+                              disabled={!isAvailable}
+                              className="
+                              mt-0.5
+                              border-2 border-white 
+                              rounded-full
+                              data-[state=checked]:bg-black
+                              data-[state=checked]:border-black
+                            "
+                            />
+                            <div className="space-y-1 leading-none flex-1">
+                              <div className="flex items-center gap-2">
+                                <Label
+                                  htmlFor={pack.id}
+                                  className={`text-sm font-medium leading-none ${
+                                    isAvailable ? "cursor-pointer" : "cursor-not-allowed opacity-70"
+                                  }`}
+                                >
+                                  {pack.name}
+                                </Label>
+                                {!isAvailable && (
+                                  <span className="text-xs text-muted-foreground italic">(Not unlocked)</span>
+                                )}
+                              </div>
+                              {pack.description && <p className="text-sm text-muted-foreground">{pack.description}</p>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </RadioGroup>
+                )}
+                {!loadingPacks && availablePacks.length === 0 && allPacks.length > 0 && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <p>No packs unlocked. Redeem a code to unlock game packs.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => navigate("/play/host")} className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateLobby}
+                  disabled={isCreating || !selectedPack}
+                  className="flex-1 bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                  size="lg"
+                >
+                  {isCreating ? "Creating..." : "Create Game"}
+                </Button>
               </div>
             </CardContent>
           </Card>
-        )}
 
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">Create New Game</h1>
-          <p className="text-muted-foreground">Set up your game and invite players</p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Game Settings</CardTitle>
-            <CardDescription>Choose your game packs</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="lobbyName">Game Name</Label>
-              <Input
-                id="lobbyName"
-                required
-                placeholder="My Awesome Game"
-                value={lobbyName}
-                onChange={(e) => setLobbyName(e.target.value)}
-              />
-            </div>
-
-            {/* Game Mode Selection */}
-            <div className="space-y-3">
-              <Label>Game Mode</Label>
-              <RadioGroup value={gameMode} onValueChange={(v) => setGameMode(v as "live" | "async")}>
-                <div className="grid grid-cols-2 gap-3">
-                  <div
-                    className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
-                      gameMode === "live" ? "border-primary bg-primary/5" : "border-border hover:bg-accent hover:text-accent-foreground"
-                    }`}
-                    onClick={() => setGameMode("live")}
-                  >
-                    <RadioGroupItem value="live" id="live" className="mt-0.5" />
-                    <div className="space-y-1">
-                      <Label htmlFor="live" className="cursor-pointer font-medium">
-                        ⏱️ Live Mode
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Time-based gameplay with countdown timers
-                      </p>
-                    </div>
-                  </div>
-                  <div
-                    className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
-                      gameMode === "async" ? "border-primary bg-primary/5" : "border-border hover:bg-accent hover:text-accent-foreground"
-                    }`}
-                    onClick={() => setGameMode("async")}
-                  >
-                    <RadioGroupItem value="async" id="async" className="mt-0.5" />
-                    <div className="space-y-1">
-                      <Label htmlFor="async" className="cursor-pointer font-medium">
-                        📬 Async Mode
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Play at your own pace, no time limits
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </RadioGroup>
-            </div>
-
-            {/* Timer Presets (only for Live mode) */}
-            {gameMode === "live" && (
-              <div className="space-y-3">
-                <Label>Timer Settings</Label>
-                <RadioGroup value={timerPreset} onValueChange={(v) => setTimerPreset(v as "quick" | "normal" | "extended")}>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(Object.entries(TIMER_PRESETS) as [keyof typeof TIMER_PRESETS, typeof TIMER_PRESETS["quick"]][]).map(([key, preset]) => (
-                      <div
-                        key={key}
-                        className={`flex flex-col items-center p-3 rounded-lg border cursor-pointer transition-colors text-center ${
-                          timerPreset === key ? "border-primary bg-primary/5" : "border-border hover:bg-accent hover:text-accent-foreground"
-                        }`}
-                        onClick={() => setTimerPreset(key)}
-                      >
-                        <RadioGroupItem value={key} id={key} className="sr-only" />
-                        <Label htmlFor={key} className="cursor-pointer text-sm font-medium capitalize">
-                          {key}
-                        </Label>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {Math.floor(preset.story / 60)}/{Math.floor(preset.guess / 60)} min
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </RadioGroup>
-                <p className="text-xs text-muted-foreground">
-                  Story time / Guess time. Auto-submits when timer expires.
+          <Card className="bg-muted/50">
+            <CardContent className="pt-6">
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>
+                  <strong>Host:</strong> {customer.name || customer.email}
+                </p>
+                <p>
+                  <strong>Shop:</strong> {shopDomain}
                 </p>
               </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Select Theme</Label>
-              {loadingThemes ? (
-                <Skeleton className="h-10 w-full" />
-              ) : themes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No themes available</p>
-              ) : (
-                <Select value={selectedTheme} onValueChange={setSelectedTheme}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a theme for whisps" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {themes.map((theme) => (
-                      <SelectItem key={theme.id} value={theme.id}>
-                        {theme.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <p className="text-xs text-muted-foreground">Whisps will be auto-generated based on this theme</p>
-            </div>
-
-            <div className="space-y-4">
-              <Label>Select Pack</Label>
-              {loadingPacks ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                </div>
-              ) : allPacks.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  <p>No packs have been created yet. Contact your administrator to create packs.</p>
-                </div>
-              ) : (
-                <RadioGroup value={selectedPack} onValueChange={setSelectedPack}>
-                  <div className="space-y-3">
-                    {allPacks.map((pack) => {
-                      const isAvailable = availablePacks.includes(pack.id);
-
-                      return (
-                        <div
-                          key={pack.id}
-                          className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
-                            selectedPack === pack.id
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : isAvailable
-                              ? "border-border bg-card hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                              : "border-muted bg-muted/30 opacity-60 cursor-not-allowed"
-                          }`}
-                          onClick={() => isAvailable && setSelectedPack(pack.id)}
-                        >
-                          <RadioGroupItem value={pack.id} id={pack.id} disabled={!isAvailable} className="mt-0.5" />
-                          <div className="space-y-1 leading-none flex-1">
-                            <div className="flex items-center gap-2">
-                              <Label
-                                htmlFor={pack.id}
-                                className={`text-sm font-medium leading-none ${
-                                  isAvailable ? "cursor-pointer" : "cursor-not-allowed opacity-70"
-                                }`}
-                              >
-                                {pack.name}
-                              </Label>
-                              {!isAvailable && (
-                                <span className="text-xs text-muted-foreground italic">(Not unlocked)</span>
-                              )}
-                            </div>
-                            {pack.description && <p className="text-sm text-muted-foreground">{pack.description}</p>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </RadioGroup>
-              )}
-              {!loadingPacks && availablePacks.length === 0 && allPacks.length > 0 && (
-                <div className="text-center py-4 text-muted-foreground">
-                  <p>No packs unlocked. Redeem a code to unlock game packs.</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => navigate("/play/host")} className="flex-1">
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateLobby}
-                disabled={isCreating || !selectedPack}
-                className="flex-1 bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                size="lg"
-              >
-                {isCreating ? "Creating..." : "Create Game"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-muted/50">
-          <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>
-                <strong>Host:</strong> {customer.name || customer.email}
-              </p>
-              <p>
-                <strong>Shop:</strong> {shopDomain}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
-  </div>
   );
 }
