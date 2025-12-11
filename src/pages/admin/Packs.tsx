@@ -7,9 +7,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Plus, Trash2, ArrowLeft, Palette, Settings, Edit2 } from "lucide-react";
+import { RefreshCw, Plus, Trash2, ArrowLeft, Palette, Settings, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTenant } from "@/hooks/useTenant";
 import type { Tables } from "@/integrations/supabase/types";
@@ -70,10 +71,8 @@ export default function Packs() {
   // Theme management modal state
   const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
-  const [isAddThemeOpen, setIsAddThemeOpen] = useState(false);
-  const [isEditThemeOpen, setIsEditThemeOpen] = useState(false);
-  const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
-  const [newTheme, setNewTheme] = useState({ name: "", icon: "🎮" });
+  const [selectedThemeToAdd, setSelectedThemeToAdd] = useState<string>("");
+  const [allThemes, setAllThemes] = useState<Theme[]>([]);
   
   const { toast } = useToast();
 
@@ -104,7 +103,8 @@ export default function Packs() {
       if (themesRes.error) throw themesRes.error;
       
       setPacks(packsRes.data || []);
-      setThemes(themesRes.data || []);
+      setAllThemes(themesRes.data || []);
+      setThemes((themesRes.data || []).filter(t => t.pack_id));
       setCoreThemes((themesRes.data || []).filter(t => t.is_core));
     } catch (error) {
       toast({
@@ -196,91 +196,72 @@ export default function Packs() {
   // Theme management functions
   const openThemeModal = (pack: Pack) => {
     setSelectedPack(pack);
+    setSelectedThemeToAdd("");
     setIsThemeModalOpen(true);
   };
 
-  const handleAddTheme = async () => {
-    if (!selectedPack) return;
-    if (!newTheme.name.trim()) {
-      toast({ title: "Theme name is required", variant: "destructive" });
-      return;
-    }
-
-    try {
-      const { error } = await supabase.functions.invoke('admin-create-theme', {
-        body: {
-          name: newTheme.name.trim(),
-          icon: newTheme.icon,
-          pack_id: selectedPack.id,
-          is_core: false
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast({ title: "Theme created successfully" });
-      setIsAddThemeOpen(false);
-      setNewTheme({ name: "", icon: "🎮" });
-      loadPacks();
-    } catch (error) {
-      toast({
-        title: "Error creating theme",
-        description: error instanceof Error ? error.message : "Failed to create",
-        variant: "destructive",
-      });
-    }
+  // Get available themes (not already assigned to this pack)
+  const getAvailableThemes = () => {
+    if (!selectedPack) return [];
+    return allThemes.filter(t => t.pack_id !== selectedPack.id && !t.is_core);
   };
 
-  const handleEditTheme = async () => {
-    if (!editingTheme) return;
-    if (!editingTheme.name.trim()) {
-      toast({ title: "Theme name is required", variant: "destructive" });
+  const handleAssignTheme = async () => {
+    if (!selectedPack || !selectedThemeToAdd) {
+      toast({ title: "Please select a theme", variant: "destructive" });
       return;
     }
 
     try {
       const { error } = await supabase.functions.invoke('admin-create-theme', {
         body: {
-          theme_id: editingTheme.id,
-          name: editingTheme.name.trim(),
-          icon: editingTheme.icon,
-          pack_id: selectedPack?.id || null,
-          is_core: editingTheme.is_core,
+          theme_id: selectedThemeToAdd,
+          name: allThemes.find(t => t.id === selectedThemeToAdd)?.name || "",
+          icon: allThemes.find(t => t.id === selectedThemeToAdd)?.icon || "🎮",
+          pack_id: selectedPack.id,
+          is_core: false,
           update: true
         }
       });
       
       if (error) throw error;
       
-      toast({ title: "Theme updated successfully" });
-      setIsEditThemeOpen(false);
-      setEditingTheme(null);
+      toast({ title: "Theme assigned to pack" });
+      setSelectedThemeToAdd("");
       loadPacks();
     } catch (error) {
       toast({
-        title: "Error updating theme",
-        description: error instanceof Error ? error.message : "Failed to update",
+        title: "Error assigning theme",
+        description: error instanceof Error ? error.message : "Failed to assign",
         variant: "destructive",
       });
     }
   };
 
-  const handleDeleteTheme = async (themeId: string, themeName: string) => {
-    if (!confirm(`Delete theme "${themeName}"?`)) return;
+  const handleRemoveThemeFromPack = async (themeId: string, themeName: string) => {
+    if (!confirm(`Remove theme "${themeName}" from this pack?`)) return;
 
     try {
-      const { error } = await supabase.functions.invoke('admin-delete-theme', {
-        body: { theme_id: themeId }
+      // Update theme to remove pack_id (set to null)
+      const { error } = await supabase.functions.invoke('admin-create-theme', {
+        body: {
+          theme_id: themeId,
+          name: allThemes.find(t => t.id === themeId)?.name || "",
+          icon: allThemes.find(t => t.id === themeId)?.icon || "🎮",
+          pack_id: null,
+          is_core: false,
+          update: true
+        }
       });
       
       if (error) throw error;
       
-      toast({ title: "Theme deleted" });
+      toast({ title: "Theme removed from pack" });
       loadPacks();
     } catch (error) {
       toast({
-        title: "Error deleting theme",
-        description: error instanceof Error ? error.message : "Failed to delete",
+        title: "Error removing theme",
+        description: error instanceof Error ? error.message : "Failed to remove",
         variant: "destructive",
       });
     }
@@ -499,10 +480,31 @@ export default function Packs() {
           </DialogHeader>
           
           <div className="space-y-4">
-            <div className="flex justify-end">
-              <Button size="sm" onClick={() => setIsAddThemeOpen(true)}>
+            {/* Add theme dropdown */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 space-y-2">
+                <Label>Add existing theme to this pack</Label>
+                <Select value={selectedThemeToAdd} onValueChange={setSelectedThemeToAdd}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a theme to add..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAvailableThemes().length === 0 ? (
+                      <SelectItem value="none" disabled>No available themes</SelectItem>
+                    ) : (
+                      getAvailableThemes().map(theme => (
+                        <SelectItem key={theme.id} value={theme.id}>
+                          <span className="mr-2">{theme.icon}</span>
+                          {theme.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleAssignTheme} disabled={!selectedThemeToAdd}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Theme
+                Add
               </Button>
             </div>
             
@@ -528,25 +530,14 @@ export default function Packs() {
                         <TableCell className="text-2xl">{theme.icon}</TableCell>
                         <TableCell className="font-medium">{theme.name}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingTheme(theme);
-                                setIsEditThemeOpen(true);
-                              }}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteTheme(theme.id, theme.name)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveThemeFromPack(theme.id, theme.name)}
+                            title="Remove from pack"
+                          >
+                            <X className="h-4 w-4 text-destructive" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -560,70 +551,6 @@ export default function Packs() {
             <Button variant="outline" onClick={() => setIsThemeModalOpen(false)}>
               Close
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Theme Dialog */}
-      <Dialog open={isAddThemeOpen} onOpenChange={setIsAddThemeOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Theme</DialogTitle>
-            <DialogDescription>Create a new theme for {selectedPack?.name}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Theme Name *</Label>
-              <Input
-                value={newTheme.name}
-                onChange={(e) => setNewTheme({ ...newTheme, name: e.target.value })}
-                placeholder="e.g., Horror, Fantasy"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Icon (Emoji)</Label>
-              <Input
-                value={newTheme.icon}
-                onChange={(e) => setNewTheme({ ...newTheme, icon: e.target.value })}
-                placeholder="🎮"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddThemeOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddTheme}>Create Theme</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Theme Dialog */}
-      <Dialog open={isEditThemeOpen} onOpenChange={setIsEditThemeOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Theme</DialogTitle>
-            <DialogDescription>Update theme details</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Theme Name *</Label>
-              <Input
-                value={editingTheme?.name || ""}
-                onChange={(e) => setEditingTheme(prev => prev ? { ...prev, name: e.target.value } : null)}
-                placeholder="e.g., Horror, Fantasy"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Icon (Emoji)</Label>
-              <Input
-                value={editingTheme?.icon || ""}
-                onChange={(e) => setEditingTheme(prev => prev ? { ...prev, icon: e.target.value } : null)}
-                placeholder="🎮"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditThemeOpen(false)}>Cancel</Button>
-            <Button onClick={handleEditTheme}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
