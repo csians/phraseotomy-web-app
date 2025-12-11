@@ -362,7 +362,7 @@ export default function CreateLobby() {
                 <div className="grid grid-cols-2 gap-3">
                   <div
                     className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
-                      gameMode === "live" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
+                      gameMode === "live" ? "border-primary bg-primary/5" : "border-border hover:bg-accent hover:text-accent-foreground"
                     }`}
                     onClick={() => setGameMode("live")}
                   >
@@ -378,7 +378,7 @@ export default function CreateLobby() {
                   </div>
                   <div
                     className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
-                      gameMode === "async" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
+                      gameMode === "async" ? "border-primary bg-primary/5" : "border-border hover:bg-accent hover:text-accent-foreground"
                     }`}
                     onClick={() => setGameMode("async")}
                   >
@@ -406,7 +406,7 @@ export default function CreateLobby() {
                       <div
                         key={key}
                         className={`flex flex-col items-center p-3 rounded-lg border cursor-pointer transition-colors text-center ${
-                          timerPreset === key ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
+                          timerPreset === key ? "border-primary bg-primary/5" : "border-border hover:bg-accent hover:text-accent-foreground"
                         }`}
                         onClick={() => setTimerPreset(key)}
                       >
@@ -470,9 +470,11 @@ export default function CreateLobby() {
                       return (
                         <div
                           key={pack.id}
-                          className={`flex items-start space-x-3 p-3 rounded-lg border ${
-                            isAvailable
-                              ? "border-border bg-card hover:bg-accent cursor-pointer"
+                          className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
+                            selectedPack === pack.id
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : isAvailable
+                              ? "border-border bg-card hover:bg-accent hover:text-accent-foreground cursor-pointer"
                               : "border-muted bg-muted/30 opacity-60 cursor-not-allowed"
                           }`}
                           onClick={() => isAvailable && setSelectedPack(pack.id)}
