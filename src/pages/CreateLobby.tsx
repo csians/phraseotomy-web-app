@@ -508,7 +508,7 @@ export default function CreateLobby() {
                               data-[state=checked]:border-black
                             "
                             />
-                            <div className="space-y-1 leading-none flex-1 pt-2">
+                            <div className="space-y-1 leading-none flex-1 pt-1">
                               <div className="flex items-center gap-2">
                                 <Label
                                   htmlFor={pack.id}
