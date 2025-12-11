@@ -746,6 +746,97 @@ export default function Game() {
     initializeGame();
   };
 
+  // Handle storyteller timer expiry - skip the round
+  const handleStoryTimeUp = useCallback(async () => {
+    const isCurrentStoryteller = currentPlayerId === session?.current_storyteller_id;
+    if (!sessionId || !isCurrentStoryteller) return;
+    
+    console.log("⏰ Story time expired - skipping round");
+    toast({
+      title: "⏰ Time's Up!",
+      description: "Round skipped - moving to next storyteller",
+      variant: "destructive",
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke("skip-turn", {
+        body: { sessionId, reason: "storyteller_timeout" },
+      });
+
+      if (error) throw error;
+
+      console.log("Skip turn response:", data);
+
+      if (data.game_completed) {
+        sendWebSocketMessage({
+          type: "game_completed",
+          winnerId: data.next_round?.winnerId,
+          winnerName: data.next_round?.winnerName,
+        });
+      } else if (data.next_round) {
+        sendWebSocketMessage({
+          type: "next_turn",
+          roundNumber: data.next_round.roundNumber,
+          newStorytellerId: data.next_round.newStorytellerId,
+          newStorytellerName: data.next_round.newStorytellerName,
+        });
+      }
+
+      // Refresh game state
+      initializeGame();
+    } catch (error) {
+      console.error("Error skipping turn:", error);
+    }
+  }, [sessionId, currentPlayerId, session?.current_storyteller_id, sendWebSocketMessage, toast]);
+
+  // Handle guess timer expiry - auto-submit for players who haven't answered
+  const handleGuessTimeUp = useCallback(async () => {
+    const isCurrentStoryteller = currentPlayerId === session?.current_storyteller_id;
+    if (!sessionId || !currentTurn || !session || isCurrentStoryteller) return;
+    
+    console.log("⏰ Guess time expired - auto-submitting");
+    toast({
+      title: "⏰ Time's Up!",
+      description: "Your guess was automatically skipped",
+      variant: "destructive",
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke("auto-submit-guess", {
+        body: {
+          sessionId,
+          roundNumber: session.current_round,
+          playerId: currentPlayerId,
+          reason: "timeout",
+        },
+      });
+
+      if (error) throw error;
+
+      console.log("Auto-submit response:", data);
+
+      if (data.game_completed) {
+        sendWebSocketMessage({
+          type: "game_completed",
+          winnerId: data.next_round?.winnerId,
+          winnerName: data.next_round?.winnerName,
+        });
+      } else if (data.next_round) {
+        sendWebSocketMessage({
+          type: "next_turn",
+          roundNumber: data.next_round.roundNumber,
+          newStorytellerId: data.next_round.newStorytellerId,
+          newStorytellerName: data.next_round.newStorytellerName,
+        });
+      }
+
+      // Refresh game state
+      initializeGame();
+    } catch (error) {
+      console.error("Error auto-submitting guess:", error);
+    }
+  }, [sessionId, currentTurn, session, currentPlayerId, sendWebSocketMessage, toast]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -792,6 +883,7 @@ export default function Game() {
               totalSeconds={session.story_time_seconds}
               startTime={currentTurn.created_at}
               label="Story Time"
+              onTimeUp={isStoryteller ? handleStoryTimeUp : undefined}
             />
           )}
           {currentTurn && gamePhase === "guessing" && session.guess_time_seconds && (
@@ -799,6 +891,7 @@ export default function Game() {
               totalSeconds={session.guess_time_seconds}
               startTime={currentTurn.completed_at}
               label="Guess Time"
+              onTimeUp={!isStoryteller ? handleGuessTimeUp : undefined}
             />
           )}
 
