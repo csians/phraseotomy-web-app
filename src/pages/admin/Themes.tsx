@@ -78,8 +78,16 @@ export default function Themes() {
   const [isAddElementOpen, setIsAddElementOpen] = useState(false);
   const [newTheme, setNewTheme] = useState({ name: "", icon: "🎮", pack_id: "", is_core: false });
   const [newElement, setNewElement] = useState({ name: "", icon: "🔮", color: "#6366f1", is_whisp: false });
+  const [newElementImage, setNewElementImage] = useState<File | null>(null);
+  const [newElementImagePreview, setNewElementImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+  const [editingElement, setEditingElement] = useState<Element | null>(null);
+  const [isEditElementOpen, setIsEditElementOpen] = useState(false);
+  const [editElementImage, setEditElementImage] = useState<File | null>(null);
+  const [editElementImagePreview, setEditElementImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const newElementFileRef = useRef<HTMLInputElement>(null);
+  const editElementFileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -201,10 +209,11 @@ export default function Themes() {
     }
 
     try {
-      const { error } = await supabase.functions.invoke('admin-create-element', {
+      // First create the element
+      const { data, error } = await supabase.functions.invoke('admin-create-element', {
         body: {
           name: newElement.name.trim(),
-          icon: newElement.icon,
+          icon: newElement.icon || "🔮",
           color: newElement.is_whisp ? null : newElement.color,
           is_whisp: newElement.is_whisp,
           theme_id: selectedTheme.id
@@ -213,9 +222,33 @@ export default function Themes() {
       
       if (error) throw error;
       
+      const elementId = data?.element?.id;
+      
+      // If there's an image to upload for visual element
+      if (!newElement.is_whisp && newElementImage && elementId) {
+        const fileExt = newElementImage.name.split('.').pop();
+        const filePath = `elements/${elementId}_${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('element_images')
+          .upload(filePath, newElementImage);
+        
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('element_images')
+          .getPublicUrl(filePath);
+        
+        await supabase.functions.invoke('admin-update-element', {
+          body: { element_id: elementId, image_url: publicUrl }
+        });
+      }
+      
       toast({ title: "Element created" });
       setIsAddElementOpen(false);
       setNewElement({ name: "", icon: "🔮", color: "#6366f1", is_whisp: false });
+      setNewElementImage(null);
+      setNewElementImagePreview(null);
       loadElements(selectedTheme.id);
     } catch (error) {
       toast({
@@ -224,6 +257,68 @@ export default function Themes() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleEditElement = async () => {
+    if (!editingElement) return;
+    if (!editingElement.name.trim()) {
+      toast({ title: "Element name is required", variant: "destructive" });
+      return;
+    }
+
+    try {
+      // Update element details
+      const { error } = await supabase.functions.invoke('admin-update-element', {
+        body: {
+          element_id: editingElement.id,
+          name: editingElement.name.trim(),
+          icon: editingElement.icon,
+          color: editingElement.is_whisp ? null : editingElement.color,
+        }
+      });
+      
+      if (error) throw error;
+      
+      // If there's a new image to upload
+      if (!editingElement.is_whisp && editElementImage) {
+        const fileExt = editElementImage.name.split('.').pop();
+        const filePath = `elements/${editingElement.id}_${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('element_images')
+          .upload(filePath, editElementImage);
+        
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('element_images')
+          .getPublicUrl(filePath);
+        
+        await supabase.functions.invoke('admin-update-element', {
+          body: { element_id: editingElement.id, image_url: publicUrl }
+        });
+      }
+      
+      toast({ title: "Element updated" });
+      setIsEditElementOpen(false);
+      setEditingElement(null);
+      setEditElementImage(null);
+      setEditElementImagePreview(null);
+      if (selectedTheme) loadElements(selectedTheme.id);
+    } catch (error) {
+      toast({
+        title: "Error updating element",
+        description: error instanceof Error ? error.message : "Failed to update",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openEditDialog = (element: Element) => {
+    setEditingElement({ ...element });
+    setEditElementImagePreview(element.image_url);
+    setEditElementImage(null);
+    setIsEditElementOpen(true);
   };
 
   const handleDeleteElement = async (elementId: string, elementName: string) => {
@@ -484,7 +579,12 @@ export default function Themes() {
                   <>
                     <Dialog open={isAddElementOpen && !newElement.is_whisp} onOpenChange={(open) => {
                       setIsAddElementOpen(open);
-                      if (open) setNewElement({ ...newElement, is_whisp: false });
+                      if (open) {
+                        setNewElement({ ...newElement, is_whisp: false });
+                      } else {
+                        setNewElementImage(null);
+                        setNewElementImagePreview(null);
+                      }
                     }}>
                       <DialogTrigger asChild>
                         <Button onClick={() => setNewElement({ ...newElement, is_whisp: false })}>
@@ -507,14 +607,6 @@ export default function Themes() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Icon (Emoji)</Label>
-                            <Input
-                              value={newElement.icon}
-                              onChange={(e) => setNewElement({ ...newElement, icon: e.target.value })}
-                              placeholder="☀️"
-                            />
-                          </div>
-                          <div className="space-y-2">
                             <Label>Color</Label>
                             <div className="flex gap-2 items-center">
                               <input
@@ -531,10 +623,148 @@ export default function Themes() {
                               />
                             </div>
                           </div>
+                          <div className="space-y-2">
+                            <Label>Image/SVG</Label>
+                            <input
+                              type="file"
+                              ref={newElementFileRef}
+                              className="hidden"
+                              accept="image/*,.svg"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setNewElementImage(file);
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    setNewElementImagePreview(event.target?.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                            <div className="flex gap-2 items-center">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => newElementFileRef.current?.click()}
+                              >
+                                <Upload className="h-4 w-4 mr-2" />
+                                Upload Image
+                              </Button>
+                              {newElementImagePreview && (
+                                <div className="relative">
+                                  <img
+                                    src={newElementImagePreview}
+                                    alt="Preview"
+                                    className="w-12 h-12 object-contain rounded border border-border"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute -top-2 -right-2 h-5 w-5 p-0 rounded-full bg-destructive text-destructive-foreground"
+                                    onClick={() => {
+                                      setNewElementImage(null);
+                                      setNewElementImagePreview(null);
+                                    }}
+                                  >
+                                    ×
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <DialogFooter>
                           <Button variant="outline" onClick={() => setIsAddElementOpen(false)}>Cancel</Button>
                           <Button onClick={handleAddElement}>Create Element</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Edit Visual Element Dialog */}
+                    <Dialog open={isEditElementOpen && editingElement && !editingElement.is_whisp} onOpenChange={(open) => {
+                      if (!open) {
+                        setIsEditElementOpen(false);
+                        setEditingElement(null);
+                        setEditElementImage(null);
+                        setEditElementImagePreview(null);
+                      }
+                    }}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Visual Element</DialogTitle>
+                          <DialogDescription>Update element details</DialogDescription>
+                        </DialogHeader>
+                        {editingElement && (
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Element Name *</Label>
+                              <Input
+                                value={editingElement.name}
+                                onChange={(e) => setEditingElement({ ...editingElement, name: e.target.value })}
+                                placeholder="e.g., Sun, Moon, Star"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Color</Label>
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="color"
+                                  value={editingElement.color || "#6366f1"}
+                                  onChange={(e) => setEditingElement({ ...editingElement, color: e.target.value })}
+                                  className="w-10 h-10 rounded cursor-pointer border border-border"
+                                />
+                                <Input
+                                  value={editingElement.color || ""}
+                                  onChange={(e) => setEditingElement({ ...editingElement, color: e.target.value })}
+                                  placeholder="#6366f1"
+                                  className="flex-1"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Image/SVG</Label>
+                              <input
+                                type="file"
+                                ref={editElementFileRef}
+                                className="hidden"
+                                accept="image/*,.svg"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    setEditElementImage(file);
+                                    const reader = new FileReader();
+                                    reader.onload = (event) => {
+                                      setEditElementImagePreview(event.target?.result as string);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                              <div className="flex gap-2 items-center">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => editElementFileRef.current?.click()}
+                                >
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  {editElementImagePreview ? 'Change Image' : 'Upload Image'}
+                                </Button>
+                                {editElementImagePreview && (
+                                  <img
+                                    src={editElementImagePreview}
+                                    alt="Preview"
+                                    className="w-12 h-12 object-contain rounded border border-border"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsEditElementOpen(false)}>Cancel</Button>
+                          <Button onClick={handleEditElement}>Save Changes</Button>
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
@@ -607,6 +837,14 @@ export default function Themes() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
+                                      onClick={() => openEditDialog(element)}
+                                      title="Edit element"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
                                       disabled={uploadingImage === element.id}
                                       onClick={() => {
                                         if (fileInputRef.current) {
@@ -614,6 +852,7 @@ export default function Themes() {
                                           fileInputRef.current.click();
                                         }
                                       }}
+                                      title="Upload image"
                                     >
                                       <Upload className={`h-4 w-4 ${uploadingImage === element.id ? 'animate-pulse' : ''}`} />
                                     </Button>
@@ -621,6 +860,7 @@ export default function Themes() {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => handleDeleteElement(element.id, element.name)}
+                                      title="Delete element"
                                     >
                                       <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
@@ -695,6 +935,45 @@ export default function Themes() {
                       </DialogContent>
                     </Dialog>
 
+                    {/* Edit Whisp Element Dialog */}
+                    <Dialog open={isEditElementOpen && editingElement?.is_whisp === true} onOpenChange={(open) => {
+                      if (!open) {
+                        setIsEditElementOpen(false);
+                        setEditingElement(null);
+                      }
+                    }}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Whisp Element</DialogTitle>
+                          <DialogDescription>Update whisp details</DialogDescription>
+                        </DialogHeader>
+                        {editingElement && (
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Whisp Word *</Label>
+                              <Input
+                                value={editingElement.name}
+                                onChange={(e) => setEditingElement({ ...editingElement, name: e.target.value })}
+                                placeholder="e.g., Coffee, Lamp, Sofa"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Icon (Emoji)</Label>
+                              <Input
+                                value={editingElement.icon}
+                                onChange={(e) => setEditingElement({ ...editingElement, icon: e.target.value })}
+                                placeholder="☕"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsEditElementOpen(false)}>Cancel</Button>
+                          <Button onClick={handleEditElement}>Save Changes</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
                     <div className="border rounded-md max-h-64 overflow-auto">
                       <Table>
                         <TableHeader>
@@ -718,13 +997,24 @@ export default function Themes() {
                                   {element.name}
                                 </TableCell>
                                 <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteElement(element.id, element.name)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => openEditDialog(element)}
+                                      title="Edit whisp"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteElement(element.id, element.name)}
+                                      title="Delete whisp"
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))
