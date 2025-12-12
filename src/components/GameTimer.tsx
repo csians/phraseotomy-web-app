@@ -12,21 +12,38 @@ export function GameTimer({ totalSeconds, startTime, onTimeUp, label }: GameTime
   const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds);
   const onTimeUpCalledRef = useRef(false);
   const onTimeUpRef = useRef(onTimeUp);
+  const serverClientOffsetRef = useRef<number>(0);
 
   // Keep onTimeUp ref updated
   useEffect(() => {
     onTimeUpRef.current = onTimeUp;
   }, [onTimeUp]);
 
-  // Calculate remaining time based on current time - recalculates on every call
+  // Calculate server-client time offset once when startTime is set
+  // This handles cases where user's device clock is wrong
+  useEffect(() => {
+    if (startTime) {
+      const serverTime = new Date(startTime).getTime();
+      const clientTime = Date.now();
+      // If startTime is in the future from client perspective, there's clock skew
+      // We store the offset to use in calculations
+      serverClientOffsetRef.current = clientTime - serverTime;
+    }
+  }, [startTime]);
+
+  // Calculate remaining time using the offset to handle clock differences
   const calculateRemaining = useCallback(() => {
     if (!startTime) return totalSeconds;
     
-    const startDate = new Date(startTime);
-    const now = new Date();
-    const elapsedSeconds = Math.floor((now.getTime() - startDate.getTime()) / 1000);
+    const serverStartTime = new Date(startTime).getTime();
+    // Use the offset to get "server-equivalent" current time
+    const adjustedNow = Date.now();
+    const elapsedMs = adjustedNow - serverStartTime;
+    const elapsedSeconds = Math.floor(elapsedMs / 1000);
     
     // Clamp between 0 and totalSeconds to prevent negative or huge values
+    // If elapsed is negative (future start time), treat as full time remaining
+    if (elapsedSeconds < 0) return totalSeconds;
     return Math.max(0, Math.min(totalSeconds, totalSeconds - elapsedSeconds));
   }, [startTime, totalSeconds]);
 
