@@ -292,12 +292,14 @@ serve(async (req) => {
           break;
 
         case "game_completed":
-          // Game is over - notify ALL
+          // Game is over - notify ALL with complete player data
           broadcastToAll(sessionId, {
             type: "game_completed",
             winnerId: message.winnerId,
             winnerName: message.winnerName,
+            winnerScore: message.winnerScore,
             finalScores: message.finalScores,
+            players: message.players || [], // Include full players array
             timestamp: new Date().toISOString(),
           });
           break;
