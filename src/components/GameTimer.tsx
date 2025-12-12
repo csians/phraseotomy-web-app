@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Clock } from "lucide-react";
 
 interface GameTimerProps {
@@ -18,20 +18,24 @@ export function GameTimer({ totalSeconds, startTime, onTimeUp, label }: GameTime
     onTimeUpRef.current = onTimeUp;
   }, [onTimeUp]);
 
+  // Calculate remaining time based on current time - recalculates on every call
+  const calculateRemaining = useCallback(() => {
+    if (!startTime) return totalSeconds;
+    
+    const startDate = new Date(startTime);
+    const now = new Date();
+    const elapsedSeconds = Math.floor((now.getTime() - startDate.getTime()) / 1000);
+    
+    // Clamp between 0 and totalSeconds to prevent negative or huge values
+    return Math.max(0, Math.min(totalSeconds, totalSeconds - elapsedSeconds));
+  }, [startTime, totalSeconds]);
+
   useEffect(() => {
     // Reset the called ref when timer resets
     onTimeUpCalledRef.current = false;
 
-    // Calculate initial remaining time based on when the phase started
-    let initialRemaining = totalSeconds;
-    
-    if (startTime) {
-      const startDate = new Date(startTime);
-      const now = new Date();
-      const elapsedSeconds = Math.floor((now.getTime() - startDate.getTime()) / 1000);
-      initialRemaining = Math.max(0, totalSeconds - elapsedSeconds);
-    }
-    
+    // Calculate initial remaining time
+    const initialRemaining = calculateRemaining();
     setRemainingSeconds(initialRemaining);
 
     // If already expired, call onTimeUp immediately
@@ -41,23 +45,38 @@ export function GameTimer({ totalSeconds, startTime, onTimeUp, label }: GameTime
       return;
     }
 
+    // Recalculate from current time on each tick - fixes tab switching issues
     const interval = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          if (!onTimeUpCalledRef.current) {
-            onTimeUpCalledRef.current = true;
-            // Use setTimeout to avoid calling during render
-            setTimeout(() => onTimeUpRef.current?.(), 0);
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
+      const remaining = calculateRemaining();
+      setRemainingSeconds(remaining);
+      
+      if (remaining <= 0 && !onTimeUpCalledRef.current) {
+        clearInterval(interval);
+        onTimeUpCalledRef.current = true;
+        setTimeout(() => onTimeUpRef.current?.(), 0);
+      }
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [totalSeconds, startTime]);
+    // Recalculate immediately when tab becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const remaining = calculateRemaining();
+        setRemainingSeconds(remaining);
+        
+        if (remaining <= 0 && !onTimeUpCalledRef.current) {
+          onTimeUpCalledRef.current = true;
+          setTimeout(() => onTimeUpRef.current?.(), 0);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [totalSeconds, startTime, calculateRemaining]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
