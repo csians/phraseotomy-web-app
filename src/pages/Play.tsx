@@ -182,119 +182,67 @@ const Play = () => {
           body: { sessionToken },
         });
 
-        // Decode session token to get customer info
-        const [payloadB64] = sessionToken.split(".");
-        let payload: { customer_id?: string; shop?: string; exp?: number } | null = null;
-        
-        if (payloadB64) {
-          try {
-            payload = JSON.parse(atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/")));
-          } catch (e) {
-            console.error("Error parsing session token:", e);
-          }
-        }
-
-        // Check if token is expired
-        if (payload?.exp && payload.exp * 1000 < Date.now()) {
-          console.warn("⚠️ Session token expired, redirecting to login");
+        if (customerError || !customerData) {
+          console.warn("⚠️ Invalid session, clearing and redirecting to login");
           localStorage.removeItem("phraseotomy_session_token");
           localStorage.removeItem("customerData");
           navigate("/login", { replace: true });
           return;
         }
 
-        // Map shop domains (handle Shopify internal domain to custom domain mapping)
-        const shopDomainMap: Record<string, string> = {
-          'qxqtbf-21.myshopify.com': 'phraseotomy.com',
-          'phraseotomy.com': 'phraseotomy.com',
-        };
-        const tokenShop = payload?.shop || '';
-        const mappedShop = shopDomainMap[tokenShop] || tokenShop;
+        // Decode session token to get customer info
+        const [payloadB64] = sessionToken.split(".");
+        if (payloadB64) {
+          const payload = JSON.parse(atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/")));
 
-        // Load tenant for this shop - try mapped domain first, then original
-        let dbTenant = null;
-        if (mappedShop) {
-          const { data: tenant1 } = await supabase
-            .from("tenants")
-            .select("id, name, tenant_key, shop_domain, environment")
-            .eq("shop_domain", mappedShop)
-            .eq("is_active", true)
-            .maybeSingle();
-          
-          dbTenant = tenant1;
-          
-          // Try original shop domain if mapping didn't work
-          if (!dbTenant && tokenShop !== mappedShop) {
-            const { data: tenant2 } = await supabase
-              .from("tenants")
-              .select("id, name, tenant_key, shop_domain, environment")
-              .eq("shop_domain", tokenShop)
-              .eq("is_active", true)
-              .maybeSingle();
-            dbTenant = tenant2;
-          }
-        }
-
-        // Parse stored customer data for use regardless of API result
-        let parsedCustomerData: any = null;
-        try {
-          parsedCustomerData = JSON.parse(storedCustomerData);
-        } catch (e) {
-          console.error("Error parsing stored customer data:", e);
-        }
-
-        // If no tenant found and no stored data, redirect to login
-        if (!dbTenant) {
-          if (parsedCustomerData?.customer_id || parsedCustomerData?.id) {
-            console.warn("⚠️ Tenant not found but stored data exists, continuing with limited functionality");
-          } else {
-            console.warn("⚠️ No tenant and no stored customer data, redirecting to login");
+          // Check if token is expired
+          if (payload.exp && payload.exp * 1000 < Date.now()) {
+            console.warn("⚠️ Session token expired, redirecting to login");
             localStorage.removeItem("phraseotomy_session_token");
             localStorage.removeItem("customerData");
             navigate("/login", { replace: true });
             return;
           }
+
+          // Load tenant for this shop
+          if (payload.shop) {
+            const { data: dbTenant } = await supabase
+              .from("tenants")
+              .select("id, name, tenant_key, shop_domain, environment")
+              .eq("shop_domain", payload.shop)
+              .eq("is_active", true)
+              .maybeSingle();
+
+            if (dbTenant) {
+              const mappedTenant: TenantConfig = {
+                id: dbTenant.id,
+                name: dbTenant.name,
+                tenant_key: dbTenant.tenant_key,
+                shop_domain: dbTenant.shop_domain,
+                environment: dbTenant.environment,
+                verified: true,
+              };
+              setTenant(mappedTenant);
+              setShopDomain(dbTenant.shop_domain);
+
+              // Set customer state
+              const parsedCustomerData = JSON.parse(storedCustomerData);
+              const customerObj: ShopifyCustomer = {
+                id: payload.customer_id,
+                email: parsedCustomerData.email || null,
+                firstName: parsedCustomerData.first_name || null,
+                lastName: parsedCustomerData.last_name || null,
+                name: parsedCustomerData.name || null,
+              };
+              setCustomer(customerObj);
+
+              // Store customer in database
+              storeCustomerInDatabase(customerObj, dbTenant.shop_domain, dbTenant.id);
+            }
+          }
+
+          console.log("✅ Session restored successfully");
         }
-
-        if (dbTenant) {
-          const mappedTenant: TenantConfig = {
-            id: dbTenant.id,
-            name: dbTenant.name,
-            tenant_key: dbTenant.tenant_key,
-            shop_domain: dbTenant.shop_domain,
-            environment: dbTenant.environment,
-            verified: true,
-          };
-          setTenant(mappedTenant);
-          setShopDomain(dbTenant.shop_domain);
-
-          // Set customer state - prefer API data, fallback to stored data
-          const customerId = payload?.customer_id || parsedCustomerData?.customer_id || parsedCustomerData?.id;
-          const customerObj: ShopifyCustomer = {
-            id: customerId,
-            email: customerData?.customer?.email || parsedCustomerData?.email || null,
-            firstName: customerData?.customer?.first_name || parsedCustomerData?.first_name || null,
-            lastName: customerData?.customer?.last_name || parsedCustomerData?.last_name || null,
-            name: customerData?.customer?.name || parsedCustomerData?.name || null,
-          };
-          setCustomer(customerObj);
-
-          // Store customer in database
-          storeCustomerInDatabase(customerObj, dbTenant.shop_domain, dbTenant.id);
-        } else if (parsedCustomerData) {
-          // No tenant but we have stored data - set customer from stored data
-          const customerId = parsedCustomerData.customer_id || parsedCustomerData.id;
-          const customerObj: ShopifyCustomer = {
-            id: customerId,
-            email: parsedCustomerData.email || null,
-            firstName: parsedCustomerData.first_name || null,
-            lastName: parsedCustomerData.last_name || null,
-            name: parsedCustomerData.name || null,
-          };
-          setCustomer(customerObj);
-        }
-
-        console.log("✅ Session restored successfully");
       } catch (error) {
         console.error("Error restoring session:", error);
         localStorage.removeItem("phraseotomy_session_token");

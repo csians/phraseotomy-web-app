@@ -10,10 +10,10 @@ interface DebugInfoProps {
 
 export const DebugInfo = ({ tenant, shopDomain, customer, backendConnected = true }: DebugInfoProps) => {
   const appEnv = import.meta.env.VITE_APP_ENV || "development";
-
+  
   return (
     <Card className="bg-black/80 border-yellow-500/30 backdrop-blur-sm">
-      {/* <div className="p-4 space-y-2 text-sm">
+      <div className="p-4 space-y-2 text-sm">
         <div className="flex justify-between items-center">
           <span className="text-yellow-500 font-semibold">Environment:</span>
           <span className="text-yellow-400 uppercase font-mono">{appEnv}</span>
@@ -44,7 +44,7 @@ export const DebugInfo = ({ tenant, shopDomain, customer, backendConnected = tru
             </span>
           </div>
         )}
-      </div> */}
+      </div>
     </Card>
   );
 };
