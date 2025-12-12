@@ -919,14 +919,6 @@ export default function Themes() {
                               placeholder="e.g., Coffee, Lamp, Sofa"
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Icon (Emoji)</Label>
-                            <Input
-                              value={newElement.icon}
-                              onChange={(e) => setNewElement({ ...newElement, icon: e.target.value })}
-                              placeholder="☕"
-                            />
-                          </div>
                         </div>
                         <DialogFooter>
                           <Button variant="outline" onClick={() => setIsAddElementOpen(false)}>Cancel</Button>
@@ -957,14 +949,6 @@ export default function Themes() {
                                 placeholder="e.g., Coffee, Lamp, Sofa"
                               />
                             </div>
-                            <div className="space-y-2">
-                              <Label>Icon (Emoji)</Label>
-                              <Input
-                                value={editingElement.icon}
-                                onChange={(e) => setEditingElement({ ...editingElement, icon: e.target.value })}
-                                placeholder="☕"
-                              />
-                            </div>
                           </div>
                         )}
                         <DialogFooter>
@@ -993,7 +977,6 @@ export default function Themes() {
                             elements.filter(e => e.is_whisp).map(element => (
                               <TableRow key={element.id}>
                                 <TableCell className="font-medium">
-                                  <span className="mr-2">{element.icon}</span>
                                   {element.name}
                                 </TableCell>
                                 <TableCell>
