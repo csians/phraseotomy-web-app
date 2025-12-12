@@ -3,7 +3,15 @@ import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,7 +33,7 @@ const extractShopFromHost = (host: string | null): string | null => {
     const shopMatch = decoded.match(/([a-zA-Z0-9-]+\.myshopify\.com)/);
     return shopMatch ? shopMatch[1] : null;
   } catch (e) {
-    console.error('Error decoding host parameter:', e);
+    console.error("Error decoding host parameter:", e);
     return null;
   }
 };
@@ -49,38 +57,38 @@ interface ThemePack {
 
 export default function Packs() {
   const [searchParams] = useSearchParams();
-  
+
   // Get shop from multiple sources
   const shopDomain = useMemo(() => {
-    const shopParam = searchParams.get('shop');
+    const shopParam = searchParams.get("shop");
     if (shopParam) return shopParam;
-    
+
     const allParams = getAllUrlParams();
-    const shopFromAll = allParams.get('shop');
+    const shopFromAll = allParams.get("shop");
     if (shopFromAll) return shopFromAll;
-    
-    const hostParam = allParams.get('host');
+
+    const hostParam = allParams.get("host");
     const shopFromHost = extractShopFromHost(hostParam);
     if (shopFromHost) return shopFromHost;
-    
-    return 'testing-cs-store.myshopify.com';
+
+    return "testing-cs-store.myshopify.com";
   }, [searchParams]);
-  
+
   const { tenant, loading: tenantLoading, error: tenantError } = useTenant(shopDomain);
-  
+
   const [packs, setPacks] = useState<Pack[]>([]);
   const [themePacks, setThemePacks] = useState<ThemePack[]>([]);
   const [coreThemes, setCoreThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newPack, setNewPack] = useState({ name: "", description: "" });
-  
+
   // Theme management modal state
   const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [selectedThemeToAdd, setSelectedThemeToAdd] = useState<string>("");
   const [allThemes, setAllThemes] = useState<Theme[]>([]);
-  
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -91,35 +99,28 @@ export default function Packs() {
 
   const loadPacks = async () => {
     if (!tenant?.id) return;
-    
+
     setLoading(true);
     try {
       const [packsRes, themesRes, themePacksRes] = await Promise.all([
-        supabase
-          .from("packs")
-          .select("*")
-          .eq("tenant_id", tenant.id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("themes")
-          .select("id, name, icon, is_core, pack_id")
-          .order("name"),
-        supabase
-          .from("theme_packs")
-          .select("id, theme_id, pack_id, theme:themes(id, name, icon, is_core, pack_id)")
+        supabase.from("packs").select("*").eq("tenant_id", tenant.id).order("created_at", { ascending: false }),
+        supabase.from("themes").select("id, name, icon, is_core, pack_id").order("name"),
+        supabase.from("theme_packs").select("id, theme_id, pack_id, theme:themes(id, name, icon, is_core, pack_id)"),
       ]);
 
       if (packsRes.error) throw packsRes.error;
       if (themesRes.error) throw themesRes.error;
       if (themePacksRes.error) throw themePacksRes.error;
-      
+
       setPacks(packsRes.data || []);
       setAllThemes(themesRes.data || []);
-      setThemePacks((themePacksRes.data || []).map(tp => ({
-        ...tp,
-        theme: tp.theme as unknown as Theme
-      })));
-      setCoreThemes((themesRes.data || []).filter(t => t.is_core));
+      setThemePacks(
+        (themePacksRes.data || []).map((tp) => ({
+          ...tp,
+          theme: tp.theme as unknown as Theme,
+        })),
+      );
+      setCoreThemes((themesRes.data || []).filter((t) => t.is_core));
     } catch (error) {
       toast({
         title: "Error loading packs",
@@ -132,7 +133,7 @@ export default function Packs() {
   };
 
   const getThemesForPack = (packId: string) => {
-    return themePacks.filter(tp => tp.pack_id === packId).map(tp => tp.theme);
+    return themePacks.filter((tp) => tp.pack_id === packId).map((tp) => tp.theme);
   };
 
   const handleAddPack = async () => {
@@ -147,7 +148,7 @@ export default function Packs() {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-create-pack', {
+      const { data, error } = await supabase.functions.invoke("admin-create-pack", {
         body: {
           tenant_id: tenant.id,
           name: newPack.name.trim(),
@@ -177,12 +178,16 @@ export default function Packs() {
 
   const handleDeletePack = async (packId: string, packName: string) => {
     if (!tenant?.id) return;
-    if (!confirm(`Are you sure you want to delete pack "${packName}"? This will also remove it from all associated codes.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete pack "${packName}"? This will also remove it from all associated codes.`,
+      )
+    ) {
       return;
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-delete-pack', {
+      const { data, error } = await supabase.functions.invoke("admin-delete-pack", {
         body: {
           pack_id: packId,
           tenant_id: tenant.id,
@@ -217,10 +222,8 @@ export default function Packs() {
   // Get available themes (not already assigned to this pack)
   const getAvailableThemes = () => {
     if (!selectedPack) return [];
-    const assignedThemeIds = themePacks
-      .filter(tp => tp.pack_id === selectedPack.id)
-      .map(tp => tp.theme_id);
-    return allThemes.filter(t => !assignedThemeIds.includes(t.id));
+    const assignedThemeIds = themePacks.filter((tp) => tp.pack_id === selectedPack.id).map((tp) => tp.theme_id);
+    return allThemes.filter((t) => !assignedThemeIds.includes(t.id));
   };
 
   const handleAssignTheme = async () => {
@@ -231,17 +234,17 @@ export default function Packs() {
 
     try {
       // Use edge function to bypass RLS
-      const { data, error } = await supabase.functions.invoke('admin-manage-theme-packs', {
+      const { data, error } = await supabase.functions.invoke("admin-manage-theme-packs", {
         body: {
-          action: 'add',
+          action: "add",
           theme_id: selectedThemeToAdd,
-          pack_id: selectedPack.id
-        }
+          pack_id: selectedPack.id,
+        },
       });
-      
+
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      
+
       toast({ title: "Theme assigned to pack" });
       setSelectedThemeToAdd("");
       loadPacks();
@@ -260,17 +263,17 @@ export default function Packs() {
 
     try {
       // Use edge function to bypass RLS
-      const { data, error } = await supabase.functions.invoke('admin-manage-theme-packs', {
+      const { data, error } = await supabase.functions.invoke("admin-manage-theme-packs", {
         body: {
-          action: 'remove',
+          action: "remove",
           theme_id: themeId,
-          pack_id: selectedPack.id
-        }
+          pack_id: selectedPack.id,
+        },
       });
-      
+
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      
+
       toast({ title: "Theme removed from pack" });
       loadPacks();
     } catch (error) {
@@ -318,9 +321,7 @@ export default function Packs() {
             </Link>
             <div>
               <h1 className="text-3xl font-bold text-foreground">Game Packs</h1>
-              <p className="text-muted-foreground mt-1">
-                {tenant.name} - Manage game packs and content
-              </p>
+              <p className="text-muted-foreground mt-1">{tenant.name} - Manage game packs and content</p>
             </div>
           </div>
         </div>
@@ -328,157 +329,155 @@ export default function Packs() {
         <Card>
           <CardHeader>
             <CardTitle>All Packs</CardTitle>
-            <CardDescription>
-              Manage game packs for {tenant.shop_domain}
-            </CardDescription>
+            <CardDescription>Manage game packs for {tenant.shop_domain}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
-            <Button onClick={loadPacks} variant="outline" disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={loadPacks} variant="outline" disabled={loading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
 
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Pack
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Pack</DialogTitle>
-                  <DialogDescription>Create a new game pack</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Pack Name *</Label>
-                    <Input
-                      id="name"
-                      value={newPack.name}
-                      onChange={(e) => setNewPack({ ...newPack, name: e.target.value })}
-                      placeholder="e.g., base, expansion1, premium"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={newPack.description}
-                      onChange={(e) => setNewPack({ ...newPack, description: e.target.value })}
-                      placeholder="Optional description"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                    Cancel
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Pack
                   </Button>
-                  <Button onClick={handleAddPack}>Create Pack</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Core/Base Themes Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Base Game Themes
-              </h3>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Pack</DialogTitle>
+                    <DialogDescription>Create a new game pack</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Pack Name *</Label>
+                      <Input
+                        id="name"
+                        value={newPack.name}
+                        onChange={(e) => setNewPack({ ...newPack, name: e.target.value })}
+                        placeholder="e.g., base, expansion1, premium"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={newPack.description}
+                        onChange={(e) => setNewPack({ ...newPack, description: e.target.value })}
+                        placeholder="Optional description"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleAddPack}>Create Pack</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-            <div className="flex flex-wrap gap-2 p-4 bg-muted/50 rounded-lg border">
-              {coreThemes.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No core themes configured yet</p>
-              ) : (
-                coreThemes.map(theme => (
-                  <Badge key={theme.id} variant="secondary" className="text-sm py-1 px-3">
-                    <span className="mr-1">{theme.icon}</span>
-                    {theme.name}
-                  </Badge>
-                ))
-              )}
-            </div>
-          </div>
 
-          {/* Packs Table */}
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pack Name</TableHead>
-                  <TableHead>Themes</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="w-32">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center">
-                      Loading...
-                    </TableCell>
-                  </TableRow>
-                ) : packs.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No packs found. Create your first pack above.
-                    </TableCell>
-                  </TableRow>
+            {/* Core/Base Themes Section */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Palette className="h-5 w-5" />
+                  Base Game Themes
+                </h3>
+              </div>
+              <div className="flex flex-wrap gap-2 p-4 bg-muted/50 rounded-lg border">
+                {coreThemes.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No core themes configured yet</p>
                 ) : (
-                  packs.map((pack) => {
-                    const packThemesList = getThemesForPack(pack.id);
-                    return (
-                      <TableRow key={pack.id}>
-                        <TableCell className="font-medium">{pack.name}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {packThemesList.length === 0 ? (
-                              <span className="text-muted-foreground text-sm">No themes</span>
-                            ) : (
-                              packThemesList.map(theme => (
-                                <Badge key={theme.id} variant="outline" className="text-xs">
-                                  <span className="mr-1">{theme.icon}</span>
-                                  {theme.name}
-                                </Badge>
-                              ))
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{pack.description || "-"}</TableCell>
-                        <TableCell>{new Date(pack.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              title="Manage Themes"
-                              onClick={() => openThemeModal(pack)}
-                            >
-                              <Settings className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeletePack(pack.id, pack.name)}
-                              title="Delete Pack"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                  coreThemes.map((theme) => (
+                    <Badge key={theme.id} variant="secondary" className="text-sm py-1 px-3">
+                      <span className="mr-1">{theme.icon}</span>
+                      {theme.name}
+                    </Badge>
+                  ))
                 )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+              </div>
+            </div>
+
+            {/* Packs Table */}
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Pack Name</TableHead>
+                    <TableHead>Themes</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="w-32">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">
+                        Loading...
+                      </TableCell>
+                    </TableRow>
+                  ) : packs.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        No packs found. Create your first pack above.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    packs.map((pack) => {
+                      const packThemesList = getThemesForPack(pack.id);
+                      return (
+                        <TableRow key={pack.id}>
+                          <TableCell className="font-medium">{pack.name}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {packThemesList.length === 0 ? (
+                                <span className="text-muted-foreground text-sm">No themes</span>
+                              ) : (
+                                packThemesList.map((theme) => (
+                                  <Badge key={theme.id} variant="outline" className="text-xs">
+                                    <span className="mr-1">{theme.icon}</span>
+                                    {theme.name}
+                                  </Badge>
+                                ))
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{pack.description || "-"}</TableCell>
+                          <TableCell>{new Date(pack.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Manage Themes"
+                                onClick={() => openThemeModal(pack)}
+                              >
+                                <Settings className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeletePack(pack.id, pack.name)}
+                                title="Delete Pack"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Theme Management Modal */}
@@ -489,11 +488,9 @@ export default function Packs() {
               <Palette className="h-5 w-5" />
               Manage Themes - {selectedPack?.name}
             </DialogTitle>
-            <DialogDescription>
-              Add, edit or delete themes for this pack
-            </DialogDescription>
+            <DialogDescription>Add, edit or delete themes for this pack</DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Add theme dropdown */}
             <div className="flex gap-2 items-end">
@@ -505,11 +502,13 @@ export default function Packs() {
                   </SelectTrigger>
                   <SelectContent>
                     {getAvailableThemes().length === 0 ? (
-                      <SelectItem value="none" disabled>No available themes</SelectItem>
+                      <SelectItem value="none" disabled>
+                        No available themes
+                      </SelectItem>
                     ) : (
-                      getAvailableThemes().map(theme => (
+                      getAvailableThemes().map((theme) => (
                         <SelectItem key={theme.id} value={theme.id}>
-                          <span className="mr-2">{theme.icon}</span>
+                          {/* <span className="mr-2">{theme.icon}</span> */}
                           {theme.name}
                         </SelectItem>
                       ))
@@ -522,7 +521,7 @@ export default function Packs() {
                 Add
               </Button>
             </div>
-            
+
             <div className="border rounded-md max-h-80 overflow-auto">
               <Table>
                 <TableHeader>
@@ -540,7 +539,7 @@ export default function Packs() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    packThemes.map(theme => (
+                    packThemes.map((theme) => (
                       <TableRow key={theme.id}>
                         <TableCell className="text-2xl">{theme.icon}</TableCell>
                         <TableCell className="font-medium">{theme.name}</TableCell>
@@ -561,7 +560,7 @@ export default function Packs() {
               </Table>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsThemeModalOpen(false)}>
               Close
