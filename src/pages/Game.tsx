@@ -614,6 +614,19 @@ export default function Game() {
       .on(
         "postgres_changes",
         {
+          event: "DELETE",
+          schema: "public",
+          table: "game_players",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          console.log("Player deleted from game, refreshing...");
+          debouncedRefresh();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
           event: "INSERT",
           schema: "public",
           table: "game_guesses",
@@ -626,6 +639,21 @@ export default function Game() {
           debouncedRefresh();
         },
       )
+      .on("broadcast", { event: "lobby_ended" }, () => {
+        toast({
+          title: "Game Ended",
+          description: "The host has ended this game",
+        });
+        navigate("/login", { replace: true });
+      })
+      .on("broadcast", { event: "player_left" }, (payload) => {
+        const leftPlayerName = payload.payload?.senderName || "A player";
+        toast({
+          title: "Player Left",
+          description: `${leftPlayerName} left the game`,
+        });
+        debouncedRefresh();
+      })
       .subscribe();
 
     return () => {

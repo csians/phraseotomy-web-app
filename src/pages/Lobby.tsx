@@ -1129,7 +1129,17 @@ export default function Lobby() {
 
     try {
       // Broadcast lobby_ended to all players via Supabase Broadcast BEFORE deleting
+      // Broadcast to both lobby and game channels to cover all players
       broadcastEvent("lobby_ended", {});
+      
+      // Also broadcast to game channel for players who are on the game page
+      const gameChannel = supabase.channel(`game-${sessionId}`);
+      await gameChannel.send({
+        type: "broadcast",
+        event: "lobby_ended",
+        payload: { sessionId, timestamp: new Date().toISOString() },
+      });
+      supabase.removeChannel(gameChannel);
 
       const { data, error } = await supabase.functions.invoke("end-lobby", {
         body: {
@@ -1190,6 +1200,15 @@ export default function Lobby() {
       
       // Broadcast AFTER successful deletion so other players see updated data
       broadcastEvent("player_left", { playerId, senderName: playerNameToSend, timestamp: Date.now() });
+      
+      // Also broadcast to game channel for players on game page
+      const gameChannel = supabase.channel(`game-${sessionId}`);
+      await gameChannel.send({
+        type: "broadcast",
+        event: "player_left",
+        payload: { playerId, senderName: playerNameToSend, timestamp: Date.now() },
+      });
+      supabase.removeChannel(gameChannel);
 
       if (error) {
         console.error("Error leaving lobby:", error);
@@ -1264,6 +1283,15 @@ export default function Lobby() {
       
       // Broadcast AFTER deletion so other players see updated data
       broadcastEvent("player_left", { playerId, senderName: playerNameToSend, timestamp: Date.now() });
+      
+      // Also broadcast to game channel for players on game page
+      const gameChannel = supabase.channel(`game-${sessionId}`);
+      await gameChannel.send({
+        type: "broadcast",
+        event: "player_left",
+        payload: { playerId, senderName: playerNameToSend, timestamp: Date.now() },
+      });
+      supabase.removeChannel(gameChannel);
 
       // Clear session storage
       sessionStorage.removeItem("current_lobby_session");
