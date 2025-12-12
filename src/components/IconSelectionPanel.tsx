@@ -16,82 +16,15 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  Briefcase, Home, Plane, Bike, Wine, Rocket, Skull, Sparkles,
-  Coffee, Users, Clock, Crown, Mail, TrendingUp, Dog, Flower,
-  Sofa, Utensils, Mountain, Camera, Compass, Map, Umbrella,
-  Sun, Heart, Star, Music, Book, Gift, Lightbulb, Palette,
-  Gamepad2, Headphones, Smartphone, Laptop, Watch, Glasses,
-  Shirt, ShoppingBag, Car, Bus, Train, Anchor, Building,
-  TreePine, Cloud, Zap, Moon, Flame, Droplet, Leaf, Bug,
-  Fish, Bird, Cat, Rabbit, GripVertical, Volume2, LucideIcon,
-} from "lucide-react";
+import { GripVertical, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// Icon mapping for dynamic icon rendering
-const iconMap: Record<string, LucideIcon> = {
-  briefcase: Briefcase,
-  home: Home,
-  plane: Plane,
-  bike: Bike,
-  wine: Wine,
-  rocket: Rocket,
-  skull: Skull,
-  sparkles: Sparkles,
-  coffee: Coffee,
-  users: Users,
-  clock: Clock,
-  crown: Crown,
-  mail: Mail,
-  "trending-up": TrendingUp,
-  dog: Dog,
-  flower: Flower,
-  sofa: Sofa,
-  utensils: Utensils,
-  mountain: Mountain,
-  camera: Camera,
-  compass: Compass,
-  map: Map,
-  umbrella: Umbrella,
-  sun: Sun,
-  heart: Heart,
-  star: Star,
-  music: Music,
-  book: Book,
-  gift: Gift,
-  lightbulb: Lightbulb,
-  palette: Palette,
-  gamepad2: Gamepad2,
-  headphones: Headphones,
-  smartphone: Smartphone,
-  laptop: Laptop,
-  watch: Watch,
-  glasses: Glasses,
-  shirt: Shirt,
-  "shopping-bag": ShoppingBag,
-  car: Car,
-  bus: Bus,
-  train: Train,
-  anchor: Anchor,
-  building: Building,
-  "tree-pine": TreePine,
-  cloud: Cloud,
-  zap: Zap,
-  moon: Moon,
-  flame: Flame,
-  droplet: Droplet,
-  leaf: Leaf,
-  bug: Bug,
-  fish: Fish,
-  bird: Bird,
-  cat: Cat,
-  rabbit: Rabbit,
-};
 
 export interface IconItem {
   id: string;
   name: string;
   icon: string;
+  image_url?: string;
+  color?: string;
   isFromCore: boolean;
 }
 
@@ -118,7 +51,8 @@ function SortableIcon({ icon, isDraggable, index }: SortableIconProps) {
     zIndex: isDragging ? 10 : 1,
   };
 
-  const IconComponent = iconMap[icon.icon] || Sparkles;
+  // Determine background color - use element's color or fallback
+  const bgColor = icon.color || (icon.isFromCore ? "#8B5CF6" : "#6B7280");
 
   return (
     <div
@@ -147,14 +81,21 @@ function SortableIcon({ icon, isDraggable, index }: SortableIconProps) {
         {index + 1}
       </div>
       
-      <div className={cn(
-        "h-16 w-16 rounded-full flex items-center justify-center",
-        icon.isFromCore ? "bg-primary/10" : "bg-secondary/50"
-      )}>
-        <IconComponent className={cn(
-          "h-8 w-8",
-          icon.isFromCore ? "text-primary" : "text-foreground"
-        )} />
+      {/* Display SVG image with color background, or fallback to Sparkles icon */}
+      <div 
+        className="h-16 w-16 rounded-full flex items-center justify-center overflow-hidden"
+        style={{ backgroundColor: bgColor }}
+      >
+        {icon.image_url ? (
+          <img 
+            src={icon.image_url} 
+            alt={icon.name}
+            className="h-10 w-10 object-contain"
+            style={{ filter: "brightness(0) invert(1)" }}
+          />
+        ) : (
+          <Sparkles className="h-8 w-8 text-white" />
+        )}
       </div>
       
       <span className="text-sm font-medium text-center">{icon.name}</span>

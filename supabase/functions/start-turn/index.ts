@@ -77,11 +77,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get elements from the selected theme (for the 3 theme icons)
+    // Get visual elements from the selected theme (for the 3 theme icons)
+    // Only fetch non-whisp elements (visual elements with images)
     const { data: themeElements, error: themeElementsError } = await supabase
       .from("elements")
-      .select("id, name, icon")
-      .eq("theme_id", themeId);
+      .select("id, name, icon, image_url, color")
+      .eq("theme_id", themeId)
+      .eq("is_whisp", false);
 
     if (themeElementsError) {
       console.error("Error fetching theme elements:", themeElementsError);
@@ -102,8 +104,9 @@ Deno.serve(async (req) => {
       const coreThemeIds = coreThemes.map(t => t.id);
       const { data: elements, error: elementsError } = await supabase
         .from("elements")
-        .select("id, name, icon, theme_id")
-        .in("theme_id", coreThemeIds);
+        .select("id, name, icon, image_url, color, theme_id")
+        .in("theme_id", coreThemeIds)
+        .eq("is_whisp", false);
 
       if (!elementsError && elements) {
         // Exclude elements from the currently selected theme to avoid duplicates
@@ -137,26 +140,27 @@ Deno.serve(async (req) => {
     console.log("Theme elements:", selectedThemeElements.map(e => e.name));
     console.log("Core elements:", selectedCoreElements.map(e => e.name));
 
-    // Pick a random element from the theme as the whisp
+    // Pick a random whisp element from the theme
     console.log("Selecting whisp from theme elements:", theme.name);
     
-    // Get all elements for this theme to pick a random one as whisp
-    const { data: allThemeElements, error: allElementsError } = await supabase
+    // Get only whisp elements for this theme (is_whisp = true)
+    const { data: whispElements, error: whispError } = await supabase
       .from("elements")
       .select("id, name")
-      .eq("theme_id", themeId);
+      .eq("theme_id", themeId)
+      .eq("is_whisp", true);
 
-    if (allElementsError || !allThemeElements || allThemeElements.length === 0) {
-      console.error("No elements found for theme:", themeId);
+    if (whispError || !whispElements || whispElements.length === 0) {
+      console.error("No whisp elements found for theme:", themeId);
       return new Response(
-        JSON.stringify({ error: "No elements found for this theme" }),
+        JSON.stringify({ error: "No whisp elements found for this theme" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Pick a random element as the whisp
-    const randomIndex = Math.floor(Math.random() * allThemeElements.length);
-    const whispElement = allThemeElements[randomIndex];
+    // Pick a random whisp element
+    const randomIndex = Math.floor(Math.random() * whispElements.length);
+    const whispElement = whispElements[randomIndex];
     const generatedWhisp = whispElement.name;
     console.log("Selected whisp from database:", generatedWhisp);
 
