@@ -305,24 +305,49 @@ export default function Game() {
           break;
 
       case "game_completed":
-          // Use fresh players from message if available, otherwise use current state
-          const playersForCompletion = message.players && message.players.length > 0 
-            ? message.players 
-            : players;
+          console.log("🎉 Received game_completed event:", message);
           
-          // Update players state with latest data
-          if (message.players && message.players.length > 0) {
-            setPlayers(message.players);
-          }
+          // Fetch latest players from database to ensure we have accurate scores
+          const fetchAndShowWinner = async () => {
+            try {
+              const { data: latestPlayers } = await supabase
+                .from("game_players")
+                .select("id, player_id, name, score, turn_order")
+                .eq("session_id", sessionId)
+                .order("score", { ascending: false });
+              
+              const playersForCompletion = (latestPlayers && latestPlayers.length > 0) 
+                ? latestPlayers 
+                : (message.players && message.players.length > 0 ? message.players : players);
+              
+              console.log("🏆 Players for completion:", playersForCompletion);
+              
+              // Update players state with latest data
+              setPlayers(playersForCompletion);
+              
+              // Find the winner
+              const sortedPlayers = [...playersForCompletion].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
+              const winner = sortedPlayers[0] || null;
+              setGameWinner(winner);
+              setGameCompleted(true);
+              
+              // Fetch lifetime points for all players
+              fetchLifetimePoints(playersForCompletion);
+            } catch (err) {
+              console.error("Error fetching players for game completion:", err);
+              // Fallback to message data
+              const playersForCompletion = message.players && message.players.length > 0 
+                ? message.players 
+                : players;
+              setPlayers(playersForCompletion);
+              const sortedPlayers = [...playersForCompletion].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
+              setGameWinner(sortedPlayers[0] || null);
+              setGameCompleted(true);
+              fetchLifetimePoints(playersForCompletion);
+            }
+          };
           
-          // Find the winner
-          const sortedPlayers = [...playersForCompletion].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-          const winner = sortedPlayers[0] || null;
-          setGameWinner(winner);
-          setGameCompleted(true);
-          
-          // Fetch lifetime points for all players
-          fetchLifetimePoints(playersForCompletion);
+          fetchAndShowWinner();
 
           supabase
             .from("game_sessions")
@@ -584,12 +609,40 @@ export default function Game() {
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "UPDATE",
           schema: "public",
           table: "game_sessions",
           filter: `id=eq.${sessionId}`,
         },
-        () => debouncedRefresh(),
+        (payload) => {
+          // Check if game was just completed - show winner popup for everyone
+          const newStatus = (payload.new as any)?.status;
+          if (newStatus === "completed" || newStatus === "expired") {
+            console.log("🎉 Game session status changed to:", newStatus);
+            // Fetch latest players and show completion dialog
+            const fetchAndShowCompletion = async () => {
+              try {
+                const { data: latestPlayers } = await supabase
+                  .from("game_players")
+                  .select("id, player_id, name, score, turn_order")
+                  .eq("session_id", sessionId)
+                  .order("score", { ascending: false });
+                
+                if (latestPlayers && latestPlayers.length > 0) {
+                  setPlayers(latestPlayers);
+                  setGameWinner(latestPlayers[0] || null);
+                  setGameCompleted(true);
+                  fetchLifetimePoints(latestPlayers);
+                }
+              } catch (err) {
+                console.error("Error fetching players for completion:", err);
+              }
+            };
+            fetchAndShowCompletion();
+          } else {
+            debouncedRefresh();
+          }
+        },
       )
       .on(
         "postgres_changes",
