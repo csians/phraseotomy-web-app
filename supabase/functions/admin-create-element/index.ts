@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { name, icon, theme_id } = await req.json();
+    const { name, icon, theme_id, color, is_whisp } = await req.json();
 
     if (!name || !theme_id) {
       return new Response(
@@ -30,7 +30,9 @@ Deno.serve(async (req) => {
       .insert({
         name,
         icon: icon || "🔮",
-        theme_id
+        theme_id,
+        color: color || null,
+        is_whisp: is_whisp || false
       })
       .select()
       .single();

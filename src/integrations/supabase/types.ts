@@ -217,26 +217,32 @@ export type Database = {
       }
       elements: {
         Row: {
+          color: string | null
           created_at: string
           icon: string
           id: string
           image_url: string | null
+          is_whisp: boolean
           name: string
           theme_id: string | null
         }
         Insert: {
+          color?: string | null
           created_at?: string
           icon: string
           id?: string
           image_url?: string | null
+          is_whisp?: boolean
           name: string
           theme_id?: string | null
         }
         Update: {
+          color?: string | null
           created_at?: string
           icon?: string
           id?: string
           image_url?: string | null
+          is_whisp?: boolean
           name?: string
           theme_id?: string | null
         }

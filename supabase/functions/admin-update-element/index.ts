@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { element_id, name, icon, image_url } = await req.json();
+    const { element_id, name, icon, image_url, color, is_whisp } = await req.json();
 
     if (!element_id) {
       return new Response(
@@ -25,10 +25,12 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const updates: Record<string, string> = {};
+    const updates: Record<string, any> = {};
     if (name !== undefined) updates.name = name;
     if (icon !== undefined) updates.icon = icon;
     if (image_url !== undefined) updates.image_url = image_url;
+    if (color !== undefined) updates.color = color;
+    if (is_whisp !== undefined) updates.is_whisp = is_whisp;
 
     if (Object.keys(updates).length === 0) {
       return new Response(

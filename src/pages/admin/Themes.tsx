@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Plus, Trash2, ArrowLeft, Upload, Image, Palette } from "lucide-react";
+import { RefreshCw, Plus, Trash2, ArrowLeft, Upload, Image, Palette, Type, Pencil } from "lucide-react";
 import { useTenant } from "@/hooks/useTenant";
 import { getAllUrlParams } from "@/lib/urlUtils";
 
@@ -27,6 +27,8 @@ interface Element {
   name: string;
   icon: string;
   image_url: string | null;
+  color: string | null;
+  is_whisp: boolean;
   theme_id: string | null;
   created_at: string;
 }
@@ -75,7 +77,7 @@ export default function Themes() {
   const [isAddThemeOpen, setIsAddThemeOpen] = useState(false);
   const [isAddElementOpen, setIsAddElementOpen] = useState(false);
   const [newTheme, setNewTheme] = useState({ name: "", icon: "🎮", pack_id: "", is_core: false });
-  const [newElement, setNewElement] = useState({ name: "", icon: "🔮" });
+  const [newElement, setNewElement] = useState({ name: "", icon: "🔮", color: "#6366f1", is_whisp: false });
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -203,6 +205,8 @@ export default function Themes() {
         body: {
           name: newElement.name.trim(),
           icon: newElement.icon,
+          color: newElement.is_whisp ? null : newElement.color,
+          is_whisp: newElement.is_whisp,
           theme_id: selectedTheme.id
         }
       });
@@ -211,7 +215,7 @@ export default function Themes() {
       
       toast({ title: "Element created" });
       setIsAddElementOpen(false);
-      setNewElement({ name: "", icon: "🔮" });
+      setNewElement({ name: "", icon: "🔮", color: "#6366f1", is_whisp: false });
       loadElements(selectedTheme.id);
     } catch (error) {
       toast({
@@ -486,15 +490,25 @@ export default function Themes() {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Add New Element</DialogTitle>
-                        <DialogDescription>Add a whisp element to {selectedTheme.name}</DialogDescription>
+                        <DialogDescription>Add an element to {selectedTheme.name}</DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="is_whisp"
+                            checked={newElement.is_whisp}
+                            onChange={(e) => setNewElement({ ...newElement, is_whisp: e.target.checked })}
+                            className="rounded border-border"
+                          />
+                          <Label htmlFor="is_whisp">Whisp Element (text-only, no SVG)</Label>
+                        </div>
                         <div className="space-y-2">
-                          <Label>Element Name (Whisp) *</Label>
+                          <Label>Element Name *</Label>
                           <Input
                             value={newElement.name}
                             onChange={(e) => setNewElement({ ...newElement, name: e.target.value })}
-                            placeholder="e.g., Coffee, Lamp, Sofa"
+                            placeholder={newElement.is_whisp ? "e.g., Coffee, Lamp, Sofa" : "e.g., Sun, Moon, Star"}
                           />
                         </div>
                         <div className="space-y-2">
@@ -505,6 +519,25 @@ export default function Themes() {
                             placeholder="☕"
                           />
                         </div>
+                        {!newElement.is_whisp && (
+                          <div className="space-y-2">
+                            <Label>Color</Label>
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="color"
+                                value={newElement.color}
+                                onChange={(e) => setNewElement({ ...newElement, color: e.target.value })}
+                                className="w-10 h-10 rounded cursor-pointer border border-border"
+                              />
+                              <Input
+                                value={newElement.color}
+                                onChange={(e) => setNewElement({ ...newElement, color: e.target.value })}
+                                placeholder="#6366f1"
+                                className="flex-1"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setIsAddElementOpen(false)}>Cancel</Button>
@@ -533,6 +566,8 @@ export default function Themes() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Element</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Color</TableHead>
                           <TableHead>Image</TableHead>
                           <TableHead className="w-32">Actions</TableHead>
                         </TableRow>
@@ -540,7 +575,7 @@ export default function Themes() {
                       <TableBody>
                         {elements.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                            <TableCell colSpan={5} className="text-center text-muted-foreground">
                               No elements yet
                             </TableCell>
                           </TableRow>
@@ -550,6 +585,32 @@ export default function Themes() {
                               <TableCell className="font-medium">
                                 <span className="mr-2">{element.icon}</span>
                                 {element.name}
+                              </TableCell>
+                              <TableCell>
+                                {element.is_whisp ? (
+                                  <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                                    <Type className="h-3 w-3" />
+                                    Whisp
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                    <Image className="h-3 w-3" />
+                                    Visual
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {element.color ? (
+                                  <div className="flex items-center gap-2">
+                                    <div 
+                                      className="w-6 h-6 rounded border border-border"
+                                      style={{ backgroundColor: element.color }}
+                                    />
+                                    <span className="text-xs text-muted-foreground">{element.color}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">-</span>
+                                )}
                               </TableCell>
                               <TableCell>
                                 {element.image_url ? (
@@ -564,19 +625,21 @@ export default function Themes() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    disabled={uploadingImage === element.id}
-                                    onClick={() => {
-                                      if (fileInputRef.current) {
-                                        fileInputRef.current.dataset.elementId = element.id;
-                                        fileInputRef.current.click();
-                                      }
-                                    }}
-                                  >
-                                    <Upload className={`h-4 w-4 ${uploadingImage === element.id ? 'animate-pulse' : ''}`} />
-                                  </Button>
+                                  {!element.is_whisp && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={uploadingImage === element.id}
+                                      onClick={() => {
+                                        if (fileInputRef.current) {
+                                          fileInputRef.current.dataset.elementId = element.id;
+                                          fileInputRef.current.click();
+                                        }
+                                      }}
+                                    >
+                                      <Upload className={`h-4 w-4 ${uploadingImage === element.id ? 'animate-pulse' : ''}`} />
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="sm"
