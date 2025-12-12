@@ -330,19 +330,7 @@ export default function Game() {
             .eq("id", sessionId)
             .then(() => console.log("✅ Session marked as expired"));
 
-          supabase.functions
-            .invoke("cleanup-game-session", {
-              body: { sessionId, delaySeconds: 35 },
-            })
-            .catch((err) => console.error("Failed to schedule cleanup:", err));
-
-          setTimeout(() => {
-            toast({
-              title: "⏰ Lobby Cleanup Warning",
-              description: "This lobby will be automatically deleted in 30 seconds...",
-              duration: 30000,
-            });
-          }, 5000);
+          // Auto-cleanup disabled - keeping sessions for history
           break;
 
         case "player_joined":
