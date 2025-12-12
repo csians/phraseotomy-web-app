@@ -285,13 +285,16 @@ Deno.serve(async (req) => {
           }
         } else {
           // Game complete - all rounds finished
-          // Get winner (player with highest score)
-          const { data: winners, error: winnerError } = await supabase
+          // Get all players with final scores for sending to clients
+          const { data: allFinalPlayers, error: allFinalPlayersError } = await supabase
             .from("game_players")
-            .select("player_id, name, score")
+            .select("id, player_id, name, score, turn_order")
             .eq("session_id", sessionId)
-            .order("score", { ascending: false })
-            .limit(1);
+            .order("score", { ascending: false });
+
+          if (allFinalPlayersError) {
+            console.error("Error fetching final players:", allFinalPlayersError);
+          }
 
           const { error: endError } = await supabase
             .from("game_sessions")
@@ -317,14 +320,14 @@ Deno.serve(async (req) => {
               console.error('Failed to schedule cleanup:', err);
             });
             
-            if (winners && winners.length > 0) {
-              nextRoundInfo = {
-                gameCompleted: true,
-                winnerId: winners[0].player_id,
-                winnerName: winners[0].name,
-                winnerScore: winners[0].score,
-              };
-            }
+            const winner = allFinalPlayers && allFinalPlayers.length > 0 ? allFinalPlayers[0] : null;
+            nextRoundInfo = {
+              gameCompleted: true,
+              winnerId: winner?.player_id,
+              winnerName: winner?.name,
+              winnerScore: winner?.score,
+              players: allFinalPlayers || [], // Include all players with final scores
+            };
           }
         }
       }
