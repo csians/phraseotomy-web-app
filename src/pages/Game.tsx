@@ -92,6 +92,7 @@ export default function Game() {
   const [unlockedPackIds, setUnlockedPackIds] = useState<string[]>([]);
   const [selectedTurnMode, setSelectedTurnMode] = useState<"audio" | "elements" | null>(null);
   const [gameCompleted, setGameCompleted] = useState(false);
+  const [isAnnouncingWinner, setIsAnnouncingWinner] = useState(false);
   const [gameWinner, setGameWinner] = useState<Player | null>(null);
   const [lifetimePoints, setLifetimePoints] = useState<Record<string, number>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -307,46 +308,50 @@ export default function Game() {
       case "game_completed":
           console.log("🎉 Received game_completed event:", message);
           
-          // Immediately show completion dialog with message data if available
-          if (message.players && message.players.length > 0) {
-            console.log("🏆 Using players from WebSocket message:", message.players);
-            setPlayers(message.players);
-            const sortedPlayers = [...message.players].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-            setGameWinner(sortedPlayers[0] || null);
+          // Show "Announcing Winner" loading first
+          setIsAnnouncingWinner(true);
+          
+          // After 3 seconds, show the actual winner dialog
+          setTimeout(() => {
+            if (message.players && message.players.length > 0) {
+              console.log("🏆 Using players from WebSocket message:", message.players);
+              setPlayers(message.players);
+              const sortedPlayers = [...message.players].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
+              setGameWinner(sortedPlayers[0] || null);
+              fetchLifetimePoints(message.players);
+            } else {
+              // Fallback: Fetch from database
+              console.log("🔄 No players in message, fetching from database...");
+              const fetchAndShowWinner = async () => {
+                try {
+                  const { data: latestPlayers } = await supabase
+                    .from("game_players")
+                    .select("id, player_id, name, score, turn_order")
+                    .eq("session_id", sessionId)
+                    .order("score", { ascending: false });
+                  
+                  const playersForCompletion = (latestPlayers && latestPlayers.length > 0) 
+                    ? latestPlayers 
+                    : players;
+                  
+                  console.log("🏆 Players from DB:", playersForCompletion);
+                  setPlayers(playersForCompletion);
+                  const sortedPlayers = [...playersForCompletion].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
+                  setGameWinner(sortedPlayers[0] || null);
+                  fetchLifetimePoints(playersForCompletion);
+                } catch (err) {
+                  console.error("Error fetching players for game completion:", err);
+                  // Last fallback: use current players state
+                  const sortedPlayers = [...players].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
+                  setGameWinner(sortedPlayers[0] || null);
+                  fetchLifetimePoints(players);
+                }
+              };
+              fetchAndShowWinner();
+            }
+            setIsAnnouncingWinner(false);
             setGameCompleted(true);
-            fetchLifetimePoints(message.players);
-          } else {
-            // Fallback: Fetch from database
-            console.log("🔄 No players in message, fetching from database...");
-            const fetchAndShowWinner = async () => {
-              try {
-                const { data: latestPlayers } = await supabase
-                  .from("game_players")
-                  .select("id, player_id, name, score, turn_order")
-                  .eq("session_id", sessionId)
-                  .order("score", { ascending: false });
-                
-                const playersForCompletion = (latestPlayers && latestPlayers.length > 0) 
-                  ? latestPlayers 
-                  : players;
-                
-                console.log("🏆 Players from DB:", playersForCompletion);
-                setPlayers(playersForCompletion);
-                const sortedPlayers = [...playersForCompletion].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-                setGameWinner(sortedPlayers[0] || null);
-                setGameCompleted(true);
-                fetchLifetimePoints(playersForCompletion);
-              } catch (err) {
-                console.error("Error fetching players for game completion:", err);
-                // Last fallback: use current players state
-                const sortedPlayers = [...players].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-                setGameWinner(sortedPlayers[0] || null);
-                setGameCompleted(true);
-                fetchLifetimePoints(players);
-              }
-            };
-            fetchAndShowWinner();
-          }
+          }, 3000);
 
           supabase
             .from("game_sessions")
@@ -1277,6 +1282,25 @@ export default function Game() {
           )}
         </main>
       </div>
+
+      {/* Announcing Winner Loading Dialog */}
+      <Dialog open={isAnnouncingWinner} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <div className="flex flex-col items-center justify-center py-8 space-y-6">
+            <div className="relative">
+              <div className="h-20 w-20 rounded-full bg-primary/20 flex items-center justify-center animate-pulse">
+                <Trophy className="h-10 w-10 text-primary animate-bounce" />
+              </div>
+              <div className="absolute inset-0 h-20 w-20 rounded-full border-4 border-primary/30 animate-ping" />
+            </div>
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-bold text-foreground">Game Complete!</h2>
+              <p className="text-lg text-muted-foreground animate-pulse">Announcing winner...</p>
+            </div>
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Game Completed Winner Dialog */}
       <Dialog open={gameCompleted} onOpenChange={() => {}}>
