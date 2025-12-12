@@ -230,15 +230,17 @@ export default function Packs() {
     }
 
     try {
-      // Insert into theme_packs junction table
-      const { error } = await supabase
-        .from("theme_packs")
-        .insert({
+      // Use edge function to bypass RLS
+      const { data, error } = await supabase.functions.invoke('admin-manage-theme-packs', {
+        body: {
+          action: 'add',
           theme_id: selectedThemeToAdd,
           pack_id: selectedPack.id
-        });
+        }
+      });
       
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       
       toast({ title: "Theme assigned to pack" });
       setSelectedThemeToAdd("");
@@ -257,14 +259,17 @@ export default function Packs() {
     if (!confirm(`Remove theme "${themeName}" from this pack?`)) return;
 
     try {
-      // Delete from theme_packs junction table
-      const { error } = await supabase
-        .from("theme_packs")
-        .delete()
-        .eq("theme_id", themeId)
-        .eq("pack_id", selectedPack.id);
+      // Use edge function to bypass RLS
+      const { data, error } = await supabase.functions.invoke('admin-manage-theme-packs', {
+        body: {
+          action: 'remove',
+          theme_id: themeId,
+          pack_id: selectedPack.id
+        }
+      });
       
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       
       toast({ title: "Theme removed from pack" });
       loadPacks();
