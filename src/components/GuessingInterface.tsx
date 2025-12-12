@@ -37,13 +37,47 @@ export function GuessingInterface({
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Reset guessing state when round changes
+  // Check if player already submitted guess for this round on mount/round change
   useEffect(() => {
-    console.log("Round changed to:", roundNumber, "- Resetting guessing state");
-    setGuess("");
-    setIsLockedOut(false);
-    setHasSubmitted(false);
-  }, [roundNumber]);
+    const checkExistingGuess = async () => {
+      console.log("Round changed to:", roundNumber, "- Checking existing guesses");
+      setGuess("");
+      setIsLockedOut(false);
+      setHasSubmitted(false);
+
+      try {
+        // Check if player already submitted a guess for this turn
+        const { data: turnData } = await supabase
+          .from("game_turns")
+          .select("id")
+          .eq("session_id", sessionId)
+          .eq("round_number", roundNumber)
+          .maybeSingle();
+
+        if (turnData?.id) {
+          const { data: existingGuess } = await supabase
+            .from("game_guesses")
+            .select("id, points_earned")
+            .eq("turn_id", turnData.id)
+            .eq("player_id", playerId)
+            .maybeSingle();
+
+          if (existingGuess) {
+            console.log("Player already submitted guess for this round");
+            setHasSubmitted(true);
+            // If points_earned is 0, they guessed wrong
+            if (existingGuess.points_earned === 0) {
+              setIsLockedOut(true);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error checking existing guess:", error);
+      }
+    };
+
+    checkExistingGuess();
+  }, [roundNumber, sessionId, playerId]);
 
   const handleSubmitGuess = async () => {
     const trimmedGuess = guess.trim();
