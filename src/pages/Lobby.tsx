@@ -728,7 +728,8 @@ export default function Lobby() {
 
             if (updatedSession.status === "active" && !isGameStarted) {
               setIsGameStarted(true);
-              fetchLobbyData();
+              // Redirect to game page immediately when status becomes active
+              navigate(`/game/${sessionId}`, { replace: true });
             }
           }
         },
@@ -889,6 +890,14 @@ export default function Lobby() {
         });
         // Don't navigate away - stay on lobby page to show error
         setLoading(false);
+        return;
+      }
+
+      // If the game is already active, redirect to the Game page immediately
+      // This handles page refresh during active game
+      if (data.session.status === "active") {
+        console.log("Game is already active, redirecting to game page...");
+        navigate(`/game/${sessionId}`, { replace: true });
         return;
       }
 
