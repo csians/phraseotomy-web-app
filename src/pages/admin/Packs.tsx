@@ -40,6 +40,13 @@ interface Theme {
   pack_id: string | null;
 }
 
+interface ThemePack {
+  id: string;
+  theme_id: string;
+  pack_id: string;
+  theme: Theme;
+}
+
 export default function Packs() {
   const [searchParams] = useSearchParams();
   
@@ -62,7 +69,7 @@ export default function Packs() {
   const { tenant, loading: tenantLoading, error: tenantError } = useTenant(shopDomain);
   
   const [packs, setPacks] = useState<Pack[]>([]);
-  const [themes, setThemes] = useState<Theme[]>([]);
+  const [themePacks, setThemePacks] = useState<ThemePack[]>([]);
   const [coreThemes, setCoreThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -87,7 +94,7 @@ export default function Packs() {
     
     setLoading(true);
     try {
-      const [packsRes, themesRes] = await Promise.all([
+      const [packsRes, themesRes, themePacksRes] = await Promise.all([
         supabase
           .from("packs")
           .select("*")
@@ -96,15 +103,22 @@ export default function Packs() {
         supabase
           .from("themes")
           .select("id, name, icon, is_core, pack_id")
-          .order("name")
+          .order("name"),
+        supabase
+          .from("theme_packs")
+          .select("id, theme_id, pack_id, theme:themes(id, name, icon, is_core, pack_id)")
       ]);
 
       if (packsRes.error) throw packsRes.error;
       if (themesRes.error) throw themesRes.error;
+      if (themePacksRes.error) throw themePacksRes.error;
       
       setPacks(packsRes.data || []);
       setAllThemes(themesRes.data || []);
-      setThemes((themesRes.data || []).filter(t => t.pack_id));
+      setThemePacks((themePacksRes.data || []).map(tp => ({
+        ...tp,
+        theme: tp.theme as unknown as Theme
+      })));
       setCoreThemes((themesRes.data || []).filter(t => t.is_core));
     } catch (error) {
       toast({
@@ -118,7 +132,7 @@ export default function Packs() {
   };
 
   const getThemesForPack = (packId: string) => {
-    return themes.filter(t => t.pack_id === packId);
+    return themePacks.filter(tp => tp.pack_id === packId).map(tp => tp.theme);
   };
 
   const handleAddPack = async () => {
@@ -203,7 +217,10 @@ export default function Packs() {
   // Get available themes (not already assigned to this pack)
   const getAvailableThemes = () => {
     if (!selectedPack) return [];
-    return allThemes.filter(t => t.pack_id !== selectedPack.id);
+    const assignedThemeIds = themePacks
+      .filter(tp => tp.pack_id === selectedPack.id)
+      .map(tp => tp.theme_id);
+    return allThemes.filter(t => !assignedThemeIds.includes(t.id));
   };
 
   const handleAssignTheme = async () => {
@@ -213,16 +230,13 @@ export default function Packs() {
     }
 
     try {
-      const { error } = await supabase.functions.invoke('admin-create-theme', {
-        body: {
+      // Insert into theme_packs junction table
+      const { error } = await supabase
+        .from("theme_packs")
+        .insert({
           theme_id: selectedThemeToAdd,
-          name: allThemes.find(t => t.id === selectedThemeToAdd)?.name || "",
-          icon: allThemes.find(t => t.id === selectedThemeToAdd)?.icon || "🎮",
-          pack_id: selectedPack.id,
-          is_core: false,
-          update: true
-        }
-      });
+          pack_id: selectedPack.id
+        });
       
       if (error) throw error;
       
@@ -239,20 +253,16 @@ export default function Packs() {
   };
 
   const handleRemoveThemeFromPack = async (themeId: string, themeName: string) => {
+    if (!selectedPack) return;
     if (!confirm(`Remove theme "${themeName}" from this pack?`)) return;
 
     try {
-      // Update theme to remove pack_id (set to null)
-      const { error } = await supabase.functions.invoke('admin-create-theme', {
-        body: {
-          theme_id: themeId,
-          name: allThemes.find(t => t.id === themeId)?.name || "",
-          icon: allThemes.find(t => t.id === themeId)?.icon || "🎮",
-          pack_id: null,
-          is_core: false,
-          update: true
-        }
-      });
+      // Delete from theme_packs junction table
+      const { error } = await supabase
+        .from("theme_packs")
+        .delete()
+        .eq("theme_id", themeId)
+        .eq("pack_id", selectedPack.id);
       
       if (error) throw error;
       

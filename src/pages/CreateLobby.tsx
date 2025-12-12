@@ -82,7 +82,7 @@ export default function CreateLobby() {
   }, [loadingPacks, allPacks, availablePacks]);
 
   // Load themes filtered by available packs
-  // Show all themes whose pack_id matches any of the customer's unlocked packs
+  // Show all themes that are linked to any of the customer's unlocked packs via theme_packs junction table
   useEffect(() => {
     const loadThemes = async () => {
       if (loadingPacks || availablePacks.length === 0) {
@@ -91,12 +91,31 @@ export default function CreateLobby() {
       }
 
       try {
-        const { data, error } = await supabase.from("themes").select("*").order("name", { ascending: true });
+        // Fetch themes and theme_packs junction data
+        const [themesRes, themePacksRes] = await Promise.all([
+          supabase.from("themes").select("*").order("name", { ascending: true }),
+          supabase.from("theme_packs").select("theme_id, pack_id")
+        ]);
 
-        if (error) throw error;
+        if (themesRes.error) throw themesRes.error;
+        if (themePacksRes.error) throw themePacksRes.error;
 
-        // Filter themes to only show those whose pack_id is in availablePacks
-        const filteredThemes = (data || []).filter((theme) => theme.pack_id && availablePacks.includes(theme.pack_id));
+        const allThemes = themesRes.data || [];
+        const themePacks = themePacksRes.data || [];
+
+        // Get theme IDs that are linked to any available pack via junction table
+        const themeIdsInAvailablePacks = new Set(
+          themePacks
+            .filter(tp => availablePacks.includes(tp.pack_id))
+            .map(tp => tp.theme_id)
+        );
+
+        // Also include themes with direct pack_id match (legacy support)
+        const filteredThemes = allThemes.filter(
+          (theme) => 
+            themeIdsInAvailablePacks.has(theme.id) || 
+            (theme.pack_id && availablePacks.includes(theme.pack_id))
+        );
 
         setThemes(filteredThemes);
 
