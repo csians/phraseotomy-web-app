@@ -94,6 +94,10 @@ export default function Game() {
   const [gameCompleted, setGameCompleted] = useState(false);
   const [isAnnouncingWinner, setIsAnnouncingWinner] = useState(false);
   const [gameWinner, setGameWinner] = useState<Player | null>(null);
+  
+  // Refs to track completion state for use in callbacks (avoid stale closures)
+  const gameCompletedRef = useRef(false);
+  const isAnnouncingWinnerRef = useRef(false);
   const [lifetimePoints, setLifetimePoints] = useState<Record<string, number>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
@@ -106,8 +110,8 @@ export default function Game() {
 
   // Debounced refresh to prevent infinite loops
   const debouncedRefresh = useCallback(() => {
-    // Don't refresh if game is completed or announcing winner
-    if (gameCompleted || isAnnouncingWinner) {
+    // Don't refresh if game is completed or announcing winner (use refs to get current values)
+    if (gameCompletedRef.current || isAnnouncingWinnerRef.current) {
       console.log("Skipping refresh - game completed or announcing winner");
       return;
     }
@@ -126,7 +130,7 @@ export default function Game() {
       lastRefreshRef.current = Date.now();
       initializeGame();
     }, 300);
-  }, [gameCompleted, isAnnouncingWinner]);
+  }, []); // Using refs instead of state for checks
 
   // Get current player ID from storage - must be defined before getCurrentPlayerInfo
   const getCurrentPlayerId = () => {
@@ -178,6 +182,16 @@ export default function Game() {
       console.error("Failed to fetch lifetime points:", err);
     }
   };
+  
+  // Keep refs in sync with state (for use in callbacks to avoid stale closures)
+  useEffect(() => {
+    gameCompletedRef.current = gameCompleted;
+  }, [gameCompleted]);
+  
+  useEffect(() => {
+    isAnnouncingWinnerRef.current = isAnnouncingWinner;
+  }, [isAnnouncingWinner]);
+  
   // Initialize audio context for real-time playback
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -313,6 +327,12 @@ export default function Game() {
 
       case "game_completed":
           console.log("🎉 Received game_completed event:", message);
+          
+          // Don't process if already announcing or completed (use refs for current values)
+          if (gameCompletedRef.current || isAnnouncingWinnerRef.current) {
+            console.log("Already announcing winner or game completed, skipping WebSocket event");
+            return;
+          }
           
           // Show "Announcing Winner" loading first
           setIsAnnouncingWinner(true);
@@ -452,8 +472,8 @@ export default function Game() {
   ]);
 
   const initializeGame = async () => {
-    // Don't reinitialize if game is already completed or announcing winner
-    if (gameCompleted || isAnnouncingWinner) {
+    // Don't reinitialize if game is already completed or announcing winner (use refs for current values)
+    if (gameCompletedRef.current || isAnnouncingWinnerRef.current) {
       console.log("Skipping initializeGame - game completed or announcing winner");
       setLoading(false);
       return;
@@ -607,8 +627,8 @@ export default function Game() {
       }
     } catch (error) {
       console.error("Error initializing game:", error);
-      // Don't show error toast if game is already completed/expired or we're announcing winner
-      if (session?.status !== "expired" && session?.status !== "completed" && !gameCompleted && !isAnnouncingWinner) {
+      // Don't show error toast if game is already completed/expired or we're announcing winner (use refs)
+      if (session?.status !== "expired" && session?.status !== "completed" && !gameCompletedRef.current && !isAnnouncingWinnerRef.current) {
         toast({
           title: "Error",
           description: "Failed to load game state.",
@@ -637,9 +657,9 @@ export default function Game() {
           if (newStatus === "completed" || newStatus === "expired") {
             console.log("🎉 Game session status changed to:", newStatus);
             
-            // Don't process if already announcing or completed
-            if (isAnnouncingWinner || gameCompleted) {
-              console.log("Already announcing winner or game completed, skipping");
+            // Don't process if already announcing or completed (use refs for current values)
+            if (isAnnouncingWinnerRef.current || gameCompletedRef.current) {
+              console.log("Already announcing winner or game completed, skipping realtime event");
               return;
             }
             
