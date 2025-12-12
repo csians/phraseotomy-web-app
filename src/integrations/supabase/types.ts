@@ -740,6 +740,42 @@ export type Database = {
         }
         Relationships: []
       }
+      theme_packs: {
+        Row: {
+          created_at: string
+          id: string
+          pack_id: string
+          theme_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pack_id: string
+          theme_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pack_id?: string
+          theme_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theme_packs_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theme_packs_theme_id_fkey"
+            columns: ["theme_id"]
+            isOneToOne: false
+            referencedRelation: "themes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       themes: {
         Row: {
           created_at: string
