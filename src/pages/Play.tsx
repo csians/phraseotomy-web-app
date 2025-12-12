@@ -182,12 +182,31 @@ const Play = () => {
           body: { sessionToken },
         });
 
+        // If session verification fails but we have stored customer data, try to continue
+        // This handles new customers who haven't synced yet
         if (customerError || !customerData) {
-          console.warn("⚠️ Invalid session, clearing and redirecting to login");
-          localStorage.removeItem("phraseotomy_session_token");
-          localStorage.removeItem("customerData");
-          navigate("/login", { replace: true });
-          return;
+          console.warn("⚠️ Session verification returned error, checking stored data...", customerError);
+          
+          // Check if we have valid stored customer data to proceed with
+          try {
+            const parsedStoredData = JSON.parse(storedCustomerData);
+            if (parsedStoredData.customer_id || parsedStoredData.id) {
+              console.log("✅ Valid stored customer data found, proceeding without full verification");
+              // Continue with stored data instead of forcing logout
+            } else {
+              console.warn("⚠️ No valid customer ID in stored data, redirecting to login");
+              localStorage.removeItem("phraseotomy_session_token");
+              localStorage.removeItem("customerData");
+              navigate("/login", { replace: true });
+              return;
+            }
+          } catch (parseError) {
+            console.error("Error parsing stored customer data:", parseError);
+            localStorage.removeItem("phraseotomy_session_token");
+            localStorage.removeItem("customerData");
+            navigate("/login", { replace: true });
+            return;
+          }
         }
 
         // Decode session token to get customer info

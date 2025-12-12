@@ -83,23 +83,49 @@ Deno.serve(async (req) => {
     }
 
     // Extract validated customer ID and shop domain from token
-    const { customer_id: customerId, shop: shopDomain } = payload;
-
+    const { customer_id: customerId, shop: tokenShopDomain } = payload;
 
     // Initialize Supabase client with service role key
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch tenant to get tenant_id and access token
-    const { data: tenant, error: tenantError } = await supabase
+    // Map custom domains to .myshopify.com domains (production shop domain mapping)
+    const shopDomainMap: Record<string, string> = {
+      'phraseotomy.com': 'phraseotomy.com',
+      'qxqtbf-21.myshopify.com': 'phraseotomy.com',
+    };
+    const shopDomain = shopDomainMap[tokenShopDomain] || tokenShopDomain;
+
+    // Fetch tenant to get tenant_id and access token - try exact match first, then with mapping
+    let tenant = null;
+    let tenantError = null;
+    
+    // Try direct match
+    const { data: directTenant, error: directError } = await supabase
       .from('tenants')
       .select('id, access_token, shop_domain')
       .eq('shop_domain', shopDomain)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
+    
+    if (directTenant) {
+      tenant = directTenant;
+    } else {
+      // Try original token shop domain if mapping failed
+      const { data: fallbackTenant, error: fallbackError } = await supabase
+        .from('tenants')
+        .select('id, access_token, shop_domain')
+        .eq('shop_domain', tokenShopDomain)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      tenant = fallbackTenant;
+      tenantError = fallbackError;
+    }
 
-    if (tenantError || !tenant) {
+    if (!tenant) {
+      console.error('Tenant not found for shop domains:', { tokenShopDomain, mappedShopDomain: shopDomain });
       return new Response(
         JSON.stringify({ error: 'Tenant not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
