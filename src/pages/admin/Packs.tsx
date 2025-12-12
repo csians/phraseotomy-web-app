@@ -508,7 +508,7 @@ export default function Packs() {
                     ) : (
                       getAvailableThemes().map((theme) => (
                         <SelectItem key={theme.id} value={theme.id}>
-                          {/* <span className="mr-2">{theme.icon}</span> */}
+                          <span className="mr-2">{theme.icon}</span>
                           {theme.name}
                         </SelectItem>
                       ))
