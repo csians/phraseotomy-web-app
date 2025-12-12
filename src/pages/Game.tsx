@@ -106,6 +106,12 @@ export default function Game() {
 
   // Debounced refresh to prevent infinite loops
   const debouncedRefresh = useCallback(() => {
+    // Don't refresh if game is completed or announcing winner
+    if (gameCompleted || isAnnouncingWinner) {
+      console.log("Skipping refresh - game completed or announcing winner");
+      return;
+    }
+
     const now = Date.now();
     // Prevent refreshing more than once per second
     if (now - lastRefreshRef.current < 1000) {
@@ -120,7 +126,7 @@ export default function Game() {
       lastRefreshRef.current = Date.now();
       initializeGame();
     }, 300);
-  }, []);
+  }, [gameCompleted, isAnnouncingWinner]);
 
   // Get current player ID from storage - must be defined before getCurrentPlayerInfo
   const getCurrentPlayerId = () => {
@@ -446,6 +452,13 @@ export default function Game() {
   ]);
 
   const initializeGame = async () => {
+    // Don't reinitialize if game is already completed or announcing winner
+    if (gameCompleted || isAnnouncingWinner) {
+      console.log("Skipping initializeGame - game completed or announcing winner");
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
       const playerId = getCurrentPlayerId();
@@ -594,8 +607,8 @@ export default function Game() {
       }
     } catch (error) {
       console.error("Error initializing game:", error);
-      // Don't show error toast if game is already completed/expired
-      if (session?.status !== "expired" && session?.status !== "completed") {
+      // Don't show error toast if game is already completed/expired or we're announcing winner
+      if (session?.status !== "expired" && session?.status !== "completed" && !gameCompleted && !isAnnouncingWinner) {
         toast({
           title: "Error",
           description: "Failed to load game state.",
@@ -623,7 +636,17 @@ export default function Game() {
           const newStatus = (payload.new as any)?.status;
           if (newStatus === "completed" || newStatus === "expired") {
             console.log("🎉 Game session status changed to:", newStatus);
-            // Fetch latest players and show completion dialog
+            
+            // Don't process if already announcing or completed
+            if (isAnnouncingWinner || gameCompleted) {
+              console.log("Already announcing winner or game completed, skipping");
+              return;
+            }
+            
+            // Show "Announcing Winner" loading first (same as WebSocket handler)
+            setIsAnnouncingWinner(true);
+            
+            // Fetch latest players and show completion dialog after 3 seconds
             const fetchAndShowCompletion = async () => {
               try {
                 const { data: latestPlayers } = await supabase
@@ -635,12 +658,17 @@ export default function Game() {
                 if (latestPlayers && latestPlayers.length > 0) {
                   setPlayers(latestPlayers);
                   setGameWinner(latestPlayers[0] || null);
-                  setGameCompleted(true);
                   fetchLifetimePoints(latestPlayers);
                 }
               } catch (err) {
                 console.error("Error fetching players for completion:", err);
               }
+              
+              // After 3 seconds, show winner dialog
+              setTimeout(() => {
+                setIsAnnouncingWinner(false);
+                setGameCompleted(true);
+              }, 3000);
             };
             fetchAndShowCompletion();
           } else {
