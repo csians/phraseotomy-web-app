@@ -93,6 +93,7 @@ export default function Game() {
   const [selectedTurnMode, setSelectedTurnMode] = useState<"audio" | "elements" | null>(null);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [gameWinner, setGameWinner] = useState<Player | null>(null);
+  const [lifetimePoints, setLifetimePoints] = useState<Record<string, number>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
@@ -147,6 +148,29 @@ export default function Game() {
     };
   };
 
+  // Fetch lifetime points for players from customers table
+  const fetchLifetimePoints = async (playersToFetch: Player[]) => {
+    try {
+      const playerIds = playersToFetch.map(p => p.player_id);
+      const { data, error } = await supabase
+        .from('customers')
+        .select('customer_id, total_points')
+        .in('customer_id', playerIds);
+      
+      if (error) {
+        console.error("Error fetching lifetime points:", error);
+        return;
+      }
+      
+      const pointsMap: Record<string, number> = {};
+      data?.forEach(c => {
+        pointsMap[c.customer_id] = c.total_points || 0;
+      });
+      setLifetimePoints(pointsMap);
+    } catch (err) {
+      console.error("Failed to fetch lifetime points:", err);
+    }
+  };
   // Initialize audio context for real-time playback
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -280,12 +304,25 @@ export default function Game() {
           debouncedRefresh();
           break;
 
-        case "game_completed":
-          // Find the winner from current players
-          const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+      case "game_completed":
+          // Use fresh players from message if available, otherwise use current state
+          const playersForCompletion = message.players && message.players.length > 0 
+            ? message.players 
+            : players;
+          
+          // Update players state with latest data
+          if (message.players && message.players.length > 0) {
+            setPlayers(message.players);
+          }
+          
+          // Find the winner
+          const sortedPlayers = [...playersForCompletion].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
           const winner = sortedPlayers[0] || null;
           setGameWinner(winner);
           setGameCompleted(true);
+          
+          // Fetch lifetime points for all players
+          fetchLifetimePoints(playersForCompletion);
 
           supabase
             .from("game_sessions")
@@ -440,6 +477,10 @@ export default function Game() {
         const winner = sortedPlayers[0] || null;
         setGameWinner(winner);
         setGameCompleted(true);
+        
+        // Fetch lifetime points for completed game
+        fetchLifetimePoints(data.players || []);
+        setLoading(false);
         return;
       }
 
@@ -741,11 +782,31 @@ export default function Game() {
     initializeGame();
   };
 
-  const handleGuessSubmit = () => {
+  const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[]) => {
     toast({
       title: "Guess Submitted!",
       description: "Waiting for other players...",
     });
+    
+    // If game just completed, handle it immediately with players data
+    if (gameCompletedFromGuess && playersFromGuess && playersFromGuess.length > 0) {
+      console.log("🎉 Game completed from guess submission");
+      setPlayers(playersFromGuess);
+      const sortedPlayers = [...playersFromGuess].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
+      setGameWinner(sortedPlayers[0] || null);
+      setGameCompleted(true);
+      fetchLifetimePoints(playersFromGuess);
+      
+      // Notify other players
+      sendWebSocketMessage({
+        type: "game_completed",
+        winnerId: sortedPlayers[0]?.player_id,
+        winnerName: sortedPlayers[0]?.name,
+        players: playersFromGuess,
+      });
+      return;
+    }
+    
     initializeGame();
   };
 
@@ -779,13 +840,24 @@ export default function Game() {
       console.log("Skip turn response:", data);
 
       if (data.game_completed) {
+        // Fetch latest players before setting game completed
+        const { data: latestPlayers } = await supabase
+          .from("game_players")
+          .select("id, player_id, name, score, turn_order")
+          .eq("session_id", sessionId)
+          .order("score", { ascending: false });
+        
+        const playersToUse = latestPlayers || players;
+        setPlayers(playersToUse);
         setGameCompleted(true);
-        const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
-        setGameWinner(sortedPlayers[0] || null);
+        setGameWinner(playersToUse[0] || null);
+        fetchLifetimePoints(playersToUse);
+        
         sendWebSocketMessage({
           type: "game_completed",
           winnerId: data.next_round?.winnerId,
           winnerName: data.next_round?.winnerName,
+          players: playersToUse,
         });
       } else if (data.next_round) {
         sendWebSocketMessage({
@@ -837,13 +909,24 @@ export default function Game() {
       console.log("Auto-submit response:", data);
 
       if (data.game_completed) {
+        // Fetch latest players before setting game completed
+        const { data: latestPlayers } = await supabase
+          .from("game_players")
+          .select("id, player_id, name, score, turn_order")
+          .eq("session_id", sessionId)
+          .order("score", { ascending: false });
+        
+        const playersToUse = latestPlayers || players;
+        setPlayers(playersToUse);
         setGameCompleted(true);
-        const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
-        setGameWinner(sortedPlayers[0] || null);
+        setGameWinner(playersToUse[0] || null);
+        fetchLifetimePoints(playersToUse);
+        
         sendWebSocketMessage({
           type: "game_completed",
           winnerId: data.next_round?.winnerId,
           winnerName: data.next_round?.winnerName,
+          players: playersToUse,
         });
       } else if (data.next_round) {
         sendWebSocketMessage({
@@ -1151,13 +1234,20 @@ export default function Game() {
                 {[...players]
                   .sort((a, b) => (b.score || 0) - (a.score || 0))
                   .map((player, index) => (
-                    <div key={player.id} className="flex items-center justify-between py-1 px-2 rounded bg-muted/50">
+                    <div key={player.id} className="flex items-center justify-between py-2 px-3 rounded bg-muted/50">
                       <span className="flex items-center gap-2">
                         <span className="text-sm font-medium">{index + 1}.</span>
                         <span>{player.name}</span>
                         {index === 0 && <span>👑</span>}
                       </span>
-                      <span className="font-semibold">{player.score || 0}</span>
+                      <div className="flex flex-col items-end">
+                        <span className="font-semibold">{player.score || 0} pts</span>
+                        {lifetimePoints[player.player_id] !== undefined && (
+                          <span className="text-xs text-muted-foreground">
+                            Total: {lifetimePoints[player.player_id]} pts
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
               </div>

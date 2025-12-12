@@ -14,7 +14,7 @@ interface GuessingInterfaceProps {
   sessionId: string;
   roundNumber: number;
   playerId: string;
-  onGuessSubmit: () => void;
+  onGuessSubmit: (gameCompleted?: boolean, players?: any[]) => void;
   selectedIcons?: IconItem[];
   turnMode?: "audio" | "elements";
 }
@@ -80,7 +80,7 @@ export function GuessingInterface({
 
       if (error) throw error;
 
-      const { correct, points_earned } = data;
+      const { correct, points_earned, game_completed, next_round } = data;
       setHasSubmitted(true);
 
       if (correct) {
@@ -88,7 +88,6 @@ export function GuessingInterface({
           title: "🎉 Correct!",
           description: `You guessed "${trimmedGuess}" and earned ${points_earned} points!`,
         });
-        onGuessSubmit();
       } else {
         setIsLockedOut(true);
         toast({
@@ -98,6 +97,9 @@ export function GuessingInterface({
           duration: 5000,
         });
       }
+      
+      // Notify parent with game completion info and players data
+      onGuessSubmit(game_completed, next_round?.players);
     } catch (error) {
       console.error("Error submitting guess:", error);
       toast({
