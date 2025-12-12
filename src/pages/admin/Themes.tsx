@@ -466,60 +466,54 @@ export default function Themes() {
             </CardContent>
           </Card>
 
-          {/* Elements for Selected Theme */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Image className="h-5 w-5" />
-                Elements {selectedTheme && `- ${selectedTheme.name}`}
-              </CardTitle>
-              <CardDescription>
-                {selectedTheme ? `Manage whisp elements for ${selectedTheme.name}` : 'Select a theme first'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {selectedTheme && (
-                <>
-                  <Dialog open={isAddElementOpen} onOpenChange={setIsAddElementOpen}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Element
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Add New Element</DialogTitle>
-                        <DialogDescription>Add an element to {selectedTheme.name}</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id="is_whisp"
-                            checked={newElement.is_whisp}
-                            onChange={(e) => setNewElement({ ...newElement, is_whisp: e.target.checked })}
-                            className="rounded border-border"
-                          />
-                          <Label htmlFor="is_whisp">Whisp Element (text-only, no SVG)</Label>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Element Name *</Label>
-                          <Input
-                            value={newElement.name}
-                            onChange={(e) => setNewElement({ ...newElement, name: e.target.value })}
-                            placeholder={newElement.is_whisp ? "e.g., Coffee, Lamp, Sofa" : "e.g., Sun, Moon, Star"}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Icon (Emoji)</Label>
-                          <Input
-                            value={newElement.icon}
-                            onChange={(e) => setNewElement({ ...newElement, icon: e.target.value })}
-                            placeholder="☕"
-                          />
-                        </div>
-                        {!newElement.is_whisp && (
+          {/* Elements for Selected Theme - Split into Visual and Whisp */}
+          <div className="space-y-6">
+            {/* Visual Elements Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Image className="h-5 w-5" />
+                  Visual Elements {selectedTheme && `- ${selectedTheme.name}`}
+                </CardTitle>
+                <CardDescription>
+                  {selectedTheme ? `Visual icons with SVG/images for ${selectedTheme.name}` : 'Select a theme first'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {selectedTheme ? (
+                  <>
+                    <Dialog open={isAddElementOpen && !newElement.is_whisp} onOpenChange={(open) => {
+                      setIsAddElementOpen(open);
+                      if (open) setNewElement({ ...newElement, is_whisp: false });
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button onClick={() => setNewElement({ ...newElement, is_whisp: false })}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Visual Element
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Visual Element</DialogTitle>
+                          <DialogDescription>Add a visual icon element to {selectedTheme.name}</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Element Name *</Label>
+                            <Input
+                              value={newElement.name}
+                              onChange={(e) => setNewElement({ ...newElement, name: e.target.value })}
+                              placeholder="e.g., Sun, Moon, Star"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Icon (Emoji)</Label>
+                            <Input
+                              value={newElement.icon}
+                              onChange={(e) => setNewElement({ ...newElement, icon: e.target.value })}
+                              placeholder="☀️"
+                            />
+                          </div>
                           <div className="space-y-2">
                             <Label>Color</Label>
                             <div className="flex gap-2 items-center">
@@ -537,95 +531,79 @@ export default function Themes() {
                               />
                             </div>
                           </div>
-                        )}
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAddElementOpen(false)}>Cancel</Button>
-                        <Button onClick={handleAddElement}>Create Element</Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsAddElementOpen(false)}>Cancel</Button>
+                          <Button onClick={handleAddElement}>Create Element</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
 
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      const elementId = fileInputRef.current?.dataset.elementId;
-                      if (file && elementId) {
-                        handleImageUpload(elementId, file);
-                      }
-                      e.target.value = '';
-                    }}
-                  />
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      accept="image/*,.svg"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        const elementId = fileInputRef.current?.dataset.elementId;
+                        if (file && elementId) {
+                          handleImageUpload(elementId, file);
+                        }
+                        e.target.value = '';
+                      }}
+                    />
 
-                  <div className="border rounded-md max-h-96 overflow-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Element</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Color</TableHead>
-                          <TableHead>Image</TableHead>
-                          <TableHead className="w-32">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {elements.length === 0 ? (
+                    <div className="border rounded-md max-h-64 overflow-auto">
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground">
-                              No elements yet
-                            </TableCell>
+                            <TableHead>Element</TableHead>
+                            <TableHead>Color</TableHead>
+                            <TableHead>Image/SVG</TableHead>
+                            <TableHead className="w-32">Actions</TableHead>
                           </TableRow>
-                        ) : (
-                          elements.map(element => (
-                            <TableRow key={element.id}>
-                              <TableCell className="font-medium">
-                                <span className="mr-2">{element.icon}</span>
-                                {element.name}
+                        </TableHeader>
+                        <TableBody>
+                          {elements.filter(e => !e.is_whisp).length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center text-muted-foreground">
+                                No visual elements yet
                               </TableCell>
-                              <TableCell>
-                                {element.is_whisp ? (
-                                  <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                    <Type className="h-3 w-3" />
-                                    Whisp
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                    <Image className="h-3 w-3" />
-                                    Visual
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {element.color ? (
-                                  <div className="flex items-center gap-2">
-                                    <div 
-                                      className="w-6 h-6 rounded border border-border"
-                                      style={{ backgroundColor: element.color }}
+                            </TableRow>
+                          ) : (
+                            elements.filter(e => !e.is_whisp).map(element => (
+                              <TableRow key={element.id}>
+                                <TableCell className="font-medium">
+                                  <span className="mr-2">{element.icon}</span>
+                                  {element.name}
+                                </TableCell>
+                                <TableCell>
+                                  {element.color ? (
+                                    <div className="flex items-center gap-2">
+                                      <div 
+                                        className="w-6 h-6 rounded border border-border"
+                                        style={{ backgroundColor: element.color }}
+                                      />
+                                      <span className="text-xs text-muted-foreground">{element.color}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground text-xs">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {element.image_url ? (
+                                    <img 
+                                      src={element.image_url} 
+                                      alt={element.name}
+                                      className="w-10 h-10 object-cover rounded"
                                     />
-                                    <span className="text-xs text-muted-foreground">{element.color}</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground text-xs">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {element.image_url ? (
-                                  <img 
-                                    src={element.image_url} 
-                                    alt={element.name}
-                                    className="w-10 h-10 object-cover rounded"
-                                  />
-                                ) : (
-                                  <span className="text-muted-foreground text-xs">No image</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex gap-1">
-                                  {!element.is_whisp && (
+                                  ) : (
+                                    <span className="text-muted-foreground text-xs">No image</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex gap-1">
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -639,7 +617,107 @@ export default function Themes() {
                                     >
                                       <Upload className={`h-4 w-4 ${uploadingImage === element.id ? 'animate-pulse' : ''}`} />
                                     </Button>
-                                  )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteElement(element.id, element.name)}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">
+                    Select a theme from the left to manage its elements
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Whisp Elements Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Type className="h-5 w-5" />
+                  Whisp Elements {selectedTheme && `- ${selectedTheme.name}`}
+                </CardTitle>
+                <CardDescription>
+                  {selectedTheme ? `Text-based whisp words for ${selectedTheme.name}` : 'Select a theme first'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {selectedTheme ? (
+                  <>
+                    <Dialog open={isAddElementOpen && newElement.is_whisp} onOpenChange={(open) => {
+                      setIsAddElementOpen(open);
+                      if (open) setNewElement({ ...newElement, is_whisp: true });
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button variant="secondary" onClick={() => setNewElement({ ...newElement, is_whisp: true })}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Whisp
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Whisp Element</DialogTitle>
+                          <DialogDescription>Add a text-based whisp word to {selectedTheme.name}</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Whisp Word *</Label>
+                            <Input
+                              value={newElement.name}
+                              onChange={(e) => setNewElement({ ...newElement, name: e.target.value })}
+                              placeholder="e.g., Coffee, Lamp, Sofa"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Icon (Emoji)</Label>
+                            <Input
+                              value={newElement.icon}
+                              onChange={(e) => setNewElement({ ...newElement, icon: e.target.value })}
+                              placeholder="☕"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsAddElementOpen(false)}>Cancel</Button>
+                          <Button onClick={handleAddElement}>Create Whisp</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    <div className="border rounded-md max-h-64 overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Whisp Word</TableHead>
+                            <TableHead className="w-20">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {elements.filter(e => e.is_whisp).length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={2} className="text-center text-muted-foreground">
+                                No whisp elements yet
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            elements.filter(e => e.is_whisp).map(element => (
+                              <TableRow key={element.id}>
+                                <TableCell className="font-medium">
+                                  <span className="mr-2">{element.icon}</span>
+                                  {element.name}
+                                </TableCell>
+                                <TableCell>
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -647,24 +725,22 @@ export default function Themes() {
                                   >
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </>
-              )}
-              
-              {!selectedTheme && (
-                <p className="text-muted-foreground text-center py-8">
-                  Select a theme from the left to manage its elements
-                </p>
-              )}
-            </CardContent>
-          </Card>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">
+                    Select a theme from the left to manage its whisp words
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
