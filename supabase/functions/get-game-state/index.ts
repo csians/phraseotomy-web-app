@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
     if (currentTurn?.selected_icon_ids && currentTurn.selected_icon_ids.length > 0) {
       const { data: elements, error: elementsError } = await supabase
         .from("elements")
-        .select("id, name, icon, theme_id")
+        .select("id, name, icon, image_url, color, theme_id")
         .in("id", currentTurn.selected_icon_ids);
 
       if (!elementsError && elements) {
@@ -141,7 +141,11 @@ Deno.serve(async (req) => {
           const element = elementMap.get(id);
           if (!element) return null;
           return {
-            ...element,
+            id: element.id,
+            name: element.name,
+            icon: element.icon,
+            image_url: element.image_url,
+            color: element.color,
             isFromCore: element.theme_id !== currentTurn.theme_id,
           };
         }).filter(Boolean);
