@@ -558,8 +558,16 @@ export default function CreateLobby() {
                                         : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
                                     }`}
                                   >
-                                    <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
-                                      <span className="text-lg font-bold text-foreground text-center px-2">
+                                    <div 
+                                      className="w-full h-full flex items-center justify-center"
+                                      style={{ 
+                                        backgroundColor: theme.color || undefined,
+                                        background: theme.color 
+                                          ? theme.color 
+                                          : 'linear-gradient(to bottom right, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.4))'
+                                      }}
+                                    >
+                                      <span className="text-lg font-bold text-white text-center px-2 drop-shadow-md">
                                         {theme.name}
                                       </span>
                                     </div>
