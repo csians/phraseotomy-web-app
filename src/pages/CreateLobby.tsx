@@ -493,52 +493,96 @@ export default function CreateLobby() {
                 ) : themes.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No themes available</p>
                 ) : (
-                  <div className="grid grid-cols-4 gap-3">
-                    {themes.map((theme) => {
-                      const isSelected = selectedTheme === theme.id;
-                      const themeImage = THEME_IMAGES[theme.name.toLowerCase()];
+                  <div className="space-y-4">
+                    {/* Featured themes with images - always show in one row */}
+                    {(() => {
+                      const featuredThemes = themes.filter(t => THEME_IMAGES[t.name.toLowerCase()]);
+                      const otherThemes = themes.filter(t => !THEME_IMAGES[t.name.toLowerCase()]);
                       
                       return (
-                        <button
-                          key={theme.id}
-                          type="button"
-                          onClick={() => setSelectedTheme(theme.id)}
-                          className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                            isSelected 
-                              ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105" 
-                              : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
-                          }`}
-                        >
-                          {themeImage ? (
-                            <img 
-                              src={themeImage} 
-                              alt={theme.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
-                              <span className="text-lg font-bold text-foreground text-center px-2">
-                                {theme.name}
-                              </span>
+                        <>
+                          {featuredThemes.length > 0 && (
+                            <div className="grid grid-cols-4 gap-3">
+                              {featuredThemes.map((theme) => {
+                                const isSelected = selectedTheme === theme.id;
+                                const themeImage = THEME_IMAGES[theme.name.toLowerCase()];
+                                
+                                return (
+                                  <button
+                                    key={theme.id}
+                                    type="button"
+                                    onClick={() => setSelectedTheme(theme.id)}
+                                    className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
+                                      isSelected 
+                                        ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105" 
+                                        : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
+                                    }`}
+                                  >
+                                    <img 
+                                      src={themeImage} 
+                                      alt={theme.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                    
+                                    {isSelected && (
+                                      <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                                        <Check className="w-4 h-4 text-primary-foreground" />
+                                      </div>
+                                    )}
+                                    
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                                      <p className="text-white text-sm font-semibold text-center truncate">
+                                        {theme.name}
+                                      </p>
+                                    </div>
+                                  </button>
+                                );
+                              })}
                             </div>
                           )}
                           
-                          {/* Selection indicator */}
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                              <Check className="w-4 h-4 text-primary-foreground" />
+                          {/* Other themes without images */}
+                          {otherThemes.length > 0 && (
+                            <div className="grid grid-cols-4 gap-3">
+                              {otherThemes.map((theme) => {
+                                const isSelected = selectedTheme === theme.id;
+                                
+                                return (
+                                  <button
+                                    key={theme.id}
+                                    type="button"
+                                    onClick={() => setSelectedTheme(theme.id)}
+                                    className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
+                                      isSelected 
+                                        ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105" 
+                                        : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
+                                    }`}
+                                  >
+                                    <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
+                                      <span className="text-lg font-bold text-foreground text-center px-2">
+                                        {theme.name}
+                                      </span>
+                                    </div>
+                                    
+                                    {isSelected && (
+                                      <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                                        <Check className="w-4 h-4 text-primary-foreground" />
+                                      </div>
+                                    )}
+                                    
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                                      <p className="text-white text-sm font-semibold text-center truncate">
+                                        {theme.name}
+                                      </p>
+                                    </div>
+                                  </button>
+                                );
+                              })}
                             </div>
                           )}
-                          
-                          {/* Theme name overlay */}
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                            <p className="text-white text-sm font-semibold text-center truncate">
-                              {theme.name}
-                            </p>
-                          </div>
-                        </button>
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">Whisps will be auto-generated based on this theme</p>
