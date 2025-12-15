@@ -504,15 +504,17 @@ export default function Packs() {
                     <SelectValue placeholder="Select a theme to add..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {getAvailableThemes().length === 0 ? (
-                      <SelectItem value="none" disabled>No available themes</SelectItem>
+                    {getAvailableThemes().filter(t => t.id).length === 0 ? (
+                      <SelectItem value="_empty" disabled>No available themes</SelectItem>
                     ) : (
-                      getAvailableThemes().map(theme => (
-                        <SelectItem key={theme.id} value={theme.id}>
-                          <span className="mr-2">{theme.icon}</span>
-                          {theme.name}
-                        </SelectItem>
-                      ))
+                      getAvailableThemes()
+                        .filter(theme => theme.id && theme.id.trim() !== '')
+                        .map(theme => (
+                          <SelectItem key={theme.id} value={theme.id}>
+                            <span className="mr-2">{theme.icon}</span>
+                            {theme.name}
+                          </SelectItem>
+                        ))
                     )}
                   </SelectContent>
                 </Select>
