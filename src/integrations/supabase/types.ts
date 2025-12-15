@@ -778,6 +778,7 @@ export type Database = {
       }
       themes: {
         Row: {
+          color: string | null
           created_at: string
           icon: string
           id: string
@@ -786,6 +787,7 @@ export type Database = {
           pack_id: string | null
         }
         Insert: {
+          color?: string | null
           created_at?: string
           icon: string
           id?: string
@@ -794,6 +796,7 @@ export type Database = {
           pack_id?: string | null
         }
         Update: {
+          color?: string | null
           created_at?: string
           icon?: string
           id?: string
