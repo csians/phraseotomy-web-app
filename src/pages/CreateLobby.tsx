@@ -5,13 +5,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getCustomerLicenses } from "@/lib/customerAccess";
 import { Skeleton } from "@/components/ui/skeleton";
 import Header from "@/components/Header";
 import type { Tables } from "@/integrations/supabase/types";
+import { Check } from "lucide-react";
+
+// Theme images
+import atHomeImg from "@/assets/themes/at-home.jpg";
+import atWorkImg from "@/assets/themes/at-work.jpg";
+import lifestyleImg from "@/assets/themes/lifestyle.jpg";
+import travelImg from "@/assets/themes/travel.jpg";
+
+// Map theme names to their images (case-insensitive matching)
+const THEME_IMAGES: Record<string, string> = {
+  "at home": atHomeImg,
+  "athome": atHomeImg,
+  "home": atHomeImg,
+  "at work": atWorkImg,
+  "atwork": atWorkImg,
+  "work": atWorkImg,
+  "lifestyle": lifestyleImg,
+  "travel": travelImg,
+};
 
 type Pack = Tables<"packs">;
 type Theme = Tables<"themes">;
@@ -464,25 +482,64 @@ export default function CreateLobby() {
                 </div>
               )}
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label>Select Theme</Label>
                 {loadingThemes ? (
-                  <Skeleton className="h-10 w-full" />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Skeleton key={i} className="aspect-[3/4] rounded-xl" />
+                    ))}
+                  </div>
                 ) : themes.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No themes available</p>
                 ) : (
-                  <Select value={selectedTheme} onValueChange={setSelectedTheme}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a theme for whisps" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {themes.map((theme) => (
-                        <SelectItem key={theme.id} value={theme.id}>
-                          {theme.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {themes.map((theme) => {
+                      const isSelected = selectedTheme === theme.id;
+                      const themeImage = THEME_IMAGES[theme.name.toLowerCase()];
+                      
+                      return (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          onClick={() => setSelectedTheme(theme.id)}
+                          className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
+                            isSelected 
+                              ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105" 
+                              : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
+                          }`}
+                        >
+                          {themeImage ? (
+                            <img 
+                              src={themeImage} 
+                              alt={theme.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
+                              <span className="text-lg font-bold text-foreground text-center px-2">
+                                {theme.name}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Selection indicator */}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                              <Check className="w-4 h-4 text-primary-foreground" />
+                            </div>
+                          )}
+                          
+                          {/* Theme name overlay */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                            <p className="text-white text-sm font-semibold text-center truncate">
+                              {theme.name}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
                 <p className="text-xs text-muted-foreground">Whisps will be auto-generated based on this theme</p>
               </div>
