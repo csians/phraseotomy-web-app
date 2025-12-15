@@ -54,12 +54,12 @@ export function ThemeSelectionCards({
   const [hoveredTheme, setHoveredTheme] = useState<string | null>(null);
 
   // Filter themes based on pack ownership
-  // Core themes (is_core=true) are always visible
-  // Expansion themes only visible if their pack is unlocked
+  // Core themes (At Home, At Work, Lifestyle, Travel) are visible but DISABLED
+  // Expansion themes are visible and enabled if their pack is unlocked
   const visibleThemes = themes.map((theme) => {
     if (theme.isCore) {
-      // Core themes are always unlocked and visible
-      return { ...theme, isUnlocked: true };
+      // Core themes are visible but locked/disabled
+      return { ...theme, isUnlocked: false };
     }
     // Expansion themes: check if pack is unlocked
     const isUnlocked = theme.packId ? unlockedPackIds.includes(theme.packId) : false;
