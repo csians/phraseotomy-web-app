@@ -407,7 +407,7 @@ export default function CreateLobby() {
               <div className="space-y-3">
                 <Label>Game Mode</Label>
                 <RadioGroup value={gameMode} onValueChange={(v) => setGameMode(v as "live" | "async")}>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-row gap-3 overflow-x-auto pb-2">
                     <div
                       className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
                         gameMode === "live"
