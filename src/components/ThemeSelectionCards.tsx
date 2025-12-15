@@ -56,24 +56,16 @@ export function ThemeSelectionCards({
   // Core theme names that are always enabled
   const coreThemeNames = ['At Home', 'At Work', 'Lifestyle', 'Travel'];
   
-  // Filter themes based on pack ownership
-  // Core themes (At Home, At Work, Lifestyle, Travel) are always ENABLED
-  // Expansion themes are DISABLED unless user has Gold or Premium pack
+  // Filter themes based on theme name
+  // Only these 4 themes are clickable; all other themes are visible but disabled
   const visibleThemes = themes.map((theme) => {
-    const isCoreTheme = coreThemeNames.includes(theme.name);
-    if (isCoreTheme) {
-      // Core themes are always unlocked and clickable
-      return { ...theme, isUnlocked: true };
-    }
-    // Expansion themes: check if pack is unlocked
-    const isUnlocked = theme.packId ? unlockedPackIds.includes(theme.packId) : false;
-    return { ...theme, isUnlocked };
+    const isEnabled = coreThemeNames.includes(theme.name);
+    return { ...theme, isUnlocked: isEnabled };
   });
 
-  // Separate base themes and expansion themes
-  const baseThemes = visibleThemes.filter((t) => t.isCore);
-  // Only show expansion themes that are unlocked (user has the pack)
-  const expansionThemes = visibleThemes.filter((t) => !t.isCore && t.isUnlocked);
+  // Separate base themes and other themes
+  const baseThemes = visibleThemes.filter((t) => coreThemeNames.includes(t.name));
+  const expansionThemes = visibleThemes.filter((t) => !coreThemeNames.includes(t.name));
 
   const renderThemeCard = (theme: ThemeOption) => {
     const IconComponent = iconMap[theme.icon] || Sparkles;
