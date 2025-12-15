@@ -465,16 +465,20 @@ export default function Themes() {
                       <div className="space-y-2">
                         <Label>Pack (Optional - for expansion themes)</Label>
                         <Select
-                          value={newTheme.pack_id}
-                          onValueChange={(v) => setNewTheme({ ...newTheme, pack_id: v })}
+                          value={newTheme.pack_id || "_none"}
+                          onValueChange={(v) =>
+                            setNewTheme({ ...newTheme, pack_id: v === "_none" ? "" : v })
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select pack (or leave empty for base)" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">No Pack (Base Game)</SelectItem>
-                            {packs.map(pack => (
-                              <SelectItem key={pack.id} value={pack.id}>{pack.name}</SelectItem>
+                            <SelectItem value="_none">No Pack (Base Game)</SelectItem>
+                            {packs.map((pack) => (
+                              <SelectItem key={pack.id} value={pack.id}>
+                                {pack.name}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
