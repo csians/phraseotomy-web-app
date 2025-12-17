@@ -13,7 +13,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Pencil, Check, ChevronsUpDown, Trash2, RefreshCw, RotateCcw } from "lucide-react";
+import { ArrowLeft, Pencil, Check, ChevronsUpDown, Trash2, RefreshCw, RotateCcw } from "lucide-react";
 import { CSVImport } from "@/components/admin/CSVImport";
 import { CodeExport } from "@/components/admin/CodeExport";
 import type { Tables } from "@/integrations/supabase/types";
@@ -59,7 +59,6 @@ const Codes = () => {
   
   const [codes, setCodes] = useState<LicenseCode[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCode, setEditingCode] = useState<LicenseCode | null>(null);
   const { toast } = useToast();
 
@@ -181,63 +180,6 @@ const Codes = () => {
         description: error instanceof Error ? error.message : 'Failed to load packs',
         variant: "destructive",
       });
-    }
-  };
-
-  const handleAddCode = async () => {
-    if (!tenant?.shop_domain) {
-      toast({
-        title: "Error",
-        description: "Tenant not found",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      // Validate code format
-      const validatedCode = validateInput(redemptionCodeSchema, formData.code);
-      
-      // Validate packs
-      const validatedPacks = validateInput(packsArraySchema, formData.packs);
-
-      setLoading(true);
-
-      // Use edge function to create code (bypasses RLS with service role)
-      const { data, error } = await supabase.functions.invoke('create-license-code', {
-        body: {
-          code: validatedCode,
-          packs_unlocked: validatedPacks,
-          shop_domain: tenant.shop_domain,
-        },
-      });
-
-      if (error || !data?.success) {
-        toast({
-          title: "Error creating code",
-          description: error?.message || data?.error || 'Failed to create license code',
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      toast({
-        title: "Code created",
-        description: `Code ${validatedCode} has been added`,
-      });
-
-      setIsAddDialogOpen(false);
-      setFormData({ code: "", packs: [], status: "unused" });
-      await loadCodes();
-      setLoading(false);
-    } catch (error) {
-      toast({
-        title: "Validation Error",
-        description: error instanceof Error ? error.message : "Invalid input",
-        variant: "destructive",
-      });
-      setLoading(false);
     }
   };
 
@@ -572,76 +514,6 @@ const Codes = () => {
             </Button>
             <CodeExport codes={codes} />
             <CSVImport shopDomain={tenant.shop_domain} onImportComplete={loadCodes} />
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Code
-                </Button>
-              </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New License Code</DialogTitle>
-                <DialogDescription>Create a new 6-digit license code</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="code">Code (6 digits)</Label>
-                  <Input
-                    id="code"
-                    placeholder="ABC123"
-                    maxLength={6}
-                    value={formData.code}
-                    onChange={(e) =>
-                      setFormData({ ...formData, code: e.target.value.toUpperCase() })
-                    }
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label>Select Packs to Unlock</Label>
-                  {availablePacks.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No packs available. Please create packs first in the Packs management page.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {availablePacks.map((pack) => (
-                        <div key={pack.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-accent/50 hover:text-accent-foreground transition-colors">
-                          <Checkbox
-                            id={`pack-${pack.id}`}
-                            checked={formData.packs.includes(pack.name)}
-                            onCheckedChange={(checked) => {
-                              setFormData({
-                                ...formData,
-                                packs: checked
-                                  ? [...formData.packs, pack.name]
-                                  : formData.packs.filter((p) => p !== pack.name),
-                              });
-                            }}
-                          />
-                          <div className="flex-1">
-                            <Label htmlFor={`pack-${pack.id}`} className="cursor-pointer font-medium">
-                              {pack.name}
-                            </Label>
-                            {pack.description && (
-                              <p className="text-sm text-muted-foreground">{pack.description}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {formData.packs.length === 0 && availablePacks.length > 0 && (
-                    <p className="text-sm text-destructive">Please select at least one pack</p>
-                  )}
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddCode}>Create Code</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
           </div>
         </div>
 

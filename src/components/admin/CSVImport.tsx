@@ -6,13 +6,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, Download, AlertCircle, Check, X } from "lucide-react";
+import { Upload, AlertCircle, Check, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from 'xlsx';
 
 type CSVRow = {
   code: string;
-  pack_names: string[]; // Changed to array
+  pack_names: string[];
   expiration_date: string;
   isDuplicate?: boolean;
   error?: string;
@@ -35,23 +35,6 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
   const [importing, setImporting] = useState(false);
   const { toast } = useToast();
 
-  const downloadTemplate = () => {
-    const csv = [
-      "code,pack_name,expiration_date",
-      "ABC123,base,2025-12-31",
-      "XYZ789,base|expansion1,2025-12-31",
-      "DEF456,base|expansion1|premium,2026-01-15"
-    ].join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "license-codes-template.csv";
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
   const parseFile = (data: any[]): CSVRow[] => {
     if (data.length === 0) {
       throw new Error("File is empty");
@@ -60,22 +43,24 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
     const originalHeaders = Object.keys(data[0]);
     const headerMap = new Map(originalHeaders.map(h => [h.toLowerCase().trim(), h]));
     
+    // Support both "Code" and "code" column names
     const codeKey = headerMap.get("code");
-    const packKey = headerMap.get("pack_name");
-    const expirationKey = headerMap.get("expiration_date");
+    // Support "Pack" column (comma-separated like "Base, Gold, Premium")
+    const packKey = headerMap.get("pack");
 
-    if (!codeKey || !packKey || !expirationKey) {
-      throw new Error("File must have columns: code, pack_name, expiration_date");
+    if (!codeKey || !packKey) {
+      throw new Error("File must have columns: Code, Pack");
     }
 
     return data.map(row => {
       const packNamesRaw = String(row[packKey] || "");
-      const packNames = packNamesRaw.split("|").map(p => p.trim()).filter(p => p);
+      // Split by comma and trim each pack name
+      const packNames = packNamesRaw.split(",").map(p => p.trim()).filter(p => p);
       
       return {
-        code: String(row[codeKey] || "").toUpperCase(),
+        code: String(row[codeKey] || "").toUpperCase().trim(),
         pack_names: packNames,
-        expiration_date: String(row[expirationKey] || ""),
+        expiration_date: "", // No expiration in new format
       };
     }).filter(row => row.code && row.pack_names.length > 0);
   };
@@ -92,7 +77,24 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
         const lines = text.trim().split("\n");
         const headers = lines[0].split(",").map(h => h.trim());
         const data = lines.slice(1).map(line => {
-          const values = line.split(",").map(v => v.trim());
+          // Handle CSV with commas inside pack values (e.g., "Base, Gold, Premium")
+          const values: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              values.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          values.push(current.trim());
+          
           const obj: any = {};
           headers.forEach((header, idx) => {
             obj[header] = values[idx] || "";
@@ -179,18 +181,11 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
         <DialogHeader>
           <DialogTitle>Import License Codes</DialogTitle>
           <DialogDescription>
-            Upload a CSV or XLSX file with license codes and pack assignments
+            Upload a CSV or XLSX file with Code and Pack columns (Pack can be comma-separated like "Base, Gold, Premium")
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={downloadTemplate}>
-              <Download className="h-4 w-4 mr-2" />
-              Download Template
-            </Button>
-          </div>
-
           <div className="space-y-2">
             <Input
               type="file"
@@ -206,7 +201,7 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    Found {preview.duplicates.length} duplicate codes in CSV: {preview.duplicates.join(", ")}
+                    Found {preview.duplicates.length} duplicate codes in file: {preview.duplicates.join(", ")}
                   </AlertDescription>
                 </Alert>
               )}
@@ -215,7 +210,7 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    New packs will be created: {preview.newPacks.join(", ")}
+                    Packs found: {preview.newPacks.join(", ")}
                   </AlertDescription>
                 </Alert>
               )}
@@ -227,7 +222,6 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
                       <TableHead className="w-12"></TableHead>
                       <TableHead>Code</TableHead>
                       <TableHead>Pack</TableHead>
-                      <TableHead>Expiration</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -241,8 +235,7 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
                           )}
                         </TableCell>
                         <TableCell>{row.code}</TableCell>
-                        <TableCell>{row.pack_names.join(" | ")}</TableCell>
-                        <TableCell>{row.expiration_date}</TableCell>
+                        <TableCell>{row.pack_names.join(", ")}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
