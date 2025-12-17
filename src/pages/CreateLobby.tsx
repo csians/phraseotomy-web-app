@@ -22,13 +22,13 @@ import travelImg from "@/assets/themes/travel.jpg";
 // Map theme names to their images (case-insensitive matching)
 const THEME_IMAGES: Record<string, string> = {
   "at home": atHomeImg,
-  "athome": atHomeImg,
-  "home": atHomeImg,
+  athome: atHomeImg,
+  home: atHomeImg,
   "at work": atWorkImg,
-  "atwork": atWorkImg,
-  "work": atWorkImg,
-  "lifestyle": lifestyleImg,
-  "travel": travelImg,
+  atwork: atWorkImg,
+  work: atWorkImg,
+  lifestyle: lifestyleImg,
+  travel: travelImg,
 };
 
 type Pack = Tables<"packs">;
@@ -112,7 +112,7 @@ export default function CreateLobby() {
         // Fetch themes and theme_packs junction data
         const [themesRes, themePacksRes] = await Promise.all([
           supabase.from("themes").select("*").order("name", { ascending: true }),
-          supabase.from("theme_packs").select("theme_id, pack_id")
+          supabase.from("theme_packs").select("theme_id, pack_id"),
         ]);
 
         if (themesRes.error) throw themesRes.error;
@@ -123,16 +123,13 @@ export default function CreateLobby() {
 
         // Get theme IDs that are linked to any available pack via junction table
         const themeIdsInAvailablePacks = new Set(
-          themePacks
-            .filter(tp => availablePacks.includes(tp.pack_id))
-            .map(tp => tp.theme_id)
+          themePacks.filter((tp) => availablePacks.includes(tp.pack_id)).map((tp) => tp.theme_id),
         );
 
         // Also include themes with direct pack_id match (legacy support)
         const filteredThemes = allThemes.filter(
-          (theme) => 
-            themeIdsInAvailablePacks.has(theme.id) || 
-            (theme.pack_id && availablePacks.includes(theme.pack_id))
+          (theme) =>
+            themeIdsInAvailablePacks.has(theme.id) || (theme.pack_id && availablePacks.includes(theme.pack_id)),
         );
 
         setThemes(filteredThemes);
@@ -496,9 +493,9 @@ export default function CreateLobby() {
                   <div className="space-y-4">
                     {/* Featured themes with images - always show in one row */}
                     {(() => {
-                      const featuredThemes = themes.filter(t => THEME_IMAGES[t.name.toLowerCase()]);
-                      const otherThemes = themes.filter(t => !THEME_IMAGES[t.name.toLowerCase()]);
-                      
+                      const featuredThemes = themes.filter((t) => THEME_IMAGES[t.name.toLowerCase()]);
+                      const otherThemes = themes.filter((t) => !THEME_IMAGES[t.name.toLowerCase()]);
+
                       return (
                         <>
                           {featuredThemes.length > 0 && (
@@ -506,50 +503,46 @@ export default function CreateLobby() {
                               {featuredThemes.map((theme) => {
                                 const isSelected = selectedTheme === theme.id;
                                 const themeImage = THEME_IMAGES[theme.name.toLowerCase()];
-                                
+
                                 return (
                                   <button
                                     key={theme.id}
                                     type="button"
                                     onClick={() => setSelectedTheme(theme.id)}
                                     className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                                      isSelected 
-                                        ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105" 
+                                      isSelected
+                                        ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105"
                                         : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
                                     }`}
                                   >
-                                    <img 
-                                      src={themeImage} 
-                                      alt={theme.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                    
+                                    <img src={themeImage} alt={theme.name} className="w-full h-full object-cover" />
+
                                     {isSelected && (
                                       <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
                                         <Check className="w-4 h-4 text-primary-foreground" />
                                       </div>
                                     )}
-                                    
+
                                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                                      <p className="text-white text-sm font-semibold text-center truncate">
+                                      {/* <p className="text-white text-sm font-semibold text-center truncate">
                                         {theme.name}
-                                      </p>
+                                      </p> */}
                                     </div>
                                   </button>
                                 );
                               })}
                             </div>
                           )}
-                          
+
                           {/* Other themes without images */}
                           {otherThemes.length > 0 && (
                             <div className="grid grid-cols-4 gap-3">
                               {otherThemes.map((theme) => {
                                 const isSelected = selectedTheme === theme.id;
                                 // Disabled themes - not clickable
-                                const disabledThemeNames = ['adult', 'core', 'fantasy', 'horror', 'sci-fi'];
+                                const disabledThemeNames = ["adult", "core", "fantasy", "horror", "sci-fi"];
                                 const isDisabled = disabledThemeNames.includes(theme.name.toLowerCase());
-                                
+
                                 return (
                                   <button
                                     key={theme.id}
@@ -559,31 +552,31 @@ export default function CreateLobby() {
                                     className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
                                       isDisabled
                                         ? "border-transparent opacity-50 cursor-not-allowed grayscale"
-                                        : isSelected 
-                                          ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105" 
+                                        : isSelected
+                                          ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105"
                                           : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
                                     }`}
                                   >
-                                    <div 
+                                    <div
                                       className="w-full h-full flex items-center justify-center"
-                                      style={{ 
+                                      style={{
                                         backgroundColor: theme.color || undefined,
-                                        background: theme.color 
-                                          ? theme.color 
-                                          : 'linear-gradient(to bottom right, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.4))'
+                                        background: theme.color
+                                          ? theme.color
+                                          : "linear-gradient(to bottom right, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.4))",
                                       }}
                                     >
                                       <span className="text-lg font-bold text-white text-center px-2 drop-shadow-md">
                                         {theme.name}
                                       </span>
                                     </div>
-                                    
+
                                     {isSelected && !isDisabled && (
                                       <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
                                         <Check className="w-4 h-4 text-primary-foreground" />
                                       </div>
                                     )}
-                                    
+
                                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
                                       <p className="text-white text-sm font-semibold text-center truncate">
                                         {theme.name}
