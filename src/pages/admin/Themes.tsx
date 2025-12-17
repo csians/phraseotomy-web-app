@@ -455,14 +455,6 @@ export default function Themes() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Icon (Emoji)</Label>
-                        <Input
-                          value={newTheme.icon}
-                          onChange={(e) => setNewTheme({ ...newTheme, icon: e.target.value })}
-                          placeholder="🎮"
-                        />
-                      </div>
-                      <div className="space-y-2">
                         <Label>Pack (Optional - for expansion themes)</Label>
                         <Select
                           value={newTheme.pack_id || "_none"}
@@ -530,7 +522,6 @@ export default function Themes() {
                           onClick={() => handleSelectTheme(theme)}
                         >
                           <TableCell className="font-medium">
-                            <span className="mr-2">{theme.icon}</span>
                             {theme.name}
                           </TableCell>
                           <TableCell>
@@ -809,7 +800,6 @@ export default function Themes() {
                             elements.filter(e => !e.is_whisp).map(element => (
                               <TableRow key={element.id}>
                                 <TableCell className="font-medium">
-                                  <span className="mr-2">{element.icon}</span>
                                   {element.name}
                                 </TableCell>
                                 <TableCell>
