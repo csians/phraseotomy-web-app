@@ -578,9 +578,9 @@ export default function CreateLobby() {
                                     )}
 
                                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                                      <p className="text-white text-sm font-semibold text-center truncate">
+                                      {/* <p className="text-white text-sm font-semibold text-center truncate">
                                         {theme.name}
-                                      </p>
+                                      </p> */}
                                     </div>
                                   </button>
                                 );
