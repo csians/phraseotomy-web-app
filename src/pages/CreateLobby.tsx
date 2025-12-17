@@ -546,16 +546,22 @@ export default function CreateLobby() {
                             <div className="grid grid-cols-4 gap-3">
                               {otherThemes.map((theme) => {
                                 const isSelected = selectedTheme === theme.id;
+                                // Disabled themes - not clickable
+                                const disabledThemeNames = ['adult', 'core', 'fantasy', 'horror', 'sci-fi'];
+                                const isDisabled = disabledThemeNames.includes(theme.name.toLowerCase());
                                 
                                 return (
                                   <button
                                     key={theme.id}
                                     type="button"
-                                    onClick={() => setSelectedTheme(theme.id)}
+                                    onClick={() => !isDisabled && setSelectedTheme(theme.id)}
+                                    disabled={isDisabled}
                                     className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                                      isSelected 
-                                        ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105" 
-                                        : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
+                                      isDisabled
+                                        ? "border-transparent opacity-50 cursor-not-allowed grayscale"
+                                        : isSelected 
+                                          ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105" 
+                                          : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
                                     }`}
                                   >
                                     <div 
@@ -572,7 +578,7 @@ export default function CreateLobby() {
                                       </span>
                                     </div>
                                     
-                                    {isSelected && (
+                                    {isSelected && !isDisabled && (
                                       <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
                                         <Check className="w-4 h-4 text-primary-foreground" />
                                       </div>
