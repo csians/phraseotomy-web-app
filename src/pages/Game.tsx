@@ -389,43 +389,47 @@ export default function Game() {
           // CRITICAL: Set ref IMMEDIATELY (before state) to block any concurrent refreshes
           isAnnouncingWinnerRef.current = true;
           
+          // Clear any round transition dialog that might be showing
+          setIsRoundTransitioning(false);
+          setRoundResultMessage(null);
+          
           // Show "Announcing Winner" loading first
           setIsAnnouncingWinner(true);
           
+          // Update players immediately with WebSocket data
+          if (message.players && message.players.length > 0) {
+            console.log("🏆 Using players from WebSocket message:", message.players);
+            setPlayers(message.players);
+            determineWinnerAndTies(message.players);
+            fetchLifetimePoints(message.players);
+          }
+          
           // After 3 seconds, show the actual winner dialog
-          setTimeout(() => {
-            if (message.players && message.players.length > 0) {
-              console.log("🏆 Using players from WebSocket message:", message.players);
-              setPlayers(message.players);
-              determineWinnerAndTies(message.players);
-              fetchLifetimePoints(message.players);
-            } else {
-              // Fallback: Fetch from database
+          setTimeout(async () => {
+            // If no players from WebSocket, fetch from database
+            if (!message.players || message.players.length === 0) {
               console.log("🔄 No players in message, fetching from database...");
-              const fetchAndShowWinner = async () => {
-                try {
-                  const { data: latestPlayers } = await supabase
-                    .from("game_players")
-                    .select("id, player_id, name, score, turn_order")
-                    .eq("session_id", sessionId)
-                    .order("score", { ascending: false });
-                  
-                  const playersForCompletion = (latestPlayers && latestPlayers.length > 0) 
-                    ? latestPlayers 
-                    : players;
-                  
-                  console.log("🏆 Players from DB:", playersForCompletion);
-                  setPlayers(playersForCompletion);
-                  determineWinnerAndTies(playersForCompletion);
-                  fetchLifetimePoints(playersForCompletion);
-                } catch (err) {
-                  console.error("Error fetching players for game completion:", err);
-                  // Last fallback: use current players state
-                  determineWinnerAndTies(players);
-                  fetchLifetimePoints(players);
-                }
-              };
-              fetchAndShowWinner();
+              try {
+                const { data: latestPlayers } = await supabase
+                  .from("game_players")
+                  .select("id, player_id, name, score, turn_order")
+                  .eq("session_id", sessionId)
+                  .order("score", { ascending: false });
+                
+                const playersForCompletion = (latestPlayers && latestPlayers.length > 0) 
+                  ? latestPlayers 
+                  : players;
+                
+                console.log("🏆 Players from DB:", playersForCompletion);
+                setPlayers(playersForCompletion);
+                determineWinnerAndTies(playersForCompletion);
+                fetchLifetimePoints(playersForCompletion);
+              } catch (err) {
+                console.error("Error fetching players for game completion:", err);
+                // Last fallback: use current players state
+                determineWinnerAndTies(players);
+                fetchLifetimePoints(players);
+              }
             }
             // Set ref BEFORE state to prevent race conditions
             gameCompletedRef.current = true;
@@ -972,6 +976,8 @@ export default function Game() {
   };
 
   const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any) => {
+    console.log("📝 handleGuessSubmit called:", { gameCompletedFromGuess, wasCorrect, whisp, playersCount: playersFromGuess?.length });
+    
     toast({
       title: "Guess Submitted!",
       description: "Waiting for other players...",
@@ -979,12 +985,23 @@ export default function Game() {
     
     // If game just completed, show result for 3 seconds before winner dialog
     if (gameCompletedFromGuess && playersFromGuess && playersFromGuess.length > 0) {
-      console.log("🎉 Game completed from guess submission");
+      console.log("🎉 Game completed from guess submission, wasCorrect:", wasCorrect);
+      
+      // IMMEDIATELY broadcast game_completed to other players (don't wait)
+      const sortedPlayers = [...playersFromGuess].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
+      sendWebSocketMessage({
+        type: "game_completed",
+        winnerId: sortedPlayers[0]?.player_id,
+        winnerName: sortedPlayers[0]?.name,
+        players: playersFromGuess,
+      });
       
       // Show round result for 3 seconds so player can see if they were right/wrong
+      // Use explicit boolean check - wasCorrect is explicitly true or false from API
+      const isCorrect = wasCorrect === true;
       setRoundResultMessage({
-        correct: wasCorrect || false,
-        message: wasCorrect 
+        correct: isCorrect,
+        message: isCorrect 
           ? `Correct! The answer was "${whisp || currentTurn?.whisp || '?'}". Game complete!` 
           : `Wrong answer. The answer was "${whisp || currentTurn?.whisp || '?'}". Game complete!`,
       });
@@ -1009,28 +1026,19 @@ export default function Game() {
           setGameCompleted(true);
           fetchLifetimePoints(playersFromGuess);
         }, 3000);
-        
-        // Get sorted players for WebSocket message
-        const sortedPlayers = [...playersFromGuess].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-        
-        // Notify other players
-        sendWebSocketMessage({
-          type: "game_completed",
-          winnerId: sortedPlayers[0]?.player_id,
-          winnerName: sortedPlayers[0]?.name,
-          players: playersFromGuess,
-        });
       }, 3000);
       return;
     }
     
     // If all players answered but game continues (next round), show result for 3 seconds for the submitting player
     if (nextRound && nextRound.newStorytellerId && !gameCompletedFromGuess) {
-      console.log("📢 Round complete, showing result before next round");
+      console.log("📢 Round complete, showing result before next round, wasCorrect:", wasCorrect);
       
+      // Use explicit boolean check
+      const isCorrect = wasCorrect === true;
       setRoundResultMessage({
-        correct: wasCorrect || false,
-        message: wasCorrect 
+        correct: isCorrect,
+        message: isCorrect 
           ? `Correct! The answer was "${whisp || currentTurn?.whisp || '?'}". ${nextRound.newStorytellerName}'s turn next!`
           : `The answer was "${whisp || currentTurn?.whisp || '?'}". ${nextRound.newStorytellerName}'s turn next!`,
       });

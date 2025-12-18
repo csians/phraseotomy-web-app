@@ -199,13 +199,17 @@ export function GuessingInterface({
       if (error) throw error;
 
       const { correct, points_earned, game_completed, next_round, whisp, all_players_answered } = data;
+      console.log("📊 Guess result from API:", { correct, points_earned, game_completed, whisp, all_players_answered });
+      
       setHasSubmitted(true);
 
-      if (correct) {
+      if (correct === true) {
         toast({
           title: "🎉 Correct!",
           description: `You guessed "${trimmedGuess}" and earned ${points_earned} points!`,
         });
+        // Lock out after correct answer too - player already answered this round
+        setIsLockedOut(true);
       } else {
         setIsLockedOut(true);
         toast({
@@ -227,8 +231,8 @@ export function GuessingInterface({
         });
       }
       
-      // Notify parent with game completion info, players data, correctness, and whisp
-      onGuessSubmit(game_completed, next_round?.players, correct, whisp, next_round);
+      // Notify parent with game completion info, players data, correctness (explicit boolean), and whisp
+      onGuessSubmit(game_completed, next_round?.players, correct === true, whisp, next_round);
     } catch (error) {
       console.error("Error submitting guess:", error);
       toast({
