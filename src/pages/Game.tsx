@@ -386,6 +386,9 @@ export default function Game() {
             return;
           }
           
+          // CRITICAL: Set ref IMMEDIATELY (before state) to block any concurrent refreshes
+          isAnnouncingWinnerRef.current = true;
+          
           // Show "Announcing Winner" loading first
           setIsAnnouncingWinner(true);
           
@@ -424,6 +427,8 @@ export default function Game() {
               };
               fetchAndShowWinner();
             }
+            // Set ref BEFORE state to prevent race conditions
+            gameCompletedRef.current = true;
             setIsAnnouncingWinner(false);
             setGameCompleted(true);
           }, 3000);
@@ -710,6 +715,9 @@ export default function Game() {
               return;
             }
             
+            // CRITICAL: Set refs IMMEDIATELY (before state) to block any concurrent refreshes
+            isAnnouncingWinnerRef.current = true;
+            
             // Show "Announcing Winner" loading first (same as WebSocket handler)
             setIsAnnouncingWinner(true);
             
@@ -724,7 +732,7 @@ export default function Game() {
                 
                 if (latestPlayers && latestPlayers.length > 0) {
                   setPlayers(latestPlayers);
-                  setGameWinner(latestPlayers[0] || null);
+                  determineWinnerAndTies(latestPlayers); // Use proper tie detection
                   fetchLifetimePoints(latestPlayers);
                 }
               } catch (err) {
@@ -734,6 +742,8 @@ export default function Game() {
               // After 3 seconds, show winner dialog
               setTimeout(() => {
                 setIsAnnouncingWinner(false);
+                // Set ref BEFORE state to prevent race conditions
+                gameCompletedRef.current = true;
                 setGameCompleted(true);
               }, 3000);
             };
@@ -987,10 +997,14 @@ export default function Game() {
         
         setPlayers(playersFromGuess);
         determineWinnerAndTies(playersFromGuess);
+        // Set ref BEFORE state to block concurrent refreshes
+        isAnnouncingWinnerRef.current = true;
         setIsAnnouncingWinner(true);
         
         // After another 3 seconds of "Announcing Winner", show the actual dialog
         setTimeout(() => {
+          // Set ref BEFORE state to prevent race conditions
+          gameCompletedRef.current = true;
           setIsAnnouncingWinner(false);
           setGameCompleted(true);
           fetchLifetimePoints(playersFromGuess);
