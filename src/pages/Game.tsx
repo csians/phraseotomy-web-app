@@ -101,6 +101,7 @@ export default function Game() {
   // Refs to track completion state for use in callbacks (avoid stale closures)
   const gameCompletedRef = useRef(false);
   const isAnnouncingWinnerRef = useRef(false);
+  const isModeSelectingRef = useRef(false); // Prevent refresh during mode selection
   const [lifetimePoints, setLifetimePoints] = useState<Record<string, number>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
@@ -113,9 +114,9 @@ export default function Game() {
 
   // Debounced refresh to prevent infinite loops
   const debouncedRefresh = useCallback(() => {
-    // Don't refresh if game is completed or announcing winner (use refs to get current values)
-    if (gameCompletedRef.current || isAnnouncingWinnerRef.current) {
-      console.log("Skipping refresh - game completed or announcing winner");
+    // Don't refresh if game is completed, announcing winner, or selecting mode
+    if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current) {
+      console.log("Skipping refresh - game completed, announcing winner, or selecting mode");
       return;
     }
 
@@ -345,7 +346,7 @@ export default function Game() {
           break;
 
         case "next_turn":
-          // Show round transition with 3-second delay so players can see the answer
+          // Show round transition with 3-second delay so ALL players can see the answer
           setRoundResultMessage({
             correct: false,
             message: `The answer was "${message.secretElement || currentTurn?.whisp || '?'}". ${message.newStorytellerName}'s turn next!`,
@@ -355,7 +356,23 @@ export default function Game() {
           setTimeout(() => {
             setIsRoundTransitioning(false);
             setRoundResultMessage(null);
-            debouncedRefresh();
+            // Small delay before refresh to ensure UI transition completes
+            setTimeout(() => debouncedRefresh(), 100);
+          }, 3000);
+          break;
+
+        case "round_result":
+          // Show round result for all players (correct answer revealed)
+          console.log("📢 Round result received:", message);
+          setRoundResultMessage({
+            correct: false,
+            message: `The answer was "${message.secretElement}". Next round starting...`,
+          });
+          setIsRoundTransitioning(true);
+          
+          setTimeout(() => {
+            setIsRoundTransitioning(false);
+            setRoundResultMessage(null);
           }, 3000);
           break;
 
@@ -503,9 +520,9 @@ export default function Game() {
   ]);
 
   const initializeGame = async () => {
-    // Don't reinitialize if game is already completed or announcing winner (use refs for current values)
-    if (gameCompletedRef.current || isAnnouncingWinnerRef.current) {
-      console.log("Skipping initializeGame - game completed or announcing winner");
+    // Don't reinitialize if game is already completed, announcing winner, or selecting mode
+    if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current) {
+      console.log("Skipping initializeGame - game completed, announcing winner, or selecting mode");
       setLoading(false);
       return;
     }
@@ -843,6 +860,8 @@ export default function Game() {
 
   // Handle mode selection
   const handleModeSelect = async (mode: "audio" | "elements") => {
+    // Set flag to prevent refresh during mode selection
+    isModeSelectingRef.current = true;
     setSelectedTurnMode(mode);
     setIsGeneratingWhisp(true);
 
@@ -921,6 +940,8 @@ export default function Game() {
       });
     } finally {
       setIsGeneratingWhisp(false);
+      // Clear mode selecting flag after completion
+      isModeSelectingRef.current = false;
     }
   };
 
@@ -932,7 +953,7 @@ export default function Game() {
     initializeGame();
   };
 
-  const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[], wasCorrect?: boolean) => {
+  const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any) => {
     toast({
       title: "Guess Submitted!",
       description: "Waiting for other players...",
@@ -946,8 +967,8 @@ export default function Game() {
       setRoundResultMessage({
         correct: wasCorrect || false,
         message: wasCorrect 
-          ? "Correct! Game complete - announcing winner..." 
-          : `Wrong answer. Game complete - announcing winner...`,
+          ? `Correct! The answer was "${whisp || currentTurn?.whisp || '?'}". Game complete!` 
+          : `Wrong answer. The answer was "${whisp || currentTurn?.whisp || '?'}". Game complete!`,
       });
       setIsRoundTransitioning(true);
       
@@ -977,6 +998,27 @@ export default function Game() {
           winnerName: sortedPlayers[0]?.name,
           players: playersFromGuess,
         });
+      }, 3000);
+      return;
+    }
+    
+    // If all players answered but game continues (next round), show result for 3 seconds for the submitting player
+    if (nextRound && nextRound.newStorytellerId && !gameCompletedFromGuess) {
+      console.log("📢 Round complete, showing result before next round");
+      
+      setRoundResultMessage({
+        correct: wasCorrect || false,
+        message: wasCorrect 
+          ? `Correct! The answer was "${whisp || currentTurn?.whisp || '?'}". ${nextRound.newStorytellerName}'s turn next!`
+          : `The answer was "${whisp || currentTurn?.whisp || '?'}". ${nextRound.newStorytellerName}'s turn next!`,
+      });
+      setIsRoundTransitioning(true);
+      
+      setTimeout(() => {
+        setIsRoundTransitioning(false);
+        setRoundResultMessage(null);
+        // Small delay before refresh
+        setTimeout(() => initializeGame(), 100);
       }, 3000);
       return;
     }
@@ -1365,6 +1407,7 @@ export default function Game() {
               onGuessSubmit={handleGuessSubmit}
               selectedIcons={selectedIcons}
               turnMode={currentTurn.turn_mode || "audio"}
+              sendWebSocketMessage={sendWebSocketMessage}
             />
           )}
 

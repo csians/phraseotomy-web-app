@@ -14,9 +14,10 @@ interface GuessingInterfaceProps {
   sessionId: string;
   roundNumber: number;
   playerId: string;
-  onGuessSubmit: (gameCompleted?: boolean, players?: any[], wasCorrect?: boolean) => void;
+  onGuessSubmit: (gameCompleted?: boolean, players?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any) => void;
   selectedIcons?: IconItem[];
   turnMode?: "audio" | "elements";
+  sendWebSocketMessage?: (message: any) => void;
 }
 
 export function GuessingInterface({
@@ -29,6 +30,7 @@ export function GuessingInterface({
   onGuessSubmit,
   selectedIcons = [],
   turnMode = "audio",
+  sendWebSocketMessage,
 }: GuessingInterfaceProps) {
   const { toast } = useToast();
   const [guess, setGuess] = useState("");
@@ -196,7 +198,7 @@ export function GuessingInterface({
 
       if (error) throw error;
 
-      const { correct, points_earned, game_completed, next_round } = data;
+      const { correct, points_earned, game_completed, next_round, whisp, all_players_answered } = data;
       setHasSubmitted(true);
 
       if (correct) {
@@ -214,8 +216,19 @@ export function GuessingInterface({
         });
       }
       
-      // Notify parent with game completion info, players data, and correctness
-      onGuessSubmit(game_completed, next_round?.players, correct);
+      // Broadcast round result to all players when all have answered (non-game-completing round)
+      if (all_players_answered && !game_completed && next_round && sendWebSocketMessage) {
+        sendWebSocketMessage({
+          type: "next_turn",
+          roundNumber: next_round.roundNumber,
+          newStorytellerId: next_round.newStorytellerId,
+          newStorytellerName: next_round.newStorytellerName,
+          secretElement: whisp,
+        });
+      }
+      
+      // Notify parent with game completion info, players data, correctness, and whisp
+      onGuessSubmit(game_completed, next_round?.players, correct, whisp, next_round);
     } catch (error) {
       console.error("Error submitting guess:", error);
       toast({
