@@ -409,8 +409,8 @@ export default function CreateLobby() {
                     <div
                       className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                         gameMode === "live"
-                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[0.02]"
-                          : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[0.02] hover:shadow-sm"
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md"
+                          : "border-border hover:border-primary/40 hover:bg-muted/50 hover:shadow-sm"
                       }`}
                       onClick={() => setGameMode("live")}
                     >
@@ -428,8 +428,8 @@ export default function CreateLobby() {
                     <div
                       className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                         gameMode === "async"
-                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[0.02]"
-                          : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[0.02] hover:shadow-sm"
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md"
+                          : "border-border hover:border-primary/40 hover:bg-muted/50 hover:shadow-sm"
                       }`}
                       onClick={() => setGameMode("async")}
                     >
