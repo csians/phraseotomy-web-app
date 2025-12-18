@@ -154,6 +154,9 @@ export function GuessingInterface({
   };
 
   const formatTime = (time: number) => {
+    if (!isFinite(time) || isNaN(time) || time < 0) {
+      return "0:00";
+    }
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -281,14 +284,14 @@ export function GuessingInterface({
                   <div className="flex-1 space-y-1">
                     <Slider
                       value={[currentTime]}
-                      max={duration || 100}
+                      max={duration > 0 ? duration : 1}
                       step={0.1}
                       onValueChange={handleSeek}
                       className="cursor-pointer"
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>{formatTime(currentTime)}</span>
-                      <span>{formatTime(duration)}</span>
+                      <span>{duration > 0 ? formatTime(duration) : "--:--"}</span>
                     </div>
                   </div>
                 </div>
