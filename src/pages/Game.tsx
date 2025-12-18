@@ -731,7 +731,7 @@ export default function Game() {
           // Check if game was just completed - show winner popup for everyone
           const newStatus = (payload.new as any)?.status;
           if (newStatus === "completed" || newStatus === "expired") {
-            console.log("🎉 Game session status changed to:", newStatus);
+            console.log("🎉 Game session status changed to (via Realtime):", newStatus);
             
             // Don't process if already announcing or completed (use refs for current values)
             if (isAnnouncingWinnerRef.current || gameCompletedRef.current) {
@@ -742,12 +742,28 @@ export default function Game() {
             // CRITICAL: Set refs IMMEDIATELY (before state) to block any concurrent refreshes
             isAnnouncingWinnerRef.current = true;
             
-            // Show "Announcing Winner" loading first (same as WebSocket handler)
-            setIsAnnouncingWinner(true);
-            
-            // Fetch latest players and show completion dialog after 3 seconds
+            // Fetch latest turn data to show round result first (same as WebSocket handler)
             const fetchAndShowCompletion = async () => {
               try {
+                // Fetch latest turn to get the secret answer
+                const { data: latestTurn } = await supabase
+                  .from("game_turns")
+                  .select("whisp, completed_at")
+                  .eq("session_id", sessionId)
+                  .order("round_number", { ascending: false })
+                  .limit(1)
+                  .single();
+                
+                const secretElement = latestTurn?.whisp || "?";
+                
+                // FIRST: Show round result for 5 seconds so ALL players see the answer
+                setRoundResultMessage({
+                  correct: false, // Realtime fallback doesn't know if correct, show neutral
+                  message: `The answer was "${secretElement}". Game complete!`,
+                });
+                setIsRoundTransitioning(true);
+                
+                // Fetch latest players
                 const { data: latestPlayers } = await supabase
                   .from("game_players")
                   .select("id, player_id, name, score, turn_order")
@@ -756,20 +772,37 @@ export default function Game() {
                 
                 if (latestPlayers && latestPlayers.length > 0) {
                   setPlayers(latestPlayers);
-                  determineWinnerAndTies(latestPlayers); // Use proper tie detection
                   fetchLifetimePoints(latestPlayers);
                 }
+                
+                // After 5 seconds, start winner announcement
+                setTimeout(() => {
+                  setIsRoundTransitioning(false);
+                  setRoundResultMessage(null);
+                  setIsAnnouncingWinner(true);
+                  
+                  // Determine winner/tie
+                  if (latestPlayers && latestPlayers.length > 0) {
+                    determineWinnerAndTies(latestPlayers);
+                  }
+                  
+                  // After 3 more seconds, show winner dialog
+                  setTimeout(() => {
+                    setIsAnnouncingWinner(false);
+                    gameCompletedRef.current = true;
+                    setGameCompleted(true);
+                  }, 3000);
+                }, 5000);
               } catch (err) {
-                console.error("Error fetching players for completion:", err);
+                console.error("Error fetching data for completion:", err);
+                // Fallback - just show winner dialog
+                setIsAnnouncingWinner(true);
+                setTimeout(() => {
+                  setIsAnnouncingWinner(false);
+                  gameCompletedRef.current = true;
+                  setGameCompleted(true);
+                }, 3000);
               }
-              
-              // After 3 seconds, show winner dialog
-              setTimeout(() => {
-                setIsAnnouncingWinner(false);
-                // Set ref BEFORE state to prevent race conditions
-                gameCompletedRef.current = true;
-                setGameCompleted(true);
-              }, 3000);
             };
             fetchAndShowCompletion();
           } else {
