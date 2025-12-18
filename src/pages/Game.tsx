@@ -1386,17 +1386,23 @@ export default function Game() {
 
       {/* Round Transition Dialog - shows answer for 3 seconds between rounds */}
       <Dialog open={isRoundTransitioning} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
           <div className="flex flex-col items-center justify-center py-8 space-y-6">
-            <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
-              <span className="text-3xl">📢</span>
+            <div className={`h-16 w-16 rounded-full flex items-center justify-center ${roundResultMessage?.correct ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+              <span className="text-3xl">{roundResultMessage?.correct ? '✅' : '❌'}</span>
             </div>
             <div className="text-center space-y-3">
-              <h2 className="text-2xl font-bold text-foreground">Round Complete!</h2>
+              <h2 className="text-2xl font-bold text-foreground">
+                {roundResultMessage?.correct ? 'Correct!' : 'Wrong Answer'}
+              </h2>
               {roundResultMessage && (
-                <p className="text-lg text-muted-foreground">{roundResultMessage.message}</p>
+                <p className={`text-lg ${roundResultMessage.correct ? 'text-green-500' : 'text-red-500'}`}>
+                  {roundResultMessage.message}
+                </p>
               )}
-              <p className="text-sm text-muted-foreground animate-pulse">Next round starting...</p>
+              <p className="text-sm text-muted-foreground animate-pulse">
+                {roundResultMessage?.message.includes('Game complete') ? 'Calculating results...' : 'Next round starting...'}
+              </p>
             </div>
             <div className="flex gap-1">
               <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />

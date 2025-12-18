@@ -6,7 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Send, Volume2, Play, Pause } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { IconSelectionPanel, IconItem } from "@/components/IconSelectionPanel";
-import { Slider } from "@/components/ui/slider";
 
 interface GuessingInterfaceProps {
   storytellerName: string;
@@ -273,7 +272,7 @@ export function GuessingInterface({
                     variant="outline"
                     size="icon"
                     onClick={togglePlayPause}
-                    className="h-12 w-12 rounded-full border-2 border-primary bg-primary/10 hover:bg-primary/20"
+                    className="h-12 w-12 rounded-full border-2 border-primary bg-primary/10 hover:bg-primary/20 flex-shrink-0"
                   >
                     {isPlaying ? (
                       <Pause className="h-5 w-5 text-primary" />
@@ -281,14 +280,31 @@ export function GuessingInterface({
                       <Play className="h-5 w-5 text-primary ml-0.5" />
                     )}
                   </Button>
-                  <div className="flex-1 space-y-1">
-                    <Slider
-                      value={[currentTime]}
-                      max={duration > 0 ? duration : 1}
-                      step={0.1}
-                      onValueChange={handleSeek}
-                      className="cursor-pointer"
-                    />
+                  <div className="flex-1 space-y-2">
+                    {/* Custom Progress Bar */}
+                    <div 
+                      className="relative h-3 w-full bg-muted rounded-full cursor-pointer overflow-hidden"
+                      onClick={(e) => {
+                        if (!audioRef.current || duration <= 0) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const percentage = clickX / rect.width;
+                        const newTime = percentage * duration;
+                        audioRef.current.currentTime = newTime;
+                        setCurrentTime(newTime);
+                      }}
+                    >
+                      {/* Progress Fill */}
+                      <div 
+                        className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-100"
+                        style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
+                      />
+                      {/* Thumb/Dot */}
+                      <div 
+                        className="absolute top-1/2 -translate-y-1/2 h-5 w-5 bg-primary rounded-full border-2 border-background shadow-lg transition-all duration-100"
+                        style={{ left: duration > 0 ? `calc(${(currentTime / duration) * 100}% - 10px)` : '0px' }}
+                      />
+                    </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>{formatTime(currentTime)}</span>
                       <span>{duration > 0 ? formatTime(duration) : "--:--"}</span>
