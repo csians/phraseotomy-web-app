@@ -282,11 +282,14 @@ serve(async (req) => {
 
         case "next_turn":
           // Moving to next turn - notify ALL
+          // Pass through optional fields (secretElement/wasCorrect) so clients can show correct popup
           broadcastToAll(sessionId, {
             type: "next_turn",
             roundNumber: message.roundNumber,
             newStorytellerId: message.newStorytellerId,
             newStorytellerName: message.newStorytellerName,
+            secretElement: message.secretElement,
+            wasCorrect: message.wasCorrect === true,
             timestamp: new Date().toISOString(),
           });
           break;

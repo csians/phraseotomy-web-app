@@ -208,8 +208,7 @@ export function GuessingInterface({
           title: "🎉 Correct!",
           description: `You guessed "${trimmedGuess}" and earned ${points_earned} points!`,
         });
-        // Lock out after correct answer too - player already answered this round
-        setIsLockedOut(true);
+        // Correct guess: lock via hasSubmitted (no "wrong" lockout UI)
       } else {
         setIsLockedOut(true);
         toast({
