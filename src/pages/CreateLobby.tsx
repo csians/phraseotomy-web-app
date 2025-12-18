@@ -407,10 +407,10 @@ export default function CreateLobby() {
                 <RadioGroup value={gameMode} onValueChange={(v) => setGameMode(v as "live" | "async")}>
                   <div className="flex flex-row gap-3 overflow-x-auto pb-2">
                     <div
-                      className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                         gameMode === "live"
-                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md"
-                          : "border-border hover:border-primary/50 hover:bg-accent hover:text-accent-foreground"
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[1.02]"
+                          : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[1.02] hover:shadow-sm"
                       }`}
                       onClick={() => setGameMode("live")}
                     >
@@ -423,10 +423,10 @@ export default function CreateLobby() {
                       </div>
                     </div>
                     <div
-                      className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                         gameMode === "async"
-                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md"
-                          : "border-border hover:border-primary/50 hover:bg-accent hover:text-accent-foreground"
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[1.02]"
+                          : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[1.02] hover:shadow-sm"
                       }`}
                       onClick={() => setGameMode("async")}
                     >
@@ -456,10 +456,10 @@ export default function CreateLobby() {
                       ).map(([key, preset]) => (
                         <div
                           key={key}
-                          className={`flex flex-col items-center p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${
+                          className={`flex flex-col items-center p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 text-center ${
                             timerPreset === key
-                              ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md"
-                              : "border-border hover:border-primary/50 hover:bg-accent hover:text-accent-foreground"
+                              ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[1.02]"
+                              : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[1.02] hover:shadow-sm"
                           }`}
                           onClick={() => setTimerPreset(key)}
                         >
@@ -474,9 +474,12 @@ export default function CreateLobby() {
                       ))}
                     </div>
                   </RadioGroup>
-                  <p className="text-xs text-muted-foreground">
-                    Story time / Guess time. Auto-submits when timer expires.
-                  </p>
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
+                    <span className="text-amber-500 text-sm">⚠️</span>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      Story time / Guess time. Auto-submits when timer expires.
+                    </p>
+                  </div>
                 </div>
               )}
 
