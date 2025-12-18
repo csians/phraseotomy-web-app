@@ -407,14 +407,14 @@ export default function CreateLobby() {
                 <RadioGroup value={gameMode} onValueChange={(v) => setGameMode(v as "live" | "async")}>
                   <div className="flex flex-row gap-3 overflow-x-auto pb-2">
                     <div
-                      className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                      className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                         gameMode === "live"
                           ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[1.02]"
                           : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[1.02] hover:shadow-sm"
                       }`}
                       onClick={() => setGameMode("live")}
                     >
-                      <RadioGroupItem value="live" id="live" className="mt-0.5" />
+                      <RadioGroupItem value="live" id="live" className="mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
                         <Label htmlFor="live" className={`cursor-pointer font-medium ${gameMode === "live" ? "text-primary" : ""}`}>
                           ⏱️ Live Mode
@@ -423,14 +423,14 @@ export default function CreateLobby() {
                       </div>
                     </div>
                     <div
-                      className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                      className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                         gameMode === "async"
                           ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[1.02]"
                           : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[1.02] hover:shadow-sm"
                       }`}
                       onClick={() => setGameMode("async")}
                     >
-                      <RadioGroupItem value="async" id="async" className="mt-0.5" />
+                      <RadioGroupItem value="async" id="async" className="mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
                         <Label htmlFor="async" className={`cursor-pointer font-medium ${gameMode === "async" ? "text-primary" : ""}`}>
                           📬 Async Mode
@@ -475,7 +475,7 @@ export default function CreateLobby() {
                     </div>
                   </RadioGroup>
                   <div className="flex items-center gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
-                    <span className="text-amber-500 text-sm">⚠️</span>
+                    <span className="text-amber-500 text-sm font-bold">*</span>
                     <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
                       Story time / Guess time. Auto-submits when timer expires.
                     </p>
