@@ -228,6 +228,7 @@ export function GuessingInterface({
           newStorytellerId: next_round.newStorytellerId,
           newStorytellerName: next_round.newStorytellerName,
           secretElement: whisp,
+          wasCorrect: correct === true,
         });
       }
       
