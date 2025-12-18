@@ -94,6 +94,9 @@ export default function Game() {
   const [gameCompleted, setGameCompleted] = useState(false);
   const [isAnnouncingWinner, setIsAnnouncingWinner] = useState(false);
   const [gameWinner, setGameWinner] = useState<Player | null>(null);
+  const [isTieGame, setIsTieGame] = useState(false);
+  const [isRoundTransitioning, setIsRoundTransitioning] = useState(false);
+  const [roundResultMessage, setRoundResultMessage] = useState<{correct: boolean; message: string} | null>(null);
   
   // Refs to track completion state for use in callbacks (avoid stale closures)
   const gameCompletedRef = useRef(false);
@@ -180,6 +183,30 @@ export default function Game() {
       setLifetimePoints(pointsMap);
     } catch (err) {
       console.error("Failed to fetch lifetime points:", err);
+    }
+  };
+
+  // Helper function to determine winner and detect ties
+  const determineWinnerAndTies = (playersData: Player[]) => {
+    if (!playersData || playersData.length === 0) {
+      setGameWinner(null);
+      setIsTieGame(false);
+      return;
+    }
+    
+    const sortedPlayers = [...playersData].sort((a, b) => (b.score || 0) - (a.score || 0));
+    const highestScore = sortedPlayers[0]?.score || 0;
+    
+    // Count how many players have the highest score
+    const playersWithHighestScore = sortedPlayers.filter(p => (p.score || 0) === highestScore);
+    
+    if (playersWithHighestScore.length > 1) {
+      // It's a tie
+      setIsTieGame(true);
+      setGameWinner(null);
+    } else {
+      setIsTieGame(false);
+      setGameWinner(sortedPlayers[0] || null);
     }
   };
   
@@ -318,11 +345,18 @@ export default function Game() {
           break;
 
         case "next_turn":
-          toast({
-            title: "Next Turn",
-            description: `${message.newStorytellerName}'s turn to tell a story!`,
+          // Show round transition with 3-second delay so players can see the answer
+          setRoundResultMessage({
+            correct: false,
+            message: `The answer was "${message.secretElement || currentTurn?.whisp || '?'}". ${message.newStorytellerName}'s turn next!`,
           });
-          debouncedRefresh();
+          setIsRoundTransitioning(true);
+          
+          setTimeout(() => {
+            setIsRoundTransitioning(false);
+            setRoundResultMessage(null);
+            debouncedRefresh();
+          }, 3000);
           break;
 
       case "game_completed":
@@ -342,8 +376,7 @@ export default function Game() {
             if (message.players && message.players.length > 0) {
               console.log("🏆 Using players from WebSocket message:", message.players);
               setPlayers(message.players);
-              const sortedPlayers = [...message.players].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-              setGameWinner(sortedPlayers[0] || null);
+              determineWinnerAndTies(message.players);
               fetchLifetimePoints(message.players);
             } else {
               // Fallback: Fetch from database
@@ -362,14 +395,12 @@ export default function Game() {
                   
                   console.log("🏆 Players from DB:", playersForCompletion);
                   setPlayers(playersForCompletion);
-                  const sortedPlayers = [...playersForCompletion].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-                  setGameWinner(sortedPlayers[0] || null);
+                  determineWinnerAndTies(playersForCompletion);
                   fetchLifetimePoints(playersForCompletion);
                 } catch (err) {
                   console.error("Error fetching players for game completion:", err);
                   // Last fallback: use current players state
-                  const sortedPlayers = [...players].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-                  setGameWinner(sortedPlayers[0] || null);
+                  determineWinnerAndTies(players);
                   fetchLifetimePoints(players);
                 }
               };
@@ -522,10 +553,8 @@ export default function Game() {
         setSession(data.session);
         setPlayers(data.players || []);
 
-        // Find winner and show completion dialog
-        const sortedPlayers = [...(data.players || [])].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-        const winner = sortedPlayers[0] || null;
-        setGameWinner(winner);
+        // Find winner (or detect tie) and show completion dialog
+        determineWinnerAndTies(data.players || []);
         setGameCompleted(true);
         
         // Fetch lifetime points for completed game
@@ -913,10 +942,12 @@ export default function Game() {
     if (gameCompletedFromGuess && playersFromGuess && playersFromGuess.length > 0) {
       console.log("🎉 Game completed from guess submission");
       setPlayers(playersFromGuess);
-      const sortedPlayers = [...playersFromGuess].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-      setGameWinner(sortedPlayers[0] || null);
+      determineWinnerAndTies(playersFromGuess);
       setGameCompleted(true);
       fetchLifetimePoints(playersFromGuess);
+      
+      // Get sorted players for WebSocket message
+      const sortedPlayers = [...playersFromGuess].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
       
       // Notify other players
       sendWebSocketMessage({
@@ -1104,8 +1135,8 @@ export default function Game() {
 
         {/* Status Indicators - Timer and Connection */}
         <div className="fixed top-20 right-4 z-50 flex flex-col gap-2 items-end">
-          {/* Game Timer - only show when game is not completed */}
-          {!gameCompleted && currentTurn && (gamePhase === "storytelling" || gamePhase === "elements") && session.story_time_seconds && (
+          {/* Game Timer - show during mode selection, storytelling, elements, and guessing phases */}
+          {!gameCompleted && currentTurn && (gamePhase === "selecting_mode" || gamePhase === "storytelling" || gamePhase === "elements") && session.story_time_seconds && (
             <GameTimer
               totalSeconds={session.story_time_seconds}
               startTime={currentTurn.created_at}
@@ -1331,6 +1362,29 @@ export default function Game() {
         </main>
       </div>
 
+      {/* Round Transition Dialog - shows answer for 3 seconds between rounds */}
+      <Dialog open={isRoundTransitioning} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <div className="flex flex-col items-center justify-center py-8 space-y-6">
+            <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
+              <span className="text-3xl">📢</span>
+            </div>
+            <div className="text-center space-y-3">
+              <h2 className="text-2xl font-bold text-foreground">Round Complete!</h2>
+              {roundResultMessage && (
+                <p className="text-lg text-muted-foreground">{roundResultMessage.message}</p>
+              )}
+              <p className="text-sm text-muted-foreground animate-pulse">Next round starting...</p>
+            </div>
+            <div className="flex gap-1">
+              <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Announcing Winner Loading Dialog */}
       <Dialog open={isAnnouncingWinner} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
@@ -1359,7 +1413,19 @@ export default function Game() {
             </div>
             <DialogTitle className="text-2xl text-center">Game Over! 🎊</DialogTitle>
             <DialogDescription className="text-center space-y-4">
-              {gameWinner ? (
+              {isTieGame ? (
+                <div className="space-y-2 pt-4">
+                  <p className="text-lg font-semibold text-foreground">🤝 It's a Tie!</p>
+                  <p className="text-muted-foreground">
+                    {(() => {
+                      const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+                      const highestScore = sortedPlayers[0]?.score || 0;
+                      const tiedPlayers = sortedPlayers.filter(p => (p.score || 0) === highestScore);
+                      return `${tiedPlayers.map(p => p.name).join(" & ")} tied with ${highestScore} points!`;
+                    })()}
+                  </p>
+                </div>
+              ) : gameWinner ? (
                 <div className="space-y-2 pt-4">
                   <p className="text-lg font-semibold text-foreground">🏆 {gameWinner.name} wins!</p>
                   <p className="text-muted-foreground">Final Score: {gameWinner.score || 0} points</p>
@@ -1371,25 +1437,31 @@ export default function Game() {
               {/* Final Standings */}
               <div className="mt-6 space-y-2 text-left">
                 <p className="text-sm font-medium text-foreground">Final Standings:</p>
-                {[...players]
-                  .sort((a, b) => (b.score || 0) - (a.score || 0))
-                  .map((player, index) => (
-                    <div key={player.id} className="flex items-center justify-between py-2 px-3 rounded bg-muted/50">
-                      <span className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{index + 1}.</span>
-                        <span>{player.name}</span>
-                        {index === 0 && <span>👑</span>}
-                      </span>
-                      <div className="flex flex-col items-end">
-                        <span className="font-semibold">{player.score || 0} pts</span>
-                        {lifetimePoints[player.player_id] !== undefined && (
-                          <span className="text-xs text-muted-foreground">
-                            Total: {lifetimePoints[player.player_id]} pts
-                          </span>
-                        )}
+                {(() => {
+                  const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+                  const highestScore = sortedPlayers[0]?.score || 0;
+                  return sortedPlayers.map((player, index) => {
+                    const isTied = isTieGame && (player.score || 0) === highestScore;
+                    return (
+                      <div key={player.id} className="flex items-center justify-between py-2 px-3 rounded bg-muted/50">
+                        <span className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{index + 1}.</span>
+                          <span>{player.name}</span>
+                          {isTied && <span>🤝</span>}
+                          {!isTieGame && index === 0 && <span>👑</span>}
+                        </span>
+                        <div className="flex flex-col items-end">
+                          <span className="font-semibold">{player.score || 0} pts</span>
+                          {lifetimePoints[player.player_id] !== undefined && (
+                            <span className="text-xs text-muted-foreground">
+                              Total: {lifetimePoints[player.player_id]} pts
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  });
+                })()}
               </div>
             </DialogDescription>
           </DialogHeader>
