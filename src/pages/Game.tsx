@@ -395,12 +395,16 @@ export default function Game() {
           // CRITICAL: Set ref IMMEDIATELY (before state) to block any concurrent refreshes
           isAnnouncingWinnerRef.current = true;
           
-          // Clear any round transition dialog that might be showing
-          setIsRoundTransitioning(false);
-          setRoundResultMessage(null);
-          
-          // Show "Announcing Winner" loading first
-          setIsAnnouncingWinner(true);
+          // FIRST: Show round result for 5 seconds so ALL players (including storyteller) see the answer
+          const wsWasCorrect = message.wasCorrect === true;
+          const wsSecretElement = message.secretElement || currentTurn?.whisp || "?";
+          setRoundResultMessage({
+            correct: wsWasCorrect,
+            message: wsWasCorrect 
+              ? `Correct! The answer was "${wsSecretElement}". Game complete!` 
+              : `The answer was "${wsSecretElement}". Game complete!`,
+          });
+          setIsRoundTransitioning(true);
           
           // Update players immediately with WebSocket data
           if (message.players && message.players.length > 0) {
@@ -410,8 +414,14 @@ export default function Game() {
             fetchLifetimePoints(message.players);
           }
           
-          // After 3 seconds, show the actual winner dialog
+          // After 5 seconds of showing round result, start winner announcement
           setTimeout(async () => {
+            setIsRoundTransitioning(false);
+            setRoundResultMessage(null);
+            
+            // Show "Announcing Winner" loading
+            setIsAnnouncingWinner(true);
+            
             // If no players from WebSocket, fetch from database
             if (!message.players || message.players.length === 0) {
               console.log("🔄 No players in message, fetching from database...");
@@ -437,11 +447,15 @@ export default function Game() {
                 fetchLifetimePoints(players);
               }
             }
-            // Set ref BEFORE state to prevent race conditions
-            gameCompletedRef.current = true;
-            setIsAnnouncingWinner(false);
-            setGameCompleted(true);
-          }, 3000);
+            
+            // After 3 seconds of "Announcing Winner", show actual dialog
+            setTimeout(() => {
+              // Set ref BEFORE state to prevent race conditions
+              gameCompletedRef.current = true;
+              setIsAnnouncingWinner(false);
+              setGameCompleted(true);
+            }, 3000);
+          }, 5000);
 
           supabase
             .from("game_sessions")
@@ -994,12 +1008,15 @@ export default function Game() {
       console.log("🎉 Game completed from guess submission, wasCorrect:", wasCorrect);
       
       // IMMEDIATELY broadcast game_completed to other players (don't wait)
+      // Include wasCorrect and secretElement so ALL players (including storyteller) see round result
       const sortedPlayers = [...playersFromGuess].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
       sendWebSocketMessage({
         type: "game_completed",
         winnerId: sortedPlayers[0]?.player_id,
         winnerName: sortedPlayers[0]?.name,
         players: playersFromGuess,
+        wasCorrect: wasCorrect === true,
+        secretElement: whisp || currentTurn?.whisp,
       });
       
       // Show round result for 3 seconds so player can see if they were right/wrong

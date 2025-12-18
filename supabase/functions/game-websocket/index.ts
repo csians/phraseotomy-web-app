@@ -295,7 +295,7 @@ serve(async (req) => {
           break;
 
         case "game_completed":
-          // Game is over - notify ALL with complete player data
+          // Game is over - notify ALL with complete player data and round result info
           broadcastToAll(sessionId, {
             type: "game_completed",
             winnerId: message.winnerId,
@@ -303,6 +303,8 @@ serve(async (req) => {
             winnerScore: message.winnerScore,
             finalScores: message.finalScores,
             players: message.players || [], // Include full players array
+            wasCorrect: message.wasCorrect === true, // Pass through round result
+            secretElement: message.secretElement, // Pass through the answer
             timestamp: new Date().toISOString(),
           });
           break;
