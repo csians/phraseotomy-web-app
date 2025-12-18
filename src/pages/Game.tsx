@@ -348,9 +348,12 @@ export default function Game() {
 
         case "next_turn":
           // Show round transition with 3-second delay so ALL players can see the answer
+          const wasCorrectNextTurn = message.wasCorrect === true;
           setRoundResultMessage({
-            correct: false,
-            message: `The answer was "${message.secretElement || currentTurn?.whisp || '?'}". ${message.newStorytellerName}'s turn next!`,
+            correct: wasCorrectNextTurn,
+            message: wasCorrectNextTurn
+              ? `Correct! The answer was "${message.secretElement || currentTurn?.whisp || '?'}". ${message.newStorytellerName}'s turn next!`
+              : `The answer was "${message.secretElement || currentTurn?.whisp || '?'}". ${message.newStorytellerName}'s turn next!`,
           });
           setIsRoundTransitioning(true);
           
@@ -365,9 +368,12 @@ export default function Game() {
         case "round_result":
           // Show round result for all players (correct answer revealed)
           console.log("📢 Round result received:", message);
+          const wasCorrectRoundResult = message.wasCorrect === true;
           setRoundResultMessage({
-            correct: false,
-            message: `The answer was "${message.secretElement}". Next round starting...`,
+            correct: wasCorrectRoundResult,
+            message: wasCorrectRoundResult
+              ? `Correct! The answer was "${message.secretElement}". Next round starting...`
+              : `The answer was "${message.secretElement}". Next round starting...`,
           });
           setIsRoundTransitioning(true);
           
