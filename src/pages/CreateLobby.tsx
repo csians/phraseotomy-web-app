@@ -409,14 +409,17 @@ export default function CreateLobby() {
                     <div
                       className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                         gameMode === "live"
-                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[1.02]"
-                          : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[1.02] hover:shadow-sm"
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[0.02]"
+                          : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[0.02] hover:shadow-sm"
                       }`}
                       onClick={() => setGameMode("live")}
                     >
                       <RadioGroupItem value="live" id="live" className="mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
-                        <Label htmlFor="live" className={`cursor-pointer font-medium ${gameMode === "live" ? "text-primary" : ""}`}>
+                        <Label
+                          htmlFor="live"
+                          className={`cursor-pointer font-medium ${gameMode === "live" ? "text-primary" : ""}`}
+                        >
                           ⏱️ Live Mode
                         </Label>
                         <p className="text-xs text-muted-foreground">Time-based gameplay with countdown timers</p>
@@ -425,14 +428,17 @@ export default function CreateLobby() {
                     <div
                       className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                         gameMode === "async"
-                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[1.02]"
-                          : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[1.02] hover:shadow-sm"
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[0.02]"
+                          : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[0.02] hover:shadow-sm"
                       }`}
                       onClick={() => setGameMode("async")}
                     >
                       <RadioGroupItem value="async" id="async" className="mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
-                        <Label htmlFor="async" className={`cursor-pointer font-medium ${gameMode === "async" ? "text-primary" : ""}`}>
+                        <Label
+                          htmlFor="async"
+                          className={`cursor-pointer font-medium ${gameMode === "async" ? "text-primary" : ""}`}
+                        >
                           📬 Async Mode
                         </Label>
                         <p className="text-xs text-muted-foreground">Play at your own pace, no time limits</p>
@@ -464,7 +470,10 @@ export default function CreateLobby() {
                           onClick={() => setTimerPreset(key)}
                         >
                           <RadioGroupItem value={key} id={key} className="sr-only" />
-                          <Label htmlFor={key} className={`cursor-pointer text-sm font-medium capitalize ${timerPreset === key ? "text-primary" : ""}`}>
+                          <Label
+                            htmlFor={key}
+                            className={`cursor-pointer text-sm font-medium capitalize ${timerPreset === key ? "text-primary" : ""}`}
+                          >
                             {key}
                           </Label>
                           <p className="text-xs text-muted-foreground mt-1">
@@ -475,7 +484,7 @@ export default function CreateLobby() {
                     </div>
                   </RadioGroup>
                   <div className="flex items-center gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
-                    <span className="text-amber-500 text-sm font-bold">*</span>
+                    {/* <span className="text-amber-500 text-sm font-bold">*</span> */}
                     <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
                       Story time / Guess time. Auto-submits when timer expires.
                     </p>
