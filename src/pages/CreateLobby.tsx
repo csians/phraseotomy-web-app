@@ -394,9 +394,10 @@ export default function CreateLobby() {
                 <Input
                   id="lobbyName"
                   required
-                  placeholder="My Awesome Game"
+                  placeholder="Enter your game name..."
                   value={lobbyName}
                   onChange={(e) => setLobbyName(e.target.value)}
+                  className="placeholder:text-muted-foreground/50 placeholder:italic"
                 />
               </div>
 
@@ -406,32 +407,32 @@ export default function CreateLobby() {
                 <RadioGroup value={gameMode} onValueChange={(v) => setGameMode(v as "live" | "async")}>
                   <div className="flex flex-row gap-3 overflow-x-auto pb-2">
                     <div
-                      className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                      className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
                         gameMode === "live"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:bg-accent hover:text-accent-foreground"
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md"
+                          : "border-border hover:border-primary/50 hover:bg-accent hover:text-accent-foreground"
                       }`}
                       onClick={() => setGameMode("live")}
                     >
                       <RadioGroupItem value="live" id="live" className="mt-0.5" />
                       <div className="space-y-1">
-                        <Label htmlFor="live" className="cursor-pointer font-medium">
+                        <Label htmlFor="live" className={`cursor-pointer font-medium ${gameMode === "live" ? "text-primary" : ""}`}>
                           ⏱️ Live Mode
                         </Label>
                         <p className="text-xs text-muted-foreground">Time-based gameplay with countdown timers</p>
                       </div>
                     </div>
                     <div
-                      className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                      className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
                         gameMode === "async"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:bg-accent hover:text-accent-foreground"
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md"
+                          : "border-border hover:border-primary/50 hover:bg-accent hover:text-accent-foreground"
                       }`}
                       onClick={() => setGameMode("async")}
                     >
                       <RadioGroupItem value="async" id="async" className="mt-0.5" />
                       <div className="space-y-1">
-                        <Label htmlFor="async" className="cursor-pointer font-medium">
+                        <Label htmlFor="async" className={`cursor-pointer font-medium ${gameMode === "async" ? "text-primary" : ""}`}>
                           📬 Async Mode
                         </Label>
                         <p className="text-xs text-muted-foreground">Play at your own pace, no time limits</p>
@@ -455,15 +456,15 @@ export default function CreateLobby() {
                       ).map(([key, preset]) => (
                         <div
                           key={key}
-                          className={`flex flex-col items-center p-3 rounded-lg border cursor-pointer transition-colors text-center ${
+                          className={`flex flex-col items-center p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${
                             timerPreset === key
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:bg-accent hover:text-accent-foreground"
+                              ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md"
+                              : "border-border hover:border-primary/50 hover:bg-accent hover:text-accent-foreground"
                           }`}
                           onClick={() => setTimerPreset(key)}
                         >
                           <RadioGroupItem value={key} id={key} className="sr-only" />
-                          <Label htmlFor={key} className="cursor-pointer text-sm font-medium capitalize">
+                          <Label htmlFor={key} className={`cursor-pointer text-sm font-medium capitalize ${timerPreset === key ? "text-primary" : ""}`}>
                             {key}
                           </Label>
                           <p className="text-xs text-muted-foreground mt-1">
