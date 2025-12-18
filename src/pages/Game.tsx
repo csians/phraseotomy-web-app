@@ -97,6 +97,7 @@ export default function Game() {
   const [isTieGame, setIsTieGame] = useState(false);
   const [isRoundTransitioning, setIsRoundTransitioning] = useState(false);
   const [roundResultMessage, setRoundResultMessage] = useState<{correct: boolean; message: string} | null>(null);
+  const [isModeTransitioning, setIsModeTransitioning] = useState(false); // Show loading during mode selection
   
   // Refs to track completion state for use in callbacks (avoid stale closures)
   const gameCompletedRef = useRef(false);
@@ -860,8 +861,9 @@ export default function Game() {
 
   // Handle mode selection
   const handleModeSelect = async (mode: "audio" | "elements") => {
-    // Set flag to prevent refresh during mode selection
+    // Set flag to prevent refresh during mode selection AND show loading overlay
     isModeSelectingRef.current = true;
+    setIsModeTransitioning(true); // Show loading overlay immediately
     setSelectedTurnMode(mode);
     setIsGeneratingWhisp(true);
 
@@ -883,6 +885,8 @@ export default function Game() {
           variant: "destructive",
         });
         setIsGeneratingWhisp(false);
+        setIsModeTransitioning(false);
+        isModeSelectingRef.current = false;
         return;
       }
 
@@ -901,9 +905,6 @@ export default function Game() {
       if (error) throw error;
 
       console.log("Start-turn response:", data);
-
-      // Wait for DB to commit
-      await new Promise((resolve) => setTimeout(resolve, 300));
 
       // Update local state immediately - include theme in turn object
       const turnWithTheme = {
@@ -931,6 +932,14 @@ export default function Game() {
         title: "Whisp Generated! ✨",
         description: `Your word is: "${data.whisp}"`,
       });
+
+      // Keep the lock for a bit longer to prevent realtime refresh from causing flicker
+      // Clear loading overlay after a delay to ensure UI is settled
+      setTimeout(() => {
+        setIsGeneratingWhisp(false);
+        setIsModeTransitioning(false);
+        isModeSelectingRef.current = false;
+      }, 500);
     } catch (error) {
       console.error("Error selecting mode:", error);
       toast({
@@ -938,9 +947,8 @@ export default function Game() {
         description: "Failed to start turn.",
         variant: "destructive",
       });
-    } finally {
       setIsGeneratingWhisp(false);
-      // Clear mode selecting flag after completion
+      setIsModeTransitioning(false);
       isModeSelectingRef.current = false;
     }
   };
@@ -1239,6 +1247,15 @@ export default function Game() {
 
         {/* Game Content */}
         <main className="flex-1 p-4">
+          {/* Mode Transition Loading Overlay - prevents flicker during mode selection */}
+          {isModeTransitioning && (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="flex flex-col items-center justify-center py-12 gap-4">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p className="text-lg text-muted-foreground">Setting up your turn...</p>
+              </div>
+            </div>
+          )}
           {/* Theme Selection Phase - Storyteller chooses theme */}
           {gamePhase === "selecting_theme" && isStoryteller && (
             <div className="min-h-screen flex items-center justify-center p-4">
@@ -1324,7 +1341,7 @@ export default function Game() {
           )}
 
           {/* Storytelling Phase */}
-          {gamePhase === "storytelling" && isStoryteller && currentTurn && (
+          {gamePhase === "storytelling" && isStoryteller && currentTurn && !isModeTransitioning && (
             <StorytellingInterface
               theme={currentTurn.theme}
               whisp={currentTurn.whisp || ""}
@@ -1340,7 +1357,7 @@ export default function Game() {
             />
           )}
 
-          {gamePhase === "storytelling" && !isStoryteller && (
+          {gamePhase === "storytelling" && !isStoryteller && !isModeTransitioning && (
             <div className="min-h-screen flex items-center justify-center p-4">
               <div className="max-w-2xl w-full space-y-6">
                 <div className="text-center">
@@ -1365,7 +1382,7 @@ export default function Game() {
           )}
 
           {/* Elements Phase - Storyteller arranges elements */}
-          {gamePhase === "elements" && isStoryteller && currentTurn && (
+          {gamePhase === "elements" && isStoryteller && currentTurn && !isModeTransitioning && (
             <ElementsInterface
               theme={currentTurn.theme}
               whisp={currentTurn.whisp || ""}
@@ -1380,7 +1397,7 @@ export default function Game() {
             />
           )}
 
-          {gamePhase === "elements" && !isStoryteller && currentTurn && (
+          {gamePhase === "elements" && !isStoryteller && currentTurn && !isModeTransitioning && (
             <ElementsInterface
               theme={currentTurn.theme}
               whisp=""
