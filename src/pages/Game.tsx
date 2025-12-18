@@ -504,8 +504,66 @@ export default function Game() {
     initializeGame();
     const cleanup = setupRealtimeSubscriptions();
 
+    // Poll fallback: ensures all clients see game completion even if WS/Realtime delivery fails.
+    const pollId = window.setInterval(async () => {
+      try {
+        if (!sessionId) return;
+        if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current) return;
+
+        const { data, error } = await supabase.functions.invoke("get-game-state", {
+          body: { sessionId },
+        });
+
+        if (error) {
+          console.log("poll:get-game-state error", error);
+          return;
+        }
+
+        const status = data?.session?.status;
+        if (status === "completed" || status === "expired") {
+          console.log("🎯 Poll detected game completed:", status);
+
+          // Prevent any further refresh loops
+          isAnnouncingWinnerRef.current = true;
+
+          const secret = data?.currentTurn?.whisp || currentTurn?.whisp || "?";
+          const playersForCompletion: Player[] = data?.players || [];
+
+          setSession(data.session);
+
+          // Show final answer briefly, then show winner dialog
+          setRoundResultMessage({
+            correct: true,
+            message: `The answer was "${secret}". Game complete!`,
+          });
+          setIsRoundTransitioning(true);
+
+          setTimeout(() => {
+            setIsRoundTransitioning(false);
+            setRoundResultMessage(null);
+            setIsAnnouncingWinner(true);
+
+            if (playersForCompletion.length > 0) {
+              setPlayers(playersForCompletion);
+              determineWinnerAndTies(playersForCompletion);
+              fetchLifetimePoints(playersForCompletion);
+            }
+
+            setTimeout(() => {
+              setIsAnnouncingWinner(false);
+              gameCompletedRef.current = true;
+              setGameCompleted(true);
+            }, 3000);
+          }, 5000);
+        }
+      } catch (err) {
+        console.error("poll:get-game-state failed", err);
+      }
+    }, 2000);
+
     return () => {
       if (cleanup) cleanup();
+      window.clearInterval(pollId);
     };
   }, [sessionId]);
 
@@ -1506,7 +1564,7 @@ export default function Game() {
             />
           )}
 
-          {gamePhase === "guessing" && isStoryteller && !gameCompleted && !isAnnouncingWinner && (
+          {gamePhase === "guessing" && isStoryteller && !gameCompleted && !isAnnouncingWinner && session?.status !== "completed" && session?.status !== "expired" && (
             <div className="min-h-screen flex items-center justify-center">
               <div className="text-center">
                 <h2 className="text-2xl font-bold text-foreground mb-2">Players are guessing...</h2>
