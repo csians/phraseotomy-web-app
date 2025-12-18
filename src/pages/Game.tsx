@@ -932,30 +932,52 @@ export default function Game() {
     initializeGame();
   };
 
-  const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[]) => {
+  const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[], wasCorrect?: boolean) => {
     toast({
       title: "Guess Submitted!",
       description: "Waiting for other players...",
     });
     
-    // If game just completed, handle it immediately with players data
+    // If game just completed, show result for 3 seconds before winner dialog
     if (gameCompletedFromGuess && playersFromGuess && playersFromGuess.length > 0) {
       console.log("🎉 Game completed from guess submission");
-      setPlayers(playersFromGuess);
-      determineWinnerAndTies(playersFromGuess);
-      setGameCompleted(true);
-      fetchLifetimePoints(playersFromGuess);
       
-      // Get sorted players for WebSocket message
-      const sortedPlayers = [...playersFromGuess].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-      
-      // Notify other players
-      sendWebSocketMessage({
-        type: "game_completed",
-        winnerId: sortedPlayers[0]?.player_id,
-        winnerName: sortedPlayers[0]?.name,
-        players: playersFromGuess,
+      // Show round result for 3 seconds so player can see if they were right/wrong
+      setRoundResultMessage({
+        correct: wasCorrect || false,
+        message: wasCorrect 
+          ? "Correct! Game complete - announcing winner..." 
+          : `Wrong answer. Game complete - announcing winner...`,
       });
+      setIsRoundTransitioning(true);
+      
+      // After 3 seconds, show winner dialog
+      setTimeout(() => {
+        setIsRoundTransitioning(false);
+        setRoundResultMessage(null);
+        
+        setPlayers(playersFromGuess);
+        determineWinnerAndTies(playersFromGuess);
+        setIsAnnouncingWinner(true);
+        
+        // After another 3 seconds of "Announcing Winner", show the actual dialog
+        setTimeout(() => {
+          setIsAnnouncingWinner(false);
+          setGameCompleted(true);
+          fetchLifetimePoints(playersFromGuess);
+        }, 3000);
+        
+        // Get sorted players for WebSocket message
+        const sortedPlayers = [...playersFromGuess].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
+        
+        // Notify other players
+        sendWebSocketMessage({
+          type: "game_completed",
+          winnerId: sortedPlayers[0]?.player_id,
+          winnerName: sortedPlayers[0]?.name,
+          players: playersFromGuess,
+        });
+      }, 3000);
       return;
     }
     

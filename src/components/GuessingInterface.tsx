@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Volume2 } from "lucide-react";
+import { Send, Volume2, Play, Pause } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { IconSelectionPanel, IconItem } from "@/components/IconSelectionPanel";
+import { Slider } from "@/components/ui/slider";
 
 interface GuessingInterfaceProps {
   storytellerName: string;
@@ -14,7 +15,7 @@ interface GuessingInterfaceProps {
   sessionId: string;
   roundNumber: number;
   playerId: string;
-  onGuessSubmit: (gameCompleted?: boolean, players?: any[]) => void;
+  onGuessSubmit: (gameCompleted?: boolean, players?: any[], wasCorrect?: boolean) => void;
   selectedIcons?: IconItem[];
   turnMode?: "audio" | "elements";
 }
@@ -36,6 +37,10 @@ export function GuessingInterface({
   const [isLockedOut, setIsLockedOut] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const hasAutoPlayedRef = useRef(false);
 
   // Check if player already submitted guess for this round on mount/round change
   useEffect(() => {
@@ -78,6 +83,81 @@ export function GuessingInterface({
 
     checkExistingGuess();
   }, [roundNumber, sessionId, playerId]);
+
+  // Audio player event handlers and autoplay (once only)
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !audioUrl) return;
+
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration);
+    };
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+
+    const handlePlay = () => {
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+
+    // Autoplay only once when audioUrl first loads
+    if (!hasAutoPlayedRef.current && audioUrl) {
+      hasAutoPlayedRef.current = true;
+      audio.play().catch(console.error);
+    }
+
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [audioUrl]);
+
+  // Reset autoplay flag when round changes
+  useEffect(() => {
+    hasAutoPlayedRef.current = false;
+  }, [roundNumber]);
+
+  const togglePlayPause = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.pause();
+    } else {
+      audio.play().catch(console.error);
+    }
+  };
+
+  const handleSeek = (value: number[]) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = value[0];
+    setCurrentTime(value[0]);
+  };
+
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   const handleSubmitGuess = async () => {
     const trimmedGuess = guess.trim();
@@ -132,8 +212,8 @@ export function GuessingInterface({
         });
       }
       
-      // Notify parent with game completion info and players data
-      onGuessSubmit(game_completed, next_round?.players);
+      // Notify parent with game completion info, players data, and correctness
+      onGuessSubmit(game_completed, next_round?.players, correct);
     } catch (error) {
       console.error("Error submitting guess:", error);
       toast({
@@ -180,12 +260,39 @@ export function GuessingInterface({
 
             {/* Audio Player - only show in audio mode */}
             {turnMode === "audio" && audioUrl && (
-              <div className="bg-muted/50 p-6 rounded-lg">
-                <div className="flex items-center gap-2 mb-3">
+              <div className="bg-card border border-border rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-4">
                   <Volume2 className="h-5 w-5 text-primary" />
-                  <span className="font-medium">Listen to the story:</span>
+                  <span className="font-medium text-foreground">Listen to the story:</span>
                 </div>
-                <audio ref={audioRef} controls src={audioUrl} className="w-full" autoPlay />
+                <div className="flex items-center gap-4">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={togglePlayPause}
+                    className="h-12 w-12 rounded-full border-2 border-primary bg-primary/10 hover:bg-primary/20"
+                  >
+                    {isPlaying ? (
+                      <Pause className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Play className="h-5 w-5 text-primary ml-0.5" />
+                    )}
+                  </Button>
+                  <div className="flex-1 space-y-1">
+                    <Slider
+                      value={[currentTime]}
+                      max={duration || 100}
+                      step={0.1}
+                      onValueChange={handleSeek}
+                      className="cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{formatTime(currentTime)}</span>
+                      <span>{formatTime(duration)}</span>
+                    </div>
+                  </div>
+                </div>
+                <audio ref={audioRef} src={audioUrl} className="hidden" />
               </div>
             )}
 
