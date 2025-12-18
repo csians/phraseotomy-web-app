@@ -1395,8 +1395,8 @@ export default function Game() {
             />
           )}
 
-          {/* Guessing Phase */}
-          {gamePhase === "guessing" && !isStoryteller && currentTurn && (
+          {/* Guessing Phase - only show if game is NOT completed/announcing */}
+          {gamePhase === "guessing" && !isStoryteller && currentTurn && !gameCompleted && !isAnnouncingWinner && (
             <GuessingInterface
               storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
               theme={currentTurn.theme}
@@ -1411,7 +1411,7 @@ export default function Game() {
             />
           )}
 
-          {gamePhase === "guessing" && isStoryteller && (
+          {gamePhase === "guessing" && isStoryteller && !gameCompleted && !isAnnouncingWinner && (
             <div className="min-h-screen flex items-center justify-center">
               <div className="text-center">
                 <h2 className="text-2xl font-bold text-foreground mb-2">Players are guessing...</h2>
