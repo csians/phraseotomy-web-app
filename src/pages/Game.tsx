@@ -235,13 +235,13 @@ export default function Game() {
     isAnnouncingWinnerRef.current = isAnnouncingWinner;
   }, [isAnnouncingWinner]);
 
-  // Set storyteller active flag to pause polling during storytelling phase
+  // Pause polling during storytelling phase for ALL players (not just storyteller)
+  // This prevents continuous get-game-state calls while someone is creating their story
   useEffect(() => {
-    const isStoryteller = currentPlayerId === session?.current_storyteller_id;
-    const shouldBeActive = isStoryteller && gamePhase === "storytelling" && !gameCompleted;
-    isStorytellerActiveRef.current = shouldBeActive;
-    console.log("Storyteller active ref updated:", shouldBeActive, "isStoryteller:", isStoryteller, "gamePhase:", gamePhase);
-  }, [currentPlayerId, session?.current_storyteller_id, gamePhase, gameCompleted]);
+    const shouldPausePolling = gamePhase === "storytelling" && !gameCompleted;
+    isStorytellerActiveRef.current = shouldPausePolling;
+    console.log("Polling paused during storytelling:", shouldPausePolling, "gamePhase:", gamePhase);
+  }, [gamePhase, gameCompleted]);
   // Initialize audio context for real-time playback
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
