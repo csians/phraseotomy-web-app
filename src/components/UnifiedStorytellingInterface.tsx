@@ -735,11 +735,23 @@ export function UnifiedStorytellingInterface({
                         <Mic className="h-6 w-6" />
                       )}
                     </Button>
-                    {isRecording && (
-                      <div className="flex items-center gap-2">
-                        <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-lg font-mono">{formatTime(recordingTime)}</span>
+                    {isRecording ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                          <span className="text-lg font-mono">{formatTime(recordingTime)}</span>
+                          <span className="text-sm text-muted-foreground">/ {formatTime(MAX_RECORDING_TIME_SECONDS)}</span>
+                        </div>
+                        {recordingTime >= MAX_RECORDING_TIME_SECONDS - 30 && (
+                          <span className="text-xs text-destructive font-medium">
+                            {MAX_RECORDING_TIME_SECONDS - recordingTime}s remaining
+                          </span>
+                        )}
                       </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Maximum: {formatTime(MAX_RECORDING_TIME_SECONDS)} (3 minutes)
+                      </p>
                     )}
                     <p className="text-sm text-muted-foreground">
                       {isRecording ? "Click to stop recording" : "Click to start recording"}

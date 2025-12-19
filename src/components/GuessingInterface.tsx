@@ -266,13 +266,13 @@ export function GuessingInterface({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Icons Display - only show in elements mode */}
-            {turnMode === "elements" && selectedIcons.length > 0 && (
+            {/* Icons Display - always show when icons are available (storyteller arranges them) */}
+            {selectedIcons.length > 0 && (
               <div className="bg-muted/30 p-6 rounded-xl">
                 <IconSelectionPanel
                   icons={selectedIcons}
                   isDraggable={false}
-                  label="Story Icons (in order)"
+                  label="Storyteller's Arranged Elements"
                 />
               </div>
             )}
@@ -332,8 +332,8 @@ export function GuessingInterface({
               </div>
             )}
 
-            {/* Elements mode hint */}
-            {turnMode === "elements" && (
+            {/* Element arrangement hint */}
+            {selectedIcons.length > 0 && (
               <div className="bg-primary/10 p-6 rounded-lg text-center">
                 <p className="text-lg font-medium text-primary">
                   🔍 Study the element order above — it's your clue!
@@ -402,9 +402,7 @@ export function GuessingInterface({
             {/* Tips */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm text-muted-foreground text-center">
-                💡 {turnMode === "elements" 
-                  ? `Look at how ${storytellerName} ordered the elements. The sequence is your clue to guess the whisp word!`
-                  : `Look at the icons and listen to the story. The whisp is a single word related to the theme "${theme.name}".`}
+                💡 Look at the arranged elements{turnMode === "audio" ? " and listen to the story" : ""}. The whisp is a single word related to the theme "{theme.name}".
               </p>
             </div>
           </CardContent>
