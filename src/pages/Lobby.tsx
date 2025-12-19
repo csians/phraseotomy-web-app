@@ -113,11 +113,7 @@ function SortablePlayerItem({
   const canKick = isHost && !isPlayerHost && !isCurrentUser && sessionStatus === "waiting";
 
   return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center justify-between p-2 rounded-md ${isCurrentUser ? "bg-primary/10 border border-primary/20" : "bg-muted/50"}`}
-    >
+    <li ref={setNodeRef} style={style} className={`flex items-center justify-between p-2 rounded-md ${isCurrentUser ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}>
       <div className="flex items-center gap-2">
         {isDraggable && (
           <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
@@ -128,7 +124,9 @@ function SortablePlayerItem({
         {isCurrentUser && (
           <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded font-semibold">You</span>
         )}
-        {isPlayerHost && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Host</span>}
+        {isPlayerHost && (
+          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Host</span>
+        )}
         {player.player_id === currentStorytellerId && (
           <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">Storyteller</span>
         )}
@@ -144,7 +142,11 @@ function SortablePlayerItem({
             onClick={() => onKick(player.player_id, player.name)}
             disabled={isKicking}
           >
-            {isKicking ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}
+            {isKicking ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <UserMinus className="h-4 w-4" />
+            )}
           </Button>
         )}
       </div>
@@ -492,23 +494,23 @@ export default function Lobby() {
       .on("broadcast", { event: "player_left" }, (payload) => {
         const leftPlayerId = payload.payload?.playerId;
         const leftPlayerName = payload.payload?.senderName || "A player";
-
+        
         if (leftPlayerId) {
           setPlayers((prev) => prev.filter((p) => p.player_id !== leftPlayerId));
         }
-
+        
         toast({
           title: "Player Left",
           description: `${leftPlayerName} left the lobby`,
         });
-
+        
         fetchLobbyData();
       })
       .on("broadcast", { event: "player_kicked" }, (payload) => {
         const kickedPlayerId = payload.payload?.playerId;
         const kickedPlayerName = payload.payload?.playerName || "A player";
         const currentId = getCurrentCustomerId();
-
+        
         if (kickedPlayerId === currentId) {
           toast({
             title: "You were kicked",
@@ -526,16 +528,16 @@ export default function Lobby() {
           navigate("/guest-join", { replace: true });
           return;
         }
-
+        
         if (kickedPlayerId) {
           setPlayers((prev) => prev.filter((p) => p.player_id !== kickedPlayerId));
         }
-
+        
         toast({
           title: "Player Kicked",
           description: `${kickedPlayerName} was removed from the lobby`,
         });
-
+        
         fetchLobbyData();
       })
       .on("broadcast", { event: "game_started" }, (payload) => {
@@ -962,7 +964,7 @@ export default function Lobby() {
             .from("elements")
             .select("id, name, icon, theme_id")
             .in("id", data.currentTurn.selected_icon_ids);
-
+          
           if (elementsData) {
             // Get the theme_id for this turn to determine which are core icons
             const turnThemeId = data.currentTurn.theme_id;
@@ -1070,13 +1072,13 @@ export default function Lobby() {
 
     try {
       const turnId = currentTurn?.id;
-
+      
       console.log("Starting turn with mode:", mode, "themeId:", session.selected_theme_id, "turnId:", turnId);
-
+      
       // Call start-turn with the session's theme and selected mode
       const { data, error } = await supabase.functions.invoke("start-turn", {
-        body: {
-          sessionId,
+        body: { 
+          sessionId, 
           turnId,
           selectedThemeId: session.selected_theme_id,
           turnMode: mode,
@@ -1088,14 +1090,14 @@ export default function Lobby() {
       console.log("Start-turn response:", data);
 
       // Wait for DB to commit
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Update local state immediately
       setCurrentTurn(data.turn);
       if (mode === "elements" && data.selectedIcons) {
         setTurnElements(data.selectedIcons);
       }
-
+      
       // Broadcast mode selected to other players
       broadcastEvent("mode_selected", { mode, whisp: data.whisp });
 
@@ -1129,7 +1131,7 @@ export default function Lobby() {
       // Broadcast lobby_ended to all players via Supabase Broadcast BEFORE deleting
       // Broadcast to both lobby and game channels to cover all players
       broadcastEvent("lobby_ended", {});
-
+      
       // Also broadcast to game channel for players who are on the game page
       const gameChannel = supabase.channel(`game-${sessionId}`);
       await gameChannel.send({
@@ -1187,7 +1189,7 @@ export default function Lobby() {
     }
 
     // Get the player name for the broadcast
-    const currentPlayer = players.find((p) => p.player_id === playerId);
+    const currentPlayer = players.find(p => p.player_id === playerId);
     const playerNameToSend = currentPlayer?.name || currentPlayerName || "A player";
 
     try {
@@ -1195,10 +1197,10 @@ export default function Lobby() {
       const { data, error } = await supabase.functions.invoke("leave-lobby", {
         body: { sessionId, playerId },
       });
-
+      
       // Broadcast AFTER successful deletion so other players see updated data
       broadcastEvent("player_left", { playerId, senderName: playerNameToSend, timestamp: Date.now() });
-
+      
       // Also broadcast to game channel for players on game page
       const gameChannel = supabase.channel(`game-${sessionId}`);
       await gameChannel.send({
@@ -1224,18 +1226,18 @@ export default function Lobby() {
       });
 
       // Wait a moment for the broadcast and realtime events to propagate
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Clear session storage
       sessionStorage.removeItem("current_lobby_session");
       localStorage.removeItem("current_lobby_session");
       sessionStorage.removeItem("lobby_player_id");
       localStorage.removeItem("lobby_player_id");
-
+      
       // Check if this is a guest player and clear their data
       const guestPlayerId = localStorage.getItem("guest_player_id");
       const isGuest = guestPlayerId === playerId;
-
+      
       if (isGuest) {
         // Clear guest-specific data
         localStorage.removeItem("guest_player_id");
@@ -1267,7 +1269,7 @@ export default function Lobby() {
     }
 
     try {
-      const currentPlayer = players.find((p) => p.player_id === playerId);
+      const currentPlayer = players.find(p => p.player_id === playerId);
       const playerNameToSend = currentPlayer?.name || currentPlayerName || "A player";
 
       // First delete from database
@@ -1278,10 +1280,10 @@ export default function Lobby() {
       if (error) {
         console.error("Error leaving lobby:", error);
       }
-
+      
       // Broadcast AFTER deletion so other players see updated data
       broadcastEvent("player_left", { playerId, senderName: playerNameToSend, timestamp: Date.now() });
-
+      
       // Also broadcast to game channel for players on game page
       const gameChannel = supabase.channel(`game-${sessionId}`);
       await gameChannel.send({
@@ -1296,7 +1298,7 @@ export default function Lobby() {
       localStorage.removeItem("current_lobby_session");
       sessionStorage.removeItem("lobby_player_id");
       localStorage.removeItem("lobby_player_id");
-
+      
       // Clear guest data if applicable
       const guestPlayerId = localStorage.getItem("guest_player_id");
       if (guestPlayerId === playerId) {
@@ -1307,7 +1309,7 @@ export default function Lobby() {
       }
 
       // Wait a moment for the broadcast and realtime events to propagate
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Always navigate to guest join page for joining another game
       navigate("/guest-join", { replace: true });
@@ -1342,10 +1344,10 @@ export default function Lobby() {
       setPlayers((prev) => prev.filter((p) => p.player_id !== playerIdToKick));
 
       // Broadcast to all players
-      broadcastEvent("player_kicked", {
-        playerId: playerIdToKick,
+      broadcastEvent("player_kicked", { 
+        playerId: playerIdToKick, 
         playerName,
-        kickedBy: getCurrentPlayerName(),
+        kickedBy: getCurrentPlayerName()
       });
 
       toast({
@@ -1708,65 +1710,63 @@ export default function Lobby() {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       <div className="flex-1 p-4 md:p-8">
-        {/* Countdown Overlay */}
-        {showCountdown && (
-          <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm flex items-center justify-center">
-            <div className="text-center animate-pulse">
-              <div className="text-[150px] md:text-[200px] font-bold text-primary animate-bounce">
-                {countdownNumber}
+      {/* Countdown Overlay */}
+      {showCountdown && (
+        <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm flex items-center justify-center">
+          <div className="text-center animate-pulse">
+            <div className="text-[150px] md:text-[200px] font-bold text-primary animate-bounce">{countdownNumber}</div>
+            <p className="text-2xl text-muted-foreground mt-4">Get Ready!</p>
+          </div>
+        </div>
+      )}
+
+      {/* Game Completed Screen */}
+      {session?.status === "completed" && (
+        <div className="fixed inset-0 z-[90] bg-background flex items-center justify-center p-4">
+          <Card className="max-w-md w-full text-center">
+            <CardHeader className="pb-2">
+              <div className="flex justify-center mb-4">
+                <PartyPopper className="h-16 w-16 text-primary animate-bounce" />
               </div>
-              <p className="text-2xl text-muted-foreground mt-4">Get Ready!</p>
-            </div>
-          </div>
-        )}
-
-        {/* Game Completed Screen */}
-        {session?.status === "completed" && (
-          <div className="fixed inset-0 z-[90] bg-background flex items-center justify-center p-4">
-            <Card className="max-w-md w-full text-center">
-              <CardHeader className="pb-2">
-                <div className="flex justify-center mb-4">
-                  <PartyPopper className="h-16 w-16 text-primary animate-bounce" />
-                </div>
-                <CardTitle className="text-3xl">Game Complete!</CardTitle>
-                <CardDescription className="text-lg">Thank you for playing!</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Final Scores */}
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold flex items-center justify-center gap-2">
-                    <Trophy className="h-5 w-5 text-yellow-500" />
-                    Final Scores
-                  </h3>
-                  <div className="space-y-2">
-                    {[...players]
-                      .sort((a, b) => (b.score || 0) - (a.score || 0))
-                      .map((player, index) => (
-                        <div
-                          key={player.id}
-                          className={`flex items-center justify-between p-3 rounded-lg ${
-                            index === 0 ? "bg-yellow-500/20 border border-yellow-500/50" : "bg-muted"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            {index === 0 && <Trophy className="h-4 w-4 text-yellow-500" />}
-                            <span className={index === 0 ? "font-bold" : ""}>{player.name}</span>
-                          </div>
-                          <span className="font-bold text-primary">{player.score || 0} pts</span>
+              <CardTitle className="text-3xl">Game Complete!</CardTitle>
+              <CardDescription className="text-lg">Thank you for playing!</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Final Scores */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold flex items-center justify-center gap-2">
+                  <Trophy className="h-5 w-5 text-yellow-500" />
+                  Final Scores
+                </h3>
+                <div className="space-y-2">
+                  {[...players]
+                    .sort((a, b) => (b.score || 0) - (a.score || 0))
+                    .map((player, index) => (
+                      <div
+                        key={player.id}
+                        className={`flex items-center justify-between p-3 rounded-lg ${
+                          index === 0 ? "bg-yellow-500/20 border border-yellow-500/50" : "bg-muted"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {index === 0 && <Trophy className="h-4 w-4 text-yellow-500" />}
+                          <span className={index === 0 ? "font-bold" : ""}>{player.name}</span>
                         </div>
-                      ))}
-                  </div>
+                        <span className="font-bold text-primary">{player.score || 0} pts</span>
+                      </div>
+                    ))}
                 </div>
+              </div>
 
-                <Button onClick={() => navigate("/play/host")} className="w-full">
-                  Back to Home
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              <Button onClick={() => navigate("/play/host")} className="w-full">
+                Back to Home
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-        {/* <div className="max-w-4xl mx-auto space-y-6">
+      {/* <div className="max-w-4xl mx-auto space-y-6">
       
         <div className="fixed top-4 right-4 z-50">
           <div
@@ -1971,13 +1971,18 @@ export default function Lobby() {
             <CardHeader>
               <CardTitle>Ready to Start?</CardTitle>
               <CardDescription>
-                {players.length < 4
-                  ? "Minimum 4 players required to start the game"
+                {players.length < 4 
+                  ? "Minimum 4 players required to start the game" 
                   : "Start the game when all players have joined"}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={handleStartGame} className="w-full" size="lg" disabled={players.length < 4}>
+              <Button 
+                onClick={handleStartGame} 
+                className="w-full" 
+                size="lg"
+                disabled={players.length < 4}
+              >
                 Start Game {players.length < 4 && `(${players.length}/4 players)`}
               </Button>
             </CardContent>
@@ -1988,82 +1993,68 @@ export default function Lobby() {
         {isStoryteller && session.status === "active" && currentTurn && !currentTurn.whisp && (
           <TurnModeSelection
             onModeSelect={handleModeSelect}
-            playerName={players.find((p) => p.player_id === currentPlayerId)?.name}
+            playerName={players.find(p => p.player_id === currentPlayerId)?.name}
             disabled={isSelectingMode}
           />
         )}
 
         {/* Show Whisp to Storyteller - Auto-generated based on theme (only for audio mode) */}
-        {isStoryteller &&
-          session.status === "active" &&
-          currentTurn?.whisp &&
-          currentTurn?.turn_mode !== "elements" && (
-            <Card className="border-primary/50 bg-primary/5">
-              <CardHeader>
-                <CardTitle className="flex items-center text-primary">
-                  <Eye className="mr-2 h-5 w-5" />
-                  Your Wisp Word
-                </CardTitle>
-                <CardDescription>Create a story about this word - other players will try to guess it!</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="p-4 bg-background rounded-lg border-2 border-primary/30 text-center">
-                  <p className="text-3xl font-bold text-primary">{currentTurn.whisp}</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        {isStoryteller && session.status === "active" && currentTurn?.whisp && currentTurn?.turn_mode !== "elements" && (
+          <Card className="border-primary/50 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center text-primary">
+                <Eye className="mr-2 h-5 w-5" />
+                Your Whisp Word
+              </CardTitle>
+              <CardDescription>Create a story about this word - other players will try to guess it!</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-background rounded-lg border-2 border-primary/30 text-center">
+                <p className="text-3xl font-bold text-primary">{currentTurn.whisp}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Audio Recording - For storyteller after whisp is shown (only for audio mode) */}
-        {isStoryteller &&
-          session.status === "active" &&
-          currentTurn?.whisp &&
-          !hasRecording &&
-          currentTurn?.turn_mode !== "elements" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Music className="mr-2 h-5 w-5" />
-                  Record Your Story
-                </CardTitle>
-                <CardDescription>Tell a story about your wisp word - be creative!</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <LobbyAudioRecording onRecordingComplete={handleRecordingComplete} isUploading={isUploading} />
-              </CardContent>
-            </Card>
-          )}
+        {isStoryteller && session.status === "active" && currentTurn?.whisp && !hasRecording && currentTurn?.turn_mode !== "elements" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Music className="mr-2 h-5 w-5" />
+                Record Your Story
+              </CardTitle>
+              <CardDescription>Tell a story about your whisp word - be creative!</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LobbyAudioRecording onRecordingComplete={handleRecordingComplete} isUploading={isUploading} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Elements Interface - For storyteller when turn_mode is elements */}
-        {isStoryteller &&
-          session.status === "active" &&
-          currentTurn?.whisp &&
-          currentTurn?.turn_mode === "elements" &&
-          !currentTurn?.completed_at && (
-            <ElementsInterface
-              theme={{
-                id: selectedTheme || session.selected_theme_id || "",
-                name: themes.find((t) => t.id === (selectedTheme || session.selected_theme_id))?.name || "",
-              }}
-              whisp={currentTurn.whisp}
-              sessionId={sessionId || ""}
-              playerId={currentCustomerId || ""}
-              turnId={currentTurn.id}
-              onSubmit={() => {
-                setCurrentTurn((prev: any) => ({ ...prev, completed_at: new Date().toISOString() }));
-              }}
-              isStoryteller={true}
-              storytellerName={players.find((p) => p.player_id === currentTurn.storyteller_id)?.name || "Storyteller"}
-              sendWebSocketMessage={(msg) => {
-                broadcastChannelRef.current?.send({
-                  type: "broadcast",
-                  event: "elements_submitted",
-                  payload: msg,
-                });
-              }}
-              selectedIcons={turnElements}
-            />
-          )}
+        {isStoryteller && session.status === "active" && currentTurn?.whisp && currentTurn?.turn_mode === "elements" && !currentTurn?.completed_at && (
+          <ElementsInterface
+            theme={{ id: selectedTheme || session.selected_theme_id || "", name: themes.find(t => t.id === (selectedTheme || session.selected_theme_id))?.name || "" }}
+            whisp={currentTurn.whisp}
+            sessionId={sessionId || ""}
+            playerId={currentCustomerId || ""}
+            turnId={currentTurn.id}
+            onSubmit={() => {
+              setCurrentTurn((prev: any) => ({ ...prev, completed_at: new Date().toISOString() }));
+            }}
+            isStoryteller={true}
+            storytellerName={players.find(p => p.player_id === currentTurn.storyteller_id)?.name || "Storyteller"}
+            sendWebSocketMessage={(msg) => {
+              broadcastChannelRef.current?.send({
+                type: "broadcast",
+                event: "elements_submitted",
+                payload: msg,
+              });
+            }}
+            selectedIcons={turnElements}
+          />
+        )}
 
         {/* Waiting for storyteller to select mode - For non-storytellers */}
         {!isStoryteller && session.status === "active" && currentTurn && !currentTurn.whisp && (
@@ -2074,8 +2065,7 @@ export default function Lobby() {
                 Waiting for Storyteller
               </CardTitle>
               <CardDescription>
-                {players.find((p) => p.player_id === session.current_storyteller_id)?.name || "The storyteller"} is
-                selecting their mode...
+                {players.find(p => p.player_id === session.current_storyteller_id)?.name || "The storyteller"} is selecting their mode...
               </CardDescription>
             </CardHeader>
           </Card>
@@ -2119,7 +2109,9 @@ export default function Lobby() {
               <div className="flex gap-2">
                 <Input
                   type="text"
-                  placeholder={isLockedOut ? "You're locked out this round" : "Type your guess..."}
+                  placeholder={
+                    isLockedOut ? "You're locked out this round" : "Type your guess..."
+                  }
                   value={guessInput}
                   onChange={(e) => setGuessInput(e.target.value)}
                   onKeyDown={(e) => {
