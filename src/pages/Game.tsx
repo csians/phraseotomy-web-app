@@ -926,18 +926,23 @@ export default function Game() {
         },
         (payload) => {
           console.log("game_turns Realtime update received:", payload);
-          // Only refresh for non-storytellers during storytelling phase
-          // Storyteller's own updates should not trigger re-render (would reset their UI state)
-          const currentStorytellerId = session?.current_storyteller_id;
+
+          // Prevent the storyteller UI from resetting while they are building the story.
+          // We can reliably detect this from the updated row itself (no stale React state/closures).
           const myId = getCurrentPlayerId();
-          const imStoryteller = myId === currentStorytellerId;
-          
-          if (imStoryteller && gamePhase === "storytelling") {
-            console.log("Skipping refresh - I am the storyteller and still in storytelling phase");
+          const newRow = (payload as any)?.new;
+          const storytellerId = newRow?.storyteller_id;
+          const isMyTurn = !!storytellerId && myId === storytellerId;
+          const isTurnCompleted = !!newRow?.completed_at;
+
+          // If I'm the storyteller and the turn is not completed yet, skip refresh.
+          // (Refreshing sets loading=true in Game.tsx, which unmounts the interface and sends you back to Step 1.)
+          if (isMyTurn && !isTurnCompleted) {
+            console.log("Skipping refresh - storyteller is still composing the story");
             return;
           }
-          
-          // For non-storytellers, or when turn is completed, refresh to see updated state
+
+          // Everyone else (or once turn is completed) should refresh to see updates immediately.
           debouncedRefresh({ bypassStoryPause: true });
         },
       )

@@ -255,7 +255,10 @@ export function UnifiedStorytellingInterface({
           selected_icon_ids: iconIds,
           icon_order: iconOrder,
         })
-        .eq("id", turnId);
+        .eq("id", turnId)
+        // Force PostgREST to return immediately with representation (avoids 204/no-body ambiguity)
+        .select("id, selected_icon_ids, icon_order")
+        .single();
 
       if (error) throw error;
 
@@ -392,7 +395,9 @@ export function UnifiedStorytellingInterface({
           completed_at: new Date().toISOString(),
           turn_mode: "audio", // unified flow uses audio mode
         })
-        .eq("id", turnId);
+        .eq("id", turnId)
+        .select("id, recording_url, completed_at, turn_mode")
+        .single();
 
       if (updateError) throw updateError;
 
