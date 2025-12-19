@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { sessionId, turnId, selectedThemeId, turnMode } = await req.json();
+    const { sessionId, turnId, selectedThemeId } = await req.json();
 
     if (!sessionId) {
       return new Response(
@@ -29,10 +29,6 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Default to 'audio' mode if not specified
-    const mode = turnMode || 'audio';
-    console.log("Turn mode:", mode);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -77,8 +73,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get visual elements from the selected theme (for the 3 theme icons)
-    // Only fetch non-whisp elements (visual elements with images)
+    // Get ALL visual elements from the selected theme (storyteller will choose 3)
     const { data: themeElements, error: themeElementsError } = await supabase
       .from("elements")
       .select("id, name, icon, image_url, color")
@@ -89,7 +84,7 @@ Deno.serve(async (req) => {
       console.error("Error fetching theme elements:", themeElementsError);
     }
 
-    // Get core elements (from all is_core=true themes) for the 2 core icons
+    // Get core elements (from all is_core=true themes) - we'll pick 2 random ones
     const { data: coreThemes, error: coreThemesError } = await supabase
       .from("themes")
       .select("id")
@@ -99,7 +94,7 @@ Deno.serve(async (req) => {
       console.error("Error fetching core themes:", coreThemesError);
     }
 
-    let coreElements: any[] = [];
+    let allCoreElements: any[] = [];
     if (coreThemes && coreThemes.length > 0) {
       const coreThemeIds = coreThemes.map(t => t.id);
       const { data: elements, error: elementsError } = await supabase
@@ -110,40 +105,20 @@ Deno.serve(async (req) => {
 
       if (!elementsError && elements) {
         // Exclude elements from the currently selected theme to avoid duplicates
-        coreElements = elements.filter(e => e.theme_id !== themeId);
+        allCoreElements = elements.filter(e => e.theme_id !== themeId);
       }
     }
 
-    // Select 5 elements total: prefer 3 from theme + 2 from core, 
-    // but if core elements are insufficient, take more from theme
-    const shuffledThemeElements = shuffleArray(themeElements || []);
-    const shuffledCoreElements = shuffleArray(coreElements);
-    
-    // Calculate how many we can take from core (max 2)
-    const coreCount = Math.min(2, shuffledCoreElements.length);
-    // Take remaining from theme (minimum 3, up to 5 if no core)
-    const themeCount = 5 - coreCount;
-    
-    const selectedThemeElements = shuffledThemeElements.slice(0, themeCount);
-    const selectedCoreElements = shuffledCoreElements.slice(0, coreCount);
+    // Randomly select exactly 2 core elements
+    const shuffledCoreElements = shuffleArray(allCoreElements);
+    const selectedCoreElements = shuffledCoreElements.slice(0, 2);
 
-    // Combine and get the IDs in order (theme first, then core)
-    const selectedIconIds = [
-      ...selectedThemeElements.map(e => e.id),
-      ...selectedCoreElements.map(e => e.id),
-    ];
-
-    // Initial order: 0, 1, 2, 3, 4
-    const iconOrder = [0, 1, 2, 3, 4];
-
-    console.log("Selected icons:", selectedIconIds);
-    console.log("Theme elements:", selectedThemeElements.map(e => e.name));
-    console.log("Core elements:", selectedCoreElements.map(e => e.name));
+    console.log("Theme elements available:", themeElements?.length || 0);
+    console.log("Core elements selected (random 2):", selectedCoreElements.map(e => e.name));
 
     // Pick a random whisp element from the theme
     console.log("Selecting whisp from theme elements:", theme.name);
     
-    // Get only whisp elements for this theme (is_whisp = true)
     const { data: whispElements, error: whispError } = await supabase
       .from("elements")
       .select("id, name")
@@ -164,10 +139,9 @@ Deno.serve(async (req) => {
     const generatedWhisp = whispElement.name;
     console.log("Selected whisp from database:", generatedWhisp);
 
-    // Check if turn exists for this round and storyteller - ALWAYS use existing if found
+    // Check if turn exists for this round and storyteller
     let turn;
     
-    // First, find any existing turn for this round/storyteller
     const { data: existingTurns, error: existingError } = await supabase
       .from("game_turns")
       .select("*")
@@ -182,18 +156,20 @@ Deno.serve(async (req) => {
     }
     
     const existingTurn = existingTurns && existingTurns.length > 0 ? existingTurns[0] : null;
+
+    // Core element IDs (the 2 random ones that are auto-selected)
+    const coreElementIds = selectedCoreElements.map(e => e.id);
     
     if (existingTurn) {
-      // Update existing turn with whisp, selected icons, and turn mode
       console.log("Updating existing turn:", existingTurn.id);
       const { data: updatedTurn, error: updateError } = await supabase
         .from("game_turns")
         .update({ 
           whisp: generatedWhisp,
           theme_id: themeId,
-          selected_icon_ids: selectedIconIds,
-          icon_order: iconOrder,
-          turn_mode: mode,
+          // Store only the core element IDs initially - storyteller will add their 3 selections
+          selected_icon_ids: coreElementIds,
+          icon_order: [0, 1], // Initial order for the 2 core elements
         })
         .eq("id", existingTurn.id)
         .select()
@@ -208,16 +184,14 @@ Deno.serve(async (req) => {
       }
       turn = updatedTurn;
     } else if (turnId) {
-      // Specific turnId provided - update it
       console.log("Updating specified turn:", turnId);
       const { data: updatedTurn, error: updateError } = await supabase
         .from("game_turns")
         .update({ 
           whisp: generatedWhisp,
           theme_id: themeId,
-          selected_icon_ids: selectedIconIds,
-          icon_order: iconOrder,
-          turn_mode: mode,
+          selected_icon_ids: coreElementIds,
+          icon_order: [0, 1],
         })
         .eq("id", turnId)
         .select()
@@ -232,7 +206,6 @@ Deno.serve(async (req) => {
       }
       turn = updatedTurn;
     } else {
-      // No existing turn found - create new one
       console.log("Creating new turn for round:", session.current_round);
       const { data: newTurn, error: turnError } = await supabase
         .from("game_turns")
@@ -242,9 +215,8 @@ Deno.serve(async (req) => {
           storyteller_id: session.current_storyteller_id,
           theme_id: themeId,
           whisp: generatedWhisp,
-          selected_icon_ids: selectedIconIds,
-          icon_order: iconOrder,
-          turn_mode: mode,
+          selected_icon_ids: coreElementIds,
+          icon_order: [0, 1],
         })
         .select()
         .single();
@@ -267,20 +239,25 @@ Deno.serve(async (req) => {
         .eq("id", sessionId);
     }
 
-    // Prepare icon data for response
-    const selectedIcons = [
-      ...selectedThemeElements.map(e => ({ ...e, isFromCore: false })),
-      ...selectedCoreElements.map(e => ({ ...e, isFromCore: true })),
-    ];
+    // Prepare core elements with isFromCore flag
+    const coreElementsWithFlag = selectedCoreElements.map(e => ({ 
+      id: e.id,
+      name: e.name,
+      icon: e.icon,
+      image_url: e.image_url,
+      color: e.color,
+      isFromCore: true,
+    }));
 
     return new Response(
       JSON.stringify({ 
         turn,
         whisp: generatedWhisp,
         theme: theme,
-        selectedIcons,
-        selectedIconIds,
-        iconOrder,
+        // ALL theme elements for the storyteller to choose 3 from
+        themeElements: themeElements || [],
+        // The 2 random core elements (auto-selected)
+        coreElements: coreElementsWithFlag,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
