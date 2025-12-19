@@ -257,7 +257,7 @@ export function StorytellingInterface({
               <div className="bg-primary/10 p-6 rounded-lg border-2 border-primary/20">
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <Sparkles className="h-6 w-6 text-primary" />
-                  <h3 className="text-xl font-semibold text-primary">Your Secret Wisp</h3>
+                  <h3 className="text-xl font-semibold text-primary">Your Secret Whisp</h3>
                   <Sparkles className="h-6 w-6 text-primary" />
                 </div>
                 <p className="text-4xl font-bold text-center text-primary mb-3">{whisp}</p>
@@ -344,8 +344,8 @@ export function StorytellingInterface({
                 <p className="text-sm text-muted-foreground">
                   {isStoryteller
                     ? turnMode === "audio"
-                      ? "Tell a creative story that describes your wisp word without saying it directly. Other players will listen and try to guess!"
-                      : "Use the icons to guide your story! Arrange them in the order you'll reference them, then tell a creative story that describes your wisp word without saying it directly."
+                      ? "Tell a creative story that describes your whisp word without saying it directly. Other players will listen and try to guess!"
+                      : "Use the icons to guide your story! Arrange them in the order you'll reference them, then tell a creative story that describes your whisp word without saying it directly."
                     : turnMode === "audio"
                       ? "Listen carefully to the story and try to guess the whisp word based on the clues!"
                       : "Watch the icons and listen carefully to the story. Try to guess the whisp word based on the clues!"}

@@ -55,11 +55,23 @@ interface UnifiedStorytellingInterfaceProps {
 type Phase = "selecting" | "arranging" | "recording" | "submitted";
 
 // Sortable element component for drag-and-drop
-function SortableElement({ element, index, isDraggable }: { element: IconItem; index: number; isDraggable: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: element.id,
-    disabled: !isDraggable,
-  });
+function SortableElement({ 
+  element, 
+  index, 
+  isDraggable 
+}: { 
+  element: IconItem; 
+  index: number; 
+  isDraggable: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: element.id, disabled: !isDraggable });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -76,11 +88,11 @@ function SortableElement({ element, index, isDraggable }: { element: IconItem; i
       style={style}
       className={cn(
         "relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all min-w-[100px]",
-        isDragging
-          ? "bg-primary/20 border-primary shadow-lg scale-105"
+        isDragging 
+          ? "bg-primary/20 border-primary shadow-lg scale-105" 
           : "bg-card border-border hover:border-primary/50",
         element.isFromCore && "ring-2 ring-offset-2 ring-primary/30",
-        isDraggable && "cursor-grab active:cursor-grabbing",
+        isDraggable && "cursor-grab active:cursor-grabbing"
       )}
     >
       {isDraggable && (
@@ -92,16 +104,18 @@ function SortableElement({ element, index, isDraggable }: { element: IconItem; i
           <GripVertical className="h-3 w-3 text-muted-foreground" />
         </div>
       )}
-
-      <div className="text-xs text-muted-foreground font-medium">{index + 1}</div>
-
-      <div
+      
+      <div className="text-xs text-muted-foreground font-medium">
+        {index + 1}
+      </div>
+      
+      <div 
         className="h-14 w-14 rounded-full flex items-center justify-center overflow-hidden"
         style={{ backgroundColor: bgColor }}
       >
         {element.image_url ? (
-          <img
-            src={element.image_url}
+          <img 
+            src={element.image_url} 
             alt={element.name}
             className="h-8 w-8 object-contain"
             style={{ filter: "brightness(0) invert(1)" }}
@@ -110,11 +124,13 @@ function SortableElement({ element, index, isDraggable }: { element: IconItem; i
           <Sparkles className="h-6 w-6 text-white" />
         )}
       </div>
-
+      
       <span className="text-xs font-medium text-center">{element.name}</span>
-
+      
       {element.isFromCore && (
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">Core</span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+          Core
+        </span>
       )}
     </div>
   );
@@ -145,6 +161,9 @@ export function UnifiedStorytellingInterface({
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
+  const MAX_RECORDING_TIME_SECONDS = 180;
+  const maxReachedRef = useRef(false);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -157,7 +176,7 @@ export function UnifiedStorytellingInterface({
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    }),
+    })
   );
 
   // Max 3 selections from theme elements
@@ -166,12 +185,12 @@ export function UnifiedStorytellingInterface({
 
   // Handle element selection (toggle)
   const handleElementClick = (element: ThemeElement) => {
-    const isSelected = selectedElements.some((e) => e.id === element.id);
-
+    const isSelected = selectedElements.some(e => e.id === element.id);
+    
     if (isSelected) {
-      setSelectedElements((prev) => prev.filter((e) => e.id !== element.id));
+      setSelectedElements(prev => prev.filter(e => e.id !== element.id));
     } else if (canSelectMore) {
-      setSelectedElements((prev) => [...prev, element]);
+      setSelectedElements(prev => [...prev, element]);
     } else {
       toast({
         title: "Selection Limit",
@@ -193,7 +212,7 @@ export function UnifiedStorytellingInterface({
     }
 
     // Combine selected theme elements (3) with core elements (2)
-    const themeIconItems: IconItem[] = selectedElements.map((e) => ({
+    const themeIconItems: IconItem[] = selectedElements.map(e => ({
       id: e.id,
       name: e.name,
       icon: e.icon,
@@ -224,10 +243,10 @@ export function UnifiedStorytellingInterface({
   // Proceed to recording phase
   const handleProceedToRecord = async () => {
     setIsLoading(true);
-
+    
     try {
       // Save the selected icon IDs and order to the database
-      const iconIds = orderedElements.map((e) => e.id);
+      const iconIds = orderedElements.map(e => e.id);
       const iconOrder = orderedElements.map((_, idx) => idx);
 
       const { error } = await supabase
@@ -236,7 +255,10 @@ export function UnifiedStorytellingInterface({
           selected_icon_ids: iconIds,
           icon_order: iconOrder,
         })
-        .eq("id", turnId);
+        .eq("id", turnId)
+        // Force PostgREST to return immediately with representation (avoids 204/no-body ambiguity)
+        .select("id, selected_icon_ids, icon_order")
+        .single();
 
       if (error) throw error;
 
@@ -278,15 +300,31 @@ export function UnifiedStorytellingInterface({
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         setRecordedAudio(audioBlob);
         setAudioUrl(URL.createObjectURL(audioBlob));
-        stream.getTracks().forEach((track) => track.stop());
+        stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorder.start(100);
       setIsRecording(true);
       setRecordingTime(0);
+      maxReachedRef.current = false;
 
       timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
+        setRecordingTime((prev) => {
+          // Hard cap at 3 minutes
+          if (prev >= MAX_RECORDING_TIME_SECONDS) {
+            if (!maxReachedRef.current) {
+              maxReachedRef.current = true;
+              toast({
+                title: "Recording stopped",
+                description: "Maximum recording time is 3 minutes.",
+              });
+            }
+            // Ensure recording stops (no-op if already stopped)
+            setTimeout(() => stopRecording(), 0);
+            return prev;
+          }
+          return prev + 1;
+        });
       }, 1000);
 
       // Notify others that recording started
@@ -308,7 +346,7 @@ export function UnifiedStorytellingInterface({
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-
+      
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -345,9 +383,9 @@ export function UnifiedStorytellingInterface({
 
       if (uploadError) throw uploadError;
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("audio_uploads").getPublicUrl(fileName);
+      const { data: { publicUrl } } = supabase.storage
+        .from("audio_uploads")
+        .getPublicUrl(fileName);
 
       // Update the turn with recording URL and mark as completed
       const { error: updateError } = await supabase
@@ -357,7 +395,9 @@ export function UnifiedStorytellingInterface({
           completed_at: new Date().toISOString(),
           turn_mode: "audio", // unified flow uses audio mode
         })
-        .eq("id", turnId);
+        .eq("id", turnId)
+        .select("id, recording_url, completed_at, turn_mode")
+        .single();
 
       if (updateError) throw updateError;
 
@@ -369,7 +409,7 @@ export function UnifiedStorytellingInterface({
       });
 
       setPhase("submitted");
-
+      
       toast({
         title: "Story Submitted! 🎉",
         description: "Waiting for other players to guess...",
@@ -418,30 +458,27 @@ export function UnifiedStorytellingInterface({
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Tell Your Story</CardTitle>
           <CardDescription>Theme: {theme?.name || "Unknown"}</CardDescription>
-
+          
           {/* Progress indicator */}
           <div className="flex items-center justify-center gap-2 mt-4">
             {["selecting", "arranging", "recording"].map((step, idx) => (
               <div key={step} className="flex items-center">
-                <div
-                  className={cn(
-                    "h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium",
-                    phase === step
-                      ? "bg-primary text-primary-foreground"
-                      : ["selecting", "arranging", "recording"].indexOf(phase) > idx
-                        ? "bg-primary/20 text-primary"
-                        : "bg-muted text-muted-foreground",
-                  )}
-                >
+                <div className={cn(
+                  "h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium",
+                  phase === step ? "bg-primary text-primary-foreground" :
+                  ["selecting", "arranging", "recording"].indexOf(phase) > idx 
+                    ? "bg-primary/20 text-primary" 
+                    : "bg-muted text-muted-foreground"
+                )}>
                   {idx + 1}
                 </div>
                 {idx < 2 && (
-                  <div
-                    className={cn(
-                      "w-8 h-0.5 mx-1",
-                      ["selecting", "arranging", "recording"].indexOf(phase) > idx ? "bg-primary" : "bg-muted",
-                    )}
-                  />
+                  <div className={cn(
+                    "w-8 h-0.5 mx-1",
+                    ["selecting", "arranging", "recording"].indexOf(phase) > idx 
+                      ? "bg-primary" 
+                      : "bg-muted"
+                  )} />
                 )}
               </div>
             ))}
@@ -456,9 +493,11 @@ export function UnifiedStorytellingInterface({
         <CardContent className="space-y-6">
           {/* Show whisp to storyteller */}
           <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center">
-            <p className="text-sm text-muted-foreground mb-1">Your Secret Wisp</p>
+            <p className="text-sm text-muted-foreground mb-1">Your Secret Whisp</p>
             <p className="text-2xl font-bold text-primary">{whisp}</p>
-            <p className="text-xs text-muted-foreground mt-2">Don't say this word! Describe it using the elements.</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Don't say this word! Describe it using the elements.
+            </p>
           </div>
 
           {/* Phase 1: Element Selection */}
@@ -467,14 +506,15 @@ export function UnifiedStorytellingInterface({
               <div className="text-center">
                 <h3 className="text-lg font-semibold">Select 3 Elements</h3>
                 <p className="text-sm text-muted-foreground">
-                  Choose 3 elements that will help you describe your wisp ({selectedElements.length}/{MAX_SELECTIONS}{" "}
-                  selected)
+                  Choose 3 elements that will help you describe your whisp ({selectedElements.length}/{MAX_SELECTIONS} selected)
                 </p>
               </div>
 
               {/* Core elements (auto-selected) */}
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Core Elements (Auto-selected - 2)</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Core Elements (Auto-selected - 2)
+                </p>
                 <div className="flex flex-wrap gap-3 justify-center">
                   {coreElements.map((element) => {
                     const bgColor = element.color || "#8B5CF6";
@@ -483,13 +523,13 @@ export function UnifiedStorytellingInterface({
                         key={element.id}
                         className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-primary/50 bg-primary/5"
                       >
-                        <div
+                        <div 
                           className="h-12 w-12 rounded-full flex items-center justify-center"
                           style={{ backgroundColor: bgColor }}
                         >
                           {element.image_url ? (
-                            <img
-                              src={element.image_url}
+                            <img 
+                              src={element.image_url} 
                               alt={element.name}
                               className="h-7 w-7 object-contain"
                               style={{ filter: "brightness(0) invert(1)" }}
@@ -499,7 +539,9 @@ export function UnifiedStorytellingInterface({
                           )}
                         </div>
                         <span className="text-xs font-medium">{element.name}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">Core</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                          Core
+                        </span>
                       </div>
                     );
                   })}
@@ -508,10 +550,12 @@ export function UnifiedStorytellingInterface({
 
               {/* Theme elements (user selects 3) */}
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Theme Elements (Select 3)</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Theme Elements (Select 3)
+                </p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                   {themeElements.map((element) => {
-                    const isSelected = selectedElements.some((e) => e.id === element.id);
+                    const isSelected = selectedElements.some(e => e.id === element.id);
                     const bgColor = element.color || "#6B7280";
                     return (
                       <button
@@ -520,17 +564,19 @@ export function UnifiedStorytellingInterface({
                         disabled={!canSelectMore && !isSelected}
                         className={cn(
                           "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all",
-                          isSelected ? "border-primary bg-primary/10" : "border-border hover:border-primary/50 bg-card",
-                          !canSelectMore && !isSelected && "opacity-50 cursor-not-allowed",
+                          isSelected 
+                            ? "border-primary bg-primary/10" 
+                            : "border-border hover:border-primary/50 bg-card",
+                          !canSelectMore && !isSelected && "opacity-50 cursor-not-allowed"
                         )}
                       >
-                        <div
+                        <div 
                           className="h-12 w-12 rounded-full flex items-center justify-center relative"
                           style={{ backgroundColor: bgColor }}
                         >
                           {element.image_url ? (
-                            <img
-                              src={element.image_url}
+                            <img 
+                              src={element.image_url} 
                               alt={element.name}
                               className="h-7 w-7 object-contain"
                               style={{ filter: "brightness(0) invert(1)" }}
@@ -574,11 +620,23 @@ export function UnifiedStorytellingInterface({
                 </p>
               </div>
 
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={orderedElements.map((e) => e.id)} strategy={horizontalListSortingStrategy}>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={orderedElements.map(e => e.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
                   <div className="flex flex-wrap gap-4 justify-center py-4">
                     {orderedElements.map((element, index) => (
-                      <SortableElement key={element.id} element={element} index={index} isDraggable={true} />
+                      <SortableElement
+                        key={element.id}
+                        element={element}
+                        index={index}
+                        isDraggable={true}
+                      />
                     ))}
                   </div>
                 </SortableContext>
@@ -596,10 +654,17 @@ export function UnifiedStorytellingInterface({
               </div>
 
               <div className="flex justify-center gap-4 pt-4">
-                <Button variant="outline" onClick={() => setPhase("selecting")}>
+                <Button
+                  variant="outline"
+                  onClick={() => setPhase("selecting")}
+                >
                   Back
                 </Button>
-                <Button onClick={handleProceedToRecord} disabled={isLoading} size="lg">
+                <Button
+                  onClick={handleProceedToRecord}
+                  disabled={isLoading}
+                  size="lg"
+                >
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -633,13 +698,13 @@ export function UnifiedStorytellingInterface({
                   return (
                     <div key={element.id} className="flex flex-col items-center gap-1">
                       <div className="text-xs text-muted-foreground">{index + 1}</div>
-                      <div
+                      <div 
                         className="h-10 w-10 rounded-full flex items-center justify-center"
                         style={{ backgroundColor: bgColor }}
                       >
                         {element.image_url ? (
-                          <img
-                            src={element.image_url}
+                          <img 
+                            src={element.image_url} 
                             alt={element.name}
                             className="h-6 w-6 object-contain"
                             style={{ filter: "brightness(0) invert(1)" }}
@@ -664,13 +729,29 @@ export function UnifiedStorytellingInterface({
                       onClick={isRecording ? stopRecording : startRecording}
                       className="h-16 w-16 rounded-full"
                     >
-                      {isRecording ? <Square className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                      {isRecording ? (
+                        <Square className="h-6 w-6" />
+                      ) : (
+                        <Mic className="h-6 w-6" />
+                      )}
                     </Button>
-                    {isRecording && (
-                      <div className="flex items-center gap-2">
-                        <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-lg font-mono">{formatTime(recordingTime)}</span>
+                    {isRecording ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                          <span className="text-lg font-mono">{formatTime(recordingTime)}</span>
+                          <span className="text-sm text-muted-foreground">/ {formatTime(MAX_RECORDING_TIME_SECONDS)}</span>
+                        </div>
+                        {recordingTime >= MAX_RECORDING_TIME_SECONDS - 30 && (
+                          <span className="text-xs text-destructive font-medium">
+                            {MAX_RECORDING_TIME_SECONDS - recordingTime}s remaining
+                          </span>
+                        )}
                       </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Maximum: {formatTime(MAX_RECORDING_TIME_SECONDS)} (3 minutes)
+                      </p>
                     )}
                     <p className="text-sm text-muted-foreground">
                       {isRecording ? "Click to stop recording" : "Click to start recording"}
@@ -690,7 +771,11 @@ export function UnifiedStorytellingInterface({
                       >
                         Re-record
                       </Button>
-                      <Button onClick={handleSubmit} disabled={isLoading} size="lg">
+                      <Button
+                        onClick={handleSubmit}
+                        disabled={isLoading}
+                        size="lg"
+                      >
                         {isLoading ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -709,7 +794,10 @@ export function UnifiedStorytellingInterface({
               </div>
 
               <div className="flex justify-center pt-4">
-                <Button variant="ghost" onClick={() => setPhase("arranging")}>
+                <Button
+                  variant="ghost"
+                  onClick={() => setPhase("arranging")}
+                >
                   Back to Arrange
                 </Button>
               </div>
