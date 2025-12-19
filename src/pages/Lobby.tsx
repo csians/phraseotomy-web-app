@@ -1102,7 +1102,7 @@ export default function Lobby() {
       broadcastEvent("mode_selected", { mode, whisp: data.whisp });
 
       toast({
-        title: "Whisp Generated!",
+        title: "Wisp Generated!",
         description: `Your word is: "${data.whisp}"`,
       });
 

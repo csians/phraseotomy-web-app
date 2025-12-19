@@ -252,12 +252,12 @@ export function StorytellingInterface({
               </div>
             )}
 
-            {/* Whisp display - only visible to storyteller */}
+            {/* Wisp display - only visible to storyteller */}
             {isStoryteller && whisp && (
               <div className="bg-primary/10 p-6 rounded-lg border-2 border-primary/20">
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <Sparkles className="h-6 w-6 text-primary" />
-                  <h3 className="text-xl font-semibold text-primary">Your Secret Whisp</h3>
+                  <h3 className="text-xl font-semibold text-primary">Your Secret Wisp</h3>
                   <Sparkles className="h-6 w-6 text-primary" />
                 </div>
                 <p className="text-4xl font-bold text-center text-primary mb-3">{whisp}</p>
