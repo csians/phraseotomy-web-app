@@ -76,7 +76,7 @@ export function TurnModeSelection({
             </div>
             <CardTitle className="text-xl">Arrange Elements</CardTitle>
             <CardDescription>
-              Order elements to hint at the whisp
+              Order elements to hint at the wisp
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
