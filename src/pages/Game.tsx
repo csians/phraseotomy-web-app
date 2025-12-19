@@ -4,17 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useGameWebSocket } from "@/hooks/useGameWebSocket";
 import { Scoreboard } from "@/components/Scoreboard";
-import { StorytellingInterface } from "@/components/StorytellingInterface";
+import { UnifiedStorytellingInterface } from "@/components/UnifiedStorytellingInterface";
 import { GuessingInterface } from "@/components/GuessingInterface";
-import { ThemeSelectionCards, ThemeOption } from "@/components/ThemeSelectionCards";
-import { TurnModeSelection } from "@/components/TurnModeSelection";
-import { ElementsInterface } from "@/components/ElementsInterface";
+import { ThemeSelectionCards } from "@/components/ThemeSelectionCards";
 import { GameTimer } from "@/components/GameTimer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Wifi, WifiOff, Loader2, Trophy, ArrowLeft } from "lucide-react";
+import { Loader2, Trophy, ArrowLeft } from "lucide-react";
 import Header from "@/components/Header";
+
 
 interface Player {
   id: string;
@@ -70,9 +69,19 @@ interface IconItem {
   name: string;
   icon: string;
   isFromCore: boolean;
+  image_url?: string | null;
+  color?: string | null;
 }
 
-type GamePhase = "selecting_theme" | "selecting_mode" | "storytelling" | "elements" | "guessing" | "scoring";
+interface ThemeElement {
+  id: string;
+  name: string;
+  icon: string;
+  image_url?: string | null;
+  color?: string | null;
+}
+
+type GamePhase = "selecting_theme" | "storytelling" | "guessing" | "scoring";
 
 export default function Game() {
   const { sessionId } = useParams();
@@ -90,14 +99,16 @@ export default function Game() {
   const [isGeneratingWhisp, setIsGeneratingWhisp] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<string>("");
   const [unlockedPackIds, setUnlockedPackIds] = useState<string[]>([]);
-  const [selectedTurnMode, setSelectedTurnMode] = useState<"audio" | "elements" | null>(null);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [isAnnouncingWinner, setIsAnnouncingWinner] = useState(false);
   const [gameWinner, setGameWinner] = useState<Player | null>(null);
   const [isTieGame, setIsTieGame] = useState(false);
   const [isRoundTransitioning, setIsRoundTransitioning] = useState(false);
   const [roundResultMessage, setRoundResultMessage] = useState<{correct: boolean; message: string} | null>(null);
-  const [isModeTransitioning, setIsModeTransitioning] = useState(false); // Show loading during mode selection
+  const [isModeTransitioning, setIsModeTransitioning] = useState(false);
+  const [themeElementsForSelection, setThemeElementsForSelection] = useState<ThemeElement[]>([]);
+  const [coreElementsForSelection, setCoreElementsForSelection] = useState<IconItem[]>([]);
+  const [currentWhisp, setCurrentWhisp] = useState<string>("");
   
   // Refs to track completion state for use in callbacks (avoid stale closures)
   const gameCompletedRef = useRef(false);
@@ -695,35 +706,15 @@ export default function Game() {
       // Session-level turn mode (set at lobby creation - skips per-turn mode selection)
       const sessionTurnMode = data.session?.turn_mode;
 
-      // Phase determination (simplified):
-      // 1. Session has theme -> NEVER show theme selection again
-      // 2. No whisp yet -> if session has turn_mode, auto-use it; otherwise show mode selection
-      // 3. Has whisp but not completed -> storytelling/elements phase
-      // 4. Completed -> guessing phase
+      // Phase determination (simplified - unified flow):
+      // 1. No session theme -> show theme selection
+      // 2. Theme exists but no whisp -> storytelling (unified)
+      // 3. Has whisp and completed -> guessing
 
       if (!sessionHasTheme && !hasTheme) {
-        // Only show theme selection if NO theme exists anywhere (first round only)
         phase = "selecting_theme";
-      } else if (!hasWhisp) {
-        // Theme exists but no whisp yet
-        // Check if turn already has turn_mode set (from previous selection before refresh)
-        if (turnMode) {
-          // Turn already has a mode selected, go to that phase
-          phase = turnMode === "elements" ? "elements" : "storytelling";
-        } else if (sessionTurnMode) {
-          // Session has a preset turn_mode, use it
-          phase = sessionTurnMode === "elements" ? "elements" : "storytelling";
-        } else {
-          // No turn_mode anywhere = need to ask storyteller
-          phase = "selecting_mode";
-        }
-      } else if (!data.currentTurn?.completed_at) {
-        // Whisp exists, show appropriate interface based on turn_mode
-        if (turnMode === "elements") {
-          phase = "elements";
-        } else {
-          phase = "storytelling";
-        }
+      } else if (!hasWhisp || !data.currentTurn?.completed_at) {
+        phase = "storytelling";
       } else {
         phase = "guessing";
       }
