@@ -467,7 +467,7 @@ export function UnifiedStorytellingInterface({
               <div className="text-center">
                 <h3 className="text-lg font-semibold">Select 3 Elements</h3>
                 <p className="text-sm text-muted-foreground">
-                  Choose 3 elements that will help you describe your whisp ({selectedElements.length}/{MAX_SELECTIONS}{" "}
+                  Choose 3 elements that will help you describe your wisp ({selectedElements.length}/{MAX_SELECTIONS}{" "}
                   selected)
                 </p>
               </div>

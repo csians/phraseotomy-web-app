@@ -344,8 +344,8 @@ export function StorytellingInterface({
                 <p className="text-sm text-muted-foreground">
                   {isStoryteller
                     ? turnMode === "audio"
-                      ? "Tell a creative story that describes your whisp word without saying it directly. Other players will listen and try to guess!"
-                      : "Use the icons to guide your story! Arrange them in the order you'll reference them, then tell a creative story that describes your whisp word without saying it directly."
+                      ? "Tell a creative story that describes your wisp word without saying it directly. Other players will listen and try to guess!"
+                      : "Use the icons to guide your story! Arrange them in the order you'll reference them, then tell a creative story that describes your wisp word without saying it directly."
                     : turnMode === "audio"
                       ? "Listen carefully to the story and try to guess the whisp word based on the clues!"
                       : "Watch the icons and listen carefully to the story. Try to guess the whisp word based on the clues!"}

@@ -77,7 +77,7 @@ export function ElementsInterface({
 
       toast({
         title: "Elements Submitted!",
-        description: "Other players can now guess your whisp.",
+        description: "Other players can now guess your wisp.",
       });
 
       onSubmit();
@@ -172,7 +172,7 @@ export function ElementsInterface({
                 <Lightbulb className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
                   {isStoryteller
-                    ? "Arrange the elements in an order that tells a story or gives clues about your whisp word. The order matters - use it creatively!"
+                    ? "Arrange the elements in an order that tells a story or gives clues about your wisp word. The order matters - use it creatively!"
                     : "Look at how the elements are ordered. The sequence is your clue to guess the whisp word!"}
                 </p>
               </div>
