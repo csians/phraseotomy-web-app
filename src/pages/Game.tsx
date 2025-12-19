@@ -116,6 +116,7 @@ export default function Game() {
   const gameCompletedRef = useRef(false);
   const isAnnouncingWinnerRef = useRef(false);
   const isModeSelectingRef = useRef(false); // Prevent refresh during mode selection
+  const isStorytellerActiveRef = useRef(false); // Prevent polling during storytelling
   const [lifetimePoints, setLifetimePoints] = useState<Record<string, number>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
@@ -128,9 +129,9 @@ export default function Game() {
 
   // Debounced refresh to prevent infinite loops
   const debouncedRefresh = useCallback(() => {
-    // Don't refresh if game is completed, announcing winner, or selecting mode
-    if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current) {
-      console.log("Skipping refresh - game completed, announcing winner, or selecting mode");
+    // Don't refresh if game is completed, announcing winner, selecting mode, or storyteller is active
+    if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current || isStorytellerActiveRef.current) {
+      console.log("Skipping refresh - game completed, announcing winner, selecting mode, or storyteller active");
       return;
     }
 
@@ -233,7 +234,14 @@ export default function Game() {
   useEffect(() => {
     isAnnouncingWinnerRef.current = isAnnouncingWinner;
   }, [isAnnouncingWinner]);
-  
+
+  // Set storyteller active flag to pause polling during storytelling phase
+  useEffect(() => {
+    const isStoryteller = currentPlayerId === session?.current_storyteller_id;
+    const shouldBeActive = isStoryteller && gamePhase === "storytelling" && !gameCompleted;
+    isStorytellerActiveRef.current = shouldBeActive;
+    console.log("Storyteller active ref updated:", shouldBeActive, "isStoryteller:", isStoryteller, "gamePhase:", gamePhase);
+  }, [currentPlayerId, session?.current_storyteller_id, gamePhase, gameCompleted]);
   // Initialize audio context for real-time playback
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -518,10 +526,13 @@ export default function Game() {
     const cleanup = setupRealtimeSubscriptions();
 
     // Poll fallback: ensures all clients see game completion even if WS/Realtime delivery fails.
+    // Only poll for non-storytellers during storytelling phase
     const pollId = window.setInterval(async () => {
       try {
         if (!sessionId) return;
         if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current) return;
+        // Skip polling when storyteller is actively creating their story
+        if (isStorytellerActiveRef.current) return;
 
         const { data, error } = await supabase.functions.invoke("get-game-state", {
           body: { sessionId },
@@ -616,9 +627,9 @@ export default function Game() {
   ]);
 
   const initializeGame = async () => {
-    // Don't reinitialize if game is already completed, announcing winner, or selecting mode
-    if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current) {
-      console.log("Skipping initializeGame - game completed, announcing winner, or selecting mode");
+    // Don't reinitialize if game is already completed, announcing winner, selecting mode, or storyteller is active
+    if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current || isStorytellerActiveRef.current) {
+      console.log("Skipping initializeGame - game completed, announcing winner, selecting mode, or storyteller active");
       setLoading(false);
       return;
     }
@@ -1026,6 +1037,8 @@ export default function Game() {
   };
 
   const handleStoryComplete = () => {
+    // Allow polling again after storyteller finishes
+    isStorytellerActiveRef.current = false;
     toast({
       title: "Story Submitted!",
       description: "Waiting for other players to guess...",
