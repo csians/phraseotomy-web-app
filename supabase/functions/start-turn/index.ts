@@ -73,8 +73,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get ALL visual elements from the selected theme (storyteller will choose 3)
-    const { data: themeElements, error: themeElementsError } = await supabase
+    // Get ALL visual elements from the selected theme, then shuffle and pick 20 random
+    const { data: allThemeElements, error: themeElementsError } = await supabase
       .from("elements")
       .select("id, name, icon, image_url, color")
       .eq("theme_id", themeId)
@@ -83,6 +83,10 @@ Deno.serve(async (req) => {
     if (themeElementsError) {
       console.error("Error fetching theme elements:", themeElementsError);
     }
+
+    // Shuffle and limit to 20 random elements for Step 1
+    const shuffledThemeElements = shuffleArray(allThemeElements || []);
+    const themeElements = shuffledThemeElements.slice(0, 20);
 
     // Get core elements (from all is_core=true themes) - we'll pick 2 random ones
     const { data: coreThemes, error: coreThemesError } = await supabase

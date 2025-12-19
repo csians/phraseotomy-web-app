@@ -141,7 +141,7 @@ const AdminHome = () => {
                 Themes & Elements
               </CardTitle>
               <CardDescription>
-                Manage themes and whisp elements with images
+                Manage themes and wisp elements with images
               </CardDescription>
             </CardHeader>
             <CardContent>
