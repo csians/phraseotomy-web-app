@@ -2004,7 +2004,7 @@ export default function Lobby() {
             <CardHeader>
               <CardTitle className="flex items-center text-primary">
                 <Eye className="mr-2 h-5 w-5" />
-                Your Whisp Word
+                Your Wisp Word
               </CardTitle>
               <CardDescription>Create a story about this word - other players will try to guess it!</CardDescription>
             </CardHeader>
@@ -2024,7 +2024,7 @@ export default function Lobby() {
                 <Music className="mr-2 h-5 w-5" />
                 Record Your Story
               </CardTitle>
-              <CardDescription>Tell a story about your whisp word - be creative!</CardDescription>
+              <CardDescription>Tell a story about your wisp word - be creative!</CardDescription>
             </CardHeader>
             <CardContent>
               <LobbyAudioRecording onRecordingComplete={handleRecordingComplete} isUploading={isUploading} />
@@ -2101,7 +2101,7 @@ export default function Lobby() {
                 <Music className="w-5 h-5" />
                 Listen and Guess
               </CardTitle>
-              <CardDescription>Listen to the story and guess the whisp word!</CardDescription>
+              <CardDescription>Listen to the story and guess the wisp word!</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <audio controls src={currentTurn.recording_url} className="w-full" />

@@ -203,7 +203,7 @@ export function StorytellingInterface({
 
       toast({
         title: "Story Submitted!",
-        description: "Other players can now guess your whisp.",
+        description: "Other players can now guess your wisp.",
       });
 
       onStoryComplete();
@@ -275,7 +275,7 @@ export function StorytellingInterface({
                   Waiting for {storytellerName} to record their story...
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Look at the icons above for clues and try to guess the whisp word!
+                  Look at the icons above for clues and try to guess the wisp word!
                 </p>
               </div>
             )}
@@ -288,7 +288,7 @@ export function StorytellingInterface({
                 {!whisp && (
                   <Alert className="mb-4">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>Waiting for whisp to be generated...</AlertDescription>
+                    <AlertDescription>Waiting for wisp to be generated...</AlertDescription>
                   </Alert>
                 )}
 
@@ -344,11 +344,11 @@ export function StorytellingInterface({
                 <p className="text-sm text-muted-foreground">
                   {isStoryteller
                     ? turnMode === "audio"
-                      ? "Tell a creative story that describes your whisp word without saying it directly. Other players will listen and try to guess!"
-                      : "Use the icons to guide your story! Arrange them in the order you'll reference them, then tell a creative story that describes your whisp word without saying it directly."
+                      ? "Tell a creative story that describes your wisp word without saying it directly. Other players will listen and try to guess!"
+                      : "Use the icons to guide your story! Arrange them in the order you'll reference them, then tell a creative story that describes your wisp word without saying it directly."
                     : turnMode === "audio"
-                      ? "Listen carefully to the story and try to guess the whisp word based on the clues!"
-                      : "Watch the icons and listen carefully to the story. Try to guess the whisp word based on the clues!"}
+                      ? "Listen carefully to the story and try to guess the wisp word based on the clues!"
+                      : "Watch the icons and listen carefully to the story. Try to guess the wisp word based on the clues!"}
                 </p>
               </div>
             </div>

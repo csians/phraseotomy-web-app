@@ -402,7 +402,7 @@ export function GuessingInterface({
             {/* Tips */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm text-muted-foreground text-center">
-                💡 Look at the arranged elements{turnMode === "audio" ? " and listen to the story" : ""}. The whisp is a single word related to the theme "{theme.name}".
+                💡 Look at the arranged elements{turnMode === "audio" ? " and listen to the story" : ""}. The wisp is a single word related to the theme "{theme.name}".
               </p>
             </div>
           </CardContent>

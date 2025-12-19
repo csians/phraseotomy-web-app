@@ -1530,7 +1530,7 @@ export default function Game() {
                 <p className="text-muted-foreground">Watch the scoreboard to see who gets it right!</p>
                 {currentTurn?.whisp && (
                   <p className="mt-4 text-lg">
-                    Your whisp was: <span className="font-bold text-primary">{currentTurn.whisp}</span>
+                    Your wisp was: <span className="font-bold text-primary">{currentTurn.whisp}</span>
                   </p>
                 )}
               </div>
