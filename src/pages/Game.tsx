@@ -151,6 +151,28 @@ export default function Game() {
     }, 300);
   }, []); // Using refs instead of state for checks
 
+  // Force refresh that bypasses storyteller active check - for critical state transitions
+  const forceRefresh = useCallback(() => {
+    // Still skip if game is completed or announcing winner
+    if (gameCompletedRef.current || isAnnouncingWinnerRef.current) {
+      console.log("Skipping forceRefresh - game completed or announcing winner");
+      return;
+    }
+
+    // Clear the storyteller active flag since story is submitted
+    isStorytellerActiveRef.current = false;
+
+    if (refreshDebounceRef.current) {
+      clearTimeout(refreshDebounceRef.current);
+    }
+
+    console.log("🔄 Force refresh triggered - story submitted, transitioning to guessing phase");
+    refreshDebounceRef.current = setTimeout(() => {
+      lastRefreshRef.current = Date.now();
+      initializeGame();
+    }, 100); // Shorter delay for immediate transition
+  }, []);
+
   // Get current player ID from storage - must be defined before getCurrentPlayerInfo
   const getCurrentPlayerId = () => {
     const storageKeys = ["customerData", "phraseotomy_customer_data", "customer_data"];
@@ -327,7 +349,8 @@ export default function Game() {
             title: "Audio Ready! 🎤",
             description: "Listen to the clue and guess the secret element",
           });
-          debouncedRefresh();
+          // Use forceRefresh to bypass storyteller active check and transition to guessing
+          forceRefresh();
           break;
 
         case "elements_submitted":
