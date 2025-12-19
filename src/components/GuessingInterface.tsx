@@ -14,7 +14,13 @@ interface GuessingInterfaceProps {
   sessionId: string;
   roundNumber: number;
   playerId: string;
-  onGuessSubmit: (gameCompleted?: boolean, players?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any) => void;
+  onGuessSubmit: (
+    gameCompleted?: boolean,
+    players?: any[],
+    wasCorrect?: boolean,
+    whisp?: string,
+    nextRound?: any,
+  ) => void;
   selectedIcons?: IconItem[];
   turnMode?: "audio" | "elements";
   sendWebSocketMessage?: (message: any) => void;
@@ -111,11 +117,11 @@ export function GuessingInterface({
       setCurrentTime(0);
     };
 
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("ended", handleEnded);
 
     // Autoplay only once when audioUrl first loads
     if (!hasAutoPlayedRef.current && audioUrl) {
@@ -124,11 +130,11 @@ export function GuessingInterface({
     }
 
     return () => {
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("ended", handleEnded);
     };
   }, [audioUrl]);
 
@@ -160,12 +166,12 @@ export function GuessingInterface({
     }
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
   const handleSubmitGuess = async () => {
     const trimmedGuess = guess.trim();
-    
+
     if (!trimmedGuess) {
       toast({
         title: "Empty Guess",
@@ -200,7 +206,7 @@ export function GuessingInterface({
 
       const { correct, points_earned, game_completed, next_round, whisp, all_players_answered } = data;
       console.log("📊 Guess result from API:", { correct, points_earned, game_completed, whisp, all_players_answered });
-      
+
       setHasSubmitted(true);
 
       if (correct === true) {
@@ -218,7 +224,7 @@ export function GuessingInterface({
           duration: 5000,
         });
       }
-      
+
       // Broadcast round result to all players when all have answered (non-game-completing round)
       if (all_players_answered && !game_completed && next_round && sendWebSocketMessage) {
         sendWebSocketMessage({
@@ -230,7 +236,7 @@ export function GuessingInterface({
           wasCorrect: correct === true,
         });
       }
-      
+
       // Notify parent with game completion info, players data, correctness (explicit boolean), and whisp
       onGuessSubmit(game_completed, next_round?.players, correct === true, whisp, next_round);
     } catch (error) {
@@ -260,7 +266,8 @@ export function GuessingInterface({
               Guess the <span className="text-primary">Whisp!</span>
             </CardTitle>
             <CardDescription className="text-center text-lg">
-              Theme: {theme.name} • {turnMode === "elements" 
+              Theme: {theme.name} •{" "}
+              {turnMode === "elements"
                 ? `Look at ${storytellerName}'s element order and guess the word`
                 : `Listen to ${storytellerName}'s story and guess the word`}
             </CardDescription>
@@ -269,11 +276,7 @@ export function GuessingInterface({
             {/* Icons Display - always show when icons are available (storyteller arranges them) */}
             {selectedIcons.length > 0 && (
               <div className="bg-muted/30 p-6 rounded-xl">
-                <IconSelectionPanel
-                  icons={selectedIcons}
-                  isDraggable={false}
-                  label="Storyteller's Arranged Elements"
-                />
+                <IconSelectionPanel icons={selectedIcons} isDraggable={false} label="Storyteller's Arranged Elements" />
               </div>
             )}
 
@@ -299,7 +302,7 @@ export function GuessingInterface({
                   </Button>
                   <div className="flex-1 space-y-2">
                     {/* Custom Progress Bar */}
-                    <div 
+                    <div
                       className="relative h-3 w-full bg-muted rounded-full cursor-pointer overflow-hidden"
                       onClick={(e) => {
                         if (!audioRef.current || duration <= 0) return;
@@ -312,14 +315,14 @@ export function GuessingInterface({
                       }}
                     >
                       {/* Progress Fill */}
-                      <div 
+                      <div
                         className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-100"
-                        style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
+                        style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%" }}
                       />
                       {/* Thumb/Dot */}
-                      <div 
+                      <div
                         className="absolute top-1/2 -translate-y-1/2 h-5 w-5 bg-primary rounded-full border-2 border-background shadow-lg transition-all duration-100"
-                        style={{ left: duration > 0 ? `calc(${(currentTime / duration) * 100}% - 10px)` : '0px' }}
+                        style={{ left: duration > 0 ? `calc(${(currentTime / duration) * 100}% - 10px)` : "0px" }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
@@ -335,9 +338,7 @@ export function GuessingInterface({
             {/* Element arrangement hint */}
             {selectedIcons.length > 0 && (
               <div className="bg-primary/10 p-6 rounded-lg text-center">
-                <p className="text-lg font-medium text-primary">
-                  🔍 Study the element order above — it's your clue!
-                </p>
+                <p className="text-lg font-medium text-primary">🔍 Study the element order above — it's your clue!</p>
                 <p className="text-sm text-muted-foreground mt-2">
                   {storytellerName} arranged these elements to hint at the whisp word.
                 </p>
@@ -347,20 +348,18 @@ export function GuessingInterface({
             {/* Guess Input */}
             <div>
               <div className="flex justify-between items-center mb-3">
-                <h3 className="text-lg font-semibold">
-                  What's the whisp word? (10 points):
-                </h3>
+                <h3 className="text-lg font-semibold">What's the wisp word? (10 points):</h3>
                 {(isLockedOut || hasSubmitted) && (
-                  <div className={`text-sm font-medium px-3 py-1 rounded-full ${
-                    isLockedOut 
-                      ? "bg-red-500/10 text-red-600" 
-                      : "bg-green-500/10 text-green-600"
-                  }`}>
+                  <div
+                    className={`text-sm font-medium px-3 py-1 rounded-full ${
+                      isLockedOut ? "bg-red-500/10 text-red-600" : "bg-green-500/10 text-green-600"
+                    }`}
+                  >
                     {isLockedOut ? "🔒 Locked this round" : "✓ Submitted"}
                   </div>
                 )}
               </div>
-              
+
               {isLockedOut ? (
                 <div className="bg-destructive/10 border-2 border-destructive/50 rounded-lg p-8 text-center">
                   <p className="text-lg font-semibold text-destructive mb-2">❌ Wrong Guess!</p>
@@ -371,9 +370,7 @@ export function GuessingInterface({
               ) : hasSubmitted ? (
                 <div className="bg-green-500/10 border-2 border-green-500/50 rounded-lg p-8 text-center">
                   <p className="text-lg font-semibold text-green-600 mb-2">✓ Guess Submitted!</p>
-                  <p className="text-sm text-muted-foreground">
-                    Waiting for other players to finish guessing...
-                  </p>
+                  <p className="text-sm text-muted-foreground">Waiting for other players to finish guessing...</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -402,7 +399,8 @@ export function GuessingInterface({
             {/* Tips */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm text-muted-foreground text-center">
-                💡 Look at the arranged elements{turnMode === "audio" ? " and listen to the story" : ""}. The whisp is a single word related to the theme "{theme.name}".
+                💡 Look at the arranged elements{turnMode === "audio" ? " and listen to the story" : ""}. The whisp is a
+                single word related to the theme "{theme.name}".
               </p>
             </div>
           </CardContent>
