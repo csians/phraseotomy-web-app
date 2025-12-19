@@ -4,7 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useGameWebSocket } from "@/hooks/useGameWebSocket";
 import { Scoreboard } from "@/components/Scoreboard";
-import { UnifiedStorytellingInterface } from "@/components/UnifiedStorytellingInterface";
+import { StorytellingInterface } from "@/components/StorytellingInterface";
+import { ElementsInterface } from "@/components/ElementsInterface";
+import { TurnModeSelection } from "@/components/TurnModeSelection";
 import { GuessingInterface } from "@/components/GuessingInterface";
 import { ThemeSelectionCards } from "@/components/ThemeSelectionCards";
 import { GameTimer } from "@/components/GameTimer";
@@ -81,7 +83,7 @@ interface ThemeElement {
   color?: string | null;
 }
 
-type GamePhase = "selecting_theme" | "storytelling" | "guessing" | "scoring";
+type GamePhase = "selecting_theme" | "selecting_mode" | "storytelling" | "elements" | "guessing" | "scoring";
 
 export default function Game() {
   const { sessionId } = useParams();
@@ -106,6 +108,7 @@ export default function Game() {
   const [isRoundTransitioning, setIsRoundTransitioning] = useState(false);
   const [roundResultMessage, setRoundResultMessage] = useState<{correct: boolean; message: string} | null>(null);
   const [isModeTransitioning, setIsModeTransitioning] = useState(false);
+  const [selectedTurnMode, setSelectedTurnMode] = useState<"audio" | "elements" | null>(null);
   const [themeElementsForSelection, setThemeElementsForSelection] = useState<ThemeElement[]>([]);
   const [coreElementsForSelection, setCoreElementsForSelection] = useState<IconItem[]>([]);
   const [currentWhisp, setCurrentWhisp] = useState<string>("");
