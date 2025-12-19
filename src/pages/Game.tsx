@@ -924,7 +924,22 @@ export default function Game() {
           table: "game_turns",
           filter: `session_id=eq.${sessionId}`,
         },
-        () => debouncedRefresh({ bypassStoryPause: true }),
+        (payload) => {
+          console.log("game_turns Realtime update received:", payload);
+          // Only refresh for non-storytellers during storytelling phase
+          // Storyteller's own updates should not trigger re-render (would reset their UI state)
+          const currentStorytellerId = session?.current_storyteller_id;
+          const myId = getCurrentPlayerId();
+          const imStoryteller = myId === currentStorytellerId;
+          
+          if (imStoryteller && gamePhase === "storytelling") {
+            console.log("Skipping refresh - I am the storyteller and still in storytelling phase");
+            return;
+          }
+          
+          // For non-storytellers, or when turn is completed, refresh to see updated state
+          debouncedRefresh({ bypassStoryPause: true });
+        },
       )
       .on(
         "postgres_changes",
