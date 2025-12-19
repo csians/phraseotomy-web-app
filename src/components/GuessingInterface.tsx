@@ -257,7 +257,7 @@ export function GuessingInterface({
         <Card>
           <CardHeader>
             <CardTitle className="text-center text-2xl">
-              Guess the <span className="text-primary">Whisp!</span>
+              Guess the <span className="text-primary">Wisp!</span>
             </CardTitle>
             <CardDescription className="text-center text-lg">
               Theme: {theme.name} • {turnMode === "elements" 
@@ -348,7 +348,7 @@ export function GuessingInterface({
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-semibold">
-                  What's the whisp word? (10 points):
+                  What's the wisp word? (10 points):
                 </h3>
                 {(isLockedOut || hasSubmitted) && (
                   <div className={`text-sm font-medium px-3 py-1 rounded-full ${

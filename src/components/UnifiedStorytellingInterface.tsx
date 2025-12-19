@@ -441,7 +441,7 @@ export function UnifiedStorytellingInterface({
         <Card className="w-full max-w-2xl">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">{storytellerName} is creating their story</CardTitle>
-            <CardDescription>Get ready to guess the secret whisp word!</CardDescription>
+            <CardDescription>Get ready to guess the secret wisp word!</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -491,9 +491,9 @@ export function UnifiedStorytellingInterface({
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Show whisp to storyteller */}
+          {/* Show wisp to storyteller */}
           <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center">
-            <p className="text-sm text-muted-foreground mb-1">Your Secret Whisp</p>
+            <p className="text-sm text-muted-foreground mb-1">Your Secret Wisp</p>
             <p className="text-2xl font-bold text-primary">{whisp}</p>
             <p className="text-xs text-muted-foreground mt-2">
               Don't say this word! Describe it using the elements.
