@@ -51,11 +51,11 @@ export default function CreateLobby() {
   const [gameMode, setGameMode] = useState<"live" | "async">("live");
   const [timerPreset, setTimerPreset] = useState<"quick" | "normal" | "extended">("normal");
 
-  // Fixed timer values: 10 min story, 15 min guess
   const TIMER_PRESETS = {
-    quick: { story: 600, guess: 900, label: "Quick (10/15 min)" },
-    normal: { story: 600, guess: 900, label: "Normal (10/15 min)" },
-    extended: { story: 600, guess: 900, label: "Extended (10/15 min)" },
+    // quick: { story: 300, guess: 180, label: "Quick (5/3 min)" },
+    // normal: { story: 600, guess: 420, label: "Normal (10/7 min)" },
+    // extended: { story: 900, guess: 600, label: "Extended (15/10 min)" },
+    Timer: { story: 600, guess: 54000, label: "Quick (5/3 min)" },
   };
 
   // Get customer and shop info from location state or window
@@ -450,7 +450,48 @@ export default function CreateLobby() {
               </div>
 
               {/* Timer Presets (only for Live mode) */}
-              {/* Timer settings hidden - using fixed values: 10 min story, 15 min guess */}
+              {gameMode === "live" && (
+                <div className="space-y-3">
+                  <Label>Timer Settings</Label>
+                  <RadioGroup
+                    value={timerPreset}
+                    onValueChange={(v) => setTimerPreset(v as "quick" | "normal" | "extended")}
+                  >
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        Object.entries(TIMER_PRESETS) as [keyof typeof TIMER_PRESETS, (typeof TIMER_PRESETS)["quick"]][]
+                      ).map(([key, preset]) => (
+                        <div
+                          key={key}
+                          className={`flex flex-col items-center p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 text-center ${
+                            timerPreset === key
+                              ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md scale-[1.02]"
+                              : "border-border hover:border-primary/40 hover:bg-muted/50 hover:scale-[1.02] hover:shadow-sm"
+                          }`}
+                          onClick={() => setTimerPreset(key)}
+                        >
+                          <RadioGroupItem value={key} id={key} className="sr-only" />
+                          <Label
+                            htmlFor={key}
+                            className={`cursor-pointer text-sm font-medium capitalize ${timerPreset === key ? "text-primary" : ""}`}
+                          >
+                            {key}
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {Math.floor(preset.story / 60)}/{Math.floor(preset.guess / 60)} min
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </RadioGroup>
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
+                    {/* <span className="text-amber-500 text-sm font-bold">*</span> */}
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      Story time / Guess time. Auto-submits when timer expires.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <Label>Select Theme</Label>
@@ -565,7 +606,7 @@ export default function CreateLobby() {
                     })()}
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">Wisps will be auto-generated based on this theme</p>
+                <p className="text-xs text-muted-foreground">Whisps will be auto-generated based on this theme</p>
               </div>
 
               <div className="space-y-4">
