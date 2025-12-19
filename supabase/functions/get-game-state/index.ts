@@ -112,9 +112,19 @@ Deno.serve(async (req) => {
     }
     
     // Get the latest turn (first in descending order)
-    const currentTurn = turns && turns.length > 0 ? turns[0] : null;
+    let currentTurn = turns && turns.length > 0 ? turns[0] : null;
     
     console.log("Current turn found:", currentTurn ? currentTurn.id : "null", "turn_mode:", currentTurn?.turn_mode);
+
+    // SECURITY: Hide whisp from non-storyteller players until turn is completed
+    // This prevents revealing the secret word before players can see elements/audio
+    if (currentTurn && playerId !== currentTurn.storyteller_id) {
+      // Only show whisp if turn is completed (has completed_at timestamp)
+      if (!currentTurn.completed_at) {
+        console.log("Hiding whisp from non-storyteller player:", playerId);
+        currentTurn = { ...currentTurn, whisp: null };
+      }
+    }
 
     // If there's a current turn with selected_icon_ids, get the icon details
     let selectedIcons: any[] = [];
