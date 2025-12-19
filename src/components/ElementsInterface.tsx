@@ -58,12 +58,12 @@ export function ElementsInterface({
     try {
       // Save final reordered icon IDs and mark turn as completed
       const reorderedIconIds = orderedIcons.map((icon) => icon.id);
-      
+
       const { error: updateError } = await supabase
         .from("game_turns")
-        .update({ 
+        .update({
           selected_icon_ids: reorderedIconIds,
-          completed_at: new Date().toISOString()
+          completed_at: new Date().toISOString(),
         })
         .eq("id", turnId);
 
@@ -105,14 +105,10 @@ export function ElementsInterface({
                   Arrange Your Elements
                 </span>
               ) : (
-                <span className="text-primary">
-                  {storytellerName} is arranging elements
-                </span>
+                <span className="text-primary">{storytellerName} is arranging elements</span>
               )}
             </CardTitle>
-            <CardDescription className="text-center text-lg">
-              Theme: {theme.name}
-            </CardDescription>
+            <CardDescription className="text-center text-lg">Theme: {theme.name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Icons Display - Only show to storyteller during arrangement phase */}
@@ -132,7 +128,7 @@ export function ElementsInterface({
               <div className="bg-primary/10 p-6 rounded-lg border-2 border-primary/20">
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <Sparkles className="h-6 w-6 text-primary" />
-                  <h3 className="text-xl font-semibold text-primary">Your Secret Whisp</h3>
+                  <h3 className="text-xl font-semibold text-primary">Your Secret Wisp</h3>
                   <Sparkles className="h-6 w-6 text-primary" />
                 </div>
                 <p className="text-4xl font-bold text-center text-primary mb-3">{whisp}</p>
@@ -175,7 +171,7 @@ export function ElementsInterface({
               <div className="flex items-start gap-2">
                 <Lightbulb className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
-                  {isStoryteller 
+                  {isStoryteller
                     ? "Arrange the elements in an order that tells a story or gives clues about your whisp word. The order matters - use it creatively!"
                     : "Look at how the elements are ordered. The sequence is your clue to guess the whisp word!"}
                 </p>
