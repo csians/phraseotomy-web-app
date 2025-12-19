@@ -154,13 +154,16 @@ export function UnifiedStorytellingInterface({
   const [selectedElements, setSelectedElements] = useState<ThemeElement[]>([]);
   const [orderedElements, setOrderedElements] = useState<IconItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Audio recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  
+
+  const MAX_RECORDING_TIME_SECONDS = 180;
+  const maxReachedRef = useRef(false);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -300,9 +303,25 @@ export function UnifiedStorytellingInterface({
       mediaRecorder.start(100);
       setIsRecording(true);
       setRecordingTime(0);
+      maxReachedRef.current = false;
 
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setRecordingTime((prev) => {
+          // Hard cap at 3 minutes
+          if (prev >= MAX_RECORDING_TIME_SECONDS) {
+            if (!maxReachedRef.current) {
+              maxReachedRef.current = true;
+              toast({
+                title: "Recording stopped",
+                description: "Maximum recording time is 3 minutes.",
+              });
+            }
+            // Ensure recording stops (no-op if already stopped)
+            setTimeout(() => stopRecording(), 0);
+            return prev;
+          }
+          return prev + 1;
+        });
       }, 1000);
 
       // Notify others that recording started

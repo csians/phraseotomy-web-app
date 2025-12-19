@@ -127,10 +127,19 @@ export default function Game() {
   const storyTimeUpTriggeredRef = useRef<string>("");
   const guessTimeUpTriggeredRef = useRef<string>("");
 
+  type RefreshOptions = { bypassStoryPause?: boolean };
+
   // Debounced refresh to prevent infinite loops
-  const debouncedRefresh = useCallback(() => {
+  const debouncedRefresh = useCallback((options: RefreshOptions = {}) => {
+    const bypassStoryPause = options.bypassStoryPause === true;
+
     // Don't refresh if game is completed, announcing winner, selecting mode, or storyteller is active
-    if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current || isStorytellerActiveRef.current) {
+    if (
+      gameCompletedRef.current ||
+      isAnnouncingWinnerRef.current ||
+      isModeSelectingRef.current ||
+      (!bypassStoryPause && isStorytellerActiveRef.current)
+    ) {
       console.log("Skipping refresh - game completed, announcing winner, selecting mode, or storyteller active");
       return;
     }
@@ -147,7 +156,7 @@ export default function Game() {
 
     refreshDebounceRef.current = setTimeout(() => {
       lastRefreshRef.current = Date.now();
-      initializeGame();
+      initializeGame(options);
     }, 300);
   }, []); // Using refs instead of state for checks
 
@@ -169,7 +178,7 @@ export default function Game() {
     console.log("🔄 Force refresh triggered - story submitted, transitioning to guessing phase");
     refreshDebounceRef.current = setTimeout(() => {
       lastRefreshRef.current = Date.now();
-      initializeGame();
+      initializeGame({ bypassStoryPause: true });
     }, 100); // Shorter delay for immediate transition
   }, []);
 
@@ -187,7 +196,9 @@ export default function Game() {
         }
       }
     }
-    return localStorage.getItem("guest_player_id") || "";
+
+    // Guest users may only have the id in sessionStorage (Safari/3rd-party iframe constraints)
+    return sessionStorage.getItem("guest_player_id") || localStorage.getItem("guest_player_id") || "";
   };
 
   // Get current player info for WebSocket
@@ -548,17 +559,18 @@ export default function Game() {
     initializeGame();
     const cleanup = setupRealtimeSubscriptions();
 
-    // Poll fallback: ensures all clients see game completion even if WS/Realtime delivery fails.
-    // Only poll for non-storytellers during storytelling phase
+    // Poll fallback: only when WS is disconnected. Used as a safety net for completion state.
     const pollId = window.setInterval(async () => {
       try {
         if (!sessionId) return;
+        if (isConnected) return;
         if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current) return;
         // Skip polling when storyteller is actively creating their story
         if (isStorytellerActiveRef.current) return;
 
+        const playerId = getCurrentPlayerId();
         const { data, error } = await supabase.functions.invoke("get-game-state", {
-          body: { sessionId },
+          body: { sessionId, playerId },
         });
 
         if (error) {
@@ -606,13 +618,13 @@ export default function Game() {
       } catch (err) {
         console.error("poll:get-game-state failed", err);
       }
-    }, 2000);
+    }, 10000);
 
     return () => {
       if (cleanup) cleanup();
       window.clearInterval(pollId);
     };
-  }, [sessionId]);
+  }, [sessionId, isConnected]);
 
   // Auto-trigger turn start when theme is selected but no whisp yet
   const autoTurnTriggeredRef = useRef(false);
@@ -649,14 +661,23 @@ export default function Game() {
     isGeneratingWhisp,
   ]);
 
-  const initializeGame = async () => {
+  const initializeGame = async (options: RefreshOptions = {}) => {
+    const bypassStoryPause = options.bypassStoryPause === true;
+
     // Don't reinitialize if game is already completed, announcing winner, selecting mode, or storyteller is active
-    if (gameCompletedRef.current || isAnnouncingWinnerRef.current || isModeSelectingRef.current || isStorytellerActiveRef.current) {
-      console.log("Skipping initializeGame - game completed, announcing winner, selecting mode, or storyteller active");
+    if (
+      gameCompletedRef.current ||
+      isAnnouncingWinnerRef.current ||
+      isModeSelectingRef.current ||
+      (!bypassStoryPause && isStorytellerActiveRef.current)
+    ) {
+      console.log(
+        "Skipping initializeGame - game completed, announcing winner, selecting mode, or storyteller active",
+      );
       setLoading(false);
       return;
     }
-    
+
     try {
       setLoading(true);
       const playerId = getCurrentPlayerId();
@@ -665,7 +686,7 @@ export default function Game() {
 
       console.log("Fetching game state for session:", sessionId);
       const { data, error } = await supabase.functions.invoke("get-game-state", {
-        body: { sessionId },
+        body: { sessionId, playerId },
       });
 
       if (error) {
@@ -703,7 +724,7 @@ export default function Game() {
         // Find winner (or detect tie) and show completion dialog
         determineWinnerAndTies(data.players || []);
         setGameCompleted(true);
-        
+
         // Fetch lifetime points for completed game
         fetchLifetimePoints(data.players || []);
         setLoading(false);
@@ -784,7 +805,12 @@ export default function Game() {
     } catch (error) {
       console.error("Error initializing game:", error);
       // Don't show error toast if game is already completed/expired or we're announcing winner (use refs)
-      if (session?.status !== "expired" && session?.status !== "completed" && !gameCompletedRef.current && !isAnnouncingWinnerRef.current) {
+      if (
+        session?.status !== "expired" &&
+        session?.status !== "completed" &&
+        !gameCompletedRef.current &&
+        !isAnnouncingWinnerRef.current
+      ) {
         toast({
           title: "Error",
           description: "Failed to load game state.",
@@ -898,7 +924,7 @@ export default function Game() {
           table: "game_turns",
           filter: `session_id=eq.${sessionId}`,
         },
-        () => debouncedRefresh(),
+        () => debouncedRefresh({ bypassStoryPause: true }),
       )
       .on(
         "postgres_changes",
@@ -908,7 +934,7 @@ export default function Game() {
           table: "game_players",
           filter: `session_id=eq.${sessionId}`,
         },
-        () => debouncedRefresh(),
+        () => debouncedRefresh({ bypassStoryPause: true }),
       )
       .on(
         "postgres_changes",
