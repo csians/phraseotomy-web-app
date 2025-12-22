@@ -339,7 +339,7 @@ export function GuessingInterface({
                   🔍 Study the element order above — it's your clue!
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  {storytellerName} arranged these elements to hint at the whisp word.
+                  {storytellerName} arranged these elements to hint at the wisp word.
                 </p>
               </div>
             )}

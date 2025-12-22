@@ -1492,7 +1492,7 @@ export default function Game() {
                   <h2 className="text-2xl font-bold text-foreground mb-2">
                     {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is creating their story
                   </h2>
-                  <p className="text-muted-foreground">Get ready to listen and guess the secret whisp!</p>
+                  <p className="text-muted-foreground">Get ready to listen and guess the secret wisp!</p>
                   {isReceivingAudio && (
                     <div className="mt-4 flex items-center justify-center gap-2 text-sm text-green-600">
                       <div className="h-3 w-3 rounded-full bg-green-600 animate-pulse" />
