@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { RefreshCw, Plus, Trash2, ArrowLeft, Upload, Image, Palette, Type, Pencil } from "lucide-react";
 import { useTenant } from "@/hooks/useTenant";
 import { getAllUrlParams } from "@/lib/urlUtils";
+import * as XLSX from "xlsx";
 
 interface Theme {
   id: string;
@@ -85,9 +86,16 @@ export default function Themes() {
   const [isEditElementOpen, setIsEditElementOpen] = useState(false);
   const [editElementImage, setEditElementImage] = useState<File | null>(null);
   const [editElementImagePreview, setEditElementImagePreview] = useState<string | null>(null);
+  const [isCsvUploadOpen, setIsCsvUploadOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [uploadingCsv, setUploadingCsv] = useState(false);
+  const [parsedWords, setParsedWords] = useState<string[]>([]);
+  const [duplicateWords, setDuplicateWords] = useState<Set<string>>(new Set());
+  const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newElementFileRef = useRef<HTMLInputElement>(null);
   const editElementFileRef = useRef<HTMLInputElement>(null);
+  const csvFileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -339,6 +347,200 @@ export default function Themes() {
         description: error instanceof Error ? error.message : "Failed to delete",
         variant: "destructive",
       });
+    }
+  };
+
+  const parseCsv = (csvText: string): string[] => {
+    const lines = csvText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    if (lines.length === 0) return [];
+    
+    // First row, first column is theme name, skip it
+    // Rest of rows, first column contains wisp words
+    const wispWords: string[] = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      // Parse CSV line (handle quoted values)
+      const columns = line.split(',').map(col => col.trim().replace(/^"|"$/g, ''));
+      const firstColumn = columns[0];
+      
+      if (firstColumn && firstColumn.length > 0) {
+        wispWords.push(firstColumn);
+      }
+    }
+    
+    return wispWords;
+  };
+
+  const parseXlsx = (file: File): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Get the first sheet
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Convert to JSON array
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as string[][];
+          
+          if (jsonData.length === 0) {
+            resolve([]);
+            return;
+          }
+          
+          // First row, first column is theme name, skip it
+          // Rest of rows, first column contains wisp words
+          const wispWords: string[] = [];
+          
+          for (let i = 1; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            const firstColumn = row[0];
+            
+            if (firstColumn && typeof firstColumn === 'string' && firstColumn.trim().length > 0) {
+              wispWords.push(firstColumn.trim());
+            }
+          }
+          
+          resolve(wispWords);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const parseFile = async (file: File): Promise<string[]> => {
+    const fileName = file.name.toLowerCase();
+    
+    if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      return await parseXlsx(file);
+    } else {
+      const text = await file.text();
+      return parseCsv(text);
+    }
+  };
+
+  const checkDuplicates = async (words: string[]): Promise<Set<string>> => {
+    if (!selectedTheme) return new Set();
+    
+    // Get existing wisp elements for this theme
+    const { data: existingElements } = await supabase
+      .from("elements")
+      .select("name")
+      .eq("theme_id", selectedTheme.id)
+      .eq("is_whisp", true);
+    
+    const existingNames = new Set(
+      (existingElements || []).map(e => e.name.toLowerCase().trim())
+    );
+    
+    // Find duplicates
+    const duplicates = new Set<string>();
+    words.forEach(word => {
+      if (existingNames.has(word.toLowerCase().trim())) {
+        duplicates.add(word);
+      }
+    });
+    
+    return duplicates;
+  };
+
+  const handleFileSelect = async (file: File) => {
+    if (!selectedTheme) return;
+    
+    try {
+      const words = await parseFile(file);
+      
+      if (words.length === 0) {
+        toast({
+          title: "No wisp words found",
+          description: "File appears to be empty or invalid",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Check for duplicates
+      const duplicates = await checkDuplicates(words);
+      
+      setParsedWords(words);
+      setDuplicateWords(duplicates);
+      setCsvFile(file);
+      setShowPreview(true);
+    } catch (error) {
+      toast({
+        title: "Error parsing file",
+        description: error instanceof Error ? error.message : "Failed to process file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!selectedTheme || parsedWords.length === 0) return;
+    
+    setUploadingCsv(true);
+    try {
+      // Filter out duplicates
+      const wordsToUpload = parsedWords.filter(word => !duplicateWords.has(word));
+      
+      if (wordsToUpload.length === 0) {
+        toast({
+          title: "No new words to upload",
+          description: "All words already exist",
+          variant: "destructive",
+        });
+        setShowPreview(false);
+        setCsvFile(null);
+        setParsedWords([]);
+        setDuplicateWords(new Set());
+        return;
+      }
+      
+      // Prepare elements for batch insert
+      const elementsToInsert = wordsToUpload.map(word => ({
+        name: word.trim(),
+        icon: "🔮",
+        color: null,
+        is_whisp: true,
+        theme_id: selectedTheme.id
+      }));
+      
+      // Use batch API endpoint that bypasses RLS
+      const { data, error } = await supabase.functions.invoke('admin-create-elements-batch', {
+        body: { elements: elementsToInsert }
+      });
+      
+      if (error) throw error;
+      
+      const successCount = data?.count || data?.elements?.length || 0;
+      const duplicateCount = duplicateWords.size;
+      
+      toast({
+        title: "Upload complete",
+        description: `Successfully created ${successCount} wisp elements${duplicateCount > 0 ? `. ${duplicateCount} duplicates skipped.` : '.'}`,
+      });
+      
+      setIsCsvUploadOpen(false);
+      setShowPreview(false);
+      setCsvFile(null);
+      setParsedWords([]);
+      setDuplicateWords(new Set());
+      if (selectedTheme) loadElements(selectedTheme.id);
+    } catch (error) {
+      toast({
+        title: "Error uploading elements",
+        description: error instanceof Error ? error.message : "Failed to upload elements",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingCsv(false);
     }
   };
 
@@ -880,25 +1082,26 @@ export default function Themes() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Type className="h-5 w-5" />
-                  Whisp Elements {selectedTheme && `- ${selectedTheme.name}`}
+                  Wisp Elements {selectedTheme && `- ${selectedTheme.name}`}
                 </CardTitle>
                 <CardDescription>
-                  {selectedTheme ? `Text-based whisp words for ${selectedTheme.name}` : 'Select a theme first'}
+                  {selectedTheme ? `Text-based wisp words for ${selectedTheme.name}` : 'Select a theme first'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {selectedTheme ? (
                   <>
-                    <Dialog open={isAddElementOpen && newElement.is_whisp} onOpenChange={(open) => {
-                      setIsAddElementOpen(open);
-                      if (open) setNewElement({ ...newElement, is_whisp: true });
-                    }}>
-                      <DialogTrigger asChild>
-                        <Button variant="secondary" onClick={() => setNewElement({ ...newElement, is_whisp: true })}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Whisp
-                        </Button>
-                      </DialogTrigger>
+                    <div className="flex gap-2">
+                      <Dialog open={isAddElementOpen && newElement.is_whisp} onOpenChange={(open) => {
+                        setIsAddElementOpen(open);
+                        if (open) setNewElement({ ...newElement, is_whisp: true });
+                      }}>
+                        <DialogTrigger asChild>
+                          <Button variant="secondary" onClick={() => setNewElement({ ...newElement, is_whisp: true })}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Whisp
+                          </Button>
+                        </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Add Whisp Element</DialogTitle>
@@ -920,6 +1123,142 @@ export default function Themes() {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
+
+                    <Dialog open={isCsvUploadOpen} onOpenChange={(open) => {
+                      setIsCsvUploadOpen(open);
+                      if (!open) {
+                        setShowPreview(false);
+                        setCsvFile(null);
+                        setParsedWords([]);
+                        setDuplicateWords(new Set());
+                      }
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" onClick={() => setIsCsvUploadOpen(true)}>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload CSV/XLSX
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Upload Wisp Elements from CSV/XLSX</DialogTitle>
+                          <DialogDescription>
+                            Upload a CSV or XLSX file with wisp words. Format: First row contains theme name, subsequent rows contain wisp words in the first column.
+                          </DialogDescription>
+                        </DialogHeader>
+                        {!showPreview ? (
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>File (CSV or XLSX)</Label>
+                              <input
+                                type="file"
+                                ref={csvFileRef}
+                                className="hidden"
+                                accept=".csv,.xlsx,.xls"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    handleFileSelect(file);
+                                  }
+                                }}
+                              />
+                              <div className="flex gap-2 items-center">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => csvFileRef.current?.click()}
+                                >
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  Select File
+                                </Button>
+                                {csvFile && (
+                                  <span className="text-sm text-muted-foreground">
+                                    {csvFile.name}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Format: First row = theme name, subsequent rows = wisp words (first column). Supports CSV and XLSX files.
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label>Preview ({parsedWords.length} words found)</Label>
+                                <div className="text-sm text-muted-foreground">
+                                  {duplicateWords.size > 0 && (
+                                    <span className="text-destructive">
+                                      {duplicateWords.size} duplicate{duplicateWords.size > 1 ? 's' : ''} will be skipped
+                                    </span>
+                                  )}
+                                  {duplicateWords.size === 0 && (
+                                    <span className="text-green-600">All words are new</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="border rounded-md max-h-64 overflow-auto p-4">
+                                <div className="space-y-1">
+                                  {parsedWords.map((word, index) => {
+                                    const isDuplicate = duplicateWords.has(word);
+                                    return (
+                                      <div
+                                        key={index}
+                                        className={`text-sm p-2 rounded ${
+                                          isDuplicate
+                                            ? 'bg-destructive/10 text-destructive line-through'
+                                            : 'bg-muted'
+                                        }`}
+                                      >
+                                        {word}
+                                        {isDuplicate && (
+                                          <span className="ml-2 text-xs">(duplicate)</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {parsedWords.length - duplicateWords.size} new word{parsedWords.length - duplicateWords.size !== 1 ? 's' : ''} will be uploaded
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => {
+                            setIsCsvUploadOpen(false);
+                            setShowPreview(false);
+                            setCsvFile(null);
+                            setParsedWords([]);
+                            setDuplicateWords(new Set());
+                          }}>
+                            Cancel
+                          </Button>
+                          {showPreview && (
+                            <Button variant="outline" onClick={() => {
+                              setShowPreview(false);
+                              setCsvFile(null);
+                              setParsedWords([]);
+                              setDuplicateWords(new Set());
+                            }}>
+                              Change File
+                            </Button>
+                          )}
+                          {showPreview ? (
+                            <Button onClick={handleConfirmUpload} disabled={uploadingCsv || parsedWords.length - duplicateWords.size === 0}>
+                              {uploadingCsv ? "Uploading..." : `Upload ${parsedWords.length - duplicateWords.size} Words`}
+                            </Button>
+                          ) : (
+                            <Button disabled={!csvFile}>
+                              Next
+                            </Button>
+                          )}
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                    </div>
 
                     {/* Edit Whisp Element Dialog */}
                     <Dialog open={isEditElementOpen && editingElement?.is_whisp === true} onOpenChange={(open) => {
