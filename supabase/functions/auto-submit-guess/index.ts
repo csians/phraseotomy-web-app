@@ -81,10 +81,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Award storyteller 10 points for the timeout (same as wrong answer)
+    // Award storyteller 1 point for the timeout (same as wrong answer)
     await supabase.rpc("increment_player_score", {
       p_player_id: storytellerId,
-      p_points: 10,
+      p_points: 1,
     });
 
     console.log(`✅ Auto-submitted timeout guess for player ${playerId}`);

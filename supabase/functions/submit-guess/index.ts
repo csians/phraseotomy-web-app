@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
 
     const isCorrect = normalizedGuess === normalizedWhisp;
     console.log(`Guess: "${normalizedGuess}" vs Whisp: "${normalizedWhisp}" = ${isCorrect}`);
-    const pointsEarned = isCorrect ? 10 : 0;
+    const pointsEarned = isCorrect ? 1 : 0;
 
     // Use storyteller_id from turnData (already fetched above)
     const storytellerId = turnData.storyteller_id;
@@ -117,10 +117,10 @@ Deno.serve(async (req) => {
 
     // Update scores based on correct/wrong answer
     if (isCorrect) {
-      // If correct, award player 10 points (game score)
+      // If correct, award player 1 point (game score)
       const { error: scoreError } = await supabase.rpc("increment_player_score", {
         p_player_id: playerId,
-        p_points: 10,
+        p_points: 1,
       });
 
       if (scoreError) {
@@ -130,17 +130,17 @@ Deno.serve(async (req) => {
       // Also update customer total points (lifetime score)
       const { error: totalPointsError } = await supabase.rpc("increment_customer_total_points", {
         p_customer_id: playerId,
-        p_points: 10,
+        p_points: 1,
       });
 
       if (totalPointsError) {
         console.error("Error updating customer total points:", totalPointsError);
       }
     } else {
-      // If wrong, award storyteller 10 points (game score)
+      // If wrong, award storyteller 1 point (game score)
       const { error: storytellerScoreError } = await supabase.rpc("increment_player_score", {
         p_player_id: storytellerId,
-        p_points: 10,
+        p_points: 1,
       });
 
       if (storytellerScoreError) {
@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
       // Also update storyteller's customer total points (lifetime score)
       const { error: storytellerTotalPointsError } = await supabase.rpc("increment_customer_total_points", {
         p_customer_id: storytellerId,
-        p_points: 10,
+        p_points: 1,
       });
 
       if (storytellerTotalPointsError) {

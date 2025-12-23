@@ -348,7 +348,7 @@ export function GuessingInterface({
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-semibold">
-                  What's the wisp word? (10 points):
+                  What's the wisp word? (1 point):
                 </h3>
                 {(isLockedOut || hasSubmitted) && (
                   <div className={`text-sm font-medium px-3 py-1 rounded-full ${

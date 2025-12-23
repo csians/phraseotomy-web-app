@@ -264,7 +264,7 @@ serve(async (req) => {
             type: "correct_answer",
             winnerId: message.winnerId || playerId,
             winnerName: message.winnerName || playerName,
-            pointsEarned: message.pointsEarned || 10,
+            pointsEarned: message.pointsEarned || 1,
             secretElement: message.secretElement,
             timestamp: new Date().toISOString(),
           });
