@@ -116,14 +116,18 @@ Deno.serve(async (req) => {
     
     console.log("Current turn found:", currentTurn ? currentTurn.id : "null", "turn_mode:", currentTurn?.turn_mode);
 
-    // SECURITY: Hide whisp from non-storyteller players until turn is completed
-    // This prevents revealing the secret word before players can see elements/audio
-    if (currentTurn && playerId !== currentTurn.storyteller_id) {
-      // Only show whisp if turn is completed (has completed_at timestamp)
-      if (!currentTurn.completed_at) {
-        console.log("Hiding whisp from non-storyteller player:", playerId);
-        currentTurn = { ...currentTurn, whisp: null };
+    // SECURITY: Encrypt whisp for non-storyteller players so it's not readable in inspect
+    // Only storyteller should see the real whisp value
+    if (currentTurn && currentTurn.whisp) {
+      const isStoryteller = playerId === currentTurn.storyteller_id;
+      
+      if (!isStoryteller) {
+        // For non-storytellers: encrypt/obfuscate the whisp
+        // Use base64 encoding to make it not immediately readable
+        const encoded = btoa(currentTurn.whisp);
+        currentTurn = { ...currentTurn, whisp: `_ENC_${encoded}` };
       }
+      // For storyteller: keep whisp as-is (no encryption needed)
     }
 
     // If there's a current turn with selected_icon_ids, get the icon details

@@ -741,7 +741,25 @@ export default function Game() {
       setSession(data.session);
       setPlayers(data.players || []);
       setThemes(data.themes || []);
-      setCurrentTurn(data.currentTurn);
+      
+      // Decode whisp for storyteller if it's encrypted
+      const isStoryteller = data.session?.current_storyteller_id === playerId;
+      if (data.currentTurn && data.currentTurn.whisp && isStoryteller) {
+        // Decode if it's encrypted (starts with _ENC_)
+        let decodedWhisp = data.currentTurn.whisp;
+        if (data.currentTurn.whisp.startsWith('_ENC_')) {
+          try {
+            decodedWhisp = atob(data.currentTurn.whisp.substring(5));
+          } catch (e) {
+            console.error('Error decoding whisp:', e);
+            decodedWhisp = data.currentTurn.whisp;
+          }
+        }
+        setCurrentTurn({ ...data.currentTurn, whisp: decodedWhisp });
+      } else {
+        setCurrentTurn(data.currentTurn);
+      }
+      
       setSelectedIcons(data.selectedIcons || []);
       setUnlockedPackIds(data.unlockedPackIds || []);
 
