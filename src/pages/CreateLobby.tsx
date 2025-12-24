@@ -166,9 +166,19 @@ export default function CreateLobby() {
         // Get customer licenses (redeemed codes)
         const licenses = await getCustomerLicenses(customer.id, shopDomain);
 
-        // Extract all unique pack names from all licenses
+        // Filter out expired licenses
+        const now = new Date();
+        const activeLicenses = licenses.filter(license => {
+          if (license.expires_at) {
+            const expiryDate = new Date(license.expires_at);
+            return expiryDate >= now; // Only include non-expired licenses
+          }
+          return true; // Include licenses without expiration
+        });
+
+        // Extract all unique pack names from active licenses only
         const licensePackNames = new Set<string>();
-        licenses.forEach((license) => {
+        activeLicenses.forEach((license) => {
           if (license.packs_unlocked && Array.isArray(license.packs_unlocked)) {
             license.packs_unlocked.forEach((pack) => licensePackNames.add(pack));
           }

@@ -44,22 +44,34 @@ Deno.serve(async (req) => {
       );
     }
 
-    // First, disable all customer licenses associated with this code
-    const { error: disableLicensesError } = await supabaseAdmin
+    // First, revoke all customer licenses associated with this code
+    // Valid status values: 'active', 'expired', 'revoked'
+    const { data: licensesData, error: revokeLicensesError } = await supabaseAdmin
       .from('customer_licenses')
-      .update({ status: 'inactive' })
+      .update({ status: 'revoked' })
       .eq('license_code_id', codeId)
-      .eq('tenant_id', tenant.id);
+      .eq('tenant_id', tenant.id)
+      .select();
 
-    if (disableLicensesError) {
-      console.error('❌ Error disabling customer licenses:', disableLicensesError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Error disabling customer licenses' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (revokeLicensesError) {
+      console.error('⚠️ Warning: Error revoking customer licenses:', revokeLicensesError);
+      // If revoking fails, try deleting customer licenses instead
+      console.log('Attempting to delete customer licenses instead...');
+      const { error: deleteLicensesError } = await supabaseAdmin
+        .from('customer_licenses')
+        .delete()
+        .eq('license_code_id', codeId)
+        .eq('tenant_id', tenant.id);
+      
+      if (deleteLicensesError) {
+        console.error('⚠️ Warning: Could not delete customer licenses either:', deleteLicensesError);
+        // Continue anyway - user wants to delete the code, and CASCADE will handle it
+      } else {
+        console.log('✅ Deleted customer licenses for code:', codeId);
+      }
+    } else {
+      console.log('✅ Revoked customer licenses for code:', codeId, 'Count:', licensesData?.length || 0);
     }
-
-    console.log('✅ Disabled customer licenses for code:', codeId);
 
     // Delete the license code
     const { error: deleteError } = await supabaseAdmin

@@ -208,26 +208,39 @@ Deno.serve(async (req) => {
       ...joinedSessions.map(s => ({ ...s, is_host: false, player_count: playerCounts[s.id] || 0 })),
     ];
 
-    // Transform licenses to match expected format
-    const formattedLicenses = (licenses || []).map(license => {
-      const licenseCode = Array.isArray(license.license_codes) 
-        ? license.license_codes[0] 
-        : license.license_codes;
-      
-      return {
-        id: license.id,
-        license_code_id: license.license_code_id,
-        customer_id: license.customer_id,
-        customer_name: license.customer_name,
-        customer_email: license.customer_email,
-        status: license.status,
-        activated_at: license.activated_at,
-        shop_domain: license.shop_domain,
-        tenant_id: license.tenant_id,
-        packs_unlocked: licenseCode?.packs_unlocked || [],
-        expires_at: licenseCode?.expires_at || null,
-      };
-    });
+    // Transform licenses to match expected format and filter out expired ones
+    const now = new Date();
+    const formattedLicenses = (licenses || [])
+      .map(license => {
+        const licenseCode = Array.isArray(license.license_codes) 
+          ? license.license_codes[0] 
+          : license.license_codes;
+        
+        return {
+          id: license.id,
+          license_code_id: license.license_code_id,
+          customer_id: license.customer_id,
+          customer_name: license.customer_name,
+          customer_email: license.customer_email,
+          status: license.status,
+          activated_at: license.activated_at,
+          shop_domain: license.shop_domain,
+          tenant_id: license.tenant_id,
+          packs_unlocked: licenseCode?.packs_unlocked || [],
+          expires_at: licenseCode?.expires_at || null,
+        };
+      })
+      .filter(license => {
+        // Filter out expired licenses
+        if (license.expires_at) {
+          const expiryDate = new Date(license.expires_at);
+          if (expiryDate < now) {
+            console.log(`Filtering out expired license: ${license.id}, expired at: ${license.expires_at}`);
+            return false; // Exclude expired license
+          }
+        }
+        return true; // Include non-expired or never-expiring licenses
+      });
 
     console.log('Successfully fetched data:', {
       licenses: formattedLicenses.length,

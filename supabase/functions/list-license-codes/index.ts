@@ -57,10 +57,10 @@ Deno.serve(async (req) => {
 
     console.log('Loading license codes for tenant:', tenant.id);
 
-    // List all license codes for the tenant
+    // List all license codes for the tenant, including previous_code_id
     const { data: codes, error: codesError } = await supabase
       .from('license_codes')
-      .select('*')
+      .select('*, previous_code_id') // Select previous_code_id
       .eq('tenant_id', tenant.id)
       .order('created_at', { ascending: false });
 
@@ -95,12 +95,34 @@ Deno.serve(async (req) => {
         }, {} as Record<string, string>);
       }
     }
+
+    // Fetch previous codes' details if previous_code_id exists
+    const previousCodeIds = codes
+      ?.filter(code => code.previous_code_id)
+      .map(code => code.previous_code_id) || [];
+
+    let previousCodesMap: Record<string, string> = {};
+    if (previousCodeIds.length > 0) {
+      const { data: prevCodesData, error: prevCodesError } = await supabase
+        .from('license_codes')
+        .select('id, code')
+        .in('id', previousCodeIds);
+
+      if (!prevCodesError && prevCodesData) {
+        previousCodesMap = prevCodesData.reduce((acc, pc) => {
+          acc[pc.id] = pc.code;
+          return acc;
+        }, {} as Record<string, string>);
+      }
+    }
     
-    // Format the response to include customer_email
+    // Format the response to include customer_email and previous_code details
     const formattedCodes = codes?.map(code => ({
       ...code,
       customer_email: code.redeemed_by ? customerEmails[code.redeemed_by] || null : null,
       customer_name: code.redeemed_by ? customerEmails[code.redeemed_by] || null : null,
+      previous_code: code.previous_code_id ? previousCodesMap[code.previous_code_id] || null : null,
+      previous_code_id_display: code.previous_code_id ? `${code.previous_code_id.substring(0, 8)}...` : null,
     }));
 
     console.log('✅ License codes loaded:', formattedCodes?.length || 0);

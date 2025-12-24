@@ -46,12 +46,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Find the license code
+    // Find the license code - IMPORTANT: Only get unused codes
+    // This ensures we get the active unused code, not expired ones with the same code value
     const { data: licenseCode, error: codeError } = await supabaseAdmin
       .from('license_codes')
       .select('*')
       .eq('code', normalizedCode)
       .eq('tenant_id', tenant.id)
+      .eq('status', 'unused') // Only get unused codes
       .maybeSingle();
 
     if (codeError) {
@@ -63,17 +65,32 @@ Deno.serve(async (req) => {
     }
 
     if (!licenseCode) {
+      // Check if code exists but is not unused (might be expired or active)
+      const { data: existingCode } = await supabaseAdmin
+        .from('license_codes')
+        .select('status')
+        .eq('code', normalizedCode)
+        .eq('tenant_id', tenant.id)
+        .limit(1)
+        .maybeSingle();
+      
+      if (existingCode) {
+        if (existingCode.status === 'expired') {
+          return new Response(
+            JSON.stringify({ success: false, error: 'CODE_EXPIRED', message: 'This code has expired.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else if (existingCode.status === 'active') {
+          return new Response(
+            JSON.stringify({ success: false, error: 'CODE_USED', message: 'This code has already been used.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      
       return new Response(
         JSON.stringify({ success: false, error: 'CODE_NOT_FOUND', message: 'Invalid code. Please check and try again.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if code is already used
-    if (licenseCode.status !== 'unused') {
-      return new Response(
-        JSON.stringify({ success: false, error: 'CODE_USED', message: 'This code has already been used.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -132,6 +149,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Calculate expiration time: 30 days from now
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
     // Update license code status to active (redeemed) and mark as redeemed
     const { error: updateError } = await supabaseAdmin
       .from('license_codes')
@@ -139,6 +160,7 @@ Deno.serve(async (req) => {
         status: 'active',
         redeemed_by: customerId,
         redeemed_at: new Date().toISOString(),
+        expires_at: expiresAt.toISOString(), // Added expiration
       })
       .eq('id', licenseCode.id);
 

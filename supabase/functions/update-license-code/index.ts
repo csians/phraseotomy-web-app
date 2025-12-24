@@ -11,9 +11,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { codeId, status, shopDomain } = await req.json();
+    const { codeId, status, shopDomain, expires_at } = await req.json();
 
-    console.log('📝 Updating license code:', { codeId, status, shopDomain });
+    console.log('📝 Updating license code:', { codeId, status, shopDomain, expires_at });
 
     if (!codeId || !status || !shopDomain) {
       return new Response(
@@ -44,6 +44,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get current code to check status
+    const { data: currentCode, error: fetchError } = await supabaseAdmin
+      .from('license_codes')
+      .select('status, expires_at')
+      .eq('id', codeId)
+      .eq('tenant_id', tenant.id)
+      .single();
+
+    if (fetchError || !currentCode) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Code not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Prepare update data
     const updates: any = { status };
 
@@ -51,27 +66,80 @@ Deno.serve(async (req) => {
     if (status === 'unused') {
       updates.redeemed_by = null;
       updates.redeemed_at = null;
+      // Only clear expiration if expires_at is not explicitly provided
+      if (expires_at === undefined) {
+        updates.expires_at = null; // Clear expiration when unused (if not provided)
+      }
     }
 
+    // Update expiration time if provided (explicitly set, even if null)
+    if (expires_at !== undefined) { // Check for undefined to allow null to be passed
+      updates.expires_at = expires_at; // expires_at will be null or ISO string
+    }
+
+    // Validate expiration is in the future for non-expired codes
+    if (updates.expires_at && status !== 'expired') {
+      const expirationDate = new Date(updates.expires_at);
+      const now = new Date();
+      if (expirationDate <= now) {
+        console.error('❌ Validation failed: expiration date is not in the future', {
+          expirationDate: expirationDate.toISOString(),
+          now: now.toISOString(),
+          expires_at: updates.expires_at
+        });
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Expiration time must be in the future',
+            details: `Expiration: ${expirationDate.toISOString()}, Now: ${now.toISOString()}`
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    console.log('📝 Update payload:', JSON.stringify(updates, null, 2));
+
     // Update the license code
-    const { error: updateError } = await supabaseAdmin
+    console.log('📝 Executing update with:', {
+      codeId,
+      tenantId: tenant.id,
+      updates: JSON.stringify(updates, null, 2)
+    });
+
+    const { data: updatedCode, error: updateError } = await supabaseAdmin
       .from('license_codes')
       .update(updates)
       .eq('id', codeId)
-      .eq('tenant_id', tenant.id);
+      .eq('tenant_id', tenant.id)
+      .select('id, code, status, expires_at')
+      .single();
 
     if (updateError) {
       console.error('❌ Error updating code:', updateError);
       return new Response(
-        JSON.stringify({ success: false, error: updateError.message }),
+        JSON.stringify({ 
+          success: false, 
+          error: updateError.message,
+          details: JSON.stringify(updateError)
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('✅ License code updated successfully');
+    console.log('✅ License code updated successfully:', {
+      id: updatedCode?.id,
+      code: updatedCode?.code,
+      status: updatedCode?.status,
+      expires_at: updatedCode?.expires_at
+    });
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Code updated successfully' }),
+      JSON.stringify({ 
+        success: true, 
+        message: 'Code updated successfully',
+        code: updatedCode
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

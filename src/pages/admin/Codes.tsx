@@ -61,16 +61,22 @@ const Codes = () => {
   const [loading, setLoading] = useState(false);
   const [editingCode, setEditingCode] = useState<LicenseCode | null>(null);
   const { toast } = useToast();
+  
+  // Filter and search state
+  const [statusFilter, setStatusFilter] = useState<"all" | "unused" | "active" | "expired">("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Form state for add/edit
   const [formData, setFormData] = useState<{
     code: string;
     packs: string[];
-    status: "unused" | "active" | "expired" | "void";
+    status: "unused" | "active" | "expired";
+    expires_at: string | null;
   }>({
     code: "",
     packs: [],
     status: "unused",
+    expires_at: null,
   });
 
   // Packs loaded from database
@@ -189,51 +195,50 @@ const Codes = () => {
     setLoading(true);
 
     try {
-      // If a customer is selected, assign the code (creates license, updates metafield & code status)
-      if (selectedCustomer) {
-        const { data, error } = await supabase.functions.invoke('assign-code-to-customer', {
-          body: {
-            customerId: selectedCustomer.id,
-            customerEmail: selectedCustomer.email,
-            customerName: selectedCustomer.name,
-            code: editingCode.code,
-            shopDomain: tenant.shop_domain,
-          },
-        });
+      // Update the code status
+      const updateBody: any = {
+          codeId: editingCode.id,
+          status: formData.status,
+          shopDomain: tenant.shop_domain,
+        };
 
-        if (error || !data?.success) {
-          throw new Error(data?.error || 'Failed to assign code to customer');
+        // Handle expiration time for non-expired codes
+        // Always send expires_at if editing a non-expired code (or if explicitly provided)
+        if (editingCode.status !== 'expired' && formData.status !== 'expired') {
+          if (formData.expires_at) {
+            // datetime-local input gives local time string like "2025-12-24T12:50"
+            // new Date() interprets it as LOCAL time, toISOString() converts to UTC
+            // This correctly converts IST (or any local time) to UTC
+            const localDate = new Date(formData.expires_at);
+            updateBody.expires_at = localDate.toISOString();
+            console.log('📅 Setting expires_at:', {
+              input: formData.expires_at,
+              localTime: localDate.toString(),
+              utcISO: localDate.toISOString(),
+              timezoneOffset: localDate.getTimezoneOffset()
+            });
+          } else {
+            // Explicitly set to null to clear expiration
+            updateBody.expires_at = null;
+            console.log('📅 Clearing expires_at');
+          }
         }
 
-        toast({
-          title: "Code assigned",
-          description: `Code assigned to ${selectedCustomer.name} successfully`,
-        });
-      } else {
-        // Just update the code status (no customer assignment)
         const { data: updateData, error: updateError } = await supabase.functions.invoke('update-license-code', {
-          body: {
-            codeId: editingCode.id,
-            status: formData.status,
-            shopDomain: tenant.shop_domain,
-          },
+          body: updateBody,
         });
 
         if (updateError || !updateData?.success) {
           throw new Error(updateData?.error || 'Failed to update code status');
         }
 
-        toast({
-          title: "Code updated",
-          description: "Code status updated successfully",
-        });
-      }
+      toast({
+        title: "Code updated",
+        description: "Code status updated successfully",
+      });
 
       setEditingCode(null);
-      setSelectedCustomer(null);
-      setCustomerSearchQuery("");
-      setSearchedCustomers([]);
-      setFormData({ code: "", packs: [], status: "unused" });
+      setFormData({ code: "", packs: [], status: "unused", expires_at: null });
       await loadCodes();
     } catch (error) {
       console.error('Error updating code:', error);
@@ -249,10 +254,28 @@ const Codes = () => {
 
   const openEditDialog = (code: LicenseCode) => {
     setEditingCode(code);
+    // Convert UTC expires_at to local time for datetime-local input
+    let formattedExpiresAt: string | null = null;
+    if (code.expires_at) {
+      const date = new Date(code.expires_at); // Parse UTC string
+      // Format using local time methods (getFullYear, getMonth, etc. return local time)
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      formattedExpiresAt = `${year}-${month}-${day}T${hours}:${minutes}`;
+      console.log('📅 Loading expires_at:', {
+        utc: code.expires_at,
+        local: formattedExpiresAt,
+        dateString: date.toString()
+      });
+    }
     setFormData({
       code: code.code,
       packs: code.packs_unlocked,
-      status: code.status as "unused" | "active" | "expired" | "void",
+      status: code.status as "unused" | "active" | "expired",
+      expires_at: formattedExpiresAt,
     });
     setSelectedCustomer(null);
     setCustomerSearchQuery("");
@@ -459,8 +482,74 @@ const Codes = () => {
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "—";
-    return new Date(dateString).toLocaleString();
+    const date = new Date(dateString);
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
   };
+
+  const formatExpirationTime = (expiresAt: string | null, status: string) => {
+    if (!expiresAt) {
+      if (status === 'expired') return <span className="text-muted-foreground">Expired</span>;
+      return "—";
+    }
+    const expirationDate = new Date(expiresAt);
+    const now = new Date(); // Both getTime() returns UTC timestamp, so comparison is correct
+    const diffMs = expirationDate.getTime() - now.getTime();
+    
+    if (diffMs < 0) {
+      return <span className="text-destructive">Expired</span>;
+    }
+    
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    // If more than 1 day remaining, show days
+    if (diffDays > 0) {
+      return <span className="text-green-600">{diffDays}d {diffHours}h</span>;
+    } 
+    // If less than 1 day but more than 1 hour, show hours
+    else if (diffHours > 0) {
+      return <span className="text-yellow-600">{diffHours}h {diffMinutes}m</span>;
+    } 
+    // If less than 1 hour but more than 1 minute, show minutes
+    else if (diffMinutes > 0) {
+      return <span className="text-orange-600">{diffMinutes}m</span>;
+    } 
+    // Less than 1 minute
+    else {
+      return <span className="text-red-600">Expiring soon</span>;
+    }
+  };
+
+  // Filter codes based on status filter and search query
+  const filteredCodes = useMemo(() => {
+    let filtered = codes;
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(code => code.status === statusFilter);
+    }
+
+    // Apply search query (search in code, customer name, customer ID)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(code => {
+        const codeMatch = code.code.toLowerCase().includes(query);
+        const customerNameMatch = (code as any).customer_name?.toLowerCase().includes(query);
+        const customerIdMatch = code.redeemed_by?.toLowerCase().includes(query);
+        const packsMatch = code.packs_unlocked.some(pack => pack.toLowerCase().includes(query));
+        return codeMatch || customerNameMatch || customerIdMatch || packsMatch;
+      });
+    }
+
+    return filtered;
+  }, [codes, statusFilter, searchQuery]);
 
   if (tenantLoading) {
     return (
@@ -521,14 +610,67 @@ const Codes = () => {
           <CardHeader>
             <CardTitle>All Codes</CardTitle>
             <CardDescription>
-              {codes.length} {codes.length === 1 ? "code" : "codes"} total
+              {filteredCodes.length} of {codes.length} {codes.length === 1 ? "code" : "codes"} shown
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Filter and Search Controls */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              {/* Search Input */}
+              <div className="flex-1">
+                <Input
+                  placeholder="Search by code, customer name, customer ID, or pack..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              
+              {/* Status Filter */}
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant={statusFilter === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter("all")}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={statusFilter === "unused" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter("unused")}
+                  className={statusFilter === "unused" ? "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500" : ""}
+                >
+                  Unused
+                </Button>
+                <Button
+                  variant={statusFilter === "active" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter("active")}
+                  className={statusFilter === "active" ? "bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500" : ""}
+                >
+                  Active
+                </Button>
+                <Button
+                  variant={statusFilter === "expired" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter("expired")}
+                  className={statusFilter === "expired" ? "bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 border-yellow-500" : ""}
+                >
+                  Expired
+                </Button>
+              </div>
+            </div>
+
             {loading ? (
               <p className="text-muted-foreground text-center py-8">Loading codes...</p>
             ) : codes.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No codes yet. Add your first code to get started.</p>
+            ) : filteredCodes.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                No codes match your filters. 
+                {searchQuery && <span className="block mt-2">Try adjusting your search query or filters.</span>}
+              </p>
             ) : (
               <Table>
                 <TableHeader>
@@ -538,12 +680,13 @@ const Codes = () => {
               <TableHead>Redeemed By</TableHead>
               <TableHead>Redeemed At</TableHead>
               <TableHead>Expires At</TableHead>
+              <TableHead>Generated From</TableHead>
               <TableHead>Packs Unlocked</TableHead>
               <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {codes.map((code) => (
+                  {filteredCodes.map((code) => (
                     <TableRow key={code.id}>
                       <TableCell className="font-mono font-semibold">{code.code}</TableCell>
                       <TableCell>
@@ -576,7 +719,23 @@ const Codes = () => {
                         )}
                       </TableCell>
                       <TableCell>{formatDate(code.redeemed_at)}</TableCell>
-                      <TableCell>{formatDate(code.expires_at)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <div>{formatExpirationTime(code.expires_at, code.status)}</div>
+                          <div className="text-xs text-muted-foreground">{formatDate(code.expires_at)}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {(code as any).previous_code ? (
+                          <div className="text-xs text-muted-foreground">
+                            {(code as any).previous_code}
+                            <br />
+                            {/* <span className="font-mono text-[0.65rem]">{(code as any).previous_code_id_display}</span> */}
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
                       <TableCell>
                         {code.packs_unlocked.length > 0
                           ? code.packs_unlocked.join(", ")
@@ -584,14 +743,16 @@ const Codes = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(code)}
-                            title="Edit code"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                          {code.status !== "expired" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(code)}
+                              title="Edit code"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
                           {code.status === "active" && (
                             <Button
                               variant="ghost"
@@ -644,78 +805,43 @@ const Codes = () => {
                     <SelectItem value="unused">Unused</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="expired">Expired</SelectItem>
-                    <SelectItem value="void">Void</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label>Assign to Customer (Optional)</Label>
-                <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={customerSearchOpen}
-                      className="w-full justify-between"
-                    >
-                      {selectedCustomer
-                        ? `${selectedCustomer.name} (${selectedCustomer.email})`
-                        : "Search by email or name..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[460px] p-0 bg-popover z-50" align="start">
-                    <Command shouldFilter={false}>
-                      <CommandInput 
-                        placeholder="Type email or name..." 
-                        value={customerSearchQuery}
-                        onValueChange={setCustomerSearchQuery}
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          {searchingCustomers ? "Searching..." : customerSearchQuery.length < 2 ? "Type at least 2 characters" : "No customers found"}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {searchedCustomers.map((customer) => {
-                            const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'No name';
-                            return (
-                              <CommandItem
-                                key={customer.id}
-                                value={customer.id}
-                                onSelect={() => {
-                                  setSelectedCustomer({
-                                    id: customer.id,
-                                    email: customer.email,
-                                    name,
-                                  });
-                                  setCustomerSearchOpen(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{name}</span>
-                                  <span className="text-sm text-muted-foreground">{customer.email}</span>
-                                </div>
-                              </CommandItem>
-                            );
-                          })}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {selectedCustomer && (
+              {editingCode?.status !== 'expired' && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-expires-at">Expires At (Local Time)</Label>
+                  <input
+                    id="edit-expires-at"
+                    type="datetime-local"
+                    value={formData.expires_at || ""}
+                    onChange={(e) => setFormData({ ...formData, expires_at: e.target.value || null })}
+                    onClick={(e) => {
+                      // Ensure the picker opens when clicked
+                      (e.target as HTMLInputElement).showPicker?.();
+                    }}
+                    onFocus={(e) => {
+                      // Try to open picker on focus as well
+                      (e.target as HTMLInputElement).showPicker?.();
+                    }}
+                    min={(() => {
+                      // Calculate minimum date in local time format (YYYY-MM-DDTHH:mm)
+                      const now = new Date();
+                      const year = now.getFullYear();
+                      const month = String(now.getMonth() + 1).padStart(2, '0');
+                      const day = String(now.getDate()).padStart(2, '0');
+                      const hours = String(now.getHours()).padStart(2, '0');
+                      const minutes = String(now.getMinutes()).padStart(2, '0');
+                      return `${year}-${month}-${day}T${hours}:${minutes}`;
+                    })()}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
                   <p className="text-sm text-muted-foreground">
-                    Will assign code to: {selectedCustomer.name}
+                    Current UTC: {formatDate(editingCode?.expires_at)}
                   </p>
-                )}
-              </div>
+                </div>
+              )}
 
               {editingCode?.redeemed_by && (
                 <div className="p-3 bg-muted rounded-md">

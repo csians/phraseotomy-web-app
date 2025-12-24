@@ -476,9 +476,20 @@ const Play = () => {
   }
 
   const appEnv = import.meta.env.VITE_APP_ENV || "development";
-  const hasActiveLicenses = licenses.length > 0;
-  const allPacks = Array.from(new Set(licenses.flatMap((l) => l.packs_unlocked)));
-  const earliestExpiry = licenses.reduce(
+  
+  // Filter out expired licenses (safety check - should already be filtered by backend)
+  const now = new Date();
+  const activeLicenses = licenses.filter(license => {
+    if (license.expires_at) {
+      const expiryDate = new Date(license.expires_at);
+      return expiryDate >= now; // Only include non-expired licenses
+    }
+    return true; // Include licenses without expiration
+  });
+  
+  const hasActiveLicenses = activeLicenses.length > 0;
+  const allPacks = Array.from(new Set(activeLicenses.flatMap((l) => l.packs_unlocked)));
+  const earliestExpiry = activeLicenses.reduce(
     (earliest, license) => {
       if (!license.expires_at) return earliest;
       const expiryDate = new Date(license.expires_at);
