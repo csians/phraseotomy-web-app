@@ -1047,20 +1047,6 @@ export default function Themes() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      disabled={uploadingImage === element.id}
-                                      onClick={() => {
-                                        if (fileInputRef.current) {
-                                          fileInputRef.current.dataset.elementId = element.id;
-                                          fileInputRef.current.click();
-                                        }
-                                      }}
-                                      title="Upload image"
-                                    >
-                                      <Upload className={`h-4 w-4 ${uploadingImage === element.id ? 'animate-pulse' : ''}`} />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
                                       onClick={() => handleDeleteElement(element.id, element.name)}
                                       title="Delete element"
                                     >
