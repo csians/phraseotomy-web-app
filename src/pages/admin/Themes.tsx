@@ -1006,24 +1006,30 @@ export default function Themes() {
                                 </TableCell>
                                 <TableCell>
                                   {element.color ? (
-                                    <div className="flex items-center gap-2">
-                                      <div 
-                                        className="w-6 h-6 rounded border border-border"
-                                        style={{ backgroundColor: element.color }}
-                                      />
-                                      <span className="text-xs text-muted-foreground">{element.color}</span>
-                                    </div>
+                                    <div 
+                                      className="w-6 h-6 rounded border border-border"
+                                      style={{ backgroundColor: element.color }}
+                                      title={element.color}
+                                    />
                                   ) : (
                                     <span className="text-muted-foreground text-xs">-</span>
                                   )}
                                 </TableCell>
                                 <TableCell>
                                   {element.image_url ? (
-                                    <img 
-                                      src={element.image_url} 
-                                      alt={element.name}
-                                      className="w-10 h-10 object-cover rounded"
-                                    />
+                                    <div 
+                                      className="w-10 h-10 rounded flex items-center justify-center p-1"
+                                      style={{ backgroundColor: element.color || 'transparent' }}
+                                    >
+                                      <img 
+                                        src={element.image_url} 
+                                        alt={element.name}
+                                        className="w-full h-full object-contain"
+                                        style={{ 
+                                          filter: element.color ? 'brightness(0) invert(1)' : 'none'
+                                        }}
+                                      />
+                                    </div>
                                   ) : (
                                     <span className="text-muted-foreground text-xs">No image</span>
                                   )}
