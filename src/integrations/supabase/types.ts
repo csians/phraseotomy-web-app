@@ -623,6 +623,7 @@ export type Database = {
           expires_at: string | null
           id: string
           packs_unlocked: string[]
+          previous_code_id: string | null
           redeemed_at: string | null
           redeemed_by: string | null
           status: string
@@ -635,6 +636,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           packs_unlocked?: string[]
+          previous_code_id?: string | null
           redeemed_at?: string | null
           redeemed_by?: string | null
           status?: string
@@ -647,6 +649,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           packs_unlocked?: string[]
+          previous_code_id?: string | null
           redeemed_at?: string | null
           redeemed_by?: string | null
           status?: string
@@ -654,6 +657,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "license_codes_previous_code_id_fkey"
+            columns: ["previous_code_id"]
+            isOneToOne: false
+            referencedRelation: "license_codes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "license_codes_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -855,6 +865,17 @@ export type Database = {
       increment_player_score: {
         Args: { p_player_id: string; p_points: number }
         Returns: undefined
+      }
+      renew_expired_license_codes: {
+        Args: never
+        Returns: {
+          error_message: string
+          expired_code: string
+          expired_code_id: string
+          new_code: string
+          new_code_id: string
+          success: boolean
+        }[]
       }
       user_is_in_session: {
         Args: { _session_id: string; _user_id: string }

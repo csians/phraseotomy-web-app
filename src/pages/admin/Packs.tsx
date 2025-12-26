@@ -395,7 +395,6 @@ export default function Packs() {
               ) : (
                 coreThemes.map(theme => (
                   <Badge key={theme.id} variant="secondary" className="text-sm py-1 px-3">
-                    <span className="mr-1">{theme.icon}</span>
                     {theme.name}
                   </Badge>
                 ))
@@ -441,7 +440,6 @@ export default function Packs() {
                             ) : (
                               packThemesList.map(theme => (
                                 <Badge key={theme.id} variant="outline" className="text-xs">
-                                  <span className="mr-1">{theme.icon}</span>
                                   {theme.name}
                                 </Badge>
                               ))
@@ -529,7 +527,6 @@ export default function Packs() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Icon</TableHead>
                     <TableHead>Theme Name</TableHead>
                     <TableHead className="w-24">Actions</TableHead>
                   </TableRow>
@@ -537,14 +534,13 @@ export default function Packs() {
                 <TableBody>
                   {packThemes.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center text-muted-foreground">
+                      <TableCell colSpan={2} className="text-center text-muted-foreground">
                         No themes in this pack yet
                       </TableCell>
                     </TableRow>
                   ) : (
                     packThemes.map(theme => (
                       <TableRow key={theme.id}>
-                        <TableCell className="text-2xl">{theme.icon}</TableCell>
                         <TableCell className="font-medium">{theme.name}</TableCell>
                         <TableCell>
                           <Button
