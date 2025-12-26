@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Plus, Trash2, ArrowLeft, Palette, Settings, X } from "lucide-react";
+import { RefreshCw, Plus, Trash2, ArrowLeft, Palette, Settings, X, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTenant } from "@/hooks/useTenant";
 import type { Tables } from "@/integrations/supabase/types";
@@ -30,7 +30,15 @@ const extractShopFromHost = (host: string | null): string | null => {
   }
 };
 
-type Pack = Tables<"packs">;
+interface Pack {
+  id: string;
+  name: string;
+  description: string | null;
+  tenant_id: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 interface Theme {
   id: string;
@@ -70,7 +78,6 @@ export default function Packs() {
   
   const [packs, setPacks] = useState<Pack[]>([]);
   const [themePacks, setThemePacks] = useState<ThemePack[]>([]);
-  const [coreThemes, setCoreThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newPack, setNewPack] = useState({ name: "", description: "" });
@@ -113,13 +120,12 @@ export default function Packs() {
       if (themesRes.error) throw themesRes.error;
       if (themePacksRes.error) throw themePacksRes.error;
       
-      setPacks(packsRes.data || []);
+      setPacks((packsRes.data || []) as Pack[]);
       setAllThemes(themesRes.data || []);
       setThemePacks((themePacksRes.data || []).map(tp => ({
         ...tp,
         theme: tp.theme as unknown as Theme
       })));
-      setCoreThemes((themesRes.data || []).filter(t => t.is_core));
     } catch (error) {
       toast({
         title: "Error loading packs",
@@ -282,6 +288,38 @@ export default function Packs() {
     }
   };
 
+  const handleSetDefaultPack = async (packId: string, packName: string, currentlyDefault: boolean) => {
+    if (!tenant?.id) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-set-default-pack', {
+        body: {
+          pack_id: packId,
+          tenant_id: tenant.id,
+          is_default: !currentlyDefault,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: currentlyDefault ? "Default removed" : "Default set",
+        description: currentlyDefault 
+          ? `Pack "${packName}" is no longer the default` 
+          : `Pack "${packName}" is now the default pack`,
+      });
+
+      loadPacks();
+    } catch (error) {
+      toast({
+        title: "Error updating default",
+        description: error instanceof Error ? error.message : "Failed to update",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (tenantLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -381,27 +419,6 @@ export default function Packs() {
             </Dialog>
           </div>
 
-          {/* Core/Base Themes Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Base Game Themes
-              </h3>
-            </div>
-            <div className="flex flex-wrap gap-2 p-4 bg-muted/50 rounded-lg border">
-              {coreThemes.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No core themes configured yet</p>
-              ) : (
-                coreThemes.map(theme => (
-                  <Badge key={theme.id} variant="secondary" className="text-sm py-1 px-3">
-                    {theme.name}
-                  </Badge>
-                ))
-              )}
-            </div>
-          </div>
-
           {/* Packs Table */}
           <div className="border rounded-md">
             <Table>
@@ -432,7 +449,17 @@ export default function Packs() {
                     const packThemesList = getThemesForPack(pack.id);
                     return (
                       <TableRow key={pack.id}>
-                        <TableCell className="font-medium">{pack.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {pack.name}
+                            {pack.is_default && (
+                              <Badge variant="default" className="text-xs">
+                                <Star className="h-3 w-3 mr-1 fill-current" />
+                                Default
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {packThemesList.length === 0 ? (
@@ -450,6 +477,14 @@ export default function Packs() {
                         <TableCell>{new Date(pack.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              title={pack.is_default ? "Remove as default" : "Set as default"}
+                              onClick={() => handleSetDefaultPack(pack.id, pack.name, pack.is_default)}
+                            >
+                              <Star className={`h-4 w-4 ${pack.is_default ? 'fill-primary text-primary' : ''}`} />
+                            </Button>
                             <Button 
                               variant="ghost" 
                               size="sm" 
