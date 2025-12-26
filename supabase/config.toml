@@ -127,3 +127,6 @@ verify_jwt = false
 
 [functions.admin-manage-theme-packs]
 verify_jwt = false
+
+[functions.admin-set-default-pack]
+verify_jwt = false
