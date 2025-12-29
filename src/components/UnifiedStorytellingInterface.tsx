@@ -434,18 +434,20 @@ export function UnifiedStorytellingInterface({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Non-storyteller waiting view
+  // Non-storyteller waiting view (optimize for mobile height/width)
   if (!isStoryteller) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">{storytellerName} is creating their story</CardTitle>
-            <CardDescription>Get ready to guess the secret wisp word!</CardDescription>
+      <div className="w-full flex justify-center items-start px-0 py-2 sm:px-2 sm:py-3 sm:min-h-screen sm:items-center">
+        <Card className="w-full rounded-none border-0 shadow-none sm:h-auto sm:rounded-xl sm:border sm:shadow-sm sm:max-w-2xl sm:max-h-[calc(100vh-1.5rem)] sm:overflow-y-auto">
+          <CardHeader className="text-center pb-3 pt-4 sm:pt-6 sm:pb-6">
+            <CardTitle className="text-lg sm:text-xl md:text-2xl">
+              {storytellerName} is creating their story
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm mt-1">Get ready to guess the secret wisp word!</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-muted-foreground">Waiting for the storyteller to finish...</p>
+          <CardContent className="flex flex-col items-center gap-2 pb-4 sm:gap-4 sm:pb-6">
+            <Loader2 className="h-8 w-8 sm:h-12 sm:w-12 animate-spin text-primary" />
+            <p className="text-xs sm:text-sm text-muted-foreground">Waiting for the storyteller to finish...</p>
           </CardContent>
         </Card>
       </div>
@@ -453,14 +455,16 @@ export function UnifiedStorytellingInterface({
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-5xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Tell Your Story</CardTitle>
-          <CardDescription>Theme: {theme?.name || "Unknown"}</CardDescription>
+    <div className="w-full sm:min-h-screen flex justify-center items-start sm:items-center px-0 py-0 sm:px-2 sm:py-3">
+      <Card className="w-full h-full rounded-none border-0 shadow-none sm:h-auto sm:rounded-xl sm:border sm:shadow-sm sm:max-w-5xl sm:max-h-[calc(100vh-2rem)] sm:overflow-y-auto">
+        <CardHeader className="text-center px-3 sm:px-6">
+          <CardTitle className="text-xl sm:text-2xl">Tell Your Story</CardTitle>
+          <CardDescription className="text-sm sm:text-base">
+            Theme: {theme?.name || "Unknown"}
+          </CardDescription>
           
           {/* Progress indicator */}
-          <div className="flex items-center justify-center gap-2 mt-4">
+          <div className="flex items-center justify-center gap-2 mt-3 sm:mt-4">
             {["selecting", "arranging", "recording"].map((step, idx) => (
               <div key={step} className="flex items-center">
                 <div className={cn(
@@ -483,14 +487,14 @@ export function UnifiedStorytellingInterface({
               </div>
             ))}
           </div>
-          <div className="flex justify-center gap-8 text-xs text-muted-foreground mt-2">
+          <div className="flex justify-center gap-6 sm:gap-8 text-xs text-muted-foreground mt-2">
             <span>Select</span>
             <span>Arrange</span>
             <span>Record</span>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-5 sm:space-y-6 px-3 pb-4 sm:px-6 sm:pb-6">
           {/* Show wisp to storyteller */}
           <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center">
             <p className="text-sm text-muted-foreground mb-1">Your Secret Wisp</p>

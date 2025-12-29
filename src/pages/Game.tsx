@@ -1376,20 +1376,37 @@ export default function Game() {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
 
-      {/* Main content area with sidebar layout */}
-      <div className="flex-1 flex">
-        {/* Scoreboard Sidebar */}
-        <aside className="w-64 lg:w-80 flex-shrink-0 p-4 sticky top-0 h-[calc(100vh-64px)] overflow-y-auto">
+      {/* Main content area with responsive layout */}
+      <div className="flex-1 flex flex-col md:flex-row">
+        {/* Scoreboard - top on mobile, sidebar on desktop */}
+        <aside className="w-full md:w-64 lg:w-80 flex-shrink-0 p-2 md:p-4 md:sticky md:top-0 md:h-[calc(100vh-64px)] md:overflow-y-auto">
           <Scoreboard
             players={players}
             currentRound={session.current_round}
             totalRounds={session.total_rounds}
             currentStorytellerId={session.current_storyteller_id}
+            timerElement={
+              !gameCompleted && currentTurn && gamePhase === "storytelling" && session.story_time_seconds ? (
+                <GameTimer
+                  totalSeconds={session.story_time_seconds}
+                  startTime={currentTurn.created_at}
+                  label="Story Time"
+                  onTimeUp={isStoryteller ? handleStoryTimeUp : undefined}
+                />
+              ) : !gameCompleted && currentTurn && gamePhase === "guessing" && session.guess_time_seconds ? (
+                <GameTimer
+                  totalSeconds={session.guess_time_seconds}
+                  startTime={currentTurn.completed_at}
+                  label="Guess Time"
+                  onTimeUp={!isStoryteller ? handleGuessTimeUp : undefined}
+                />
+              ) : undefined
+            }
           />
         </aside>
 
-        {/* Status Indicators - Timer and Connection */}
-        <div className="fixed top-20 right-4 z-50 flex flex-col gap-2 items-end">
+        {/* Status Indicators - Timer and Connection (desktop only) */}
+        <div className="hidden md:flex fixed top-20 right-4 z-50 flex-col gap-2 items-end">
           {/* Game Timer - show during mode selection, storytelling, elements, and guessing phases */}
           {!gameCompleted && currentTurn && gamePhase === "storytelling" && session.story_time_seconds && (
             <GameTimer
@@ -1504,22 +1521,22 @@ export default function Game() {
           )}
 
           {gamePhase === "storytelling" && !isStoryteller && !isModeTransitioning && (
-            <div className="min-h-screen flex items-center justify-center p-4">
-              <div className="max-w-2xl w-full space-y-6">
+            <div className="w-full flex items-start justify-center px-2 py-2 sm:min-h-screen sm:items-center sm:p-4">
+              <div className="max-w-2xl w-full space-y-3 sm:space-y-6">
                 <div className="text-center">
-                  <h2 className="text-2xl font-bold text-foreground mb-2">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-1 sm:mb-2">
                     {players.find((p) => p.player_id === session.current_storyteller_id)?.name} is creating their story
                   </h2>
-                  <p className="text-muted-foreground">Get ready to listen and guess the secret wisp!</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Get ready to listen and guess the secret wisp!</p>
                   {isReceivingAudio && (
-                    <div className="mt-4 flex items-center justify-center gap-2 text-sm text-green-600">
-                      <div className="h-3 w-3 rounded-full bg-green-600 animate-pulse" />
+                    <div className="mt-2 sm:mt-4 flex items-center justify-center gap-2 text-xs sm:text-sm text-green-600">
+                      <div className="h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-green-600 animate-pulse" />
                       <span className="font-medium">Listening to live recording...</span>
                     </div>
                   )}
                 </div>
-                <div className="flex justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <div className="flex justify-center pb-2 sm:pb-0">
+                  <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
                 </div>
               </div>
             </div>
@@ -1542,12 +1559,12 @@ export default function Game() {
           )}
 
           {gamePhase === "guessing" && isStoryteller && !gameCompleted && !isAnnouncingWinner && session?.status !== "completed" && session?.status !== "expired" && (
-            <div className="min-h-screen flex items-center justify-center">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-foreground mb-2">Players are guessing...</h2>
-                <p className="text-muted-foreground">Watch the scoreboard to see who gets it right!</p>
+            <div className="w-full flex items-start justify-center px-2 py-2 sm:min-h-screen sm:items-center sm:p-4">
+              <div className="text-center max-w-2xl w-full">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-1 sm:mb-2">Players are guessing...</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-0">Watch the scoreboard to see who gets it right!</p>
                 {currentTurn?.whisp && (
-                  <p className="mt-4 text-lg">
+                  <p className="mt-2 sm:mt-4 text-sm sm:text-base md:text-lg">
                     Your wisp was: <span className="font-bold text-primary">{currentTurn.whisp}</span>
                   </p>
                 )}

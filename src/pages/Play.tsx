@@ -335,9 +335,48 @@ const Play = () => {
       });
 
       if (error) {
+        // Extract error message from response body
+        // When edge function returns non-2xx, the actual error message is in the response body
+        let errorMessage = "Could not join the lobby";
+        
+        try {
+          // Try to parse the error response body from error.context (Response object)
+          if (error.context && error.context instanceof Response) {
+            // Clone the response since it can only be read once
+            const clonedResponse = error.context.clone();
+            const responseBody = await clonedResponse.json();
+            if (responseBody?.error) {
+              errorMessage = responseBody.error;
+            }
+          } else if (data?.error) {
+            // Fallback: check if error is in data
+            errorMessage = data.error;
+          } else if (error.message && error.message !== "Edge Function returned a non-2xx status code") {
+            // Use error.message if it's not the generic Supabase message
+            errorMessage = error.message;
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, try to get text from response
+          try {
+            if (error.context && error.context instanceof Response) {
+              const clonedResponse = error.context.clone();
+              const textBody = await clonedResponse.text();
+              if (textBody) {
+                const parsed = JSON.parse(textBody);
+                if (parsed?.error) {
+                  errorMessage = parsed.error;
+                }
+              }
+            }
+          } catch (e) {
+            // If all parsing fails, use generic message
+            console.error("Error parsing error response:", e);
+          }
+        }
+        
         toast({
-          title: "Failed to Join",
-          description: error.message || "Could not join the lobby",
+          title: "Unable to Join",
+          description: errorMessage,
           variant: "destructive",
         });
         return;
@@ -350,10 +389,22 @@ const Play = () => {
         sessionStorage.setItem("current_lobby_session", data.session.id);
         localStorage.setItem("current_lobby_session", data.session.id);
 
-        toast({
-          title: "Joined Lobby!",
-          description: `You've joined lobby ${validatedLobbyCode}`,
-        });
+        // Clear the lobby code input
+        setLobbyCode("");
+
+        // Check if user was already in the lobby
+        if (data.message === "Already in lobby") {
+          toast({
+            title: "Already in Lobby",
+            description: `You're already in lobby ${validatedLobbyCode}. Redirecting...`,
+          });
+        } else {
+          // New join - show success message
+          toast({
+            title: "Successfully Joined! 🎮",
+            description: `Welcome to lobby ${validatedLobbyCode}. Waiting for other players...`,
+          });
+        }
 
         // Navigate to lobby page
         navigate(`/lobby/${data.session.id}`);
@@ -751,40 +802,6 @@ const Play = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* Footer */}
-        {/* <div className="w-full max-w-2xl pt-12 pb-4">
-        <div className="bg-game-gray/30 border border-game-yellow/20 rounded-lg p-4">
-          <div className="text-xs text-game-yellow/80 space-y-1.5">
-            <div className="flex justify-between">
-              <span className="font-semibold">Environment:</span>
-              <span className="uppercase">{appEnv}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="font-semibold">Backend:</span>
-              <span>{isSupabaseConfigured() ? "Connected" : "Not Configured"}</span>
-            </div>
-            {tenant && (
-              <>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Tenant:</span>
-                  <span>{tenant.tenant_key}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Shop:</span>
-                  <span>{shopDomain || "Unknown"}</span>
-                </div>
-              </>
-            )}
-            {customer && (
-              <div className="flex justify-between">
-                <span className="font-semibold">Customer:</span>
-                <span>{customer.email || customer.name || customer.id}</span>
-              </div>
-            )}
-          </div>
-        </div>
-        </div> */}
       </div>
     </div>
   );

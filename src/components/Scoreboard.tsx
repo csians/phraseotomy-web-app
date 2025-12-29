@@ -14,20 +14,26 @@ interface ScoreboardProps {
   currentRound: number;
   totalRounds: number;
   currentStorytellerId?: string;
+  timerElement?: React.ReactNode;
 }
 
-export function Scoreboard({ players, currentRound, totalRounds, currentStorytellerId }: ScoreboardProps) {
+export function Scoreboard({ players, currentRound, totalRounds, currentStorytellerId, timerElement }: ScoreboardProps) {
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
 
   return (
     <Card className="bg-card/50 backdrop-blur border-border">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+      <CardHeader className="space-y-1 pb-2 pt-3">
+        <CardTitle className="flex items-center justify-between gap-0">
           <span>Scoreboard</span>
-          <span className="text-sm font-normal text-muted-foreground">
+          <span className="text-sm font-normal text-muted-foreground whitespace-nowrap">
             Round {currentRound} of {totalRounds}
           </span>
         </CardTitle>
+        {timerElement && (
+          <div className="md:hidden flex justify-end -mt-0.5">
+            <div className="scale-90 origin-right">{timerElement}</div>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-2">

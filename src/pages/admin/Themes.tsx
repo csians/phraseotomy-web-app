@@ -13,6 +13,8 @@ import { RefreshCw, Plus, Trash2, ArrowLeft, Upload, Image, Palette, Type, Penci
 import { useTenant } from "@/hooks/useTenant";
 import { getAllUrlParams } from "@/lib/urlUtils";
 import * as XLSX from "xlsx";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 interface Theme {
   id: string;
@@ -37,6 +39,12 @@ interface Element {
 interface Pack {
   id: string;
   name: string;
+}
+
+interface ThemePack {
+  id: string;
+  theme_id: string;
+  pack_id: string;
 }
 
 const extractShopFromHost = (host: string | null): string | null => {
@@ -73,11 +81,12 @@ export default function Themes() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [elements, setElements] = useState<Element[]>([]);
   const [packs, setPacks] = useState<Pack[]>([]);
+  const [themePacks, setThemePacks] = useState<ThemePack[]>([]);
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAddThemeOpen, setIsAddThemeOpen] = useState(false);
   const [isAddElementOpen, setIsAddElementOpen] = useState(false);
-  const [newTheme, setNewTheme] = useState({ name: "", icon: "🎮", pack_id: "", is_core: false });
+  const [newTheme, setNewTheme] = useState({ name: "", icon: "🎮", pack_ids: [] as string[], is_core: false });
   const [newElement, setNewElement] = useState({ name: "", icon: "🔮", color: "#6366f1", is_whisp: false });
   const [newElementImage, setNewElementImage] = useState<File | null>(null);
   const [newElementImagePreview, setNewElementImagePreview] = useState<string | null>(null);
@@ -108,16 +117,19 @@ export default function Themes() {
     if (!tenant?.id) return;
     setLoading(true);
     try {
-      const [themesRes, packsRes] = await Promise.all([
+      const [themesRes, packsRes, themePacksRes] = await Promise.all([
         supabase.from("themes").select("*").order("name"),
-        supabase.from("packs").select("id, name").eq("tenant_id", tenant.id)
+        supabase.from("packs").select("id, name").eq("tenant_id", tenant.id),
+        supabase.from("theme_packs").select("id, theme_id, pack_id")
       ]);
       
       if (themesRes.error) throw themesRes.error;
       if (packsRes.error) throw packsRes.error;
+      if (themePacksRes.error) throw themePacksRes.error;
       
       setThemes(themesRes.data || []);
       setPacks(packsRes.data || []);
+      setThemePacks(themePacksRes.data || []);
     } catch (error) {
       toast({
         title: "Error loading data",
@@ -160,20 +172,45 @@ export default function Themes() {
     }
 
     try {
-      const { error } = await supabase.functions.invoke('admin-create-theme', {
+      // First create the theme
+      const { data: themeData, error: themeError } = await supabase.functions.invoke('admin-create-theme', {
         body: {
           name: newTheme.name.trim(),
           icon: newTheme.icon,
-          pack_id: newTheme.pack_id || null,
+          pack_id: null, // Don't use pack_id anymore, use theme_packs junction table
           is_core: newTheme.is_core
         }
       });
       
-      if (error) throw error;
+      if (themeError) throw themeError;
+      
+      const themeId = themeData?.theme?.id;
+      if (!themeId) {
+        throw new Error("Theme created but no ID returned");
+      }
+      
+      // Then create theme_packs relationships for selected packs
+      if (newTheme.pack_ids.length > 0) {
+        const packPromises = newTheme.pack_ids.map(packId =>
+          supabase.functions.invoke('admin-manage-theme-packs', {
+            body: {
+              action: 'add',
+              theme_id: themeId,
+              pack_id: packId
+            }
+          })
+        );
+        
+        const packResults = await Promise.all(packPromises);
+        const packErrors = packResults.filter(r => r.error);
+        if (packErrors.length > 0) {
+          console.warn("Some pack associations failed:", packErrors);
+        }
+      }
       
       toast({ title: "Theme created successfully" });
       setIsAddThemeOpen(false);
-      setNewTheme({ name: "", icon: "🎮", pack_id: "", is_core: false });
+      setNewTheme({ name: "", icon: "🎮", pack_ids: [], is_core: false });
       loadData();
     } catch (error) {
       toast({
@@ -635,7 +672,12 @@ export default function Themes() {
                   Refresh
                 </Button>
                 
-                <Dialog open={isAddThemeOpen} onOpenChange={setIsAddThemeOpen}>
+                <Dialog open={isAddThemeOpen} onOpenChange={(open) => {
+                  setIsAddThemeOpen(open);
+                  if (!open) {
+                    setNewTheme({ name: "", icon: "🎮", pack_ids: [], is_core: false });
+                  }
+                }}>
                   <DialogTrigger asChild>
                     <Button>
                       <Plus className="h-4 w-4 mr-2" />
@@ -657,25 +699,45 @@ export default function Themes() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Pack (Optional - for expansion themes)</Label>
-                        <Select
-                          value={newTheme.pack_id || "_none"}
-                          onValueChange={(v) =>
-                            setNewTheme({ ...newTheme, pack_id: v === "_none" ? "" : v })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select pack (or leave empty for base)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="_none">No Pack (Base Game)</SelectItem>
-                            {packs.map((pack) => (
-                              <SelectItem key={pack.id} value={pack.id}>
-                                {pack.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label>Packs (Optional - select multiple packs for this theme)</Label>
+                        <div className="border rounded-md p-4 max-h-48 overflow-y-auto space-y-2">
+                          {packs.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No packs available. Create packs first.</p>
+                          ) : (
+                            packs.map((pack) => (
+                              <div key={pack.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`pack-${pack.id}`}
+                                  checked={newTheme.pack_ids.includes(pack.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setNewTheme({
+                                        ...newTheme,
+                                        pack_ids: [...newTheme.pack_ids, pack.id]
+                                      });
+                                    } else {
+                                      setNewTheme({
+                                        ...newTheme,
+                                        pack_ids: newTheme.pack_ids.filter(id => id !== pack.id)
+                                      });
+                                    }
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`pack-${pack.id}`}
+                                  className="text-sm font-normal cursor-pointer"
+                                >
+                                  {pack.name}
+                                </Label>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        {newTheme.pack_ids.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {newTheme.pack_ids.length} pack{newTheme.pack_ids.length > 1 ? 's' : ''} selected
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <input
@@ -727,15 +789,25 @@ export default function Themes() {
                             {theme.name}
                           </TableCell>
                           <TableCell>
-                            {theme.is_core ? (
-                              <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">Core</span>
-                            ) : theme.pack_id ? (
-                              <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">
-                                {packs.find(p => p.id === theme.pack_id)?.name || 'Pack'}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            )}
+                            <div className="flex flex-wrap gap-1">
+                              {theme.is_core ? (
+                                <Badge variant="default" className="text-xs">Core</Badge>
+                              ) : null}
+                              {themePacks
+                                .filter(tp => tp.theme_id === theme.id)
+                                .map(tp => {
+                                  const pack = packs.find(p => p.id === tp.pack_id);
+                                  return pack ? (
+                                    <Badge key={tp.id} variant="secondary" className="text-xs">
+                                      {pack.name}
+                                    </Badge>
+                                  ) : null;
+                                })
+                                .filter(item => item !== null)}
+                              {!theme.is_core && themePacks.filter(tp => tp.theme_id === theme.id).length === 0 && (
+                                <span className="text-xs text-muted-foreground">-</span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Button
