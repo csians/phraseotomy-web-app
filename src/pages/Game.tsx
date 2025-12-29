@@ -991,11 +991,64 @@ export default function Game() {
           const storytellerId = newRow?.storyteller_id;
           const isMyTurn = !!storytellerId && myId === storytellerId;
           const isTurnCompleted = !!newRow?.completed_at;
+          const oldRow = (payload as any)?.old;
+          const wasJustCompleted = !oldRow?.completed_at && isTurnCompleted;
 
           // If I'm the storyteller and the turn is not completed yet, skip refresh.
           // (Refreshing sets loading=true in Game.tsx, which unmounts the interface and sends you back to Step 1.)
           if (isMyTurn && !isTurnCompleted) {
             console.log("Skipping refresh - storyteller is still composing the story");
+            return;
+          }
+
+          // If turn was just completed (all players answered), show round transition for ALL players
+          if (wasJustCompleted && isTurnCompleted && gamePhase === "guessing") {
+            console.log("🎯 Turn completed - showing round transition for all players");
+            const secretElement = newRow?.whisp || currentTurn?.whisp || "?";
+            const turnId = newRow?.id;
+            
+            // Check if current player got it right by checking their guess
+            const checkPlayerResult = async () => {
+              if (turnId && myId) {
+                try {
+                  const { data: myGuess } = await supabase
+                    .from("game_guesses")
+                    .select("points_earned")
+                    .eq("turn_id", turnId)
+                    .eq("player_id", myId)
+                    .maybeSingle();
+                  
+                  const wasCorrect = myGuess?.points_earned === 1;
+                  
+                  setRoundResultMessage({
+                    correct: wasCorrect,
+                    message: wasCorrect
+                      ? `Correct! The answer was "${secretElement}". Round complete!`
+                      : `The answer was "${secretElement}". Round complete!`,
+                  });
+                } catch (error) {
+                  console.error("Error checking player result:", error);
+                  setRoundResultMessage({
+                    correct: false,
+                    message: `The answer was "${secretElement}". Round complete!`,
+                  });
+                }
+              } else {
+                setRoundResultMessage({
+                  correct: false,
+                  message: `The answer was "${secretElement}". Round complete!`,
+                });
+              }
+            };
+            
+            setIsRoundTransitioning(true);
+            checkPlayerResult();
+            
+            setTimeout(() => {
+              setIsRoundTransitioning(false);
+              setRoundResultMessage(null);
+              debouncedRefresh({ bypassStoryPause: true });
+            }, 3000);
             return;
           }
 
@@ -1605,6 +1658,22 @@ export default function Game() {
               selectedIcons={selectedIcons}
               turnMode={currentTurn.turn_mode || "audio"}
               sendWebSocketMessage={sendWebSocketMessage}
+              turnId={currentTurn.id}
+              onAllPlayersAnswered={(whisp, wasCorrect) => {
+                // Show round transition when all players have answered
+                setRoundResultMessage({
+                  correct: wasCorrect,
+                  message: wasCorrect
+                    ? `Correct! The answer was "${whisp || currentTurn?.whisp || '?'}". Round complete!`
+                    : `The answer was "${whisp || currentTurn?.whisp || '?'}". Round complete!`,
+                });
+                setIsRoundTransitioning(true);
+                setTimeout(() => {
+                  setIsRoundTransitioning(false);
+                  setRoundResultMessage(null);
+                  debouncedRefresh({ bypassStoryPause: true });
+                }, 3000);
+              }}
             />
           )}
 

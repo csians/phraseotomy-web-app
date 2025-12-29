@@ -18,6 +18,8 @@ interface GuessingInterfaceProps {
   selectedIcons?: IconItem[];
   turnMode?: "audio" | "elements";
   sendWebSocketMessage?: (message: any) => void;
+  turnId?: string;
+  onAllPlayersAnswered?: (whisp: string, wasCorrect: boolean) => void;
 }
 
 export function GuessingInterface({
@@ -31,6 +33,8 @@ export function GuessingInterface({
   selectedIcons = [],
   turnMode = "audio",
   sendWebSocketMessage,
+  turnId,
+  onAllPlayersAnswered,
 }: GuessingInterfaceProps) {
   const { toast } = useToast();
   const [guess, setGuess] = useState("");
@@ -168,6 +172,122 @@ export function GuessingInterface({
       audio.removeEventListener('ended', handleEnded);
     };
   }, [audioUrl]);
+
+  // Poll to check if all players have answered (for players who submitted early)
+  // This ensures all players see the round transition, not just the last one to submit
+  const hasTriggeredTransitionRef = useRef(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    if (!turnId || !onAllPlayersAnswered || !hasSubmitted) return;
+    if (hasTriggeredTransitionRef.current) return; // Already triggered transition
+    
+    const checkAllPlayersAnswered = async () => {
+      // Stop polling if transition already triggered
+      if (hasTriggeredTransitionRef.current) {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        return;
+      }
+      
+      try {
+        // Get the turn to check if it's completed
+        const { data: turnData } = await supabase
+          .from("game_turns")
+          .select("id, completed_at, whisp, storyteller_id")
+          .eq("id", turnId)
+          .maybeSingle();
+        
+        if (!turnData) return;
+        
+        // If turn is completed, all players have answered
+        if (turnData.completed_at) {
+          // Check if current player got it right
+          const { data: myGuess } = await supabase
+            .from("game_guesses")
+            .select("points_earned")
+            .eq("turn_id", turnId)
+            .eq("player_id", playerId)
+            .maybeSingle();
+          
+          const wasCorrect = myGuess?.points_earned === 1;
+          const whisp = turnData.whisp || "";
+          
+          // Mark as triggered and stop polling
+          hasTriggeredTransitionRef.current = true;
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          
+          onAllPlayersAnswered(whisp, wasCorrect);
+          return;
+        }
+        
+        // Check if all non-storyteller players have answered
+        const { data: sessionPlayers } = await supabase
+          .from("game_players")
+          .select("player_id")
+          .eq("session_id", sessionId);
+        
+        if (!sessionPlayers) return;
+        
+        const storytellerId = turnData.storyteller_id;
+        const nonStorytellerPlayers = sessionPlayers.filter(
+          p => p.player_id !== storytellerId
+        );
+        
+        const { data: allGuesses } = await supabase
+          .from("game_guesses")
+          .select("player_id")
+          .eq("turn_id", turnId);
+        
+        const uniqueAnswers = new Set(allGuesses?.map(g => g.player_id) || []);
+        const allAnswered = nonStorytellerPlayers.length > 0 && 
+                           uniqueAnswers.size >= nonStorytellerPlayers.length;
+        
+        if (allAnswered && turnData.whisp) {
+          // All players answered but turn not marked complete yet
+          const { data: myGuess } = await supabase
+            .from("game_guesses")
+            .select("points_earned")
+            .eq("turn_id", turnId)
+            .eq("player_id", playerId)
+            .maybeSingle();
+          
+          const wasCorrect = myGuess?.points_earned === 1;
+          
+          // Mark as triggered and stop polling
+          hasTriggeredTransitionRef.current = true;
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          
+          onAllPlayersAnswered(turnData.whisp, wasCorrect);
+        }
+      } catch (error) {
+        console.error("Error checking all players answered:", error);
+      }
+    };
+    
+    // Poll every 2 seconds if player has submitted but waiting for others
+    pollIntervalRef.current = setInterval(checkAllPlayersAnswered, 2000);
+    
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [turnId, sessionId, playerId, hasSubmitted, onAllPlayersAnswered]);
+
+  // Reset transition trigger when round changes
+  useEffect(() => {
+    hasTriggeredTransitionRef.current = false;
+  }, [roundNumber]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
