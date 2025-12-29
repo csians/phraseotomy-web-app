@@ -1033,11 +1033,22 @@ export default function Game() {
           schema: "public",
           table: "game_guesses",
         },
-        () => {
-          toast({
-            title: "Player Guessed!",
-            description: "A player has submitted their guess",
-          });
+        (payload) => {
+          // Get player_id from the inserted guess
+          const guessPlayerId = (payload.new as any)?.player_id;
+          
+          // Find player name from current players state
+          const guessingPlayer = players.find((p) => p.player_id === guessPlayerId);
+          const playerName = guessingPlayer?.name || "A player";
+          
+          // Don't show toast if it's the current player (they already see their own submission)
+          if (guessPlayerId !== currentPlayerId) {
+            toast({
+              title: "Player Guessed!",
+              description: `${playerName} submitted their guess`,
+            });
+          }
+          
           debouncedRefresh();
         },
       )

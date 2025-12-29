@@ -41,10 +41,28 @@ export function GuessingInterface({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const hasAutoPlayedRef = useRef(false);
+  const lastCheckedRoundRef = useRef<number | null>(null);
+  const lastCheckedTurnIdRef = useRef<string | null>(null);
+  
+  // Check if we've already auto-played for this session (persists across component remounts)
+  const getHasAutoPlayed = () => {
+    const key = `autoplay_${sessionId}`;
+    return sessionStorage.getItem(key) === 'true';
+  };
+  
+  const setHasAutoPlayed = () => {
+    const key = `autoplay_${sessionId}`;
+    sessionStorage.setItem(key, 'true');
+  };
 
   // Check if player already submitted guess for this round on mount/round change
+  // Only check once per round to avoid unnecessary API calls
   useEffect(() => {
+    // Skip if we already checked this round
+    if (lastCheckedRoundRef.current === roundNumber) {
+      return;
+    }
+
     const checkExistingGuess = async () => {
       console.log("Round changed to:", roundNumber, "- Checking existing guesses");
       setGuess("");
@@ -61,6 +79,12 @@ export function GuessingInterface({
           .maybeSingle();
 
         if (turnData?.id) {
+          // Skip if we already checked this turn
+          if (lastCheckedTurnIdRef.current === turnData.id) {
+            lastCheckedRoundRef.current = roundNumber;
+            return;
+          }
+
           const { data: existingGuess } = await supabase
             .from("game_guesses")
             .select("id, points_earned")
@@ -76,7 +100,13 @@ export function GuessingInterface({
               setIsLockedOut(true);
             }
           }
+
+          // Mark this turn as checked
+          lastCheckedTurnIdRef.current = turnData.id;
         }
+        
+        // Mark this round as checked
+        lastCheckedRoundRef.current = roundNumber;
       } catch (error) {
         console.error("Error checking existing guess:", error);
       }
@@ -117,10 +147,17 @@ export function GuessingInterface({
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
 
-    // Autoplay only once when audioUrl first loads
-    if (!hasAutoPlayedRef.current && audioUrl) {
-      hasAutoPlayedRef.current = true;
-      audio.play().catch(console.error);
+    // Autoplay only once when audioUrl first loads on initial page visit
+    // Use sessionStorage to persist across component remounts
+    if (!getHasAutoPlayed() && audioUrl) {
+      setHasAutoPlayed();
+      // Try to play, but don't show errors if autoplay is blocked by browser
+      audio.play().catch((err) => {
+        console.log("Autoplay prevented by browser:", err);
+        // Remove the flag if autoplay was blocked - user can manually play
+        const key = `autoplay_${sessionId}`;
+        sessionStorage.removeItem(key);
+      });
     }
 
     return () => {
@@ -131,11 +168,6 @@ export function GuessingInterface({
       audio.removeEventListener('ended', handleEnded);
     };
   }, [audioUrl]);
-
-  // Reset autoplay flag when round changes
-  useEffect(() => {
-    hasAutoPlayedRef.current = false;
-  }, [roundNumber]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
