@@ -88,7 +88,7 @@ export default function Game() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false to prevent stuck loading screen
   const [session, setSession] = useState<GameSession | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
@@ -117,6 +117,7 @@ export default function Game() {
   const isAnnouncingWinnerRef = useRef(false);
   const isModeSelectingRef = useRef(false); // Prevent refresh during mode selection
   const isStorytellerActiveRef = useRef(false); // Prevent polling during storytelling
+  const roundTransitionTriggeredRef = useRef<string | null>(null); // Prevent duplicate round transitions
   const [lifetimePoints, setLifetimePoints] = useState<Record<string, number>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
@@ -132,16 +133,18 @@ export default function Game() {
   // Debounced refresh to prevent infinite loops
   const debouncedRefresh = useCallback((options: RefreshOptions = {}) => {
     const bypassStoryPause = options.bypassStoryPause === true;
-    const showLoading = options.showLoading === true; // Only show loading if explicitly requested
+    // Default to false - only show loading if explicitly requested (initial load only)
+    const showLoading = options.showLoading === true;
 
-    // Don't refresh if game is completed, announcing winner, selecting mode, or storyteller is active
+    // Don't refresh if game is completed, announcing winner, selecting mode, storyteller is active, or round is transitioning
     if (
       gameCompletedRef.current ||
       isAnnouncingWinnerRef.current ||
       isModeSelectingRef.current ||
-      (!bypassStoryPause && isStorytellerActiveRef.current)
+      (!bypassStoryPause && isStorytellerActiveRef.current) ||
+      roundTransitionTriggeredRef.current !== null // Don't refresh while round transition is active
     ) {
-      console.log("Skipping refresh - game completed, announcing winner, selecting mode, or storyteller active");
+      console.log("Skipping refresh - game completed, announcing winner, selecting mode, storyteller active, or round transitioning");
       return;
     }
 
@@ -157,7 +160,8 @@ export default function Game() {
 
     refreshDebounceRef.current = setTimeout(() => {
       lastRefreshRef.current = Date.now();
-      initializeGame(options);
+      // Ensure showLoading is false unless explicitly set to true
+      initializeGame({ ...options, showLoading: options.showLoading === true });
     }, 300);
   }, []); // Using refs instead of state for checks
 
@@ -179,7 +183,7 @@ export default function Game() {
     console.log("🔄 Force refresh triggered - story submitted, transitioning to guessing phase");
     refreshDebounceRef.current = setTimeout(() => {
       lastRefreshRef.current = Date.now();
-      initializeGame({ bypassStoryPause: true });
+      initializeGame({ bypassStoryPause: true, showLoading: false });
     }, 100); // Shorter delay for immediate transition
   }, []);
 
@@ -343,7 +347,7 @@ export default function Game() {
             title: "Theme Selected",
             description: `${message.storytellerName || "Storyteller"} chose a theme`,
           });
-          debouncedRefresh();
+          debouncedRefresh({ showLoading: false });
           break;
 
         case "mode_selected":
@@ -352,7 +356,7 @@ export default function Game() {
             title: "Mode Selected",
             description: `${message.storytellerName || "Storyteller"} is ready`,
           });
-          debouncedRefresh();
+          debouncedRefresh({ showLoading: false });
           break;
 
         case "recording_uploaded":
@@ -391,7 +395,7 @@ export default function Game() {
               });
             }
           }
-          debouncedRefresh();
+          debouncedRefresh({ showLoading: false });
           break;
 
         case "correct_answer":
@@ -399,44 +403,19 @@ export default function Game() {
             title: "Round Complete! 🏆",
             description: `${message.winnerName} got it right! The answer was "${message.secretElement}"`,
           });
-          debouncedRefresh();
+          debouncedRefresh({ showLoading: false });
           break;
 
         case "next_turn":
-          // Show round transition with 3-second delay so ALL players can see the answer
-          const wasCorrectNextTurn = message.wasCorrect === true;
-          setRoundResultMessage({
-            correct: wasCorrectNextTurn,
-            message: wasCorrectNextTurn
-              ? `Correct! The answer was "${message.secretElement || currentTurn?.whisp || '?'}". ${message.newStorytellerName}'s turn next!`
-              : `The answer was "${message.secretElement || currentTurn?.whisp || '?'}". ${message.newStorytellerName}'s turn next!`,
-          });
-          setIsRoundTransitioning(true);
-          
-          setTimeout(() => {
-            setIsRoundTransitioning(false);
-            setRoundResultMessage(null);
-            // Small delay before refresh to ensure UI transition completes
-            setTimeout(() => debouncedRefresh(), 100);
-          }, 3000);
+          // Skip showing round transition dialog - just refresh silently
+          debouncedRefresh({ showLoading: false });
           break;
 
         case "round_result":
-          // Show round result for all players (correct answer revealed)
-          console.log("📢 Round result received:", message);
-          const wasCorrectRoundResult = message.wasCorrect === true;
-          setRoundResultMessage({
-            correct: wasCorrectRoundResult,
-            message: wasCorrectRoundResult
-              ? `Correct! The answer was "${message.secretElement}". Next round starting...`
-              : `The answer was "${message.secretElement}". Next round starting...`,
-          });
-          setIsRoundTransitioning(true);
-          
-          setTimeout(() => {
-            setIsRoundTransitioning(false);
-            setRoundResultMessage(null);
-          }, 3000);
+          // This message should only be shown when ALL players have answered
+          // Skip if turn is not actually completed (check via realtime or polling instead)
+          console.log("📢 Round result received (ignoring - should use next_turn or realtime instead):", message);
+          // Don't show dialog here - let the realtime subscription or polling handle it
           break;
 
       case "game_completed":
@@ -451,17 +430,7 @@ export default function Game() {
           // CRITICAL: Set ref IMMEDIATELY (before state) to block any concurrent refreshes
           isAnnouncingWinnerRef.current = true;
           
-          // FIRST: Show round result for 5 seconds so ALL players (including storyteller) see the answer
-          const wsWasCorrect = message.wasCorrect === true;
-          const wsSecretElement = message.secretElement || currentTurn?.whisp || "?";
-          setRoundResultMessage({
-            correct: wsWasCorrect,
-            message: wsWasCorrect 
-              ? `Correct! The answer was "${wsSecretElement}". Game complete!` 
-              : `The answer was "${wsSecretElement}". Game complete!`,
-          });
-          setIsRoundTransitioning(true);
-          
+          // Skip showing round result dialog - go directly to announcing winner
           // Update players immediately with WebSocket data
           if (message.players && message.players.length > 0) {
             console.log("🏆 Using players from WebSocket message:", message.players);
@@ -470,17 +439,13 @@ export default function Game() {
             fetchLifetimePoints(message.players);
           }
           
-          // After 5 seconds of showing round result, start winner announcement
-          setTimeout(async () => {
-            setIsRoundTransitioning(false);
-            setRoundResultMessage(null);
-            
-            // Show "Announcing Winner" loading
-            setIsAnnouncingWinner(true);
-            
-            // If no players from WebSocket, fetch from database
-            if (!message.players || message.players.length === 0) {
-              console.log("🔄 No players in message, fetching from database...");
+          // Show "Announcing Winner" loading immediately
+          setIsAnnouncingWinner(true);
+          
+          // If no players from WebSocket, fetch from database
+          if (!message.players || message.players.length === 0) {
+            console.log("🔄 No players in message, fetching from database...");
+            (async () => {
               try {
                 const { data: latestPlayers } = await supabase
                   .from("game_players")
@@ -502,16 +467,16 @@ export default function Game() {
                 determineWinnerAndTies(players);
                 fetchLifetimePoints(players);
               }
-            }
-            
-            // After 3 seconds of "Announcing Winner", show actual dialog
-            setTimeout(() => {
-              // Set ref BEFORE state to prevent race conditions
-              gameCompletedRef.current = true;
-              setIsAnnouncingWinner(false);
-              setGameCompleted(true);
-            }, 3000);
-          }, 5000);
+            })();
+          }
+          
+          // After 3 seconds of "Announcing Winner", show actual dialog
+          setTimeout(() => {
+            // Set ref BEFORE state to prevent race conditions
+            gameCompletedRef.current = true;
+            setIsAnnouncingWinner(false);
+            setGameCompleted(true);
+          }, 3000);
 
           supabase
             .from("game_sessions")
@@ -527,7 +492,7 @@ export default function Game() {
             title: "Player Joined",
             description: `${message.playerName} joined the game`,
           });
-          debouncedRefresh();
+          debouncedRefresh({ showLoading: false });
           break;
 
         case "player_left":
@@ -535,11 +500,11 @@ export default function Game() {
             title: "Player Left",
             description: `${message.playerName} left the game`,
           });
-          debouncedRefresh();
+          debouncedRefresh({ showLoading: false });
           break;
 
         case "refresh_game_state":
-          debouncedRefresh();
+          debouncedRefresh({ showLoading: false });
           break;
 
         default:
@@ -558,13 +523,17 @@ export default function Game() {
       return;
     }
 
-    // Set a timeout fallback to ensure loading never gets stuck (10 seconds max)
+    // Set a timeout fallback to ensure loading never gets stuck (3 seconds max)
     let loadingTimeoutId: NodeJS.Timeout | null = setTimeout(() => {
       console.warn("⚠️ Loading timeout - clearing loading state to prevent stuck screen");
       setLoading(false);
-    }, 10000);
+    }, 3000);
 
+    // Only show loading briefly for initial load
+    setLoading(true);
     initializeGame({ showLoading: true }).finally(() => {
+      // Always clear loading after initialization, regardless of success/failure
+      setLoading(false);
       // Clear timeout once initialization completes
       if (loadingTimeoutId) {
         clearTimeout(loadingTimeoutId);
@@ -605,30 +574,20 @@ export default function Game() {
 
           setSession(data.session);
 
-          // Show final answer briefly, then show winner dialog
-          setRoundResultMessage({
-            correct: true,
-            message: `The answer was "${secret}". Game complete!`,
-          });
-          setIsRoundTransitioning(true);
+          // Skip showing round result dialog - go directly to announcing winner
+          setIsAnnouncingWinner(true);
+
+          if (playersForCompletion.length > 0) {
+            setPlayers(playersForCompletion);
+            determineWinnerAndTies(playersForCompletion);
+            fetchLifetimePoints(playersForCompletion);
+          }
 
           setTimeout(() => {
-            setIsRoundTransitioning(false);
-            setRoundResultMessage(null);
-            setIsAnnouncingWinner(true);
-
-            if (playersForCompletion.length > 0) {
-              setPlayers(playersForCompletion);
-              determineWinnerAndTies(playersForCompletion);
-              fetchLifetimePoints(playersForCompletion);
-            }
-
-            setTimeout(() => {
-              setIsAnnouncingWinner(false);
-              gameCompletedRef.current = true;
-              setGameCompleted(true);
-            }, 3000);
-          }, 5000);
+            setIsAnnouncingWinner(false);
+            gameCompletedRef.current = true;
+            setGameCompleted(true);
+          }, 3000);
         }
       } catch (err) {
         console.error("poll:get-game-state failed", err);
@@ -682,7 +641,8 @@ export default function Game() {
 
   const initializeGame = async (options: RefreshOptions = {}) => {
     const bypassStoryPause = options.bypassStoryPause === true;
-    const showLoading = options.showLoading === true; // Only show loading if explicitly requested
+    // Default to false - only show loading if explicitly requested (initial load only)
+    const showLoading = options.showLoading === true;
 
     // Don't reinitialize if game is already completed, announcing winner, selecting mode, or storyteller is active
     if (
@@ -717,10 +677,8 @@ export default function Game() {
 
       if (error) {
         console.error("Error from get-game-state:", error);
-        // Always clear loading before navigation
-        if (showLoading) {
-          setLoading(false);
-        }
+        // Always clear loading on error
+        setLoading(false);
         // Check if session was deleted (game completed and cleaned up)
         if (error.message?.includes("Session not found") || session?.status === "expired") {
           console.log("Session was cleaned up, redirecting...");
@@ -737,10 +695,8 @@ export default function Game() {
       // If session not found in response, it was deleted
       if (!data?.session) {
         console.log("Session not found in response, likely cleaned up");
-        // Always clear loading before navigation
-        if (showLoading) {
-          setLoading(false);
-        }
+        // Always clear loading
+        setLoading(false);
         toast({
           title: "Game Ended",
           description: "This game session has ended.",
@@ -761,9 +717,8 @@ export default function Game() {
 
         // Fetch lifetime points for completed game
         fetchLifetimePoints(data.players || []);
-        if (showLoading) {
-          setLoading(false);
-        }
+        // Always clear loading
+        setLoading(false);
         return;
       }
 
@@ -774,6 +729,14 @@ export default function Game() {
       console.log("Current turn:", data.currentTurn);
       console.log("Current storyteller:", data.session?.current_storyteller_id);
 
+      // Reset round transition trigger when round changes
+      const previousRound = session?.current_round;
+      const newRound = data.session?.current_round;
+      if (previousRound !== undefined && newRound !== undefined && previousRound !== newRound) {
+        console.log(`🔄 Round changed from ${previousRound} to ${newRound} - resetting transition trigger`);
+        roundTransitionTriggeredRef.current = null;
+      }
+      
       setSession(data.session);
       setPlayers(data.players || []);
       setThemes(data.themes || []);
@@ -919,13 +882,7 @@ export default function Game() {
                 
                 const secretElement = latestTurn?.whisp || "?";
                 
-                // FIRST: Show round result for 5 seconds so ALL players see the answer
-                setRoundResultMessage({
-                  correct: false, // Realtime fallback doesn't know if correct, show neutral
-                  message: `The answer was "${secretElement}". Game complete!`,
-                });
-                setIsRoundTransitioning(true);
-                
+                // Skip showing round result dialog - go directly to announcing winner
                 // Fetch latest players
                 const { data: latestPlayers } = await supabase
                   .from("game_players")
@@ -938,24 +895,20 @@ export default function Game() {
                   fetchLifetimePoints(latestPlayers);
                 }
                 
-                // After 5 seconds, start winner announcement
+                // Determine winner/tie
+                if (latestPlayers && latestPlayers.length > 0) {
+                  determineWinnerAndTies(latestPlayers);
+                }
+                
+                // Show "Announcing Winner" loading immediately
+                setIsAnnouncingWinner(true);
+                
+                // After 3 seconds, show winner dialog
                 setTimeout(() => {
-                  setIsRoundTransitioning(false);
-                  setRoundResultMessage(null);
-                  setIsAnnouncingWinner(true);
-                  
-                  // Determine winner/tie
-                  if (latestPlayers && latestPlayers.length > 0) {
-                    determineWinnerAndTies(latestPlayers);
-                  }
-                  
-                  // After 3 more seconds, show winner dialog
-                  setTimeout(() => {
-                    setIsAnnouncingWinner(false);
-                    gameCompletedRef.current = true;
-                    setGameCompleted(true);
-                  }, 3000);
-                }, 5000);
+                  setIsAnnouncingWinner(false);
+                  gameCompletedRef.current = true;
+                  setGameCompleted(true);
+                }, 3000);
               } catch (err) {
                 console.error("Error fetching data for completion:", err);
                 // Fallback - just show winner dialog
@@ -969,7 +922,7 @@ export default function Game() {
             };
             fetchAndShowCompletion();
           } else {
-            debouncedRefresh();
+            debouncedRefresh({ showLoading: false });
           }
         },
       )
@@ -1003,57 +956,43 @@ export default function Game() {
 
           // If turn was just completed (all players answered), show round transition for ALL players
           if (wasJustCompleted && isTurnCompleted && gamePhase === "guessing") {
-            console.log("🎯 Turn completed - showing round transition for all players");
-            const secretElement = newRow?.whisp || currentTurn?.whisp || "?";
             const turnId = newRow?.id;
             
-            // Check if current player got it right by checking their guess
-            const checkPlayerResult = async () => {
-              if (turnId && myId) {
-                try {
-                  const { data: myGuess } = await supabase
-                    .from("game_guesses")
-                    .select("points_earned")
-                    .eq("turn_id", turnId)
-                    .eq("player_id", myId)
-                    .maybeSingle();
-                  
-                  const wasCorrect = myGuess?.points_earned === 1;
-                  
-                  setRoundResultMessage({
-                    correct: wasCorrect,
-                    message: wasCorrect
-                      ? `Correct! The answer was "${secretElement}". Round complete!`
-                      : `The answer was "${secretElement}". Round complete!`,
-                  });
-                } catch (error) {
-                  console.error("Error checking player result:", error);
-                  setRoundResultMessage({
-                    correct: false,
-                    message: `The answer was "${secretElement}". Round complete!`,
-                  });
-                }
-              } else {
-                setRoundResultMessage({
-                  correct: false,
-                  message: `The answer was "${secretElement}". Round complete!`,
-                });
-              }
-            };
+            // Prevent duplicate transitions - check if we already showed this transition
+            if (roundTransitionTriggeredRef.current === turnId) {
+              console.log("⏭️ Skipping duplicate round transition for turn:", turnId);
+              return;
+            }
             
-            setIsRoundTransitioning(true);
-            checkPlayerResult();
-            
+            console.log("🎯 Turn completed - refreshing silently (no dialog)");
+            roundTransitionTriggeredRef.current = turnId;
+            // Clear transition trigger immediately and refresh silently
             setTimeout(() => {
-              setIsRoundTransitioning(false);
-              setRoundResultMessage(null);
-              debouncedRefresh({ bypassStoryPause: true });
-            }, 3000);
+              roundTransitionTriggeredRef.current = null;
+              debouncedRefresh({ bypassStoryPause: true, showLoading: false });
+            }, 100);
             return;
           }
 
-          // Everyone else (or once turn is completed) should refresh to see updates immediately.
-          debouncedRefresh({ bypassStoryPause: true });
+          // Skip refresh if round transition is already showing (prevents multiple API calls)
+          if (roundTransitionTriggeredRef.current === null) {
+            // Only refresh if not in round transition
+            debouncedRefresh({ bypassStoryPause: true, showLoading: false });
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "game_players",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          // Silent refresh when new player joins - don't show loading
+          console.log("New player joined - silent refresh");
+          debouncedRefresh({ showLoading: false, bypassStoryPause: true });
         },
       )
       .on(
@@ -1064,7 +1003,10 @@ export default function Game() {
           table: "game_players",
           filter: `session_id=eq.${sessionId}`,
         },
-        () => debouncedRefresh({ bypassStoryPause: true }),
+        () => {
+          // Silent refresh for player updates (score changes, etc.) - don't show loading
+          debouncedRefresh({ showLoading: false, bypassStoryPause: true });
+        },
       )
       .on(
         "postgres_changes",
@@ -1076,7 +1018,7 @@ export default function Game() {
         },
         () => {
           console.log("Player deleted from game, refreshing...");
-          debouncedRefresh();
+          debouncedRefresh({ showLoading: false });
         },
       )
       .on(
@@ -1102,7 +1044,7 @@ export default function Game() {
             });
           }
           
-          debouncedRefresh();
+          debouncedRefresh({ showLoading: false });
         },
       )
       .on("broadcast", { event: "lobby_ended" }, () => {
@@ -1118,7 +1060,7 @@ export default function Game() {
           title: "Player Left",
           description: `${leftPlayerName} left the game`,
         });
-        debouncedRefresh();
+        debouncedRefresh({ showLoading: false });
       })
       .subscribe();
 
@@ -1236,7 +1178,7 @@ export default function Game() {
     initializeGame({ showLoading: false }); // Silent refresh after story submission
   };
 
-  const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any) => {
+  const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any, allPlayersAnswered?: boolean) => {
     console.log("📝 handleGuessSubmit called:", { gameCompletedFromGuess, wasCorrect, whisp, playersCount: playersFromGuess?.length });
     
     toast({
@@ -1260,64 +1202,39 @@ export default function Game() {
         secretElement: whisp || currentTurn?.whisp,
       });
       
-      // Show round result for 3 seconds so player can see if they were right/wrong
-      // Use explicit boolean check - wasCorrect is explicitly true or false from API
-      const isCorrect = wasCorrect === true;
-      setRoundResultMessage({
-        correct: isCorrect,
-        message: isCorrect 
-          ? `Correct! The answer was "${whisp || currentTurn?.whisp || '?'}". Game complete!` 
-          : `Wrong answer. The answer was "${whisp || currentTurn?.whisp || '?'}". Game complete!`,
-      });
-      setIsRoundTransitioning(true);
+      // Skip showing round result dialog - go directly to announcing winner
+      setPlayers(playersFromGuess);
+      determineWinnerAndTies(playersFromGuess);
+      // Set ref BEFORE state to block concurrent refreshes
+      isAnnouncingWinnerRef.current = true;
+      setIsAnnouncingWinner(true);
       
-      // After 3 seconds, show winner dialog
+      // After 3 seconds of "Announcing Winner", show the actual dialog
       setTimeout(() => {
-        setIsRoundTransitioning(false);
-        setRoundResultMessage(null);
-        
-        setPlayers(playersFromGuess);
-        determineWinnerAndTies(playersFromGuess);
-        // Set ref BEFORE state to block concurrent refreshes
-        isAnnouncingWinnerRef.current = true;
-        setIsAnnouncingWinner(true);
-        
-        // After another 3 seconds of "Announcing Winner", show the actual dialog
-        setTimeout(() => {
-          // Set ref BEFORE state to prevent race conditions
-          gameCompletedRef.current = true;
-          setIsAnnouncingWinner(false);
-          setGameCompleted(true);
-          fetchLifetimePoints(playersFromGuess);
-        }, 3000);
+        // Set ref BEFORE state to prevent race conditions
+        gameCompletedRef.current = true;
+        setIsAnnouncingWinner(false);
+        setGameCompleted(true);
+        fetchLifetimePoints(playersFromGuess);
       }, 3000);
       return;
     }
     
-    // If all players answered but game continues (next round), show result for 3 seconds for the submitting player
-    if (nextRound && nextRound.newStorytellerId && !gameCompletedFromGuess) {
-      console.log("📢 Round complete, showing result before next round, wasCorrect:", wasCorrect);
-      
-      // Use explicit boolean check
-      const isCorrect = wasCorrect === true;
-      setRoundResultMessage({
-        correct: isCorrect,
-        message: isCorrect 
-          ? `Correct! The answer was "${whisp || currentTurn?.whisp || '?'}". ${nextRound.newStorytellerName}'s turn next!`
-          : `The answer was "${whisp || currentTurn?.whisp || '?'}". ${nextRound.newStorytellerName}'s turn next!`,
-      });
-      setIsRoundTransitioning(true);
-      
-      setTimeout(() => {
-        setIsRoundTransitioning(false);
-        setRoundResultMessage(null);
-        // Small delay before refresh
-        setTimeout(() => initializeGame({ showLoading: false }), 100);
-      }, 3000);
+    // If all players answered but game continues (next round), skip dialog and refresh silently
+    if (nextRound && nextRound.newStorytellerId && !gameCompletedFromGuess && allPlayersAnswered === true) {
+      console.log("📢 Round complete, refreshing silently (no dialog)");
+      // Clear transition trigger and refresh
+      roundTransitionTriggeredRef.current = null;
+      setTimeout(() => initializeGame({ showLoading: false }), 100);
       return;
     }
     
-    initializeGame({ showLoading: false }); // Don't show loading for user action refreshes
+    // If player answered correctly but not all players have answered yet, don't show transition message
+    // The message will be shown via WebSocket or polling when all players have answered
+    // Don't refresh if round transition is active
+    if (roundTransitionTriggeredRef.current === null) {
+      initializeGame({ showLoading: false }); // Don't show loading for user action refreshes
+    }
   };
 
   // Handle storyteller timer expiry - skip the round
@@ -1660,19 +1577,11 @@ export default function Game() {
               sendWebSocketMessage={sendWebSocketMessage}
               turnId={currentTurn.id}
               onAllPlayersAnswered={(whisp, wasCorrect) => {
-                // Show round transition when all players have answered
-                setRoundResultMessage({
-                  correct: wasCorrect,
-                  message: wasCorrect
-                    ? `Correct! The answer was "${whisp || currentTurn?.whisp || '?'}". Round complete!`
-                    : `The answer was "${whisp || currentTurn?.whisp || '?'}". Round complete!`,
-                });
-                setIsRoundTransitioning(true);
-                setTimeout(() => {
-                  setIsRoundTransitioning(false);
-                  setRoundResultMessage(null);
-                  debouncedRefresh({ bypassStoryPause: true });
-                }, 3000);
+                // Skip showing round transition dialog - refresh silently
+                console.log("✅ All players answered - refreshing silently (no dialog), wasCorrect:", wasCorrect);
+                // Clear transition trigger and refresh
+                roundTransitionTriggeredRef.current = null;
+                debouncedRefresh({ bypassStoryPause: true, showLoading: false });
               }}
             />
           )}
@@ -1693,8 +1602,8 @@ export default function Game() {
         </main>
       </div>
 
-      {/* Round Transition Dialog - shows answer for 3 seconds between rounds */}
-      <Dialog open={isRoundTransitioning} onOpenChange={() => {}}>
+      {/* Round Transition Dialog - REMOVED: No longer showing "Correct! The answer was..." dialog */}
+      {/* <Dialog open={isRoundTransitioning} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
           <div className="flex flex-col items-center justify-center py-8 space-y-6">
             <div className={`h-16 w-16 rounded-full flex items-center justify-center ${roundResultMessage?.correct ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
@@ -1720,7 +1629,7 @@ export default function Game() {
             </div>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* Announcing Winner Loading Dialog */}
       <Dialog open={isAnnouncingWinner} onOpenChange={() => {}}>

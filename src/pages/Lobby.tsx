@@ -465,7 +465,7 @@ export default function Lobby() {
     // Store sessionId in both storage types to persist across refreshes and browser restarts
     sessionStorage.setItem("current_lobby_session", sessionId);
     localStorage.setItem("current_lobby_session", sessionId);
-    fetchLobbyData();
+    fetchLobbyData(true); // Show loading on initial load only
 
     // Set up real-time subscription for lobby updates using Supabase Realtime Broadcast
     const channel = supabase
@@ -489,7 +489,7 @@ export default function Lobby() {
           title: "Player Joined! 🎮",
           description: `${payload.payload?.senderName || "A player"} joined the lobby`,
         });
-        fetchLobbyData();
+        fetchLobbyData(false); // Silent refresh - no loading screen
       })
       .on("broadcast", { event: "player_left" }, (payload) => {
         const leftPlayerId = payload.payload?.playerId;
@@ -504,7 +504,7 @@ export default function Lobby() {
           description: `${leftPlayerName} left the lobby`,
         });
         
-        fetchLobbyData();
+        fetchLobbyData(false); // Silent refresh - no loading screen
       })
       .on("broadcast", { event: "player_kicked" }, (payload) => {
         const kickedPlayerId = payload.payload?.playerId;
@@ -538,7 +538,7 @@ export default function Lobby() {
           description: `${kickedPlayerName} was removed from the lobby`,
         });
         
-        fetchLobbyData();
+        fetchLobbyData(false); // Silent refresh - no loading screen
       })
       .on("broadcast", { event: "game_started" }, (payload) => {
         toast({
@@ -571,14 +571,14 @@ export default function Lobby() {
         if (payload.payload?.themeId) {
           setSelectedTheme(payload.payload.themeId);
         }
-        fetchLobbyData();
+        fetchLobbyData(false); // Silent refresh - no loading screen
       })
       .on("broadcast", { event: "secret_selected" }, (payload) => {
         toast({
           title: "Secret Element Selected",
           description: `${payload.payload?.senderName || "Storyteller"} has selected their secret element`,
         });
-        fetchLobbyData();
+        fetchLobbyData(false); // Silent refresh - no loading screen
       })
       .on("broadcast", { event: "recording_uploaded" }, (payload) => {
         toast({
@@ -586,7 +586,7 @@ export default function Lobby() {
           description: "Listen to the clue and guess the secret element",
         });
         setHasRecording(true);
-        fetchLobbyData();
+        fetchLobbyData(false); // Silent refresh - no loading screen
       })
       .on("broadcast", { event: "guess_submitted" }, (payload) => {
         if (payload.payload?.isCorrect) {
@@ -595,7 +595,7 @@ export default function Lobby() {
             description: `${payload.payload?.senderName || "A player"} guessed correctly!`,
           });
         }
-        fetchLobbyData();
+        fetchLobbyData(false); // Silent refresh - no loading screen
       })
       .on("broadcast", { event: "player_answered" }, (payload) => {
         const { playerId, playerName, guess, isCorrect } = payload.payload;
@@ -628,11 +628,11 @@ export default function Lobby() {
         setSelectedTheme("");
         setSelectedElementId("");
         setHasRecording(false);
-        fetchLobbyData();
+        fetchLobbyData(false); // Silent refresh - no loading screen
       })
       .on("broadcast", { event: "turn_order_changed" }, async (payload) => {
         await new Promise((resolve) => setTimeout(resolve, 200));
-        await fetchLobbyData();
+        await fetchLobbyData(false); // Silent refresh - no loading screen
         toast({
           title: "Turn Order Updated",
           description: "The host has reordered the players",
@@ -649,7 +649,7 @@ export default function Lobby() {
         },
         async (payload) => {
           if (payload.new && "turn_order" in payload.new) {
-            await fetchLobbyData();
+            await fetchLobbyData(false); // Silent refresh - no loading screen
             if (!isHost) {
               toast({
                 title: "Turn Order Updated",
@@ -674,7 +674,7 @@ export default function Lobby() {
             title: "Player Left",
             description: `${deletedPlayer?.name || "A player"} has left the game`,
           });
-          await fetchLobbyData();
+          await fetchLobbyData(false); // Silent refresh - no loading screen
         },
       )
       // Listen for game_players INSERT (player joined)
@@ -692,7 +692,7 @@ export default function Lobby() {
             title: "Player Joined! 🎮",
             description: `${newPlayer?.name || "A player"} joined the lobby`,
           });
-          await fetchLobbyData();
+          await fetchLobbyData(false); // Silent refresh - no loading screen
         },
       )
       // Listen for game_sessions changes
@@ -802,7 +802,7 @@ export default function Lobby() {
         },
         (payload) => {
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-            fetchLobbyData();
+            fetchLobbyData(false); // Silent refresh - no loading screen
           }
         },
       );
@@ -864,9 +864,12 @@ export default function Lobby() {
     }
   };
 
-  const fetchLobbyData = async () => {
+  const fetchLobbyData = async (showLoadingState: boolean = false) => {
     try {
-      setLoading(true);
+      // Only show loading if explicitly requested (initial load only)
+      if (showLoadingState) {
+        setLoading(true);
+      }
 
       const currentCustomerId = getCurrentCustomerId();
       const guestPlayerId = localStorage.getItem("guest_player_id");
@@ -892,6 +895,7 @@ export default function Lobby() {
             description: "This game session doesn't exist or you don't have access to it",
             variant: "destructive",
           });
+          // Always clear loading on error/navigation
           setLoading(false);
           navigate("/play/host", { replace: true });
           return;
@@ -1030,7 +1034,10 @@ export default function Lobby() {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      // Only clear loading if it was shown
+      if (showLoadingState) {
+        setLoading(false);
+      }
     }
   };
 
@@ -1132,7 +1139,7 @@ export default function Lobby() {
       });
 
       // Fetch updated data
-      await fetchLobbyData();
+      await fetchLobbyData(false); // Silent refresh - no loading screen
     } catch (error) {
       console.error("Error selecting mode:", error);
       toast({
@@ -1432,7 +1439,7 @@ export default function Lobby() {
       if (data.success && data.audio_id) {
         setHasRecording(true);
         broadcastEvent("recording_uploaded", { audioUrl: data.audio_url });
-        await fetchLobbyData();
+        await fetchLobbyData(false); // Silent refresh - no loading screen
         toast({
           title: "Recording saved",
           description: "Your audio has been uploaded successfully",
@@ -1551,7 +1558,7 @@ export default function Lobby() {
             setShowResults(false);
             setIsLockedOut(false); // Allow guessing in new round
             // Fetch updated data after state reset
-            fetchLobbyData();
+            fetchLobbyData(false); // Silent refresh - no loading screen
           }, 5000); // Show results for 5 seconds
         }
 
@@ -1996,8 +2003,8 @@ export default function Lobby() {
             <CardHeader>
               <CardTitle>Ready to Start?</CardTitle>
               <CardDescription>
-                {players.length < 4 
-                  ? "Minimum 4 players required to start the game" 
+                {players.length < 2
+                  ? "Minimum 2 players required to start the game" 
                   : "Start the game when all players have joined"}
               </CardDescription>
             </CardHeader>
@@ -2006,9 +2013,9 @@ export default function Lobby() {
                 onClick={handleStartGame} 
                 className="w-full" 
                 size="lg"
-                disabled={players.length < 4}
+                disabled={players.length < 2}
               >
-                Start Game {players.length < 4 && `(${players.length}/4 players)`}
+                Start Game {players.length < 2 && `(${players.length}/2 players)`}
               </Button>
             </CardContent>
           </Card>
@@ -2141,6 +2148,7 @@ export default function Lobby() {
                   onChange={(e) => setGuessInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !isSubmittingGuess && !isLockedOut) {
+                      e.preventDefault();
                       handleSubmitGuess();
                     }
                   }}

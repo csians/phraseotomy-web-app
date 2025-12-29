@@ -14,7 +14,7 @@ interface GuessingInterfaceProps {
   sessionId: string;
   roundNumber: number;
   playerId: string;
-  onGuessSubmit: (gameCompleted?: boolean, players?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any) => void;
+  onGuessSubmit: (gameCompleted?: boolean, players?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any, allPlayersAnswered?: boolean) => void;
   selectedIcons?: IconItem[];
   turnMode?: "audio" | "elements";
   sendWebSocketMessage?: (message: any) => void;
@@ -59,6 +59,9 @@ export function GuessingInterface({
     sessionStorage.setItem(key, 'true');
   };
 
+  // Track if player has submitted in current session to prevent unlocking
+  const hasSubmittedThisTurnRef = useRef(false);
+  
   // Check if player already submitted guess for this round on mount/round change
   // Only check once per round to avoid unnecessary API calls
   useEffect(() => {
@@ -69,44 +72,89 @@ export function GuessingInterface({
 
     const checkExistingGuess = async () => {
       console.log("Round changed to:", roundNumber, "- Checking existing guesses");
-      setGuess("");
-      setIsLockedOut(false);
-      setHasSubmitted(false);
+      
+      // Reset submission tracking for new round (will be set again if already submitted)
+      const previousSubmittedState = hasSubmittedThisTurnRef.current;
+      hasSubmittedThisTurnRef.current = false;
 
       try {
-        // Check if player already submitted a guess for this turn
+        // First check if this player is the storyteller - if so, skip checking guesses
         const { data: turnData } = await supabase
           .from("game_turns")
-          .select("id")
+          .select("id, storyteller_id, completed_at")
           .eq("session_id", sessionId)
           .eq("round_number", roundNumber)
           .maybeSingle();
+        
+        // If player is the storyteller, don't check for guesses (storytellers don't guess)
+        // Also skip if turn is not completed yet (storyteller might still be submitting)
+        if (turnData?.storyteller_id === playerId) {
+          console.log("Player is storyteller - skipping guess check and resetting state");
+          lastCheckedRoundRef.current = roundNumber;
+          // Reset state to prevent showing wrong answer dialog
+          setIsLockedOut(false);
+          setHasSubmitted(false);
+          setGuess("");
+          return;
+        }
+        
+        // If turn is not completed yet, don't check for guesses (storyteller is still submitting)
+        if (!turnData?.completed_at) {
+          console.log("Turn not completed yet - skipping guess check");
+          lastCheckedRoundRef.current = roundNumber;
+          // Reset state to prevent showing wrong answer dialog
+          setIsLockedOut(false);
+          setHasSubmitted(false);
+          return;
+        }
+        
+        // Check if player already submitted a guess for this turn
+        const turnIdForGuess = turnData?.id;
 
-        if (turnData?.id) {
+        if (turnIdForGuess) {
           // Skip if we already checked this turn
-          if (lastCheckedTurnIdRef.current === turnData.id) {
+          if (lastCheckedTurnIdRef.current === turnIdForGuess) {
             lastCheckedRoundRef.current = roundNumber;
+            // Preserve submission state if we already checked
+            if (previousSubmittedState) {
+              hasSubmittedThisTurnRef.current = true;
+            }
             return;
           }
 
           const { data: existingGuess } = await supabase
             .from("game_guesses")
             .select("id, points_earned")
-            .eq("turn_id", turnData.id)
+            .eq("turn_id", turnIdForGuess)
             .eq("player_id", playerId)
             .maybeSingle();
 
           if (existingGuess) {
             console.log("Player already submitted guess for this round");
+            hasSubmittedThisTurnRef.current = true;
             setHasSubmitted(true);
             // If points_earned is 0, they guessed wrong
             if (existingGuess.points_earned === 0) {
               setIsLockedOut(true);
             }
+          } else {
+            // No existing guess - reset state only if we haven't submitted in this turn
+            if (!previousSubmittedState) {
+              setGuess("");
+              setIsLockedOut(false);
+              setHasSubmitted(false);
+            }
           }
 
           // Mark this turn as checked
-          lastCheckedTurnIdRef.current = turnData.id;
+          lastCheckedTurnIdRef.current = turnIdForGuess;
+        } else {
+          // No turn data yet - reset state only if we haven't submitted
+          if (!previousSubmittedState) {
+            setGuess("");
+            setIsLockedOut(false);
+            setHasSubmitted(false);
+          }
         }
         
         // Mark this round as checked
@@ -248,8 +296,11 @@ export function GuessingInterface({
         const allAnswered = nonStorytellerPlayers.length > 0 && 
                            uniqueAnswers.size >= nonStorytellerPlayers.length;
         
-        if (allAnswered && turnData.whisp) {
-          // All players answered but turn not marked complete yet
+        // Only trigger if all players answered AND turn is completed
+        // Don't show dialog if turn is not yet marked as completed
+        // The backend will mark it complete when the last player submits
+        if (allAnswered && turnData.whisp && turnData.completed_at) {
+          // All players answered AND turn is completed
           const { data: myGuess } = await supabase
             .from("game_guesses")
             .select("points_earned")
@@ -353,6 +404,8 @@ export function GuessingInterface({
       const { correct, points_earned, game_completed, next_round, whisp, all_players_answered } = data;
       console.log("📊 Guess result from API:", { correct, points_earned, game_completed, whisp, all_players_answered });
       
+      // Mark as submitted and prevent unlocking
+      hasSubmittedThisTurnRef.current = true;
       setHasSubmitted(true);
 
       if (correct === true) {
@@ -384,7 +437,8 @@ export function GuessingInterface({
       }
       
       // Notify parent with game completion info, players data, correctness (explicit boolean), and whisp
-      onGuessSubmit(game_completed, next_round?.players, correct === true, whisp, next_round);
+      // Only pass nextRound if all players have answered (to prevent showing transition message early)
+      onGuessSubmit(game_completed, next_round?.players, correct === true, whisp, all_players_answered ? next_round : undefined, all_players_answered);
     } catch (error) {
       console.error("Error submitting guess:", error);
       toast({
@@ -532,21 +586,26 @@ export function GuessingInterface({
                 <div className="space-y-4">
                   <Input
                     value={guess}
-                    onChange={(e) => setGuess(e.target.value)}
+                    onChange={(e) => {
+                      // Prevent changes if already submitted or locked out
+                      if (!hasSubmitted && !isLockedOut) {
+                        setGuess(e.target.value);
+                      }
+                    }}
                     onKeyPress={handleKeyPress}
                     placeholder="Type your guess here..."
                     className="text-lg py-6"
-                    disabled={isSubmitting}
-                    autoFocus
+                    disabled={isSubmitting || hasSubmitted || isLockedOut}
+                    autoFocus={!hasSubmitted && !isLockedOut}
                   />
                   <Button
                     onClick={handleSubmitGuess}
-                    disabled={isSubmitting || !guess.trim()}
+                    disabled={isSubmitting || hasSubmitted || isLockedOut || !guess.trim()}
                     size="lg"
                     className="w-full"
                   >
                     <Send className="mr-2 h-5 w-5" />
-                    {isSubmitting ? "Submitting..." : "Submit Guess"}
+                    {isSubmitting ? "Submitting..." : hasSubmitted || isLockedOut ? "Already Submitted" : "Submit Guess"}
                   </Button>
                 </div>
               )}
