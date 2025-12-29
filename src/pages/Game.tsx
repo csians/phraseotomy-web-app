@@ -127,11 +127,12 @@ export default function Game() {
   const storyTimeUpTriggeredRef = useRef<string>("");
   const guessTimeUpTriggeredRef = useRef<string>("");
 
-  type RefreshOptions = { bypassStoryPause?: boolean };
+  type RefreshOptions = { bypassStoryPause?: boolean; showLoading?: boolean };
 
   // Debounced refresh to prevent infinite loops
   const debouncedRefresh = useCallback((options: RefreshOptions = {}) => {
     const bypassStoryPause = options.bypassStoryPause === true;
+    const showLoading = options.showLoading === true; // Only show loading if explicitly requested
 
     // Don't refresh if game is completed, announcing winner, selecting mode, or storyteller is active
     if (
@@ -552,11 +553,25 @@ export default function Game() {
     console.log("Game component mounted, sessionId:", sessionId);
     if (!sessionId) {
       console.log("No sessionId, redirecting to /play/host");
+      setLoading(false);
       navigate("/play/host");
       return;
     }
 
-    initializeGame();
+    // Set a timeout fallback to ensure loading never gets stuck (10 seconds max)
+    let loadingTimeoutId: NodeJS.Timeout | null = setTimeout(() => {
+      console.warn("⚠️ Loading timeout - clearing loading state to prevent stuck screen");
+      setLoading(false);
+    }, 10000);
+
+    initializeGame({ showLoading: true }).finally(() => {
+      // Clear timeout once initialization completes
+      if (loadingTimeoutId) {
+        clearTimeout(loadingTimeoutId);
+        loadingTimeoutId = null;
+      }
+    });
+    
     const cleanup = setupRealtimeSubscriptions();
 
     // Poll fallback: only when WS is disconnected. Used as a safety net for completion state.
@@ -623,6 +638,10 @@ export default function Game() {
     return () => {
       if (cleanup) cleanup();
       window.clearInterval(pollId);
+      // Clear loading timeout on unmount
+      if (loadingTimeoutId) {
+        clearTimeout(loadingTimeoutId);
+      }
     };
   }, [sessionId, isConnected]);
 
@@ -663,6 +682,7 @@ export default function Game() {
 
   const initializeGame = async (options: RefreshOptions = {}) => {
     const bypassStoryPause = options.bypassStoryPause === true;
+    const showLoading = options.showLoading === true; // Only show loading if explicitly requested
 
     // Don't reinitialize if game is already completed, announcing winner, selecting mode, or storyteller is active
     if (
@@ -674,12 +694,18 @@ export default function Game() {
       console.log(
         "Skipping initializeGame - game completed, announcing winner, selecting mode, or storyteller active",
       );
-      setLoading(false);
+      // Only clear loading if it was shown
+      if (showLoading) {
+        setLoading(false);
+      }
       return;
     }
 
     try {
-      setLoading(true);
+      // Only show loading if explicitly requested (initial load or user action)
+      if (showLoading) {
+        setLoading(true);
+      }
       const playerId = getCurrentPlayerId();
       console.log("Current player ID:", playerId);
       setCurrentPlayerId(playerId);
@@ -691,6 +717,10 @@ export default function Game() {
 
       if (error) {
         console.error("Error from get-game-state:", error);
+        // Always clear loading before navigation
+        if (showLoading) {
+          setLoading(false);
+        }
         // Check if session was deleted (game completed and cleaned up)
         if (error.message?.includes("Session not found") || session?.status === "expired") {
           console.log("Session was cleaned up, redirecting...");
@@ -707,6 +737,10 @@ export default function Game() {
       // If session not found in response, it was deleted
       if (!data?.session) {
         console.log("Session not found in response, likely cleaned up");
+        // Always clear loading before navigation
+        if (showLoading) {
+          setLoading(false);
+        }
         toast({
           title: "Game Ended",
           description: "This game session has ended.",
@@ -727,7 +761,9 @@ export default function Game() {
 
         // Fetch lifetime points for completed game
         fetchLifetimePoints(data.players || []);
-        setLoading(false);
+        if (showLoading) {
+          setLoading(false);
+        }
         return;
       }
 
@@ -836,7 +872,10 @@ export default function Game() {
         });
       }
     } finally {
-      setLoading(false);
+      // Only hide loading if it was shown
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -1130,7 +1169,7 @@ export default function Game() {
       title: "Story Submitted!",
       description: "Waiting for other players to guess...",
     });
-    initializeGame();
+    initializeGame({ showLoading: false }); // Silent refresh after story submission
   };
 
   const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any) => {
@@ -1209,12 +1248,12 @@ export default function Game() {
         setIsRoundTransitioning(false);
         setRoundResultMessage(null);
         // Small delay before refresh
-        setTimeout(() => initializeGame(), 100);
+        setTimeout(() => initializeGame({ showLoading: false }), 100);
       }, 3000);
       return;
     }
     
-    initializeGame();
+    initializeGame({ showLoading: false }); // Don't show loading for user action refreshes
   };
 
   // Handle storyteller timer expiry - skip the round
@@ -1274,7 +1313,7 @@ export default function Game() {
           newStorytellerName: data.next_round.newStorytellerName,
         });
         // Only refresh if game continues
-        initializeGame();
+        initializeGame({ showLoading: false }); // Silent refresh after skip
       }
     } catch (error) {
       console.error("Error skipping turn:", error);
@@ -1343,7 +1382,7 @@ export default function Game() {
           newStorytellerName: data.next_round.newStorytellerName,
         });
         // Only refresh if game continues
-        initializeGame();
+        initializeGame({ showLoading: false }); // Silent refresh after auto-submit
       }
     } catch (error) {
       console.error("Error auto-submitting guess:", error);

@@ -59,6 +59,7 @@ export function ThemeElements({ themeId, onElementSelect, selectedElementId, isG
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       handleCustomElementSelect();
     }
   };

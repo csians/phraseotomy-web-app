@@ -99,6 +99,7 @@ export function NamePromptDialog({
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !isSaving) {
+      e.preventDefault();
       handleSave();
     }
   };

@@ -247,6 +247,7 @@ export function GuessingInterface({
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !isSubmitting && !isLockedOut && !hasSubmitted) {
+      e.preventDefault();
       handleSubmitGuess();
     }
   };
