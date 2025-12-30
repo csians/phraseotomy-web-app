@@ -85,7 +85,8 @@ function SortableElement({
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{ ...style, touchAction: isDraggable ? 'none' : 'auto' }}
+      {...(isDraggable ? { ...attributes, ...listeners } : {})}
       className={cn(
         "relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all min-w-[100px]",
         isDragging 
@@ -97,11 +98,9 @@ function SortableElement({
     >
       {isDraggable && (
         <div
-          {...attributes}
-          {...listeners}
-          className="absolute top-1 right-1 p-1 rounded-md bg-muted/50 hover:bg-muted"
+          className="absolute top-1 right-1 p-2 sm:p-1 rounded-md bg-muted/50 hover:bg-muted pointer-events-none"
         >
-          <GripVertical className="h-3 w-3 text-muted-foreground" />
+          <GripVertical className="h-4 w-4 sm:h-3 sm:w-3 text-muted-foreground" />
         </div>
       )}
       
@@ -171,7 +170,9 @@ export function UnifiedStorytellingInterface({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5,
+        // Use delay for mobile devices, distance for desktop
+        delay: 150,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -437,7 +438,7 @@ export function UnifiedStorytellingInterface({
   // Non-storyteller waiting view (optimize for mobile height/width)
   if (!isStoryteller) {
     return (
-      <div className="w-full flex justify-center items-start px-0 py-2 sm:px-2 sm:py-3 sm:min-h-screen sm:items-center">
+      <div className="w-full flex justify-center items-start px-0 py-2 sm:px-2 sm:py-3 sm:min-h-screen-safe sm:items-center">
         <Card className="w-full rounded-none border-0 shadow-none sm:h-auto sm:rounded-xl sm:border sm:shadow-sm sm:max-w-2xl sm:max-h-[calc(100vh-1.5rem)] sm:overflow-y-auto">
           <CardHeader className="text-center pb-3 pt-4 sm:pt-6 sm:pb-6">
             <CardTitle className="text-lg sm:text-xl md:text-2xl">
@@ -445,7 +446,7 @@ export function UnifiedStorytellingInterface({
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm mt-1">Get ready to guess the secret wisp word!</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col items-center gap-2 pb-4 sm:gap-4 sm:pb-6">
+          <CardContent className="flex flex-col items-center gap-2 pb-safe sm:gap-4 sm:pb-6">
             <Loader2 className="h-8 w-8 sm:h-12 sm:w-12 animate-spin text-primary" />
             <p className="text-xs sm:text-sm text-muted-foreground">Waiting for the storyteller to finish...</p>
           </CardContent>
@@ -455,7 +456,7 @@ export function UnifiedStorytellingInterface({
   }
 
   return (
-    <div className="w-full sm:min-h-screen flex justify-center items-start sm:items-center px-0 py-0 sm:px-2 sm:py-3">
+    <div className="w-full sm:min-h-screen-safe flex justify-center items-start sm:items-center px-0 py-0 sm:px-2 sm:py-3">
       <Card className="w-full h-full rounded-none border-0 shadow-none sm:h-auto sm:rounded-xl sm:border sm:shadow-sm sm:max-w-5xl sm:max-h-[calc(100vh-2rem)] sm:overflow-y-auto">
         <CardHeader className="text-center px-3 sm:px-6">
           <CardTitle className="text-xl sm:text-2xl">Tell Your Story</CardTitle>
@@ -494,7 +495,7 @@ export function UnifiedStorytellingInterface({
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-5 sm:space-y-6 px-3 pb-4 sm:px-6 sm:pb-6">
+        <CardContent className="space-y-5 sm:space-y-6 px-3 pb-safe sm:px-6 sm:pb-6">
           {/* Show wisp to storyteller */}
           <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center">
             <p className="text-sm text-muted-foreground mb-1">Your Secret Wisp</p>
