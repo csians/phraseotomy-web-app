@@ -52,8 +52,8 @@ const Header = () => {
           />
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
+        {/* Desktop Navigation - switches at 900px */}
+        <nav className="hidden header:flex items-center gap-8">
           <a
             href="https://phraseotomy.com/collections/all"
             target="_blank"
@@ -97,10 +97,10 @@ const Header = () => {
         </nav>
 
         <div className="flex items-center gap-3">
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu Button - visible below 900px */}
           <button
             type="button"
-            className="md:hidden w-9 h-9 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
+            className="header:hidden w-9 h-9 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
             onClick={toggleMobileNav}
             aria-label={isMobileNavOpen ? "Close menu" : "Open menu"}
           >
@@ -166,9 +166,9 @@ const Header = () => {
         </div>
       </div>
 
-      {/* Mobile Full-Width Dropdown Navigation (pushes content) */}
+      {/* Mobile Full-Width Dropdown Navigation (pushes content) - visible below 900px */}
       <nav
-        className={`md:hidden w-full bg-black border-t border-white/10 overflow-hidden transition-[max-height] duration-300 ease-in-out ${
+        className={`header:hidden w-full bg-black border-t border-white/10 overflow-hidden transition-[max-height] duration-300 ease-in-out ${
           isMobileNavOpen ? "max-h-96" : "max-h-0"
         }`}
       >

@@ -13,6 +13,9 @@ export default {
       },
     },
     extend: {
+      screens: {
+        'header': '900px', // Custom breakpoint for header at 900px
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
