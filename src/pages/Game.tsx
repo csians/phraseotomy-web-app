@@ -89,6 +89,9 @@ export default function Game() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false); // Start with false to prevent stuck loading screen
+  // After the first successful get-game-state, we keep the main UI visible and only
+  // update it in place, even if later refreshes briefly toggle `loading`.
+  const [hasInitialized, setHasInitialized] = useState(false);
   const [session, setSession] = useState<GameSession | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
@@ -323,6 +326,13 @@ export default function Game() {
     playerName: getCurrentPlayerInfo().playerName,
     enabled: !!sessionId && !!currentPlayerId,
     onMessage: (message) => {
+      // WebSocket connection is already scoped to this sessionId, so all messages are for this session
+      // Only filter if message explicitly includes a different sessionId (for broadcast messages)
+      const msgSessionId = (message as any)?.sessionId || (message as any)?.session_id;
+      if (msgSessionId && sessionId && msgSessionId !== sessionId) {
+        console.log("Ignoring message from different session:", msgSessionId, "current:", sessionId);
+        return;
+      }
       switch (message.type) {
         case "recording_started":
           setIsReceivingAudio(true);
@@ -395,7 +405,8 @@ export default function Game() {
               });
             }
           }
-          debouncedRefresh({ showLoading: false });
+          // Always refresh immediately when someone submits a guess - bypass all checks
+          forceRefresh();
           break;
 
         case "correct_answer":
@@ -407,8 +418,10 @@ export default function Game() {
           break;
 
         case "next_turn":
-          // Skip showing round transition dialog - just refresh silently
-          debouncedRefresh({ showLoading: false });
+          // Skip showing round transition dialog - refresh immediately when round completes
+          // Clear round transition trigger to allow refresh
+          roundTransitionTriggeredRef.current = null;
+          forceRefresh();
           break;
 
         case "round_result":
@@ -504,7 +517,8 @@ export default function Game() {
           break;
 
         case "refresh_game_state":
-          debouncedRefresh({ showLoading: false });
+          // Force immediate refresh when explicitly requested - bypass all checks
+          forceRefresh();
           break;
 
         default:
@@ -738,6 +752,10 @@ export default function Game() {
       }
       
       setSession(data.session);
+      // Mark that we've successfully initialized at least once.
+      if (!hasInitialized) {
+        setHasInitialized(true);
+      }
       setPlayers(data.players || []);
       setThemes(data.themes || []);
       
@@ -1027,17 +1045,25 @@ export default function Game() {
           event: "INSERT",
           schema: "public",
           table: "game_guesses",
+          // Ensure we only react to guesses from this session/lobby
+          filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
+          const newRow = payload.new as any;
+          // Extra safety: ignore guesses from other sessions even if subscription filter misbehaves
+          if (newRow?.session_id && newRow.session_id !== sessionId) {
+            return;
+          }
+
           // Get player_id from the inserted guess
-          const guessPlayerId = (payload.new as any)?.player_id;
+          const guessPlayerId = newRow?.player_id;
           
           // Find player name from current players state
           const guessingPlayer = players.find((p) => p.player_id === guessPlayerId);
           const playerName = guessingPlayer?.name || "A player";
           
           // Don't show toast if it's the current player (they already see their own submission)
-          if (guessPlayerId !== currentPlayerId) {
+          if (guessPlayerId && guessPlayerId !== currentPlayerId) {
             toast({
               title: "Player Guessed!",
               description: `${playerName} submitted their guess`,
@@ -1370,7 +1396,10 @@ export default function Game() {
     }
   }, [sessionId, currentTurn, session, currentPlayerId, gameCompleted, players, sendWebSocketMessage, toast]);
 
-  if (loading) {
+  // Only show the full-screen loading view before we've ever successfully
+  // fetched a game state. After initialization, background get-game-state
+  // calls should not hide the UI behind "Loading game...".
+  if (loading && !hasInitialized) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Loading game...</p>

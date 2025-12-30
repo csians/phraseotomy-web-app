@@ -401,11 +401,19 @@ export function UnifiedStorytellingInterface({
 
       if (updateError) throw updateError;
 
-      // Notify other players
+      // Notify other players in this lobby that the story has been submitted
       sendWebSocketMessage({
         type: "story_submitted",
         turnId,
         hasRecording: true,
+      });
+
+      // Immediately ask all clients in this session to refresh game state so
+      // guessers switch from "creating story" to the guessing UI without
+      // needing a manual page refresh.
+      sendWebSocketMessage({
+        type: "refresh_game_state",
+        sessionId,
       });
 
       setPhase("submitted");

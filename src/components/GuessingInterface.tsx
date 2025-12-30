@@ -404,23 +404,62 @@ export function GuessingInterface({
       const { correct, points_earned, game_completed, next_round, whisp, all_players_answered } = data;
       console.log("📊 Guess result from API:", { correct, points_earned, game_completed, whisp, all_players_answered });
       
-      // Mark as submitted and prevent unlocking
-      hasSubmittedThisTurnRef.current = true;
-      setHasSubmitted(true);
-
       if (correct === true) {
         toast({
           title: "🎉 Correct!",
           description: `You guessed "${trimmedGuess}" and earned ${points_earned} points!`,
         });
-        // Correct guess: lock via hasSubmitted (no "wrong" lockout UI)
+        
+        // For correct answer: wait for get-game-state to complete, then unlock input
+        // Lock the input first to prevent multiple submissions in same round
+        hasSubmittedThisTurnRef.current = true;
+        setHasSubmitted(true);
+        
+        try {
+          const { data: gameStateData, error: gameStateError } = await supabase.functions.invoke("get-game-state", {
+            body: { sessionId, playerId },
+          });
+          
+          if (!gameStateError && gameStateData) {
+            console.log("✅ get-game-state completed after correct answer");
+            const newRound = gameStateData.session?.current_round;
+            // If round has changed, unlock the input for the new round
+            if (newRound && newRound !== roundNumber) {
+              console.log(`Round changed from ${roundNumber} to ${newRound} - unlocking input`);
+              hasSubmittedThisTurnRef.current = false;
+              setHasSubmitted(false);
+              setIsLockedOut(false);
+              setGuess(""); // Clear the guess for next round
+            }
+            // If round hasn't changed, keep input locked (player already submitted for this round)
+          } else {
+            // If get-game-state fails, keep input locked
+            console.warn("get-game-state failed after correct answer, keeping input locked");
+          }
+        } catch (gameStateErr) {
+          console.error("Error calling get-game-state after correct answer:", gameStateErr);
+          // If get-game-state fails, keep input locked
+        }
       } else {
+        // Wrong answer: lock immediately
+        hasSubmittedThisTurnRef.current = true;
+        setHasSubmitted(true);
         setIsLockedOut(true);
         toast({
           title: "❌ Wrong Answer!",
           description: `"${trimmedGuess}" is not correct. Wait for the next round!`,
           variant: "destructive",
           duration: 5000,
+        });
+      }
+      
+      // Notify other players in this session that a guess was submitted so they
+      // immediately see who answered and trigger a fresh get-game-state.
+      if (sendWebSocketMessage) {
+        sendWebSocketMessage({
+          type: "guess_submitted",
+          isCorrect: correct === true,
+          pointsEarned: points_earned || 0,
         });
       }
       
@@ -438,7 +477,24 @@ export function GuessingInterface({
       
       // Notify parent with game completion info, players data, correctness (explicit boolean), and whisp
       // Only pass nextRound if all players have answered (to prevent showing transition message early)
-      onGuessSubmit(game_completed, next_round?.players, correct === true, whisp, all_players_answered ? next_round : undefined, all_players_answered);
+      onGuessSubmit(
+        game_completed,
+        next_round?.players,
+        correct === true,
+        whisp,
+        all_players_answered ? next_round : undefined,
+        all_players_answered,
+      );
+
+      // After every guess submission, ask all clients in this lobby to refresh game state.
+      // This ensures elements, audio, and scores update immediately for everyone
+      // without requiring a manual page refresh.
+      if (sendWebSocketMessage) {
+        sendWebSocketMessage({
+          type: "refresh_game_state",
+          sessionId,
+        });
+      }
     } catch (error) {
       console.error("Error submitting guess:", error);
       toast({
