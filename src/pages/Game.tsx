@@ -1370,7 +1370,10 @@ export default function Game() {
     }
   }, [sessionId, currentTurn, session, currentPlayerId, gameCompleted, players, sendWebSocketMessage, toast]);
 
-  if (loading) {
+  // Only show the global loading screen before we have a session.
+  // Once the game has loaded, avoid replacing the UI with "Loading game..."
+  // during background refreshes of get-game-state.
+  if (loading && !session) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Loading game...</p>
@@ -1378,7 +1381,7 @@ export default function Game() {
     );
   }
 
-  if (!session) {
+  if (!loading && !session) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Game not found</p>
@@ -1633,7 +1636,7 @@ export default function Game() {
 
       {/* Announcing Winner Loading Dialog */}
       <Dialog open={isAnnouncingWinner} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} hideCloseButton>
           <div className="flex flex-col items-center justify-center py-8 space-y-6">
             <div className="relative">
               <div className="h-20 w-20 rounded-full bg-primary/20 flex items-center justify-center animate-pulse">
@@ -1652,7 +1655,7 @@ export default function Game() {
 
       {/* Game Completed Winner Dialog */}
       <Dialog open={gameCompleted} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} hideCloseButton>
           <DialogHeader className="text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
               <Trophy className="h-8 w-8 text-primary" />
