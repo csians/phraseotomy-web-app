@@ -1739,9 +1739,9 @@ export default function Lobby() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen-safe bg-background flex flex-col">
       <Header />
-      <div className="flex-1 p-4 md:p-8">
+      <div className="flex-1 p-4 md:p-8 pb-safe">
       {/* Countdown Overlay */}
       {showCountdown && (
         <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm flex items-center justify-center">

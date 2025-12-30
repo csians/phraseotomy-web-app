@@ -56,3 +56,22 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* Safe area insets for mobile devices */
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6rem);
+  }
+  
+  @media (min-width: 768px) {
+    .pb-safe {
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+    }
+  }
+  
+  /* Better viewport height for mobile browsers */
+  .min-h-screen-safe {
+    min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
+  }
+}
