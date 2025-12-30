@@ -378,6 +378,15 @@ export function GuessingInterface({
       return;
     }
 
+    if (trimmedGuess.length < 3) {
+      toast({
+        title: "Guess Too Short",
+        description: "Your guess must be at least 3 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (isLockedOut || hasSubmitted) {
       toast({
         title: "Already Answered",
@@ -452,7 +461,7 @@ export function GuessingInterface({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !isSubmitting && !isLockedOut && !hasSubmitted) {
+    if (e.key === "Enter" && !isSubmitting && !isLockedOut && !hasSubmitted && guess.trim().length >= 3) {
       e.preventDefault();
       handleSubmitGuess();
     }
@@ -593,14 +602,15 @@ export function GuessingInterface({
                       }
                     }}
                     onKeyPress={handleKeyPress}
-                    placeholder="Type your guess here..."
+                    placeholder="Type your guess here... (min 3 characters)"
                     className="text-lg py-6"
                     disabled={isSubmitting || hasSubmitted || isLockedOut}
                     autoFocus={!hasSubmitted && !isLockedOut}
+                    minLength={3}
                   />
                   <Button
                     onClick={handleSubmitGuess}
-                    disabled={isSubmitting || hasSubmitted || isLockedOut || !guess.trim()}
+                    disabled={isSubmitting || hasSubmitted || isLockedOut || !guess.trim() || guess.trim().length < 3}
                     size="lg"
                     className="w-full"
                   >
@@ -614,7 +624,7 @@ export function GuessingInterface({
             {/* Tips */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm text-muted-foreground text-center">
-                💡 Look at the arranged elements{turnMode === "audio" ? " and listen to the story" : ""}. The wisp is a single word related to the theme "{theme.name}".
+                💡 Look at the arranged elements{turnMode === "audio" ? " and listen to the story" : ""}. The wisp is a single word related to the theme "{theme.name}". Your guess must be at least 3 characters long.
               </p>
             </div>
           </CardContent>

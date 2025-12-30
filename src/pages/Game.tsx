@@ -111,6 +111,7 @@ export default function Game() {
   const [themeElementsForSelection, setThemeElementsForSelection] = useState<ThemeElement[]>([]);
   const [coreElementsForSelection, setCoreElementsForSelection] = useState<IconItem[]>([]);
   const [currentWhisp, setCurrentWhisp] = useState<string>("");
+  const [answeredPlayerIds, setAnsweredPlayerIds] = useState<string[]>([]); // Track which players have answered for current turn
   
   // Refs to track completion state for use in callbacks (avoid stale closures)
   const gameCompletedRef = useRef(false);
@@ -695,9 +696,20 @@ export default function Game() {
       // Reset round transition trigger when round changes
       const previousRound = session?.current_round;
       const newRound = data.session?.current_round;
+      const previousTurnId = currentTurn?.id;
+      const newTurnId = data.currentTurn?.id;
+      
       if (previousRound !== undefined && newRound !== undefined && previousRound !== newRound) {
         console.log(`🔄 Round changed from ${previousRound} to ${newRound} - resetting transition trigger`);
         roundTransitionTriggeredRef.current = null;
+        // Clear answered players when round changes
+        setAnsweredPlayerIds([]);
+      }
+      
+      // Clear answered players when turn changes (new turn = new round of guessing)
+      if (previousTurnId && newTurnId && previousTurnId !== newTurnId) {
+        console.log(`🔄 Turn changed from ${previousTurnId} to ${newTurnId} - clearing answered players`);
+        setAnsweredPlayerIds([]);
       }
       
       setSession(data.session);
@@ -720,6 +732,14 @@ export default function Game() {
         setCurrentTurn({ ...data.currentTurn, whisp: decodedWhisp });
       } else {
         setCurrentTurn(data.currentTurn);
+      }
+      
+      // Fetch answered players for current turn (only if turn exists and is in guessing phase)
+      if (data.currentTurn?.id && data.currentTurn?.completed_at) {
+        fetchAnsweredPlayers(data.currentTurn.id);
+      } else {
+        // Clear answered players if turn doesn't exist or isn't completed yet
+        setAnsweredPlayerIds([]);
       }
       
       setSelectedIcons(data.selectedIcons || []);
@@ -802,6 +822,27 @@ export default function Game() {
       if (showLoading) {
         setLoading(false);
       }
+    }
+  };
+
+  // Fetch which players have answered for the current turn
+  const fetchAnsweredPlayers = async (turnId: string) => {
+    try {
+      const { data: guesses, error } = await supabase
+        .from("game_guesses")
+        .select("player_id")
+        .eq("turn_id", turnId);
+      
+      if (error) {
+        console.error("Error fetching answered players:", error);
+        return;
+      }
+      
+      // Extract unique player IDs who have answered
+      const answeredIds = [...new Set(guesses?.map((g: any) => g.player_id) || [])];
+      setAnsweredPlayerIds(answeredIds);
+    } catch (error) {
+      console.error("Error in fetchAnsweredPlayers:", error);
     }
   };
 
@@ -962,13 +1003,54 @@ export default function Game() {
           schema: "public",
           table: "game_guesses",
         },
-        (payload) => {
-          // Get player_id from the inserted guess
+        async (payload) => {
+          // Get turn_id and player_id from the inserted guess
+          const guessTurnId = (payload.new as any)?.turn_id;
           const guessPlayerId = (payload.new as any)?.player_id;
           
-          // Find player name from current players state
+          // Verify this guess belongs to the current session
+          // Check if turn_id matches currentTurn.id (fast check)
+          const isCurrentTurn = currentTurn?.id === guessTurnId;
+          
+          // If not current turn, verify the turn belongs to this session
+          if (!isCurrentTurn && guessTurnId) {
+            try {
+              const { data: turnData } = await supabase
+                .from("game_turns")
+                .select("session_id")
+                .eq("id", guessTurnId)
+                .single();
+              
+              // If turn doesn't belong to current session, ignore this guess
+              if (!turnData || turnData.session_id !== sessionId) {
+                console.log("Ignoring guess from different session:", guessTurnId);
+                return;
+              }
+            } catch (err) {
+              console.error("Error verifying turn session:", err);
+              return; // Don't process if we can't verify
+            }
+          }
+          
+          // Only process guesses for the current session
+          // Find player name from current players state (only if player is in this session)
           const guessingPlayer = players.find((p) => p.player_id === guessPlayerId);
-          const playerName = guessingPlayer?.name || "A player";
+          
+          // If player is not in current session, ignore this guess
+          if (!guessingPlayer) {
+            console.log("Ignoring guess from player not in current session:", guessPlayerId);
+            return;
+          }
+          
+          const playerName = guessingPlayer.name;
+          
+          // Update answered players list
+          setAnsweredPlayerIds((prev) => {
+            if (!prev.includes(guessPlayerId)) {
+              return [...prev, guessPlayerId];
+            }
+            return prev;
+          });
           
           // Don't show toast if it's the current player (they already see their own submission)
           if (guessPlayerId !== currentPlayerId) {
@@ -1199,6 +1281,14 @@ export default function Game() {
   const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any, allPlayersAnswered?: boolean) => {
     console.log("📝 handleGuessSubmit called:", { gameCompletedFromGuess, wasCorrect, whisp, playersCount: playersFromGuess?.length });
     
+    // Immediately add current player to answered players for instant UI feedback
+    setAnsweredPlayerIds((prev) => {
+      if (!prev.includes(currentPlayerId)) {
+        return [...prev, currentPlayerId];
+      }
+      return prev;
+    });
+    
     toast({
       title: "Guess Submitted!",
       description: "Waiting for other players...",
@@ -1412,6 +1502,7 @@ export default function Game() {
             currentRound={session.current_round}
             totalRounds={session.total_rounds}
             currentStorytellerId={session.current_storyteller_id}
+            answeredPlayerIds={answeredPlayerIds}
             timerElement={
               !gameCompleted && currentTurn && gamePhase === "storytelling" && session.story_time_seconds ? (
                 <GameTimer
