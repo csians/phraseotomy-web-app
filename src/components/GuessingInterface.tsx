@@ -47,6 +47,7 @@ export function GuessingInterface({
   const [duration, setDuration] = useState(0);
   const lastCheckedRoundRef = useRef<number | null>(null);
   const lastCheckedTurnIdRef = useRef<string | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   
   // Check if we've already auto-played for this session (persists across component remounts)
   const getHasAutoPlayed = () => {
@@ -173,31 +174,115 @@ export function GuessingInterface({
     if (!audio || !audioUrl) return;
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
     };
 
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
+    const handleLoadedData = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+
+    // Use requestAnimationFrame for smooth progress bar updates
+    // This provides 60fps updates instead of relying on timeupdate (which fires ~4 times per second)
+    const updateProgress = () => {
+      const currentAudio = audioRef.current;
+      if (!currentAudio) {
+        animationFrameRef.current = null;
+        return;
+      }
+
+      const time = currentAudio.currentTime;
+      const dur = currentAudio.duration;
+      
+      // Always update current time if valid
+      if (time !== undefined && isFinite(time) && time >= 0) {
+        setCurrentTime(time);
+      }
+      
+      // Update duration if valid and different
+      if (dur !== undefined && isFinite(dur) && dur > 0) {
+        if (!duration || Math.abs(duration - dur) > 0.1) {
+          setDuration(dur);
+        }
+      }
+      
+      // Continue animation loop if playing (check multiple conditions)
+      if (!currentAudio.paused && !currentAudio.ended && currentAudio.readyState > 0) {
+        animationFrameRef.current = requestAnimationFrame(updateProgress);
+      } else {
+        // Stop loop if paused or ended
+        animationFrameRef.current = null;
+        if (currentAudio.ended) {
+          setIsPlaying(false);
+          setCurrentTime(dur || 0);
+        } else if (currentAudio.paused) {
+          setIsPlaying(false);
+        }
+      }
     };
 
     const handlePlay = () => {
       setIsPlaying(true);
+      // Start animation frame loop immediately for smooth updates
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      // Start the loop right away
+      animationFrameRef.current = requestAnimationFrame(updateProgress);
     };
 
     const handlePause = () => {
       setIsPlaying(false);
+      // Stop animation frame loop
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
     };
 
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
+      // Stop animation frame loop
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
     };
 
+    const handleCanPlay = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+
+    // Fallback timeupdate handler (only used if animation frame isn't running)
+    const handleTimeUpdate = () => {
+      // Only update if animation frame isn't running (fallback)
+      if (!animationFrameRef.current && audio.currentTime !== undefined && isFinite(audio.currentTime)) {
+        setCurrentTime(audio.currentTime);
+      }
+    };
+
+    // Attach all event listeners
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadeddata', handleLoadedData);
+    audio.addEventListener('canplay', handleCanPlay);
+    // Use 'play' and 'playing' events to start animation loop
     audio.addEventListener('play', handlePlay);
+    audio.addEventListener('playing', handlePlay);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
+    // Also listen for timeupdate as fallback (but animation frame is primary)
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+
+    // Ensure duration is set if already loaded
+    if (audio.readyState >= 2 && audio.duration && isFinite(audio.duration)) {
+      setDuration(audio.duration);
+    }
 
     // Autoplay only once when audioUrl first loads on initial page visit
     // Use sessionStorage to persist across component remounts
@@ -214,12 +299,20 @@ export function GuessingInterface({
 
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('loadeddata', handleLoadedData);
+      audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('playing', handlePlay);
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('ended', handleEnded);
+      // Clean up animation frame
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
     };
-  }, [audioUrl]);
+  }, [audioUrl, sessionId]);
 
   // Poll to check if all players have answered (for players who submitted early)
   // This ensures all players see the round transition, not just the last one to submit
@@ -529,12 +622,12 @@ export function GuessingInterface({
                     >
                       {/* Progress Fill */}
                       <div 
-                        className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-100"
+                        className="absolute top-0 left-0 h-full bg-primary rounded-full"
                         style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
                       />
                       {/* Thumb/Dot */}
                       <div 
-                        className="absolute top-1/2 -translate-y-1/2 h-5 w-5 bg-primary rounded-full border-2 border-background shadow-lg transition-all duration-100"
+                        className="absolute top-1/2 -translate-y-1/2 h-5 w-5 bg-primary rounded-full border-2 border-background shadow-lg"
                         style={{ left: duration > 0 ? `calc(${(currentTime / duration) * 100}% - 10px)` : '0px' }}
                       />
                     </div>
@@ -544,7 +637,12 @@ export function GuessingInterface({
                     </div>
                   </div>
                 </div>
-                <audio ref={audioRef} src={audioUrl} className="hidden" />
+                <audio 
+                  ref={audioRef} 
+                  src={audioUrl} 
+                  className="hidden" 
+                  preload="metadata"
+                />
               </div>
             )}
 
