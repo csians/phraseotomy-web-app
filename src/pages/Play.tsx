@@ -517,7 +517,7 @@ const Play = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-game-black flex items-center justify-center px-4">
+      <div className="min-h-screen-safe bg-game-black flex items-center justify-center px-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-game-yellow border-t-transparent mx-auto"></div>
           <p className="mt-4 text-game-yellow">Loading...</p>
@@ -564,9 +564,9 @@ const Play = () => {
   };
 
   return (
-    <div className="min-h-screen bg-game-black flex flex-col">
+    <div className="min-h-screen-safe bg-game-black flex flex-col">
       <Header />
-      <div className="flex-1 flex flex-col items-center justify-between px-4 py-8">
+      <div className="flex-1 flex flex-col items-center justify-between px-4 py-8 pb-safe">
         {/* Name Prompt Dialog */}
         {customer && shopDomain && (
           <NamePromptDialog
