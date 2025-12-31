@@ -563,7 +563,7 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
-        <DebugInfo tenant={tenant} shopDomain={shopDomain} customer={null} backendConnected={true} />
+        {/* <DebugInfo tenant={tenant} shopDomain={shopDomain} customer={null} backendConnected={true} /> */}
 
         {/* Logo and Title */}
         <div className="text-center space-y-4">
