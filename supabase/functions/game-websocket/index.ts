@@ -305,6 +305,7 @@ serve(async (req) => {
             players: message.players || [], // Include full players array
             wasCorrect: message.wasCorrect === true, // Pass through round result
             secretElement: message.secretElement, // Pass through the answer
+            submittingPlayerId: message.submittingPlayerId, // Pass through who submitted (only they see answer)
             timestamp: new Date().toISOString(),
           });
           break;
