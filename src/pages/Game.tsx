@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Loader2, Trophy, ArrowLeft } from "lucide-react";
 import Header from "@/components/Header";
 import type { IconItem } from "@/components/IconSelectionPanel";
+import { set } from "date-fns";
 
 
 interface Player {
@@ -105,14 +106,14 @@ export default function Game() {
   const [gameWinner, setGameWinner] = useState<Player | null>(null);
   const [isTieGame, setIsTieGame] = useState(false);
   const [isRoundTransitioning, setIsRoundTransitioning] = useState(false);
-  const [roundResultMessage, setRoundResultMessage] = useState<{correct: boolean; message: string} | null>(null);
+  const [roundResultMessage, setRoundResultMessage] = useState<{ correct: boolean; message: string } | null>(null);
   const [isModeTransitioning, setIsModeTransitioning] = useState(false);
   const [selectedTurnMode, setSelectedTurnMode] = useState<"audio" | "elements" | null>(null);
   const [themeElementsForSelection, setThemeElementsForSelection] = useState<ThemeElement[]>([]);
   const [coreElementsForSelection, setCoreElementsForSelection] = useState<IconItem[]>([]);
   const [currentWhisp, setCurrentWhisp] = useState<string>("");
   const [answeredPlayerIds, setAnsweredPlayerIds] = useState<string[]>([]); // Track which players have answered for current turn
-  
+
   // Refs to track completion state for use in callbacks (avoid stale closures)
   const gameCompletedRef = useRef(false);
   const isAnnouncingWinnerRef = useRef(false);
@@ -228,12 +229,12 @@ export default function Game() {
         .from('customers')
         .select('customer_id, total_points')
         .in('customer_id', playerIds);
-      
+
       if (error) {
         console.error("Error fetching lifetime points:", error);
         return;
       }
-      
+
       const pointsMap: Record<string, number> = {};
       data?.forEach(c => {
         pointsMap[c.customer_id] = c.total_points || 0;
@@ -251,13 +252,13 @@ export default function Game() {
       setIsTieGame(false);
       return;
     }
-    
+
     const sortedPlayers = [...playersData].sort((a, b) => (b.score || 0) - (a.score || 0));
     const highestScore = sortedPlayers[0]?.score || 0;
-    
+
     // Count how many players have the highest score
     const playersWithHighestScore = sortedPlayers.filter(p => (p.score || 0) === highestScore);
-    
+
     if (playersWithHighestScore.length > 1) {
       // It's a tie
       setIsTieGame(true);
@@ -267,12 +268,12 @@ export default function Game() {
       setGameWinner(sortedPlayers[0] || null);
     }
   };
-  
+
   // Keep refs in sync with state (for use in callbacks to avoid stale closures)
   useEffect(() => {
     gameCompletedRef.current = gameCompleted;
   }, [gameCompleted]);
-  
+
   useEffect(() => {
     isAnnouncingWinnerRef.current = isAnnouncingWinner;
   }, [isAnnouncingWinner]);
@@ -422,28 +423,28 @@ export default function Game() {
           // Don't show dialog here - let the realtime subscription or polling handle it
           break;
 
-      case "game_completed":
+        case "game_completed":
           console.log("🎉 Received game_completed event:", message);
-          
+
           // Don't process if already showing result (use ref to prevent race conditions)
           if (gameCompletionResultShownRef.current) {
             console.log("Game completion result already shown, skipping duplicate WebSocket event");
             return;
           }
-          
+
           // NO REFRESH - Use only WebSocket message data for instant display
           // WebSocket message should contain all necessary data (players, secretElement, wasCorrect)
           if (!message.players || message.players.length === 0) {
             console.error("⚠️ WebSocket game_completed message missing players data");
             return;
           }
-          
+
           const secretElement = message.secretElement || currentTurn?.whisp || "?";
           // Use wasCorrect from message if available (for the last player who submitted)
           // submittingPlayerId identifies who submitted the answer - only they see the result
           const playerWasCorrect = message.wasCorrect !== undefined ? message.wasCorrect : undefined;
           const submittingPlayerId = message.submittingPlayerId || message.playerId; // Fallback to playerId for backward compatibility
-          
+
           // Use shared handler - only the submitting player sees their answer, others skip to final results
           // WebSocket broadcasts to ALL players simultaneously, ensuring synchronization
           // NO REFRESH CALLS - all data comes from WebSocket message
@@ -511,7 +512,7 @@ export default function Game() {
         loadingTimeoutId = null;
       }
     });
-    
+
     const cleanup = setupRealtimeSubscriptions();
 
     // Poll fallback: only when WS is disconnected. Used as a safety net for completion state.
@@ -701,24 +702,24 @@ export default function Game() {
       const newRound = data.session?.current_round;
       const previousTurnId = currentTurn?.id;
       const newTurnId = data.currentTurn?.id;
-      
+
       if (previousRound !== undefined && newRound !== undefined && previousRound !== newRound) {
         console.log(`🔄 Round changed from ${previousRound} to ${newRound} - resetting transition trigger`);
         roundTransitionTriggeredRef.current = null;
         // Clear answered players when round changes
         setAnsweredPlayerIds([]);
       }
-      
+
       // Clear answered players when turn changes (new turn = new round of guessing)
       if (previousTurnId && newTurnId && previousTurnId !== newTurnId) {
         console.log(`🔄 Turn changed from ${previousTurnId} to ${newTurnId} - clearing answered players`);
         setAnsweredPlayerIds([]);
       }
-      
+
       setSession(data.session);
       setPlayers(data.players || []);
       setThemes(data.themes || []);
-      
+
       // Decode whisp for storyteller if it's encrypted
       const isStoryteller = data.session?.current_storyteller_id === playerId;
       if (data.currentTurn && data.currentTurn.whisp && isStoryteller) {
@@ -736,7 +737,7 @@ export default function Game() {
       } else {
         setCurrentTurn(data.currentTurn);
       }
-      
+
       // Fetch answered players for current turn (only if turn exists and is in guessing phase)
       if (data.currentTurn?.id && data.currentTurn?.completed_at) {
         fetchAnsweredPlayers(data.currentTurn.id);
@@ -744,7 +745,7 @@ export default function Game() {
         // Clear answered players if turn doesn't exist or isn't completed yet
         setAnsweredPlayerIds([]);
       }
-      
+
       setSelectedIcons(data.selectedIcons || []);
       setUnlockedPackIds(data.unlockedPackIds || []);
 
@@ -835,12 +836,12 @@ export default function Game() {
         .from("game_guesses")
         .select("player_id")
         .eq("turn_id", turnId);
-      
+
       if (error) {
         console.error("Error fetching answered players:", error);
         return;
       }
-      
+
       // Extract unique player IDs who have answered
       const answeredIds = [...new Set(guesses?.map((g: any) => g.player_id) || [])];
       setAnsweredPlayerIds(answeredIds);
@@ -865,14 +866,14 @@ export default function Game() {
           const newStatus = (payload.new as any)?.status;
           if (newStatus === "completed" || newStatus === "expired") {
             console.log("🎉 Game session status changed to (via Realtime):", newStatus);
-            
+
             // Don't process if already showing result (use ref to prevent race conditions)
             // WebSocket should be the primary source for synchronized display - skip realtime if WebSocket already handled it
             if (gameCompletionResultShownRef.current || isAnnouncingWinnerRef.current || gameCompletedRef.current || isRoundTransitioning) {
               console.log("Already showing game completion result via WebSocket, skipping realtime event");
               return;
             }
-            
+
             // Realtime is fallback only - WebSocket should handle this first
             // If we reach here, WebSocket might not be connected, so use realtime as fallback
             // But still try to avoid refresh by using existing data
@@ -891,7 +892,7 @@ export default function Game() {
                     .select("id, player_id, name, score, turn_order")
                     .eq("session_id", sessionId)
                     .order("score", { ascending: false });
-                  
+
                   const playersForCompletion = (latestPlayers && latestPlayers.length > 0) ? latestPlayers : players;
                   // No submittingPlayerId means no one sees the answer
                   handleGameCompletion(playersForCompletion, secretElement, undefined, undefined);
@@ -938,13 +939,13 @@ export default function Game() {
           // If turn was just completed (all players answered), show round transition for ALL players
           if (wasJustCompleted && isTurnCompleted && gamePhase === "guessing") {
             const turnId = newRow?.id;
-            
+
             // Prevent duplicate transitions - check if we already showed this transition
             if (roundTransitionTriggeredRef.current === turnId) {
               console.log("⏭️ Skipping duplicate round transition for turn:", turnId);
               return;
             }
-            
+
             console.log("🎯 Turn completed - refreshing silently (no dialog)");
             roundTransitionTriggeredRef.current = turnId;
             // Clear transition trigger immediately and refresh silently
@@ -1013,11 +1014,11 @@ export default function Game() {
           // Get turn_id and player_id from the inserted guess
           const guessTurnId = (payload.new as any)?.turn_id;
           const guessPlayerId = (payload.new as any)?.player_id;
-          
+
           // Verify this guess belongs to the current session
           // Check if turn_id matches currentTurn.id (fast check)
           const isCurrentTurn = currentTurn?.id === guessTurnId;
-          
+
           // If not current turn, verify the turn belongs to this session
           if (!isCurrentTurn && guessTurnId) {
             try {
@@ -1026,7 +1027,7 @@ export default function Game() {
                 .select("session_id")
                 .eq("id", guessTurnId)
                 .single();
-              
+
               // If turn doesn't belong to current session, ignore this guess
               if (!turnData || turnData.session_id !== sessionId) {
                 console.log("Ignoring guess from different session:", guessTurnId);
@@ -1037,19 +1038,19 @@ export default function Game() {
               return; // Don't process if we can't verify
             }
           }
-          
+
           // Only process guesses for the current session
           // Find player name from current players state (only if player is in this session)
           const guessingPlayer = players.find((p) => p.player_id === guessPlayerId);
-          
+
           // If player is not in current session, ignore this guess
           if (!guessingPlayer) {
             console.log("Ignoring guess from player not in current session:", guessPlayerId);
             return;
           }
-          
+
           const playerName = guessingPlayer.name;
-          
+
           // Update answered players list
           setAnsweredPlayerIds((prev) => {
             if (!prev.includes(guessPlayerId)) {
@@ -1057,7 +1058,7 @@ export default function Game() {
             }
             return prev;
           });
-          
+
           // Don't show toast if it's the current player (they already see their own submission)
           if (guessPlayerId !== currentPlayerId) {
             toast({
@@ -1065,7 +1066,7 @@ export default function Game() {
               description: `${playerName} submitted their guess`,
             });
           }
-          
+
           debouncedRefresh({ showLoading: false });
         },
       )
@@ -1086,13 +1087,13 @@ export default function Game() {
       })
       .on("broadcast", { event: "game_completed" }, (payload) => {
         console.log("🎉 Received game_completed broadcast via Realtime:", payload);
-        
+
         // Don't process if already showing result (use ref to prevent race conditions)
         if (gameCompletionResultShownRef.current || isAnnouncingWinnerRef.current || gameCompletedRef.current || isRoundTransitioning) {
           console.log("Already showing game completion result, skipping Realtime broadcast");
           return;
         }
-        
+
         // Use broadcast payload data - ensures ALL players (including storyteller) see result simultaneously
         // This is synchronized similar to the "3-2-1-Start" countdown
         const broadcastData = payload.payload;
@@ -1100,11 +1101,11 @@ export default function Game() {
           console.error("⚠️ game_completed broadcast missing players data");
           return;
         }
-        
+
         const secretElement = broadcastData.secretElement || currentTurn?.whisp || "?";
         const playerWasCorrect = broadcastData.wasCorrect !== undefined ? broadcastData.wasCorrect : undefined;
         const submittingPlayerId = broadcastData.submittingPlayerId || broadcastData.senderId; // Get submitting player ID
-        
+
         // Use shared handler - only the submitting player sees their answer, others skip to final results
         // Realtime broadcast ensures synchronization - all players receive it at the same time
         // NO REFRESH CALLS - all data comes from broadcast payload
@@ -1183,7 +1184,7 @@ export default function Game() {
         theme: data.theme,
       };
       setCurrentTurn(turnWithTheme);
-      
+
       // Store theme elements and core elements for the unified interface
       setThemeElementsForSelection(data.themeElements || []);
       setCoreElementsForSelection(data.coreElements || []);
@@ -1219,7 +1220,7 @@ export default function Game() {
     }
   };
 
-  const handleStoryComplete = () => {
+    const handleStoryComplete = () => {
     // Allow polling again after storyteller finishes
     isStorytellerActiveRef.current = false;
     toast({
@@ -1231,69 +1232,60 @@ export default function Game() {
 
   // Shared function to handle game completion - ensures all players see results the same way
   // NO REFRESH CALLS - uses only WebSocket data for instant display
-  const handleGameCompletion = useCallback(async (playersData: Player[], secretElement: string, playerWasCorrect?: boolean | null, submittingPlayerId?: string) => {
-    // Don't process if already showing round result or announcing winner
-    // Use ref to prevent race conditions from multiple triggers (WebSocket, realtime, polling)
-    if (gameCompletionResultShownRef.current || isRoundTransitioning || isAnnouncingWinnerRef.current || gameCompletedRef.current) {
-      console.log("Already showing round result, announcing winner, or game completed, skipping");
-      return;
-    }
-    
-    // Mark as shown immediately to prevent duplicate displays
-    gameCompletionResultShownRef.current = true;
+  const handleGameCompletion = useCallback(
+    async (
+      playersData: Player[],
+      secretElement: string,
+      playerWasCorrect?: boolean | null,
+      submittingPlayerId?: string
+    ) => {
+      if (
+        gameCompletionResultShownRef.current ||
+        isAnnouncingWinnerRef.current ||
+        gameCompletedRef.current
+      ) {
+        console.log("Already showing result, skipping");
+        return;
+      }
 
-    // Check if current player is the one who submitted the answer
-    const isSubmittingPlayer = submittingPlayerId === currentPlayerId;
-    
-    // Update players immediately
-    setPlayers(playersData);
-    determineWinnerAndTies(playersData);
-    fetchLifetimePoints(playersData);
-    
-    // Only show round result message to the player who submitted the answer
-    // All other players wait 5 seconds then see final results
-    if (isSubmittingPlayer && playerWasCorrect !== undefined && playerWasCorrect !== null) {
-      // This player submitted the answer - show them their result for 5 seconds
-      setRoundResultMessage({
-        correct: playerWasCorrect === true,
-        message: playerWasCorrect === true 
-          ? `Correct! The answer was "${secretElement}"` 
-          : `Wrong Answer. The answer was "${secretElement}"`
-      });
-      setIsRoundTransitioning(true);
-      
-      // After 5 seconds, show final results to everyone (including submitting player)
-      setTimeout(() => {
-        setIsRoundTransitioning(false);
-        setRoundResultMessage(null);
-        // Set ref BEFORE state to prevent race conditions
+      gameCompletionResultShownRef.current = true;
+
+      const isSubmittingPlayer = submittingPlayerId === currentPlayerId;
+
+      setPlayers(playersData);
+      determineWinnerAndTies(playersData);
+      fetchLifetimePoints(playersData);
+
+      if (isSubmittingPlayer && playerWasCorrect !== undefined && playerWasCorrect !== null) {
+        // ✅ Only last player: open dialog with correct/wrong + answer
+        setRoundResultMessage({
+          correct: playerWasCorrect === true,
+          message:
+            playerWasCorrect === true
+              ? `Correct! The answer was ${secretElement}`
+              : `Wrong Answer. The answer was ${secretElement}`,
+        });
+        setIsRoundTransitioning(true);
+
+        setTimeout(() => {
+          setIsRoundTransitioning(false);
+          setRoundResultMessage(null);
+          gameCompletedRef.current = true;
+          setGameCompleted(true);
+        }, 7000);
+      } else {
+        // ❌ Everyone else: DO NOT open the dialog, just mark completed (or delay without dialog)
         gameCompletedRef.current = true;
         setGameCompleted(true);
-      }, 5000); // Show round result for 5 seconds, then show final results
-    } else {
-      // All other players (including storyteller) wait 5 seconds then see final results
-      // They don't see the answer, just wait
-      setIsRoundTransitioning(true);
-      setRoundResultMessage(null);
-      
-      // After 5 seconds, show final results
-      setTimeout(() => {
-        setIsRoundTransitioning(false);
-        // Set ref BEFORE state to prevent race conditions
-        gameCompletedRef.current = true;
-        setGameCompleted(true);
-      }, 5000); // Wait 5 seconds, then show final results
-    }
-    
-    // Update players immediately
-    setPlayers(playersData);
-    determineWinnerAndTies(playersData);
-    fetchLifetimePoints(playersData);
-  }, [sessionId, currentPlayerId, session?.current_storyteller_id, isRoundTransitioning]);
+      }
+    },
+    [currentPlayerId, determineWinnerAndTies, fetchLifetimePoints]
+  );
+
 
   const handleGuessSubmit = async (gameCompletedFromGuess?: boolean, playersFromGuess?: any[], wasCorrect?: boolean, whisp?: string, nextRound?: any, allPlayersAnswered?: boolean) => {
     console.log("📝 handleGuessSubmit called:", { gameCompletedFromGuess, wasCorrect, whisp, playersCount: playersFromGuess?.length });
-    
+
     // Immediately add current player to answered players for instant UI feedback
     setAnsweredPlayerIds((prev) => {
       if (!prev.includes(currentPlayerId)) {
@@ -1301,21 +1293,21 @@ export default function Game() {
       }
       return prev;
     });
-    
+
     toast({
       title: "Guess Submitted!",
       description: "Waiting for other players...",
     });
-    
+
     // If game just completed, broadcast game_completed message via both WebSocket and Realtime
     // This ensures ALL players (including storyteller) receive it simultaneously, similar to "3-2-1-Start"
     if (gameCompletedFromGuess && playersFromGuess && playersFromGuess.length > 0) {
       console.log("🎉 Game completed from guess submission, wasCorrect:", wasCorrect);
-      
+
       const sortedPlayers = [...playersFromGuess].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
       const winner = sortedPlayers[0];
       const secretElement = whisp || currentTurn?.whisp || "?";
-      
+
       // Broadcast via WebSocket - ensures all players receive it
       // Include submittingPlayerId so only that player sees their answer
       sendWebSocketMessage({
@@ -1327,7 +1319,7 @@ export default function Game() {
         secretElement: secretElement,
         submittingPlayerId: currentPlayerId, // Identify who submitted the answer
       });
-      
+
       // Also broadcast via Realtime to ensure storyteller and all players receive it simultaneously
       // This provides redundancy and ensures synchronization similar to the countdown
       if (broadcastChannelRef.current) {
@@ -1352,12 +1344,12 @@ export default function Game() {
           // Continue - WebSocket should still work
         }
       }
-      
+
       // Don't call handleGameCompletion directly - let WebSocket/Realtime handler do it for consistency
       // This ensures ALL players (including storyteller) see the result dialog at the same time
       return;
     }
-    
+
     // If all players answered but game continues (next round), skip dialog and refresh silently
     if (nextRound && nextRound.newStorytellerId && !gameCompletedFromGuess && allPlayersAnswered === true) {
       console.log("📢 Round complete, refreshing silently (no dialog)");
@@ -1366,7 +1358,7 @@ export default function Game() {
       setTimeout(() => initializeGame({ showLoading: false }), 100);
       return;
     }
-    
+
     // If player answered correctly but not all players have answered yet, don't show transition message
     // The message will be shown via WebSocket or polling when all players have answered
     // Don't refresh if round transition is active
@@ -1379,7 +1371,7 @@ export default function Game() {
   const handleStoryTimeUp = useCallback(async () => {
     const isCurrentStoryteller = currentPlayerId === session?.current_storyteller_id;
     const turnId = currentTurn?.id || "";
-    
+
     // Prevent multiple triggers for the same turn
     if (!sessionId || !isCurrentStoryteller || gameCompleted) return;
     if (storyTimeUpTriggeredRef.current === turnId) {
@@ -1387,7 +1379,7 @@ export default function Game() {
       return;
     }
     storyTimeUpTriggeredRef.current = turnId;
-    
+
     console.log("⏰ Story time expired - skipping round");
     toast({
       title: "⏰ Time's Up!",
@@ -1411,10 +1403,10 @@ export default function Game() {
           .select("id, player_id, name, score, turn_order")
           .eq("session_id", sessionId)
           .order("score", { ascending: false });
-        
+
         const playersToUse = latestPlayers || players;
         const sortedPlayers = [...playersToUse].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-        
+
         // Broadcast via WebSocket - all players (including storyteller) will see result once via WebSocket handler
         sendWebSocketMessage({
           type: "game_completed",
@@ -1442,7 +1434,7 @@ export default function Game() {
   const handleGuessTimeUp = useCallback(async () => {
     const isCurrentStoryteller = currentPlayerId === session?.current_storyteller_id;
     const turnId = currentTurn?.id || "";
-    
+
     // Prevent multiple triggers for the same turn
     if (!sessionId || !currentTurn || !session || isCurrentStoryteller || gameCompleted) return;
     if (guessTimeUpTriggeredRef.current === turnId) {
@@ -1450,7 +1442,7 @@ export default function Game() {
       return;
     }
     guessTimeUpTriggeredRef.current = turnId;
-    
+
     console.log("⏰ Guess time expired - auto-submitting");
     toast({
       title: "⏰ Time's Up!",
@@ -1479,10 +1471,10 @@ export default function Game() {
           .select("id, player_id, name, score, turn_order")
           .eq("session_id", sessionId)
           .order("score", { ascending: false });
-        
+
         const playersToUse = latestPlayers || players;
         const sortedPlayers = [...playersToUse].sort((a: Player, b: Player) => (b.score || 0) - (a.score || 0));
-        
+
         // Broadcast via WebSocket - all players (including storyteller) will see result once via WebSocket handler
         sendWebSocketMessage({
           type: "game_completed",
@@ -1743,46 +1735,44 @@ export default function Game() {
       </div>
 
       {/* Round Transition Dialog - Shows final round result before winner announcement - CANNOT BE SKIPPED */}
-      <Dialog open={isRoundTransitioning} onOpenChange={() => {}}>
-        <DialogContent 
-          className="sm:max-w-md" 
-          onPointerDownOutside={(e) => e.preventDefault()} 
+      <Dialog open={isRoundTransitioning} onOpenChange={() => { }}>
+        <DialogContent
+          className="sm:max-w-md"
+          onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
           hideCloseButton
         >
           <div className="flex flex-col items-center justify-center py-8 space-y-6">
-            <div className={`h-16 w-16 rounded-full flex items-center justify-center ${
-              roundResultMessage?.message?.includes('Game Complete') 
-                ? 'bg-primary/20' 
-                : roundResultMessage?.correct 
-                  ? 'bg-green-500/20' 
-                  : 'bg-red-500/20'
-            }`}>
+            <div className={`h-16 w-16 rounded-full flex items-center justify-center ${roundResultMessage?.message?.includes('Game Complete')
+              ? 'bg-primary/20'
+              : roundResultMessage?.correct
+                ? 'bg-green-500/20'
+                : 'bg-red-500/20'
+              }`}>
               <span className="text-3xl">
-                {roundResultMessage?.message?.includes('Game Complete') 
-                  ? '🎊' 
-                  : roundResultMessage?.correct 
-                    ? '✅' 
+                {roundResultMessage?.message?.includes('Game Complete')
+                  ? '🎊'
+                  : roundResultMessage?.correct
+                    ? '✅'
                     : '❌'}
               </span>
             </div>
             <div className="text-center space-y-3">
               <h2 className="text-2xl font-bold text-foreground">
-                {roundResultMessage?.message?.includes('Game Complete') 
-                  ? 'Game Complete!' 
-                  : roundResultMessage?.correct 
-                    ? 'Correct!' 
+                {roundResultMessage?.message?.includes('Game Complete')
+                  ? 'Game Complete!'
+                  : roundResultMessage?.correct
+                    ? 'Correct!'
                     : 'Wrong Answer'}
               </h2>
               {roundResultMessage && (
-                <p className={`text-lg ${
-                  roundResultMessage.message?.includes('Game Complete')
-                    ? 'text-primary'
-                    : roundResultMessage.correct 
-                      ? 'text-green-500' 
-                      : 'text-red-500'
-                }`}>
+                <p className={`text-lg ${roundResultMessage.message?.includes('Game Complete')
+                  ? 'text-primary'
+                  : roundResultMessage.correct
+                    ? 'text-green-500'
+                    : 'text-red-500'
+                  }`}>
                   {roundResultMessage.message}
                 </p>
               )}
@@ -1802,9 +1792,9 @@ export default function Game() {
       </Dialog>
 
       {/* Announcing Winner Loading Dialog - CANNOT BE SKIPPED */}
-      <Dialog open={isAnnouncingWinner} onOpenChange={() => {}}>
-        <DialogContent 
-          className="sm:max-w-md" 
+      <Dialog open={isAnnouncingWinner} onOpenChange={() => { }}>
+        <DialogContent
+          className="sm:max-w-md"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
@@ -1827,9 +1817,9 @@ export default function Game() {
       </Dialog>
 
       {/* Game Completed Winner Dialog - CANNOT BE SKIPPED */}
-      <Dialog open={gameCompleted} onOpenChange={() => {}}>
-        <DialogContent 
-          className="sm:max-w-md" 
+      <Dialog open={gameCompleted} onOpenChange={() => { }}>
+        <DialogContent
+          className="sm:max-w-md"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
