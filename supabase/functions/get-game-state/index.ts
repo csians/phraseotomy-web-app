@@ -50,7 +50,11 @@ Deno.serve(async (req) => {
       console.error("Error fetching players:", playersError);
     }
 
-    // Get all themes with pack info and unlock status
+    // Get packs_used from session (the pack selected when game was created)
+    const packsUsed = session.packs_used || [];
+    console.log("Session packs_used:", packsUsed);
+
+    // Get all themes with pack info
     const { data: themes, error: themesError } = await supabase
       .from("themes")
       .select("*, pack:packs(id, name)");
@@ -59,36 +63,42 @@ Deno.serve(async (req) => {
       console.error("Error fetching themes:", themesError);
     }
 
-    // Get customer's unlocked packs if playerId provided
-    let unlockedPackIds: string[] = [];
-    if (playerId) {
-      const { data: licenses, error: licensesError } = await supabase
-        .from("customer_licenses")
-        .select("license_code_id")
-        .eq("customer_id", playerId)
-        .eq("status", "active");
+    // Get theme_packs junction table to find themes linked to packs_used
+    const { data: themePacks, error: themePacksError } = await supabase
+      .from("theme_packs")
+      .select("theme_id, pack_id")
+      .in("pack_id", packsUsed);
 
-      if (!licensesError && licenses) {
-        const licenseCodeIds = licenses.map(l => l.license_code_id);
-        
-        if (licenseCodeIds.length > 0) {
-          const { data: codePacks, error: codePacksError } = await supabase
-            .from("license_code_packs")
-            .select("pack_id")
-            .in("license_code_id", licenseCodeIds);
-
-          if (!codePacksError && codePacks) {
-            unlockedPackIds = codePacks.map(cp => cp.pack_id);
-          }
-        }
-      }
+    if (themePacksError) {
+      console.error("Error fetching theme_packs:", themePacksError);
     }
 
-    // Process themes to add unlock status
-    const processedThemes = (themes || []).map(theme => ({
+    // Create a set of theme IDs that are linked to packs_used
+    const themeIdsInPacksUsed = new Set(
+      (themePacks || []).map(tp => tp.theme_id)
+    );
+
+    // Filter themes: show core themes OR themes linked to packs_used
+    const availableThemes = (themes || []).filter(theme => {
+      // Always include core themes
+      if (theme.is_core) return true;
+      
+      // Include themes directly linked to packs_used via pack_id
+      if (theme.pack_id && packsUsed.includes(theme.pack_id)) return true;
+      
+      // Include themes linked via theme_packs junction table
+      if (themeIdsInPacksUsed.has(theme.id)) return true;
+      
+      return false;
+    });
+
+    console.log(`Filtered ${availableThemes.length} themes from ${themes?.length || 0} total themes based on packs_used:`, packsUsed);
+
+    // Process themes to add unlock status (all filtered themes are unlocked for this game)
+    const processedThemes = availableThemes.map(theme => ({
       ...theme,
       isCore: theme.is_core,
-      isUnlocked: theme.is_core || (theme.pack_id && unlockedPackIds.includes(theme.pack_id)),
+      isUnlocked: true, // All filtered themes are available for this game
       packName: theme.pack?.name || null,
     }));
 
@@ -187,7 +197,6 @@ Deno.serve(async (req) => {
         currentTurn,
         selectedIcons,
         themeElements,
-        unlockedPackIds,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

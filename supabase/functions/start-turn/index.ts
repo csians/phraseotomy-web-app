@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     // Get session details
     const { data: session, error: sessionError } = await supabase
       .from("game_sessions")
-      .select("current_round, current_storyteller_id, selected_theme_id")
+      .select("current_round, current_storyteller_id")
       .eq("id", sessionId)
       .single();
 
@@ -49,15 +49,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use provided theme or fallback to session theme
-    const themeId = selectedThemeId || session.selected_theme_id;
-    
-    if (!themeId) {
+    // Theme must be selected by storyteller at start of each turn
+    if (!selectedThemeId) {
       return new Response(
-        JSON.stringify({ error: "No theme selected for this session" }),
+        JSON.stringify({ error: "Theme must be selected by storyteller at start of turn" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const themeId = selectedThemeId;
 
     // Get the theme details
     const { data: theme, error: themeError } = await supabase
@@ -235,13 +235,7 @@ Deno.serve(async (req) => {
       turn = newTurn;
     }
 
-    // If a new theme was selected, update the session
-    if (selectedThemeId && selectedThemeId !== session.selected_theme_id) {
-      await supabase
-        .from("game_sessions")
-        .update({ selected_theme_id: selectedThemeId })
-        .eq("id", sessionId);
-    }
+    // Theme is per-turn, not stored at session level
 
     // Prepare core elements with isFromCore flag
     const coreElementsWithFlag = selectedCoreElements.map(e => ({ 

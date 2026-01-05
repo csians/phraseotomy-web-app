@@ -233,41 +233,33 @@ Deno.serve(async (req) => {
             const nextStoryteller = allPlayers.find(p => p.turn_order === nextRound);
             
             if (nextStoryteller) {
-              // Get the session's selected theme (theme stays the same for ALL rounds)
-              const { data: currentSession } = await supabase
-                .from("game_sessions")
-                .select("selected_theme_id")
-                .eq("id", sessionId)
-                .single();
-
               // Create a new turn record for the next round
-              // Include theme_id from session so phase determination skips theme selection
-              // Whisp will be generated when the new storyteller selects their mode via start-turn
+              // No theme_id - storyteller will select theme at start of their turn
+              // Whisp will be generated when the new storyteller selects theme and mode via start-turn
               const { error: newTurnError } = await supabase
                 .from("game_turns")
                 .insert({
                   session_id: sessionId,
                   round_number: nextRound,
                   storyteller_id: nextStoryteller.player_id,
-                  theme_id: currentSession?.selected_theme_id || null, // Keep the session's theme
+                  theme_id: null, // Storyteller selects theme at start of turn
                   // No whisp, selected_icon_ids, or turn_mode
-                  // These will be set when the new storyteller selects mode
+                  // These will be set when the new storyteller selects theme and mode
                 });
 
               if (newTurnError) {
                 console.error("Error creating new turn for next round:", newTurnError);
               } else {
-                console.log(`✅ Created new turn for round ${nextRound} with theme_id: ${currentSession?.selected_theme_id}`);
+                console.log(`✅ Created new turn for round ${nextRound} (storyteller will select theme)`);
               }
 
               // Update session to next round and storyteller
-              // KEEP selected_theme_id - theme is fixed for all rounds
+              // Theme is per-turn, not stored at session level
               const { error: updateError } = await supabase
                 .from("game_sessions")
                 .update({
                   current_round: nextRound,
                   current_storyteller_id: nextStoryteller.player_id,
-                  // DO NOT clear selected_theme_id - theme stays the same for all rounds
                 })
                 .eq("id", sessionId);
 

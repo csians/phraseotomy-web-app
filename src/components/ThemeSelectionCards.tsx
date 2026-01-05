@@ -9,6 +9,24 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Theme images
+import atHomeImg from "@/assets/themes/at-home.jpg";
+import atWorkImg from "@/assets/themes/at-work.jpg";
+import lifestyleImg from "@/assets/themes/lifestyle.jpg";
+import travelImg from "@/assets/themes/travel.jpg";
+
+// Map theme names to their images (case-insensitive matching)
+const THEME_IMAGES: Record<string, string> = {
+  "at home": atHomeImg,
+  athome: atHomeImg,
+  home: atHomeImg,
+  "at work": atWorkImg,
+  atwork: atWorkImg,
+  work: atWorkImg,
+  lifestyle: lifestyleImg,
+  travel: travelImg,
+};
+
 const iconMap: Record<string, LucideIcon> = {
   briefcase: Briefcase,
   home: Home,
@@ -56,21 +74,25 @@ export function ThemeSelectionCards({
   // Core theme names that are always enabled
   const coreThemeNames = ['At Home', 'At Work', 'Lifestyle', 'Travel'];
   
-  // Filter themes based on theme name
-  // Only these 4 themes are clickable; all other themes are visible but disabled
-  const visibleThemes = themes.map((theme) => {
-    const isEnabled = coreThemeNames.includes(theme.name);
-    return { ...theme, isUnlocked: isEnabled };
-  });
-
-  // Separate base themes and other themes
-  const baseThemes = visibleThemes.filter((t) => coreThemeNames.includes(t.name));
-  const expansionThemes = visibleThemes.filter((t) => !coreThemeNames.includes(t.name));
+  // All themes passed here are already filtered by pack
+  // Filter out "Core" theme and separate base themes and expansion themes
+  const filteredThemes = themes.filter((t) => t.name.toLowerCase() !== 'core');
+  const baseThemes = filteredThemes.filter((t) => coreThemeNames.includes(t.name));
+  const expansionThemes = filteredThemes.filter((t) => !coreThemeNames.includes(t.name));
+  
+  // Combine all themes and mark only first 4 as enabled
+  const allThemes = [...baseThemes, ...expansionThemes];
+  const themesWithEnabledStatus = allThemes.map((theme, index) => ({
+    ...theme,
+    isUnlocked: index < 4, // Only first 4 themes are enabled
+  }));
 
   const renderThemeCard = (theme: ThemeOption) => {
     const IconComponent = iconMap[theme.icon] || Sparkles;
     const isSelected = selectedThemeId === theme.id;
     const isLocked = !theme.isUnlocked;
+    const themeImage = THEME_IMAGES[theme.name.toLowerCase()];
+    const isCoreTheme = coreThemeNames.includes(theme.name);
 
     return (
       <button
@@ -80,17 +102,37 @@ export function ThemeSelectionCards({
         onMouseLeave={() => setHoveredTheme(null)}
         disabled={isLocked || disabled}
         className={cn(
-          "relative flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 transition-all duration-200",
+          "relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 shadow-md",
+          "flex flex-col justify-between p-4",
           isSelected
-            ? "bg-primary text-primary-foreground border-primary shadow-lg scale-105"
+            ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105 shadow-lg"
             : isLocked
-            ? "bg-muted/30 border-muted cursor-not-allowed opacity-60"
-            : "bg-card border-border hover:border-primary/50 hover:bg-primary/5 cursor-pointer",
+            ? "border-muted cursor-not-allowed opacity-60"
+            : "border-transparent hover:border-primary/50 hover:scale-102 cursor-pointer",
           disabled && "opacity-50 cursor-not-allowed"
         )}
       >
+        {/* Theme image background */}
+        {themeImage ? (
+          <img 
+            src={themeImage} 
+            alt={theme.name} 
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div
+            className="absolute inset-0 w-full h-full"
+            style={{
+              backgroundColor: isLocked ? "#374151" : "#4b5563",
+            }}
+          />
+        )}
+
+        {/* Overlay gradient for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+
         {isLocked && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-xl">
+          <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-xl z-10">
             <div className="flex flex-col items-center gap-2">
               <Lock className="h-6 w-6 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">
@@ -100,26 +142,14 @@ export function ThemeSelectionCards({
           </div>
         )}
 
-        <div
-          className={cn(
-            "h-16 w-16 rounded-full flex items-center justify-center transition-colors",
-            isSelected ? "bg-primary-foreground/20" : "bg-primary/10"
-          )}
-        >
-          <IconComponent
-            className={cn(
-              "h-8 w-8 transition-colors",
-              isSelected ? "text-primary-foreground" : "text-primary"
-            )}
-          />
-        </div>
-
-        <span className="text-lg font-semibold">{theme.name}</span>
-
-        {theme.isCore && (
-          <Badge variant="secondary" className="text-xs">
-            Base Game
-          </Badge>
+        {/* Content - only show theme name if NO image exists */}
+        {!themeImage && (
+          <div className="relative z-10 flex flex-col h-full items-center justify-center">
+            {/* Theme name - large bold text */}
+            <span className="text-2xl font-bold block text-white drop-shadow-lg">
+              {theme.name.toUpperCase()}
+            </span>
+          </div>
         )}
       </button>
     );
@@ -138,29 +168,10 @@ export function ThemeSelectionCards({
         </div>
       )}
 
-      {/* Base Game Themes */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Base Game Themes
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {baseThemes.map(renderThemeCard)}
-        </div>
+      {/* All Themes - no section titles, only first 4 enabled */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {themesWithEnabledStatus.map(renderThemeCard)}
       </div>
-
-      {/* Expansion Themes */}
-      {expansionThemes.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Rocket className="h-5 w-5 text-primary" />
-            Expansion Packs
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {expansionThemes.map(renderThemeCard)}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

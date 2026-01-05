@@ -100,7 +100,6 @@ export default function Game() {
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
   const [isGeneratingWhisp, setIsGeneratingWhisp] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<string>("");
-  const [unlockedPackIds, setUnlockedPackIds] = useState<string[]>([]);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [isAnnouncingWinner, setIsAnnouncingWinner] = useState(false);
   const [gameWinner, setGameWinner] = useState<Player | null>(null);
@@ -580,7 +579,7 @@ export default function Game() {
 
     const hasWhisp = !!currentTurn?.whisp;
     const isStoryteller = session?.current_storyteller_id === currentPlayerId;
-    const hasTheme = !!session?.selected_theme_id;
+    const hasTheme = !!currentTurn?.theme_id;
 
     if (
       hasTheme &&
@@ -589,9 +588,9 @@ export default function Game() {
       !isGeneratingWhisp &&
       gamePhase === "storytelling"
     ) {
-      console.log("Auto-triggering turn start with theme:", session?.selected_theme_id);
+      console.log("Auto-triggering turn start with theme:", currentTurn?.theme_id);
       autoTurnTriggeredRef.current = true;
-      handleStartTurn(session?.selected_theme_id || "");
+      handleStartTurn(currentTurn?.theme_id || "");
     }
 
     // Reset flag when turn changes
@@ -599,7 +598,7 @@ export default function Game() {
       autoTurnTriggeredRef.current = false;
     }
   }, [
-    session?.selected_theme_id,
+    currentTurn?.theme_id,
     session?.current_storyteller_id,
     currentPlayerId,
     currentTurn?.whisp,
@@ -747,7 +746,7 @@ export default function Game() {
       }
 
       setSelectedIcons(data.selectedIcons || []);
-      setUnlockedPackIds(data.unlockedPackIds || []);
+      // Themes are now filtered by packs_used from session, no need for unlockedPackIds
 
       // Determine game phase based on turn state
       let phase: GamePhase;
@@ -755,19 +754,15 @@ export default function Game() {
       const hasWhisp = !!data.currentTurn?.whisp;
       const hasTheme = !!data.currentTurn?.theme_id;
 
-      // Session theme is the permanent theme for all rounds (selected once in Round 1)
-      const sessionThemeId = data.session?.selected_theme_id;
-      const sessionHasTheme = !!sessionThemeId;
-
       // Session-level turn mode (set at lobby creation - skips per-turn mode selection)
       const sessionTurnMode = data.session?.turn_mode;
 
-      // Phase determination (simplified - unified flow):
-      // 1. No session theme -> show theme selection
+      // Phase determination (theme selected per turn by storyteller):
+      // 1. No turn theme -> show theme selection (storyteller selects theme)
       // 2. Theme exists but no whisp -> storytelling (unified)
       // 3. Has whisp and completed -> guessing
 
-      if (!sessionHasTheme && !hasTheme) {
+      if (!hasTheme) {
         phase = "selecting_theme";
       } else if (!hasWhisp || !data.currentTurn?.completed_at) {
         phase = "storytelling";
@@ -778,8 +773,6 @@ export default function Game() {
       console.log(
         "Game phase:",
         phase,
-        "sessionHasTheme:",
-        sessionHasTheme,
         "hasTheme:",
         hasTheme,
         "hasWhisp:",
@@ -791,11 +784,11 @@ export default function Game() {
       );
       setGamePhase(phase);
 
-      // Always use session theme (for all rounds)
-      if (sessionThemeId) {
-        setSelectedThemeId(sessionThemeId);
-      } else if (data.currentTurn?.theme_id) {
+      // Use turn theme (selected by storyteller at start of each turn)
+      if (data.currentTurn?.theme_id) {
         setSelectedThemeId(data.currentTurn.theme_id);
+      } else {
+        setSelectedThemeId(""); // Clear if no theme selected yet
       }
 
       // Set turn mode: prefer session-level, fallback to turn-level
@@ -1122,24 +1115,20 @@ export default function Game() {
   };
 
   // Handle theme selection - immediately start turn with unified flow
+  // Theme is selected per turn by the storyteller
   const handleThemeSelect = async (themeId: string) => {
     setSelectedThemeId(themeId);
     setIsGeneratingWhisp(true);
     setIsModeTransitioning(true);
 
     try {
-      // Save theme selection to game_sessions
-      const { error } = await supabase.from("game_sessions").update({ selected_theme_id: themeId }).eq("id", sessionId);
-
-      if (error) throw error;
-
       // Notify other players
       sendWebSocketMessage({
         type: "theme_selected",
         themeId,
       });
 
-      // Start the turn immediately
+      // Start the turn immediately (start-turn will update the turn with theme_id)
       await handleStartTurn(themeId);
     } catch (error) {
       console.error("Error selecting theme:", error);
@@ -1538,7 +1527,14 @@ export default function Game() {
             currentStorytellerId={session.current_storyteller_id}
             answeredPlayerIds={answeredPlayerIds}
             timerElement={
-              !gameCompleted && currentTurn && gamePhase === "storytelling" && session.story_time_seconds ? (
+              !gameCompleted && gamePhase === "selecting_theme" && session.story_time_seconds && currentTurn ? (
+                <GameTimer
+                  totalSeconds={session.story_time_seconds}
+                  startTime={currentTurn.created_at}
+                  label="Theme Selection Time"
+                  onTimeUp={isStoryteller ? handleStoryTimeUp : undefined}
+                />
+              ) : !gameCompleted && currentTurn && gamePhase === "storytelling" && session.story_time_seconds ? (
                 <GameTimer
                   totalSeconds={session.story_time_seconds}
                   startTime={currentTurn.created_at}
@@ -1559,7 +1555,15 @@ export default function Game() {
 
         {/* Status Indicators - Timer and Connection (desktop only) */}
         <div className="hidden md:flex fixed top-20 right-4 z-50 flex-col gap-2 items-end">
-          {/* Game Timer - show during mode selection, storytelling, elements, and guessing phases */}
+          {/* Game Timer - show during theme selection, storytelling, and guessing phases */}
+          {!gameCompleted && gamePhase === "selecting_theme" && session.story_time_seconds && currentTurn && (
+            <GameTimer
+              totalSeconds={session.story_time_seconds}
+              startTime={currentTurn.created_at}
+              label="Theme Selection Time"
+              onTimeUp={isStoryteller ? handleStoryTimeUp : undefined}
+            />
+          )}
           {!gameCompleted && currentTurn && gamePhase === "storytelling" && session.story_time_seconds && (
             <GameTimer
               totalSeconds={session.story_time_seconds}
@@ -1636,7 +1640,6 @@ export default function Game() {
                       selectedThemeId={selectedThemeId}
                       disabled={isGeneratingWhisp}
                       playerName={players.find((p) => p.player_id === currentPlayerId)?.name}
-                      unlockedPackIds={unlockedPackIds}
                     />
                   )}
                 </CardContent>

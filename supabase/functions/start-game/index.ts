@@ -27,30 +27,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get session including theme
+    // Get session (theme is not required at game start - storyteller selects per turn)
     const { data: sessionData, error: sessionError } = await supabase
       .from("game_sessions")
-      .select("selected_theme_id")
+      .select("id")
       .eq("id", sessionId)
       .single();
 
-    if (sessionError || !sessionData?.selected_theme_id) {
+    if (sessionError || !sessionData) {
       return new Response(
-        JSON.stringify({ error: "No theme selected for this game" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Get theme name for logging
-    const { data: theme, error: themeError } = await supabase
-      .from("themes")
-      .select("name")
-      .eq("id", sessionData.selected_theme_id)
-      .single();
-
-    if (themeError || !theme) {
-      return new Response(
-        JSON.stringify({ error: "Theme not found" }),
+        JSON.stringify({ error: "Session not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -103,29 +89,28 @@ Deno.serve(async (req) => {
 
     console.log("Game started successfully:", updatedSession);
 
-    // Create all turns for all rounds upfront WITHOUT whisp or turn_mode
-    // (mode selection and whisp generation happen in start-turn after storyteller chooses)
-    const turnsToCreate = allPlayers.map((player: { player_id: string }, index: number) => ({
-      session_id: sessionId,
-      round_number: index + 1,
-      storyteller_id: player.player_id,
-      theme_id: sessionData.selected_theme_id,
-      turn_mode: null, // Explicitly null so storyteller must choose mode
-      // whisp will be generated in start-turn after mode selection
-    }));
-
-    const { data: createdTurns, error: turnsError } = await supabase
+    // Create ONLY the first turn (no theme - storyteller will select at start of their turn)
+    // Other turns will be created as rounds progress
+    const { data: createdTurn, error: turnError } = await supabase
       .from("game_turns")
-      .insert(turnsToCreate)
-      .select();
+      .insert({
+        session_id: sessionId,
+        round_number: 1,
+        storyteller_id: firstPlayer.player_id,
+        theme_id: null, // Storyteller will select theme at start of turn
+        turn_mode: null, // Storyteller will choose mode
+        // whisp will be generated in start-turn after theme and mode selection
+      })
+      .select()
+      .single();
 
-    if (turnsError) {
-      console.error("Error creating turns:", turnsError);
+    if (turnError) {
+      console.error("Error creating first turn:", turnError);
     } else {
-      console.log(`Created ${createdTurns?.length} turns for ${totalRounds} rounds`);
+      console.log(`Created first turn for round 1, storyteller: ${firstPlayer.player_id}`);
     }
 
-    const turn = createdTurns?.[0] || null;
+    const turn = createdTurn || null;
 
     return new Response(
       JSON.stringify({ session: updatedSession, turn }),

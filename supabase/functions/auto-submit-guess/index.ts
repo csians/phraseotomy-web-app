@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
       // Get session data for round advancement
       const { data: sessionData } = await supabase
         .from("game_sessions")
-        .select("current_round, total_rounds, selected_theme_id")
+        .select("current_round, total_rounds")
         .eq("id", sessionId)
         .single();
 
@@ -140,13 +140,14 @@ Deno.serve(async (req) => {
           const nextStoryteller = allPlayers?.find(p => p.turn_order === nextRound);
           
           if (nextStoryteller) {
+            // Create new turn without theme - storyteller will select at start of turn
             await supabase
               .from("game_turns")
               .insert({
                 session_id: sessionId,
                 round_number: nextRound,
                 storyteller_id: nextStoryteller.player_id,
-                theme_id: sessionData.selected_theme_id || null,
+                theme_id: null, // Storyteller selects theme at start of turn
               });
 
             await supabase

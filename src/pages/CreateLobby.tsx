@@ -11,28 +11,8 @@ import { getCustomerLicenses } from "@/lib/customerAccess";
 import { Skeleton } from "@/components/ui/skeleton";
 import Header from "@/components/Header";
 import type { Tables } from "@/integrations/supabase/types";
-import { Check } from "lucide-react";
-
-// Theme images
-import atHomeImg from "@/assets/themes/at-home.jpg";
-import atWorkImg from "@/assets/themes/at-work.jpg";
-import lifestyleImg from "@/assets/themes/lifestyle.jpg";
-import travelImg from "@/assets/themes/travel.jpg";
-
-// Map theme names to their images (case-insensitive matching)
-const THEME_IMAGES: Record<string, string> = {
-  "at home": atHomeImg,
-  athome: atHomeImg,
-  home: atHomeImg,
-  "at work": atWorkImg,
-  atwork: atWorkImg,
-  work: atWorkImg,
-  lifestyle: lifestyleImg,
-  travel: travelImg,
-};
 
 type Pack = Tables<"packs">;
-type Theme = Tables<"themes">;
 
 export default function CreateLobby() {
   const navigate = useNavigate();
@@ -41,13 +21,10 @@ export default function CreateLobby() {
 
   const [lobbyName, setLobbyName] = useState("");
   const [selectedPack, setSelectedPack] = useState<string>("");
-  const [selectedTheme, setSelectedTheme] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
   const [availablePacks, setAvailablePacks] = useState<string[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(true);
   const [allPacks, setAllPacks] = useState<Pack[]>([]);
-  const [themes, setThemes] = useState<Theme[]>([]);
-  const [loadingThemes, setLoadingThemes] = useState(true);
   const [gameMode, setGameMode] = useState<"live" | "async">("live");
   const [timerPreset, setTimerPreset] = useState<"quick" | "normal" | "extended">("normal");
 
@@ -99,56 +76,6 @@ export default function CreateLobby() {
       }
     }
   }, [loadingPacks, allPacks, availablePacks]);
-
-  // Load themes filtered by available packs
-  // Show all themes that are linked to any of the customer's unlocked packs via theme_packs junction table
-  useEffect(() => {
-    const loadThemes = async () => {
-      if (loadingPacks || availablePacks.length === 0) {
-        if (!loadingPacks) setLoadingThemes(false);
-        return;
-      }
-
-      try {
-        // Fetch themes and theme_packs junction data
-        const [themesRes, themePacksRes] = await Promise.all([
-          supabase.from("themes").select("*").order("name", { ascending: true }),
-          supabase.from("theme_packs").select("theme_id, pack_id"),
-        ]);
-
-        if (themesRes.error) throw themesRes.error;
-        if (themePacksRes.error) throw themePacksRes.error;
-
-        const allThemes = themesRes.data || [];
-        const themePacks = themePacksRes.data || [];
-
-        // Get theme IDs that are linked to any available pack via junction table
-        const themeIdsInAvailablePacks = new Set(
-          themePacks.filter((tp) => availablePacks.includes(tp.pack_id)).map((tp) => tp.theme_id),
-        );
-
-        // Also include themes with direct pack_id match (legacy support)
-        const filteredThemes = allThemes.filter(
-          (theme) =>
-            themeIdsInAvailablePacks.has(theme.id) || (theme.pack_id && availablePacks.includes(theme.pack_id)),
-        );
-
-        setThemes(filteredThemes);
-
-        // Auto-select first theme if available
-        if (filteredThemes.length > 0 && !selectedTheme) {
-          setSelectedTheme(filteredThemes[0].id);
-        }
-      } catch (error) {
-        console.error("Error loading themes:", error);
-        setThemes([]);
-      } finally {
-        setLoadingThemes(false);
-      }
-    };
-
-    loadThemes();
-  }, [loadingPacks, availablePacks]);
 
   // Load customer's available packs from redeemed codes
   useEffect(() => {
@@ -241,15 +168,6 @@ export default function CreateLobby() {
       return;
     }
 
-    if (!selectedTheme) {
-      toast({
-        title: "Select Theme",
-        description: "Please select a theme for the game",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsCreating(true);
 
     try {
@@ -266,7 +184,7 @@ export default function CreateLobby() {
           tenantId: tenant.id,
           packsUsed: [selectedPack],
           gameName: lobbyName.trim(),
-          themeId: selectedTheme,
+          themeId: null, // Theme will be selected by storyteller at start of each turn
           gameMode,
           timerPreset: gameMode === "live" ? timerPreset : null,
           storyTimeSeconds: gameMode === "live" ? timerSettings.story : null,
@@ -461,122 +379,6 @@ export default function CreateLobby() {
 
               {/* Timer Presets (only for Live mode) */}
               {/* Timer settings hidden - using fixed values: 10 min story, 15 min guess */}
-
-              <div className="space-y-3">
-                <Label>Select Theme</Label>
-                {loadingThemes ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {[1, 2, 3, 4].map((i) => (
-                      <Skeleton key={i} className="aspect-[3/4] rounded-xl" />
-                    ))}
-                  </div>
-                ) : themes.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No themes available</p>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Featured themes with images - always show in one row */}
-                    {(() => {
-                      const featuredThemes = themes.filter((t) => THEME_IMAGES[t.name.toLowerCase()]);
-                      const otherThemes = themes.filter((t) => !THEME_IMAGES[t.name.toLowerCase()]);
-
-                      return (
-                        <>
-                          {featuredThemes.length > 0 && (
-                            <div className="grid grid-cols-4 gap-3">
-                              {featuredThemes.map((theme) => {
-                                const isSelected = selectedTheme === theme.id;
-                                const themeImage = THEME_IMAGES[theme.name.toLowerCase()];
-
-                                return (
-                                  <button
-                                    key={theme.id}
-                                    type="button"
-                                    onClick={() => setSelectedTheme(theme.id)}
-                                    className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                                      isSelected
-                                        ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105"
-                                        : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
-                                    }`}
-                                  >
-                                    <img src={themeImage} alt={theme.name} className="w-full h-full object-cover" />
-
-                                    {isSelected && (
-                                      <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                                        <Check className="w-4 h-4 text-primary-foreground" />
-                                      </div>
-                                    )}
-
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                                      {/* <p className="text-white text-sm font-semibold text-center truncate">
-                                        {theme.name}
-                                      </p> */}
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          {/* Other themes without images */}
-                          {otherThemes.length > 0 && (
-                            <div className="grid grid-cols-4 gap-3">
-                              {otherThemes.map((theme) => {
-                                const isSelected = selectedTheme === theme.id;
-                                // Disabled themes - not clickable
-                                const disabledThemeNames = ["adult", "core", "fantasy", "horror", "sci-fi"];
-                                const isDisabled = disabledThemeNames.includes(theme.name.toLowerCase());
-
-                                return (
-                                  <button
-                                    key={theme.id}
-                                    type="button"
-                                    onClick={() => !isDisabled && setSelectedTheme(theme.id)}
-                                    disabled={isDisabled}
-                                    className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                                      isDisabled
-                                        ? "border-transparent opacity-50 cursor-not-allowed grayscale"
-                                        : isSelected
-                                          ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105"
-                                          : "border-transparent hover:border-muted-foreground/30 hover:scale-102"
-                                    }`}
-                                  >
-                                    <div
-                                      className="w-full h-full flex items-center justify-center"
-                                      style={{
-                                        backgroundColor: theme.color || undefined,
-                                        background: theme.color
-                                          ? theme.color
-                                          : "linear-gradient(to bottom right, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.4))",
-                                      }}
-                                    >
-                                      <span className="text-lg font-bold text-white text-center px-2 drop-shadow-md">
-                                        {theme.name}
-                                      </span>
-                                    </div>
-
-                                    {isSelected && !isDisabled && (
-                                      <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                                        <Check className="w-4 h-4 text-primary-foreground" />
-                                      </div>
-                                    )}
-
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                                      {/* <p className="text-white text-sm font-semibold text-center truncate">
-                                        {theme.name}
-                                      </p> */}
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">Wisps will be auto-generated based on this theme</p>
-              </div>
 
               <div className="space-y-4">
                 <Label>Select Pack</Label>

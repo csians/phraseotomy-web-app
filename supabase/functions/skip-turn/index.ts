@@ -82,21 +82,15 @@ Deno.serve(async (req) => {
       const nextStoryteller = allPlayers.find(p => p.turn_order === nextRound);
       
       if (nextStoryteller) {
-        // Get session's theme (stays same for all rounds)
-        const { data: currentSession } = await supabase
-          .from("game_sessions")
-          .select("selected_theme_id")
-          .eq("id", sessionId)
-          .single();
-
         // Create new turn for next round
+        // No theme_id - storyteller will select theme at start of their turn
         const { error: newTurnError } = await supabase
           .from("game_turns")
           .insert({
             session_id: sessionId,
             round_number: nextRound,
             storyteller_id: nextStoryteller.player_id,
-            theme_id: currentSession?.selected_theme_id || null,
+            theme_id: null, // Storyteller selects theme at start of turn
           });
 
         if (newTurnError) {
