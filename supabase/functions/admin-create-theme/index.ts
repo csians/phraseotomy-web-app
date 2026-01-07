@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { name, icon, pack_id, is_core, theme_id, update } = await req.json();
+    const { name, icon, pack_id, is_core, core_theme_type, theme_id, update } = await req.json();
 
     if (!name) {
       return new Response(
@@ -29,14 +29,23 @@ Deno.serve(async (req) => {
 
     if (update && theme_id) {
       // Update existing theme
+      // Only set core_theme_type if is_core is true, otherwise set to null
+      const updateData: any = {
+        name,
+        icon: icon || "🎮",
+        pack_id: pack_id || null,
+        is_core: is_core || false
+      };
+      
+      if (is_core) {
+        updateData.core_theme_type = core_theme_type || null;
+      } else {
+        updateData.core_theme_type = null;
+      }
+      
       const result = await supabase
         .from("themes")
-        .update({
-          name,
-          icon: icon || "🎮",
-          pack_id: pack_id || null,
-          is_core: is_core || false
-        })
+        .update(updateData)
         .eq("id", theme_id)
         .select()
         .single();
@@ -46,14 +55,23 @@ Deno.serve(async (req) => {
       console.log("Theme updated:", data);
     } else {
       // Create new theme
+      // Only set core_theme_type if is_core is true, otherwise set to null
+      const insertData: any = {
+        name,
+        icon: icon || "🎮",
+        pack_id: pack_id || null,
+        is_core: is_core || false
+      };
+      
+      if (is_core) {
+        insertData.core_theme_type = core_theme_type || null;
+      } else {
+        insertData.core_theme_type = null;
+      }
+      
       const result = await supabase
         .from("themes")
-        .insert({
-          name,
-          icon: icon || "🎮",
-          pack_id: pack_id || null,
-          is_core: is_core || false
-        })
+        .insert(insertData)
         .select()
         .single();
       

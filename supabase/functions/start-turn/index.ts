@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     const shuffledThemeElements = shuffleArray(allThemeElements || []);
     const themeElements = shuffledThemeElements.slice(0, 20);
 
-    // Get core elements (from all is_core=true themes) - we'll pick 2 random ones
+    // Get core elements (from all is_core=true themes) - we want 1 "feeling" + 1 "event" when possible
     const { data: coreThemes, error: coreThemesError } = await supabase
       .from("themes")
       .select("id")
@@ -98,27 +98,55 @@ Deno.serve(async (req) => {
       console.error("Error fetching core themes:", coreThemesError);
     }
 
-    let allCoreElements: any[] = [];
+    let selectedCoreElements: any[] = [];
+
     if (coreThemes && coreThemes.length > 0) {
-      const coreThemeIds = coreThemes.map(t => t.id);
+      const coreThemeIds = coreThemes.map((t) => t.id);
+
       const { data: elements, error: elementsError } = await supabase
         .from("elements")
-        .select("id, name, icon, image_url, color, theme_id")
+        .select("id, name, icon, image_url, color, theme_id, core_element_type")
         .in("theme_id", coreThemeIds)
         .eq("is_whisp", false);
 
-      if (!elementsError && elements) {
+      if (!elementsError && elements && elements.length > 0) {
         // Exclude elements from the currently selected theme to avoid duplicates
-        allCoreElements = elements.filter(e => e.theme_id !== themeId);
+        const allCoreElements = elements.filter((e) => e.theme_id !== themeId);
+
+        // Group elements by core_element_type (element-level, not theme-level)
+        const feelingElements = allCoreElements.filter((e) =>
+          e.core_element_type === "feelings"
+        );
+        const eventElements = allCoreElements.filter((e) =>
+          e.core_element_type === "events"
+        );
+
+        // Helper to pick 1 random element from a list
+        const pickOneRandom = (arr: any[]): any | null => {
+          if (!arr || arr.length === 0) return null;
+          const idx = Math.floor(Math.random() * arr.length);
+          return arr[idx];
+        };
+
+        const feelingChoice = pickOneRandom(feelingElements);
+        const eventChoice = pickOneRandom(eventElements);
+
+        if (feelingChoice && eventChoice) {
+          // Ideal case: 1 feeling + 1 event
+          selectedCoreElements = [feelingChoice, eventChoice];
+        } else {
+          // Fallback: behave like before and just pick any 2 core elements
+          const shuffledCoreElements = shuffleArray(allCoreElements);
+          selectedCoreElements = shuffledCoreElements.slice(0, 2);
+        }
       }
     }
 
-    // Randomly select exactly 2 core elements
-    const shuffledCoreElements = shuffleArray(allCoreElements);
-    const selectedCoreElements = shuffledCoreElements.slice(0, 2);
-
     console.log("Theme elements available:", themeElements?.length || 0);
-    console.log("Core elements selected (random 2):", selectedCoreElements.map(e => e.name));
+    console.log(
+      "Core elements selected (target: 1 feeling + 1 event, fallback any 2):",
+      selectedCoreElements.map((e) => e.name),
+    );
 
     // Pick a random whisp element from the theme
     console.log("Selecting whisp from theme elements:", theme.name);

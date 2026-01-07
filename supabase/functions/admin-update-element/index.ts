@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { element_id, name, icon, image_url, color, is_whisp } = await req.json();
+    const { element_id, name, icon, image_url, color, is_whisp, core_element_type } = await req.json();
 
     if (!element_id) {
       return new Response(
@@ -25,12 +25,42 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // If core_element_type is being updated, check if element belongs to core theme
+    if (core_element_type !== undefined) {
+      const { data: element } = await supabase
+        .from("elements")
+        .select("theme_id")
+        .eq("id", element_id)
+        .single();
+      
+      if (element?.theme_id) {
+        const { data: theme } = await supabase
+          .from("themes")
+          .select("is_core")
+          .eq("id", element.theme_id)
+          .single();
+        
+        const isCoreTheme = theme?.is_core || false;
+        
+        if (core_element_type && !isCoreTheme) {
+          return new Response(
+            JSON.stringify({ error: "core_element_type can only be set for elements in core themes" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
+
     const updates: Record<string, any> = {};
     if (name !== undefined) updates.name = name;
     if (icon !== undefined) updates.icon = icon;
     if (image_url !== undefined) updates.image_url = image_url;
     if (color !== undefined) updates.color = color;
     if (is_whisp !== undefined) updates.is_whisp = is_whisp;
+    if (core_element_type !== undefined) {
+      // If setting to null or empty, set to null. Otherwise use the value
+      updates.core_element_type = core_element_type || null;
+    }
 
     if (Object.keys(updates).length === 0) {
       return new Response(

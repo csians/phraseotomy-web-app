@@ -35,14 +35,37 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // Get unique theme IDs and check which are core
+    const themeIds = [...new Set(elements.map(e => e.theme_id))];
+    const { data: themes } = await supabase
+      .from("themes")
+      .select("id, is_core")
+      .in("id", themeIds);
+    
+    const coreThemeIds = new Set(
+      (themes || []).filter(t => t.is_core).map(t => t.id)
+    );
+
     // Prepare elements for insertion
-    const elementsToInsert = elements.map(element => ({
-      name: element.name.trim(),
-      icon: element.icon || "🔮",
-      theme_id: element.theme_id,
-      color: element.color || null,
-      is_whisp: element.is_whisp || false
-    }));
+    const elementsToInsert = elements.map(element => {
+      const isCoreTheme = coreThemeIds.has(element.theme_id);
+      const insertData: any = {
+        name: element.name.trim(),
+        icon: element.icon || "🔮",
+        theme_id: element.theme_id,
+        color: element.color || null,
+        is_whisp: element.is_whisp || false
+      };
+      
+      // Only set core_element_type if theme is core
+      if (isCoreTheme) {
+        insertData.core_element_type = element.core_element_type || null;
+      } else {
+        insertData.core_element_type = null;
+      }
+      
+      return insertData;
+    });
 
     const { data, error } = await supabase
       .from("elements")

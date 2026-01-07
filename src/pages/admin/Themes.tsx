@@ -21,6 +21,7 @@ interface Theme {
   name: string;
   icon: string;
   is_core: boolean;
+  core_theme_type: 'feelings' | 'events' | null;
   pack_id: string | null;
   created_at: string;
 }
@@ -32,6 +33,7 @@ interface Element {
   image_url: string | null;
   color: string | null;
   is_whisp: boolean;
+  core_element_type: 'feelings' | 'events' | null;
   theme_id: string | null;
   created_at: string;
 }
@@ -86,8 +88,8 @@ export default function Themes() {
   const [loading, setLoading] = useState(true);
   const [isAddThemeOpen, setIsAddThemeOpen] = useState(false);
   const [isAddElementOpen, setIsAddElementOpen] = useState(false);
-  const [newTheme, setNewTheme] = useState({ name: "", icon: "🎮", pack_ids: [] as string[], is_core: false });
-  const [newElement, setNewElement] = useState({ name: "", icon: "🔮", color: "#6366f1", is_whisp: false });
+  const [newTheme, setNewTheme] = useState({ name: "", icon: "🎮", pack_ids: [] as string[], is_core: false, core_theme_type: null as 'feelings' | 'events' | null });
+  const [newElement, setNewElement] = useState({ name: "", icon: "🔮", color: "#6366f1", is_whisp: false, core_element_type: null as 'feelings' | 'events' | null });
   const [newElementImage, setNewElementImage] = useState<File | null>(null);
   const [newElementImagePreview, setNewElementImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
@@ -178,7 +180,8 @@ export default function Themes() {
           name: newTheme.name.trim(),
           icon: newTheme.icon,
           pack_id: null, // Don't use pack_id anymore, use theme_packs junction table
-          is_core: newTheme.is_core
+          is_core: newTheme.is_core,
+          core_theme_type: newTheme.is_core ? newTheme.core_theme_type : null
         }
       });
       
@@ -210,7 +213,7 @@ export default function Themes() {
       
       toast({ title: "Theme created successfully" });
       setIsAddThemeOpen(false);
-      setNewTheme({ name: "", icon: "🎮", pack_ids: [], is_core: false });
+      setNewTheme({ name: "", icon: "🎮", pack_ids: [], is_core: false, core_theme_type: null });
       loadData();
     } catch (error) {
       toast({
@@ -261,7 +264,8 @@ export default function Themes() {
           icon: newElement.icon || "🔮",
           color: newElement.is_whisp ? null : newElement.color,
           is_whisp: newElement.is_whisp,
-          theme_id: selectedTheme.id
+          theme_id: selectedTheme.id,
+          core_element_type: selectedTheme.is_core ? newElement.core_element_type : null
         }
       });
       
@@ -291,7 +295,7 @@ export default function Themes() {
       
       toast({ title: "Element created" });
       setIsAddElementOpen(false);
-      setNewElement({ name: "", icon: "🔮", color: "#6366f1", is_whisp: false });
+      setNewElement({ name: "", icon: "🔮", color: "#6366f1", is_whisp: false, core_element_type: null });
       setNewElementImage(null);
       setNewElementImagePreview(null);
       loadElements(selectedTheme.id);
@@ -319,6 +323,7 @@ export default function Themes() {
           name: editingElement.name.trim(),
           icon: editingElement.icon,
           color: editingElement.is_whisp ? null : editingElement.color,
+          core_element_type: selectedTheme?.is_core ? editingElement.core_element_type : null
         }
       });
       
@@ -675,7 +680,7 @@ export default function Themes() {
                 <Dialog open={isAddThemeOpen} onOpenChange={(open) => {
                   setIsAddThemeOpen(open);
                   if (!open) {
-                    setNewTheme({ name: "", icon: "🎮", pack_ids: [], is_core: false });
+                    setNewTheme({ name: "", icon: "🎮", pack_ids: [], is_core: false, core_theme_type: null });
                   }
                 }}>
                   <DialogTrigger asChild>
@@ -744,11 +749,31 @@ export default function Themes() {
                           type="checkbox"
                           id="is_core"
                           checked={newTheme.is_core}
-                          onChange={(e) => setNewTheme({ ...newTheme, is_core: e.target.checked })}
+                          onChange={(e) => setNewTheme({ ...newTheme, is_core: e.target.checked, core_theme_type: e.target.checked ? newTheme.core_theme_type : null })}
                           className="rounded border-border"
                         />
                         <Label htmlFor="is_core">Core Theme (base game)</Label>
                       </div>
+                      {newTheme.is_core && (
+                        <div className="space-y-2">
+                          <Label>Core Theme Type *</Label>
+                          <Select
+                            value={newTheme.core_theme_type || ""}
+                            onValueChange={(value) => setNewTheme({ ...newTheme, core_theme_type: value === "" ? null : value as 'feelings' | 'events' })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="feelings">Feelings</SelectItem>
+                              <SelectItem value="events">Events</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Select whether this core theme contains feelings or events elements
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setIsAddThemeOpen(false)}>Cancel</Button>
@@ -832,6 +857,7 @@ export default function Themes() {
 
           {/* Elements for Selected Theme - Split into Visual and Whisp */}
           <div className="space-y-6">
+    
             {/* Visual Elements Section */}
             <Card>
               <CardHeader>
@@ -943,6 +969,26 @@ export default function Themes() {
                               )}
                             </div>
                           </div>
+                          {selectedTheme.is_core && (
+                            <div className="space-y-2">
+                              <Label>Core Element Type</Label>
+                              <Select
+                                value={newElement.core_element_type || ""}
+                                onValueChange={(value) => setNewElement({ ...newElement, core_element_type: value === "" ? null : value as 'feelings' | 'events' })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select type (optional)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="feelings">Feelings</SelectItem>
+                                  <SelectItem value="events">Events</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                Classify this element as feelings or events (for core themes only)
+                              </p>
+                            </div>
+                          )}
                         </div>
                         <DialogFooter>
                           <Button variant="outline" onClick={() => setIsAddElementOpen(false)}>Cancel</Button>
@@ -1029,6 +1075,26 @@ export default function Themes() {
                                 )}
                               </div>
                             </div>
+                            {selectedTheme?.is_core && (
+                              <div className="space-y-2">
+                                <Label>Core Element Type</Label>
+                                <Select
+                                  value={editingElement.core_element_type || ""}
+                                  onValueChange={(value) => setEditingElement({ ...editingElement, core_element_type: value === "" ? null : value as 'feelings' | 'events' })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select type (optional)" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="feelings">Feelings</SelectItem>
+                                    <SelectItem value="events">Events</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                  Classify this element as feelings or events (for core themes only)
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )}
                         <DialogFooter>
@@ -1060,13 +1126,14 @@ export default function Themes() {
                             <TableHead>Element</TableHead>
                             <TableHead>Color</TableHead>
                             <TableHead>Image/SVG</TableHead>
+                            {selectedTheme.is_core && <TableHead>Type</TableHead>}
                             <TableHead className="w-32">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {elements.filter(e => !e.is_whisp).length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={4} className="text-center text-muted-foreground">
+                              <TableCell colSpan={selectedTheme.is_core ? 5 : 4} className="text-center text-muted-foreground">
                                 No visual elements yet
                               </TableCell>
                             </TableRow>
@@ -1106,6 +1173,17 @@ export default function Themes() {
                                     <span className="text-muted-foreground text-xs">No image</span>
                                   )}
                                 </TableCell>
+                                {selectedTheme.is_core && (
+                                  <TableCell>
+                                    {element.core_element_type ? (
+                                      <Badge variant="secondary" className="text-xs">
+                                        {element.core_element_type === 'feelings' ? 'Feelings' : 'Events'}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs">-</span>
+                                    )}
+                                  </TableCell>
+                                )}
                                 <TableCell>
                                   <div className="flex gap-1">
                                     <Button
