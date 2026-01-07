@@ -34,6 +34,7 @@ const Play = () => {
   const [availablePacks, setAvailablePacks] = useState<{ id: string; name: string; description: string | null }[]>([]);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
 
+  const [isJoining, setIsJoining] = useState(false);
   // Check if customer needs to enter their name
   const customerNeedsName = (cust: ShopifyCustomer | null): boolean => {
     if (!cust) return false;
@@ -304,6 +305,8 @@ const Play = () => {
   }, [loading, customer, shopDomain]);
 
   const handleJoinGame = async () => {
+    if (isJoining) return; // Prevent multiple submissions
+    setIsJoining(true);
     try {
       // Validate lobby code
       const validatedLobbyCode = validateInput(lobbyCodeSchema, lobbyCode);
@@ -379,6 +382,7 @@ const Play = () => {
           description: errorMessage,
           variant: "destructive",
         });
+        setIsJoining(false);
         return;
       }
 
@@ -416,6 +420,7 @@ const Play = () => {
         description: error instanceof Error ? error.message : "Please check your lobby code",
         variant: "destructive",
       });
+      setIsJoining(false);
     }
   };
 
@@ -796,8 +801,8 @@ const Play = () => {
                   maxLength={6}
                 />
               </div>
-              <Button onClick={handleJoinGame} className="w-full" size="lg">
-                Join Game
+              <Button onClick={handleJoinGame} className="w-full" size="lg" disabled={isJoining}>
+                {isJoining ? "Joining Game..." : "Join Game"}
               </Button>
             </CardContent>
           </Card>

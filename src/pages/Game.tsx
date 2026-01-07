@@ -1603,15 +1603,17 @@ export default function Game() {
 
         {/* Game Content */}
         <main className="flex-1 p-4">
-          {/* Mode Transition Loading Overlay - prevents flicker during mode selection */}
-          {isModeTransitioning && (
+        
+        {/* Mode Transition Loading Overlay - prevents flicker during mode selection */}
+            {/* {isModeTransitioning && (
             <div className="min-h-screen flex items-center justify-center">
               <div className="flex flex-col items-center justify-center py-12 gap-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 <p className="text-lg text-muted-foreground">Setting up your turn...</p>
               </div>
             </div>
-          )}
+          )} */}
+        
           {/* Theme Selection Phase - Storyteller chooses theme */}
           {gamePhase === "selecting_theme" && isStoryteller && (
             <div className="min-h-screen flex items-center justify-center p-4">
