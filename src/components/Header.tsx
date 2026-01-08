@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { ShoppingBag, User, FileText, Menu } from "lucide-react";
+import { ShoppingBag, User, FileText, Menu, Ticket } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import phraseotomyLogo from "@/assets/phraseotomy-logo.avif";
 
 const Header = () => {
+  const navigate = useNavigate();
   const [customerName, setCustomerName] = useState<string>("");
   const [customerEmail, setCustomerEmail] = useState<string>("");
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
@@ -122,10 +123,10 @@ const Header = () => {
                   </h3>
                   <p className="text-sm text-muted-foreground">{customerEmail}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2">
                   <Button
                     variant="outline"
-                    className="flex-1 gap-2"
+                    className="w-full gap-2"
                     onClick={() =>
                       window.open(
                         "https://shopify.com/95234130268/account/orders?locale=en&region_country=GB",
@@ -138,7 +139,19 @@ const Header = () => {
                   </Button>
                   <Button
                     variant="outline"
-                    className="flex-1 gap-2"
+                    className="w-full gap-2"
+                    onClick={() => {
+                      const currentUrl = window.location.href;
+                      const baseUrl = currentUrl.split('#')[0];
+                      window.open(`${baseUrl}#/redeem`, "_blank");
+                    }}
+                  >
+                    <Ticket className="h-4 w-4" />
+                    REDEEM CODE
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
                     onClick={() =>
                       window.open(
                         "https://shopify.com/95234130268/account/profile?locale=en&region_country=GB",

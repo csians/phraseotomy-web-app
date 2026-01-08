@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import CreateLobby from "./pages/CreateLobby";
 import Lobby from "./pages/Lobby";
 import Game from "./pages/Game";
+import RedeemCode from "./pages/Redeem";
 
 import NotFound from "./pages/NotFound";
 import AdminHome from "./pages/admin/AdminHome";
@@ -148,6 +149,7 @@ const App = () => (
           <Route path="/create-lobby" element={<CreateLobby />} />
           <Route path="/lobby/:sessionId" element={<Lobby />} />
           <Route path="/game/:sessionId" element={<Game />} />
+          <Route path="/redeem" element={<RedeemCode />} />
           <Route path="/admin" element={<AdminHome />} />
           <Route path="/admin/packs" element={<Packs />} />
           <Route path="/admin/codes" element={<Codes />} />
