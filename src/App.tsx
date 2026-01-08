@@ -74,11 +74,11 @@ const RootRedirect = () => {
     const currentPath = window.location.hash.replace('#', '');
     const urlParams = getAllUrlParams();
     
-    
-    // CRITICAL: Don't redirect if already on lobby/game/redeem pages
-    if (currentPath.startsWith('/lobby/') || currentPath.startsWith('/game/') || currentPath === '/redeem') {
-      console.log('Already on lobby/game/redeem page, skipping RootRedirect entirely');
-      setRedirectTarget(currentPath); // Stay on current path
+    // CRITICAL: RootRedirect should only handle root path '/'
+    // If we're on any other path, don't redirect - let React Router handle it
+    if (currentPath !== '/' && currentPath !== '') {
+      console.log('Not on root path, skipping RootRedirect:', currentPath);
+      setRedirectTarget(null); // Don't redirect, let React Router handle it
       return;
     }
     
@@ -127,6 +127,11 @@ const RootRedirect = () => {
       setRedirectTarget('/login');
     }
   }, []);
+
+  // If redirectTarget is null, it means we're on a protected path - don't redirect
+  if (redirectTarget === null) {
+    return null; // Let React Router handle the route
+  }
 
   if (!redirectTarget) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
