@@ -75,9 +75,9 @@ const RootRedirect = () => {
     const urlParams = getAllUrlParams();
     
     
-    // CRITICAL: Don't redirect if already on lobby/game pages
-    if (currentPath.startsWith('/lobby/') || currentPath.startsWith('/game/')) {
-      console.log('Already on lobby/game page, skipping RootRedirect entirely');
+    // CRITICAL: Don't redirect if already on lobby/game/redeem pages
+    if (currentPath.startsWith('/lobby/') || currentPath.startsWith('/game/') || currentPath === '/redeem') {
+      console.log('Already on lobby/game/redeem page, skipping RootRedirect entirely');
       setRedirectTarget(currentPath); // Stay on current path
       return;
     }
