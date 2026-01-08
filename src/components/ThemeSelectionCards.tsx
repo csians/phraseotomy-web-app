@@ -2,20 +2,32 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Lock } from "lucide-react";
 import {
   Briefcase, Home, Plane, Bike, Wine, Rocket, Skull, Sparkles,
   Music, Gamepad2, Heart, Camera, LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Theme images
+// Theme images - Core themes
 import atHomeImg from "@/assets/themes/at-home.jpg";
 import atWorkImg from "@/assets/themes/at-work.jpg";
 import lifestyleImg from "@/assets/themes/lifestyle.jpg";
 import travelImg from "@/assets/themes/travel.jpg";
 
+// Theme images - Expansion themes (regular)
+import adultTileImg from "@/assets/themes/adult tile.png";
+import fantasyTileImg from "@/assets/themes/fantasy tile.png";
+import horrorTileImg from "@/assets/themes/horror tile.png";
+import sciFiTileImg from "@/assets/themes/sci-fi tile.png";
+
+// Theme images - Expansion themes (grey/locked versions)
+import adultTileGreyImg from "@/assets/themes/adult tile grey.png";
+import fantasyTileGreyImg from "@/assets/themes/fantasy tile grey.png";
+import horrorTileGreyImg from "@/assets/themes/horror tile grey.png";
+import sciFiTileGreyImg from "@/assets/themes/sci-fi tile grey.png";
+
 // Map theme names to their images (case-insensitive matching)
+// Regular images for unlocked themes
 const THEME_IMAGES: Record<string, string> = {
   "at home": atHomeImg,
   athome: atHomeImg,
@@ -25,6 +37,22 @@ const THEME_IMAGES: Record<string, string> = {
   work: atWorkImg,
   lifestyle: lifestyleImg,
   travel: travelImg,
+  adult: adultTileImg,
+  fantasy: fantasyTileImg,
+  horror: horrorTileImg,
+  "sci-fi": sciFiTileImg,
+  scifi: sciFiTileImg,
+  "sci fi": sciFiTileImg,
+};
+
+// Map theme names to their grey images (for locked themes)
+const THEME_IMAGES_GREY: Record<string, string> = {
+  adult: adultTileGreyImg,
+  fantasy: fantasyTileGreyImg,
+  horror: horrorTileGreyImg,
+  "sci-fi": sciFiTileGreyImg,
+  scifi: sciFiTileGreyImg,
+  "sci fi": sciFiTileGreyImg,
 };
 
 const iconMap: Record<string, LucideIcon> = {
@@ -91,7 +119,14 @@ export function ThemeSelectionCards({
     const IconComponent = iconMap[theme.icon] || Sparkles;
     const isSelected = selectedThemeId === theme.id;
     const isLocked = !theme.isUnlocked;
-    const themeImage = THEME_IMAGES[theme.name.toLowerCase()];
+    const themeNameLower = theme.name.toLowerCase();
+    
+    // Get the appropriate image - use grey version if locked and available, otherwise use regular
+    let themeImage = THEME_IMAGES[themeNameLower];
+    if (isLocked && THEME_IMAGES_GREY[themeNameLower]) {
+      themeImage = THEME_IMAGES_GREY[themeNameLower];
+    }
+    
     const isCoreTheme = coreThemeNames.includes(theme.name);
 
     return (
@@ -130,17 +165,6 @@ export function ThemeSelectionCards({
 
         {/* Overlay gradient for text readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-        {isLocked && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-xl z-10">
-            <div className="flex flex-col items-center gap-2">
-              <Lock className="h-6 w-6 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">
-                {theme.packName || "Expansion Pack"}
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* Content - only show theme name if NO image exists */}
         {!themeImage && (
