@@ -202,7 +202,10 @@ const RedeemCode = () => {
                 Please log in to your account to access the redeem code page.
               </p>
               <Button
-                onClick={() => navigate("/login")}
+                onClick={() => {
+                  // Redirect to phraseotomy.com login page
+                  window.location.href = "https://phraseotomy.com/#/login";
+                }}
                 className="w-full"
                 size="lg"
               >

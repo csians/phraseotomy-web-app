@@ -141,9 +141,7 @@ const Header = () => {
                     variant="outline"
                     className="w-full gap-2"
                     onClick={() => {
-                      const currentUrl = window.location.href;
-                      const baseUrl = currentUrl.split('#')[0];
-                      window.open(`${baseUrl}#/redeem`, "_blank");
+                      window.open("https://phraseotomy.com/#/redeem", "_blank");
                     }}
                   >
                     <Ticket className="h-4 w-4" />
