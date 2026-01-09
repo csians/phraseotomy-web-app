@@ -9,13 +9,20 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { NamePromptDialog } from "@/components/NamePromptDialog";
 import Header from "@/components/Header";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import type { TenantConfig, ShopifyCustomer } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
 import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
 import { lobbyCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
-import { redeemCode } from "@/lib/redemption";
 import { getAllUrlParams } from "@/lib/urlUtils";
 
 const Play = () => {
@@ -29,10 +36,9 @@ const Play = () => {
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [lobbyCode, setLobbyCode] = useState("");
-  const [redemptionCode, setRedemptionCode] = useState("");
-  const [isRedeeming, setIsRedeeming] = useState(false);
   const [availablePacks, setAvailablePacks] = useState<{ id: string; name: string; description: string | null }[]>([]);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [showRedeemDialog, setShowRedeemDialog] = useState(false);
 
   const [isJoining, setIsJoining] = useState(false);
   // Check if customer needs to enter their name
@@ -425,75 +431,15 @@ const Play = () => {
   };
 
   const handleHostGame = () => {
+    if (!hasActiveLicenses) {
+      setShowRedeemDialog(true);
+      return;
+    }
     navigate("/create-lobby", {
       state: { customer, shopDomain, tenant },
     });
   };
 
-  const handleRedeemCode = async () => {
-    if (!customer || !shopDomain) {
-      toast({
-        title: "Error",
-        description: "Please log in to redeem a code.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (redemptionCode.length !== 6) {
-      toast({
-        title: "Invalid Code",
-        description: "Please enter a 6-character code.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsRedeeming(true);
-    try {
-      const result = await redeemCode(redemptionCode, customer.id, shopDomain);
-
-      if (result.success) {
-        toast({
-          title: "Success!",
-          description: result.message,
-        });
-
-        // Clear the input
-        setRedemptionCode("");
-
-        // Refresh customer data to show updated licenses
-        setDataLoading(true);
-        try {
-          const [customerLicenses, customerSessions] = await Promise.all([
-            getCustomerLicenses(customer.id, shopDomain),
-            getCustomerSessions(customer.id, shopDomain),
-          ]);
-          setLicenses(customerLicenses);
-          setSessions(customerSessions);
-        } catch (error) {
-          console.error("Error refreshing customer data:", error);
-        } finally {
-          setDataLoading(false);
-        }
-      } else {
-        toast({
-          title: "Redemption Failed",
-          description: result.message,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Error redeeming code:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRedeeming(false);
-    }
-  };
 
   const handleLogout = () => {
     // Get the custom domain from localStorage (e.g., phraseotomy.com) before clearing
@@ -581,6 +527,35 @@ const Play = () => {
             onNameSaved={handleNameSaved}
           />
         )}
+
+        {/* Redeem Code Dialog */}
+        <Dialog open={showRedeemDialog} onOpenChange={setShowRedeemDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Redeem Code Required</DialogTitle>
+              <DialogDescription>
+                If you want to host a game, you need to redeem a code first.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowRedeemDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  window.open("https://phraseotomy.com/pages/redeem-code", "_blank");
+                  setShowRedeemDialog(false);
+                }}
+                className="bg-game-yellow hover:bg-game-yellow/90 text-game-black"
+              >
+                Redeem Code
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Logo and Branding */}
         <div className="w-full max-w-2xl text-center pt-8">
@@ -675,26 +650,6 @@ const Play = () => {
                   </div>
                 </>
               )}
-
-              {/* Redeem Code Section */}
-              <div className="pt-4 border-t border-border space-y-3">
-                <label className="text-sm font-medium">
-                  {hasActiveLicenses ? "Redeem another code" : "Redeem a code"}
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Enter code"
-                    value={redemptionCode}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setRedemptionCode(e.target.value.toUpperCase())
-                    }
-                    maxLength={6}
-                  />
-                  <Button onClick={handleRedeemCode} disabled={redemptionCode.length !== 6 || isRedeeming}>
-                    {isRedeeming ? "Redeeming..." : "Redeem"}
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
@@ -703,25 +658,17 @@ const Play = () => {
             <CardHeader>
               <CardTitle className="text-lg">Host New Game</CardTitle>
               <CardDescription>
-                {hasActiveLicenses
-                  ? "Start a new game session and invite friends"
-                  : "You're in the right place! Redeem a code above to unlock game packs"}
+                Start a new game session and invite friends
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               <Button
                 onClick={handleHostGame}
-                disabled={!hasActiveLicenses}
-                className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold"
                 size="lg"
               >
                 Host New Game
               </Button>
-              {!hasActiveLicenses && (
-                <div className="bg-muted/50 border border-border rounded-lg p-3 text-center">
-                  <p className="text-sm text-muted-foreground">👆 Enter a code above to get started</p>
-                </div>
-              )}
             </CardContent>
           </Card>
 
