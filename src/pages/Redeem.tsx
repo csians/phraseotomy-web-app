@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +10,6 @@ import type { ShopifyCustomer } from "@/lib/types";
 import Header from "@/components/Header";
 
 const RedeemCode = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [customer, setCustomer] = useState<ShopifyCustomer | null>(null);
   const [shopDomain, setShopDomain] = useState<string | null>(null);
@@ -112,7 +110,7 @@ const RedeemCode = () => {
     };
 
     checkAuthentication();
-  }, [navigate]);
+  }, []);
 
   const handleRedeemCode = async () => {
     if (!customer || !shopDomain) {
@@ -146,9 +144,10 @@ const RedeemCode = () => {
         // Clear the input
         setRedemptionCode("");
 
-        // Redirect to play page after successful redemption
+        // Open play page in new window after successful redemption
         setTimeout(() => {
-          navigate("/play/host", { replace: true });
+          const playUrl = `${window.location.origin}${window.location.pathname}#/play/host`;
+          window.open(playUrl, "_blank");
         }, 1500); // Small delay to show success message
       } else {
         toast({
