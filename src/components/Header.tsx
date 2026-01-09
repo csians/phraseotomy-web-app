@@ -141,18 +141,8 @@ const Header = () => {
                     variant="outline"
                     className="w-full gap-2"
                     onClick={() => {
-                      // Check if we're in an iframe (Shopify proxy context)
-                      const isInIframe = window.self !== window.top;
-                      const hasProxyConfig = window.__PHRASEOTOMY_CONFIG__;
-                      const isProxyPath = window.location.pathname.includes('/apps/phraseotomy');
-                      
-                      if (isInIframe || hasProxyConfig || isProxyPath) {
-                        // Navigate within the same iframe using React Router
-                        navigate("/redeem");
-                      } else {
-                        // Open in new window using the proxy path to maintain iframe context
-                        window.open("https://phraseotomy.com/apps/phraseotomy#/redeem", "_blank");
-                      }
+                      // Always open in new tab
+                      window.open("https://phraseotomy.com/pages/redeem-code", "_blank");
                     }}
                   >
                     <Ticket className="h-4 w-4" />

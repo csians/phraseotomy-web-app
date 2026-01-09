@@ -77,7 +77,8 @@ const RootRedirect = () => {
     
     // CRITICAL: RootRedirect should only handle root path '/'
     // If we're on any other path, don't redirect - let React Router handle it
-    if (currentPath !== '/' && currentPath !== '') {
+    // Also exclude redeem-code path to prevent redirects
+    if (currentPath !== '/' && currentPath !== '' && currentPath !== '/redeem-code') {
       console.log('Not on root path, skipping RootRedirect:', currentPath);
       setRedirectTarget(null); // Don't redirect, let React Router handle it
       return;
@@ -164,6 +165,7 @@ const App = () => (
           <Route path="/lobby/:sessionId" element={<Lobby />} />
           <Route path="/game/:sessionId" element={<Game />} />
           <Route path="/redeem" element={<RedeemCode />} />
+          <Route path="/redeem-code" element={<RedeemCode />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<AdminHome />} />
           <Route path="/admin/packs" element={<Packs />} />
