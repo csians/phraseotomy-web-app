@@ -146,7 +146,7 @@ const RedeemCode = () => {
 
         // Open play page in new window after successful redemption
         setTimeout(() => {
-          const playUrl = `${window.location.origin}${window.location.pathname}#/play/host`;
+          const playUrl = 'https://phraseotomy.com/apps/phraseotomy';
           window.open(playUrl, "_blank");
         }, 1500); // Small delay to show success message
       } else {
