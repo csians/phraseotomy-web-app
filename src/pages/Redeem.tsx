@@ -145,6 +145,11 @@ const RedeemCode = () => {
 
         // Clear the input
         setRedemptionCode("");
+
+        // Redirect to play page after successful redemption
+        setTimeout(() => {
+          navigate("/play/host", { replace: true });
+        }, 1500); // Small delay to show success message
       } else {
         toast({
           title: "Redemption Failed",
