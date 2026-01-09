@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { redeemCode } from "@/lib/redemption";
 import type { ShopifyCustomer } from "@/lib/types";
-import Header from "@/components/Header";
 
 const RedeemCode = () => {
   const { toast } = useToast();
@@ -171,7 +170,6 @@ const RedeemCode = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
         <div className="container mx-auto px-4 py-8 flex items-center justify-center">
           <Card className="w-full max-w-md">
             <CardHeader>
@@ -192,7 +190,6 @@ const RedeemCode = () => {
   if (isNotLoggedIn) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
         <div className="container mx-auto px-4 py-8 flex items-center justify-center">
           <Card className="w-full max-w-md">
             <CardHeader>
@@ -224,7 +221,6 @@ const RedeemCode = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto space-y-6">
           <div>
