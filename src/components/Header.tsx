@@ -142,7 +142,7 @@ const Header = () => {
                     className="w-full gap-2"
                     onClick={() => {
                       // Always open in new tab
-                      window.open("https://phraseotomy.com/app/phraseotomy/redeem", "_blank");
+                      window.open("https://phraseotomy.com/pages/redeem-code", "_blank");
                     }}
                   >
                     <Ticket className="h-4 w-4" />

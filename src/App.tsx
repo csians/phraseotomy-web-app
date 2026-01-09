@@ -11,7 +11,6 @@ import CreateLobby from "./pages/CreateLobby";
 import Lobby from "./pages/Lobby";
 import Game from "./pages/Game";
 import RedeemCode from "./pages/Redeem";
-import Profile from "./pages/Profile";
 
 import NotFound from "./pages/NotFound";
 import AdminHome from "./pages/admin/AdminHome";
@@ -116,10 +115,10 @@ const RootRedirect = () => {
       console.log('Accessed from Shopify admin, redirecting to /admin');
       setRedirectTarget('/admin');
     }
-    // If accessed via proxy path and authenticated, go to Profile page
+    // If accessed via proxy path and authenticated, go to play page
     else if (isProxyPath && (customerData || (storedCustomerData && sessionToken))) {
-      console.log('Accessed via proxy path, redirecting to /apps/phraseotomy (Profile)');
-      setRedirectTarget('/apps/phraseotomy');
+      console.log('Accessed via proxy path, redirecting to /play/host');
+      setRedirectTarget('/play/host');
     }
     // If customer is authenticated via iframe, go to play page
     else if (customerData) {
@@ -160,12 +159,11 @@ const App = () => (
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
           <Route path="/play/host" element={<Play />} />
-          <Route path="/apps/phraseotomy" element={<Profile />} />
+          <Route path="/apps/phraseotomy" element={<Play />} />
           <Route path="/create-lobby" element={<CreateLobby />} />
           <Route path="/lobby/:sessionId" element={<Lobby />} />
           <Route path="/game/:sessionId" element={<Game />} />
           <Route path="/redeem" element={<RedeemCode />} />
-          <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<AdminHome />} />
           <Route path="/admin/packs" element={<Packs />} />
           <Route path="/admin/codes" element={<Codes />} />
