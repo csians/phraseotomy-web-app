@@ -41,6 +41,18 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const queryParams = url.searchParams;
   const shop = queryParams.get("shop");
+  
+  // Extract route from URL path (e.g., /apps/phraseotomy/redeem-code -> /redeem-code)
+  const pathParts = url.pathname.split('/').filter(p => p);
+  let targetRoute = "/play/host"; // default route
+  if (pathParts.length > 2 && pathParts[0] === 'apps' && pathParts[1] === 'phraseotomy') {
+    // Extract route after /apps/phraseotomy
+    const routePart = pathParts.slice(2).join('/');
+    if (routePart) {
+      targetRoute = `/${routePart}`;
+    }
+  }
+  console.log("🔍 [ROUTE_DETECTION] URL path:", url.pathname, "-> Target route:", targetRoute);
 
   console.log("Proxy request received:", {
     shop,
@@ -314,7 +326,7 @@ Deno.serve(async (req) => {
     });
 
     // Pass token and customer data to app
-    return new Response(generateAppHtml(tenant, shop, customerData, nonce), {
+    return new Response(generateAppHtml(tenant, shop, customerData, nonce, null, targetRoute), {
       status: 200,
       headers,
     });
@@ -421,6 +433,7 @@ function generateAppHtml(
   customer: any = null,
   nonce: string,
   guestSession: string | null = null,
+  targetRoute: string = "/play/host",
 ): string {
   // Sanitize tenant data for embedding
   const tenantConfig = {
@@ -455,8 +468,8 @@ function generateAppHtml(
     configParams.set("guestSession", guestSession);
   }
 
-  // Determine the route - if guest session, go to lobby; otherwise go to play/host
-  const route = guestSession ? `/lobby/${guestSession}` : "/play/host";
+  // Determine the route - if guest session, go to lobby; otherwise use targetRoute
+  const route = guestSession ? `/lobby/${guestSession}` : targetRoute;
 
   // For HashRouter, parameters must come before the hash
   const appUrl = `${baseUrl}/?${configParams.toString()}#${route}`;

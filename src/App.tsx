@@ -164,7 +164,6 @@ const App = () => (
           <Route path="/create-lobby" element={<CreateLobby />} />
           <Route path="/lobby/:sessionId" element={<Lobby />} />
           <Route path="/game/:sessionId" element={<Game />} />
-          <Route path="/redeem" element={<RedeemCode />} />
           <Route path="/redeem-code" element={<RedeemCode />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<AdminHome />} />
