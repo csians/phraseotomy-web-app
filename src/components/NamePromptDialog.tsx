@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,21 +16,43 @@ interface NamePromptDialogProps {
   open: boolean;
   customerId: string;
   shopDomain: string;
+  customerEmail: string | null;
   onNameSaved: (name: string) => void;
 }
+
+// Function to extract and format name from email
+const extractNameFromEmail = (email: string | null): string => {
+  if (!email) return "";
+  
+  // Extract part before @
+  const emailPrefix = email.split("@")[0];
+  
+  // Replace special characters (., _, -, +, etc.) with spaces
+  const withSpaces = emailPrefix.replace(/[._\-+]/g, " ");
+  
+  // Split by spaces and capitalize each word
+  const words = withSpaces.split(/\s+/).filter(word => word.length > 0);
+  const capitalizedWords = words.map(word => {
+    if (word.length === 0) return "";
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+  
+  return capitalizedWords.join(" ");
+};
 
 export function NamePromptDialog({
   open,
   customerId,
   shopDomain,
+  customerEmail,
   onNameSaved,
 }: NamePromptDialogProps) {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = async () => {
-    const trimmedName = name.trim();
+  const handleSave = useCallback(async (nameToSave?: string) => {
+    const trimmedName = (nameToSave || name).trim();
     
     if (!trimmedName) {
       toast({
@@ -95,7 +117,17 @@ export function NamePromptDialog({
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [customerId, shopDomain, name, onNameSaved, toast]);
+
+  // Auto-extract name from email when dialog opens
+  useEffect(() => {
+    if (open && customerEmail && !name) {
+      const extractedName = extractNameFromEmail(customerEmail);
+      if (extractedName) {
+        setName(extractedName);
+      }
+    }
+  }, [open, customerEmail, name]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !isSaving) {
@@ -113,9 +145,13 @@ export function NamePromptDialog({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle className="text-2xl text-center">What should we call you?</DialogTitle>
+          <DialogTitle className="text-2xl text-center">Welcome!</DialogTitle>
           <DialogDescription className="text-center">
-            Enter your name to personalize your experience.
+            {isSaving 
+              ? "Setting up your profile..." 
+              : name 
+                ? `We've extracted your name "${name}" from your email. You can edit it below if needed.`
+                : "Enter your name to personalize your experience."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -128,11 +164,16 @@ export function NamePromptDialog({
               onChange={(e) => setName(e.target.value)}
               onKeyPress={handleKeyPress}
               disabled={isSaving}
-              autoFocus
+              autoFocus={!isSaving}
             />
+            {customerEmail && (
+              <p className="text-xs text-muted-foreground">
+                Extracted from: {customerEmail}
+              </p>
+            )}
           </div>
           <Button 
-            onClick={handleSave} 
+            onClick={() => handleSave()} 
             className="w-full" 
             disabled={isSaving || !name.trim()}
           >

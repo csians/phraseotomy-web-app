@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { NamePromptDialog } from "@/components/NamePromptDialog";
 import Header from "@/components/Header";
 import {
   Dialog,
@@ -37,8 +36,8 @@ const Play = () => {
   const [dataLoading, setDataLoading] = useState(false);
   const [lobbyCode, setLobbyCode] = useState("");
   const [availablePacks, setAvailablePacks] = useState<{ id: string; name: string; description: string | null }[]>([]);
-  const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
+  const [nameAutoSaveAttempted, setNameAutoSaveAttempted] = useState(false);
 
   const [isJoining, setIsJoining] = useState(false);
   // Check if customer needs to enter their name
@@ -47,6 +46,72 @@ const Play = () => {
     const hasName = cust.name && cust.name.trim().length > 0;
     const hasFirstName = cust.firstName && cust.firstName.trim().length > 0;
     return !hasName && !hasFirstName;
+  };
+
+  // Function to extract and format name from email
+  const extractNameFromEmail = (email: string | null): string => {
+    if (!email) return "";
+    
+    // Extract part before @
+    const emailPrefix = email.split("@")[0];
+    
+    // Replace special characters (., _, -, +, etc.) with spaces
+    const withSpaces = emailPrefix.replace(/[._\-+]/g, " ");
+    
+    // Split by spaces and capitalize each word
+    const words = withSpaces.split(/\s+/).filter(word => word.length > 0);
+    const capitalizedWords = words.map(word => {
+      if (word.length === 0) return "";
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    });
+    
+    return capitalizedWords.join(" ");
+  };
+
+  // Auto-save name from email without showing dialog
+  const autoSaveNameFromEmail = async (customerData: ShopifyCustomer, shopDomain: string) => {
+    if (!customerData.email) return;
+    
+    const extractedName = extractNameFromEmail(customerData.email);
+    if (!extractedName || extractedName.length < 2) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("update-customer-name", {
+        body: {
+          customer_id: customerData.id,
+          customer_name: extractedName,
+          shop_domain: shopDomain,
+        },
+      });
+
+      if (error || data?.error) {
+        console.error("Error auto-saving name:", error || data?.error);
+        return;
+      }
+
+      // Update customer state with new name
+      const nameParts = extractedName.split(" ");
+      setCustomer({
+        ...customerData,
+        name: extractedName,
+        firstName: nameParts[0],
+        lastName: nameParts.slice(1).join(" ") || null,
+      });
+
+      // Update localStorage with new name
+      const existingData = localStorage.getItem("customerData");
+      if (existingData) {
+        const parsed = JSON.parse(existingData);
+        parsed.name = extractedName;
+        parsed.first_name = nameParts[0];
+        parsed.last_name = nameParts.slice(1).join(" ") || null;
+        localStorage.setItem("customerData", JSON.stringify(parsed));
+      }
+
+      console.log("✅ Name auto-saved from email:", extractedName);
+    } catch (error) {
+      console.error("Error auto-saving name:", error);
+    }
   };
 
   // Store customer in database on first login
@@ -264,12 +329,13 @@ const Play = () => {
     initializeSession();
   }, [navigate]);
 
-  // Show name prompt dialog when customer has no name
+  // Auto-save name from email when customer has no name (no dialog)
   useEffect(() => {
-    if (!loading && customer && customerNeedsName(customer)) {
-      setShowNamePrompt(true);
+    if (!loading && customer && shopDomain && customerNeedsName(customer) && customer.email && !nameAutoSaveAttempted) {
+      setNameAutoSaveAttempted(true);
+      autoSaveNameFromEmail(customer, shopDomain);
     }
-  }, [loading, customer]);
+  }, [loading, customer, shopDomain, nameAutoSaveAttempted]);
 
   // Load customer data when logged in
   useEffect(() => {
@@ -500,33 +566,11 @@ const Play = () => {
     null as Date | null,
   );
 
-  const handleNameSaved = (name: string) => {
-    setShowNamePrompt(false);
-    // Update customer state with new name
-    if (customer) {
-      const nameParts = name.split(" ");
-      setCustomer({
-        ...customer,
-        name: name,
-        firstName: nameParts[0],
-        lastName: nameParts.slice(1).join(" ") || null,
-      });
-    }
-  };
 
   return (
     <div className="min-h-screen-safe bg-game-black flex flex-col">
       <Header />
       <div className="flex-1 flex flex-col items-center justify-between px-4 py-8 pb-safe">
-        {/* Name Prompt Dialog */}
-        {customer && shopDomain && (
-          <NamePromptDialog
-            open={showNamePrompt}
-            customerId={customer.id}
-            shopDomain={shopDomain}
-            onNameSaved={handleNameSaved}
-          />
-        )}
 
         {/* Redeem Code Dialog */}
         <Dialog open={showRedeemDialog} onOpenChange={setShowRedeemDialog}>

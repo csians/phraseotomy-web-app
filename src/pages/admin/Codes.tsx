@@ -202,6 +202,16 @@ const Codes = () => {
           shopDomain: tenant.shop_domain,
         };
 
+        // Update code value if provided and different (only for unused codes)
+        if (editingCode.status === 'unused' && formData.code && formData.code.trim() !== editingCode.code) {
+          updateBody.code = formData.code.trim().toUpperCase();
+        }
+
+        // Update packs_unlocked if provided (only for unused codes)
+        if (editingCode.status === 'unused' && formData.packs) {
+          updateBody.packs_unlocked = formData.packs;
+        }
+
         // Handle expiration time for non-expired codes
         // Always send expires_at if editing a non-expired code (or if explicitly provided)
         if (editingCode.status !== 'expired' && formData.status !== 'expired') {
@@ -229,15 +239,45 @@ const Codes = () => {
         });
 
         if (updateError || !updateData?.success) {
-          throw new Error(updateData?.error || 'Failed to update code status');
+          throw new Error(updateData?.error || 'Failed to update code');
         }
 
-      toast({
-        title: "Code updated",
-        description: "Code status updated successfully",
-      });
+        // Handle customer assignment if selected (only for unused codes)
+        if (editingCode.status === 'unused' && selectedCustomer) {
+          const { data: assignData, error: assignError } = await supabase.functions.invoke('update-customer-metafield', {
+            body: {
+              customerId: selectedCustomer.id,
+              customerEmail: selectedCustomer.email,
+              code: updateBody.code || editingCode.code,
+              shopDomain: tenant.shop_domain,
+            },
+          });
+
+          if (assignError || !assignData) {
+            console.warn('Customer assignment failed:', assignError || assignData);
+            // Don't fail the whole operation if assignment fails
+            toast({
+              title: "Code updated",
+              description: "Code updated but customer assignment failed. You can assign manually later.",
+              variant: "default",
+            });
+          } else {
+            toast({
+              title: "Code updated",
+              description: "Code updated and assigned to customer successfully",
+            });
+          }
+        } else {
+          toast({
+            title: "Code updated",
+            description: "Code updated successfully",
+          });
+        }
 
       setEditingCode(null);
+      setSelectedCustomer(null);
+      setCustomerSearchQuery("");
+      setSearchedCustomers([]);
       setFormData({ code: "", packs: [], status: "unused", expires_at: null });
       await loadCodes();
     } catch (error) {
@@ -743,7 +783,7 @@ const Codes = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {code.status !== "expired" && (
+                          {(code.status === "unused" || code.status === "active") && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -784,12 +824,82 @@ const Codes = () => {
 
         {/* Edit Dialog */}
         <Dialog open={!!editingCode} onOpenChange={() => setEditingCode(null)}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className={editingCode?.status === 'unused' ? "sm:max-w-[600px] max-h-[90vh] overflow-y-auto" : "sm:max-w-[500px]"}>
             <DialogHeader>
               <DialogTitle>Edit Code: {editingCode?.code}</DialogTitle>
-              <DialogDescription>Update code status or assign to a customer</DialogDescription>
+              <DialogDescription>
+                {editingCode?.status === 'unused' 
+                  ? 'Edit code value, packs, status, or assign to customer'
+                  : 'Update code status or assign to a customer'}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {/* Code Value - Only for unused codes */}
+              {editingCode?.status === 'unused' && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-code">Code Value</Label>
+                  <Input
+                    id="edit-code"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                    placeholder="e.g., GAME-ABC-123"
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Change the actual redemption code text (e.g., GAME-ABC-123 → GAME-ABC-456)
+                  </p>
+                </div>
+              )}
+
+              {/* Game / Expansion Association - Only for unused codes */}
+              {editingCode?.status === 'unused' && (
+                <div className="space-y-2">
+                  <Label>Game / Expansion Association</Label>
+                  <div className="border rounded-md p-4 max-h-48 overflow-y-auto space-y-2">
+                    {availablePacks.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No packs available. Create packs first.</p>
+                    ) : (
+                      availablePacks.map((pack) => (
+                        <div key={pack.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`edit-pack-${pack.id}`}
+                            checked={formData.packs.includes(pack.name)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setFormData({
+                                  ...formData,
+                                  packs: [...formData.packs, pack.name]
+                                });
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  packs: formData.packs.filter(p => p !== pack.name)
+                                });
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`edit-pack-${pack.id}`}
+                            className="text-sm font-normal cursor-pointer flex-1"
+                          >
+                            <div>
+                              <div className="font-medium">{pack.name}</div>
+                              {pack.description && (
+                                <div className="text-xs text-muted-foreground">{pack.description}</div>
+                              )}
+                            </div>
+                          </Label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Reassign the code to different games or expansions
+                  </p>
+                </div>
+              )}
+
+              {/* Status */}
               <div className="space-y-2">
                 <Label htmlFor="edit-status">Status</Label>
                 <Select
@@ -807,9 +917,89 @@ const Codes = () => {
                     <SelectItem value="expired">Expired</SelectItem>
                   </SelectContent>
                 </Select>
+                {editingCode?.status === 'unused' && (
+                  <p className="text-xs text-muted-foreground">
+                    Mark as Redeemed or reset back to Not Redeemed. Helpful for fixing mistakes or manual overrides.
+                  </p>
+                )}
               </div>
 
-              {editingCode?.status !== 'expired' && (
+              {/* Assigned Customer - Only for unused codes */}
+              {editingCode?.status === 'unused' && (
+                <div className="space-y-2">
+                  <Label>Assign Customer (Future-ready)</Label>
+                  <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={customerSearchOpen}
+                        className="w-full justify-between"
+                      >
+                        {selectedCustomer
+                          ? `${selectedCustomer.name} (${selectedCustomer.email})`
+                          : "Search by email or name..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0 bg-popover z-50" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput 
+                          placeholder="Type email or name..." 
+                          value={customerSearchQuery}
+                          onValueChange={setCustomerSearchQuery}
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            {searchingCustomers ? "Searching..." : customerSearchQuery.length < 2 ? "Type at least 2 characters" : "No customers found"}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {searchedCustomers.map((customer) => {
+                              const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'No name';
+                              return (
+                                <CommandItem
+                                  key={customer.id}
+                                  value={customer.id}
+                                  onSelect={() => {
+                                    setSelectedCustomer({
+                                      id: customer.id,
+                                      email: customer.email,
+                                      name,
+                                    });
+                                    setCustomerSearchOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{name}</span>
+                                    <span className="text-sm text-muted-foreground">{customer.email}</span>
+                                  </div>
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {selectedCustomer && (
+                    <p className="text-sm text-muted-foreground">
+                      Customer ID: {selectedCustomer.id}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Link a code to a Shopify customer account (optional)
+                  </p>
+                </div>
+              )}
+
+              {/* Expires At - For non-expired codes */}
+              {editingCode?.status !== 'expired' && formData.status !== 'expired' && (
                 <div className="space-y-2">
                   <Label htmlFor="edit-expires-at">Expires At (Local Time)</Label>
                   <input
@@ -843,6 +1033,7 @@ const Codes = () => {
                 </div>
               )}
 
+              {/* Current redemption info */}
               {editingCode?.redeemed_by && (
                 <div className="p-3 bg-muted rounded-md">
                   <p className="text-sm text-muted-foreground">
@@ -857,7 +1048,12 @@ const Codes = () => {
             <DialogFooter>
               <Button 
                 variant="outline" 
-                onClick={() => setEditingCode(null)}
+                onClick={() => {
+                  setEditingCode(null);
+                  setSelectedCustomer(null);
+                  setCustomerSearchQuery("");
+                  setSearchedCustomers([]);
+                }}
                 disabled={loading}
               >
                 Cancel

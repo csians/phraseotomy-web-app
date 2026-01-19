@@ -11,9 +11,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { codeId, status, shopDomain, expires_at } = await req.json();
+    const { codeId, status, shopDomain, expires_at, code, packs_unlocked } = await req.json();
 
-    console.log('📝 Updating license code:', { codeId, status, shopDomain, expires_at });
+    console.log('📝 Updating license code:', { codeId, status, shopDomain, expires_at, code, packs_unlocked });
 
     if (!codeId || !status || !shopDomain) {
       return new Response(
@@ -44,10 +44,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get current code to check status
+    // Get current code to check status and current code value
     const { data: currentCode, error: fetchError } = await supabaseAdmin
       .from('license_codes')
-      .select('status, expires_at')
+      .select('status, expires_at, code')
       .eq('id', codeId)
       .eq('tenant_id', tenant.id)
       .single();
@@ -61,6 +61,45 @@ Deno.serve(async (req) => {
 
     // Prepare update data
     const updates: any = { status };
+
+    // Update code value if provided and different from current
+    if (code !== undefined && code !== null && code.trim() !== '') {
+      const normalizedCode = code.trim().toUpperCase();
+      
+      // Check if code is being changed
+      if (normalizedCode !== currentCode.code) {
+        // Check for uniqueness within tenant
+        const { data: existingCode, error: checkError } = await supabaseAdmin
+          .from('license_codes')
+          .select('id')
+          .eq('tenant_id', tenant.id)
+          .eq('code', normalizedCode)
+          .neq('id', codeId)
+          .maybeSingle();
+
+        if (checkError) {
+          console.error('❌ Error checking code uniqueness:', checkError);
+          return new Response(
+            JSON.stringify({ success: false, error: 'Error checking code uniqueness' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (existingCode) {
+          return new Response(
+            JSON.stringify({ success: false, error: `Code "${normalizedCode}" already exists for this shop` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        updates.code = normalizedCode;
+      }
+    }
+
+    // Update packs_unlocked if provided
+    if (packs_unlocked !== undefined && Array.isArray(packs_unlocked)) {
+      updates.packs_unlocked = packs_unlocked;
+    }
 
     // If changing to unused, clear redemption data
     if (status === 'unused') {
