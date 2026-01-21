@@ -346,6 +346,21 @@ const RedeemCode = () => {
   }, [pendingAutoRedeem, customer, shopDomain, handleRedeemCode, isRedeeming, cameFromShopify, loading]);
 
 
+  // Show only loader when coming from Shopify (page already exists in Shopify)
+  if (cameFromShopify && (loading || isRedeeming || pendingAutoRedeem)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto"></div>
+          <p className="text-muted-foreground">
+            {isRedeeming ? "Redeeming code..." : "Processing..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular loading state for non-Shopify flows
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
