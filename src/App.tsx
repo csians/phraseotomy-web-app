@@ -15,6 +15,7 @@ import RedeemCode from "./pages/Redeem";
 import NotFound from "./pages/NotFound";
 import AdminHome from "./pages/admin/AdminHome";
 import Codes from "./pages/admin/Codes";
+import ThemeCodes from "./pages/admin/ThemeCodes";
 import Packs from "./pages/admin/Packs";
 import Themes from "./pages/admin/Themes";
 
@@ -167,6 +168,7 @@ const App = () => (
           <Route path="/admin" element={<AdminHome />} />
           <Route path="/admin/packs" element={<Packs />} />
           <Route path="/admin/codes" element={<Codes />} />
+          <Route path="/admin/theme-codes" element={<ThemeCodes />} />
           <Route path="/admin/themes" element={<Themes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

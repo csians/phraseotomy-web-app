@@ -138,6 +138,23 @@ const AdminHome = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Palette className="h-5 w-5" />
+                Theme Codes
+              </CardTitle>
+              <CardDescription>
+                Manage codes for unlocking themes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to={`/admin/theme-codes?shop=${shop}`}>
+                <Button className="w-full">Manage Theme Codes</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5" />
                 Themes & Elements
               </CardTitle>
               <CardDescription>
