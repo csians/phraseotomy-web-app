@@ -15,6 +15,33 @@ export interface RedemptionResult {
 }
 
 /**
+ * Redirect to Shopify redeem-code page with error message
+ */
+export function redirectToShopifyWithError(errorMessage: string): void {
+  const errorResponse = encodeURIComponent(errorMessage);
+  const redirectUrl = `https://phraseotomy.com/pages/redeem-code?status=failed&response=${errorResponse}`;
+  console.log('🔄 Redirecting to Shopify with error:', { status: 'failed', response: errorMessage, url: redirectUrl });
+  window.location.href = redirectUrl;
+}
+
+/**
+ * Get user-friendly error message based on error code
+ */
+function getErrorMessage(errorCode: string | undefined, defaultMessage: string): string {
+  const errorMessages: Record<string, string> = {
+    'CODE_NOT_FOUND': 'Invalid code. Please check and try again.',
+    'CODE_USED': 'This code has already been used.',
+    'CODE_EXPIRED': 'This code has expired.',
+    'ALREADY_REDEEMED': 'You have already redeemed this code.',
+    'INVALID_FORMAT': 'Invalid code format. Please enter a 6-character code.',
+    'REDEMPTION_ERROR': 'Error redeeming code. Please try again.',
+    'UNEXPECTED_ERROR': 'An unexpected error occurred. Please try again.',
+  };
+
+  return errorCode && errorMessages[errorCode] ? errorMessages[errorCode] : defaultMessage;
+}
+
+/**
  * Verify code against Shopify customer metafields
  */
 async function verifyCodeInMetafields(
@@ -80,10 +107,14 @@ export async function redeemCode(
     try {
       normalizedCode = validateInput(redemptionCodeSchema, code);
     } catch (validationError) {
+      const errorCode = 'INVALID_FORMAT';
+      const errorMessage = validationError instanceof Error 
+        ? validationError.message 
+        : getErrorMessage(errorCode, 'Invalid code format. Please enter a 6-character code.');
       return {
         success: false,
-        message: validationError instanceof Error ? validationError.message : 'Invalid code format',
-        error: 'INVALID_FORMAT',
+        message: errorMessage,
+        error: errorCode,
       };
     }
 
@@ -98,18 +129,23 @@ export async function redeemCode(
 
     if (error) {
       console.error('Error calling redeem edge function:', error);
+      const errorCode = 'REDEMPTION_ERROR';
+      const errorMessage = getErrorMessage(errorCode, 'Error redeeming code. Please try again.');
       return {
         success: false,
-        message: 'Error redeeming code. Please try again.',
-        error: 'REDEMPTION_ERROR',
+        message: errorMessage,
+        error: errorCode,
       };
     }
 
     if (!data.success) {
+      const errorCode = data.error || 'REDEMPTION_ERROR';
+      // Use the message from API if available, otherwise get user-friendly message based on error code
+      const errorMessage = data.message || getErrorMessage(errorCode, 'Error redeeming code. Please try again.');
       return {
         success: false,
-        message: data.message || 'Error redeeming code',
-        error: data.error || 'REDEMPTION_ERROR',
+        message: errorMessage,
+        error: errorCode,
       };
     }
 
@@ -120,10 +156,12 @@ export async function redeemCode(
     };
   } catch (error) {
     console.error('Unexpected error redeeming code:', error);
+    const errorCode = 'UNEXPECTED_ERROR';
+    const errorMessage = getErrorMessage(errorCode, 'An unexpected error occurred. Please try again.');
     return {
       success: false,
-      message: 'An unexpected error occurred. Please try again.',
-      error: 'UNEXPECTED_ERROR',
+      message: errorMessage,
+      error: errorCode,
     };
   }
 }
