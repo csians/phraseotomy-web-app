@@ -23,6 +23,7 @@ import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type Ga
 import { lobbyCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllUrlParams } from "@/lib/urlUtils";
+import { redeemCode, redirectToShopifyWithError } from "@/lib/redemption";
 
 const Play = () => {
   const navigate = useNavigate();
@@ -157,6 +158,46 @@ const Play = () => {
   // Initialize from localStorage and verify session
   useEffect(() => {
     const initializeSession = async () => {
+      const urlParams = getAllUrlParams();
+
+      // PRIORITY: Check for redeem code parameters FIRST (before any other checks)
+      // This handles Shopify redirects with redeem code params in URL hash
+      const redeemCodeParam = urlParams.get("Code") || urlParams.get("code");
+      const customerIdParam = urlParams.get("CustomerId") || urlParams.get("customer_id");
+      const customerEmailParam = urlParams.get("CustomerEmail") || urlParams.get("customer_email");
+      const shopDomainParam = urlParams.get("shop_domain");
+
+      if (redeemCodeParam && customerIdParam && shopDomainParam) {
+        console.log('🎟️ [PLAY] Redeem code params detected on Play page:', {
+          Code: redeemCodeParam,
+          CustomerId: customerIdParam,
+          CustomerEmail: customerEmailParam,
+          shop_domain: shopDomainParam
+        });
+
+        try {
+          // Call redeem-license-code API
+          const redeemResult = await redeemCode(redeemCodeParam, customerIdParam, shopDomainParam);
+
+          if (!redeemResult.success) {
+            // Failed - redirect to Shopify with error message
+            console.error('❌ Redeem code failed:', redeemResult.message);
+            redirectToShopifyWithError(redeemResult.message);
+            return;
+          }
+
+          // Success - redirect to Shopify app page
+          console.log('✅ Redeem code successful:', redeemResult.message);
+          window.location.href = 'https://phraseotomy.com/apps/phraseotomy';
+          return;
+        } catch (error) {
+          console.error('❌ Error processing redeem code:', error);
+          const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
+          redirectToShopifyWithError(errorMessage);
+          return;
+        }
+      }
+
       // Check for embedded config from proxy (primary method)
       if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
         setTenant(window.__PHRASEOTOMY_CONFIG__);
@@ -189,8 +230,6 @@ const Play = () => {
         setLoading(false);
         return;
       }
-
-      const urlParams = getAllUrlParams();
 
       // Check for iframe config from URL parameters (fallback method)
       const configParam = urlParams.get("config");

@@ -15,6 +15,16 @@ export interface RedemptionResult {
 }
 
 /**
+ * Redirect to Shopify redeem-code page with error message
+ */
+export function redirectToShopifyWithError(errorMessage: string): void {
+  const errorResponse = encodeURIComponent(errorMessage);
+  const redirectUrl = `https://phraseotomy.com/pages/redeem-code?status=failed&response=${errorResponse}`;
+  console.log('🔄 Redirecting to Shopify with error:', { status: 'failed', response: errorMessage, url: redirectUrl });
+  window.location.href = redirectUrl;
+}
+
+/**
  * Verify code against Shopify customer metafields
  */
 async function verifyCodeInMetafields(
