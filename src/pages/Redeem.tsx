@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { redeemCode, redirectToShopifyWithError } from "@/lib/redemption";
+import { redeemCode } from "@/lib/redemption";
 import type { ShopifyCustomer } from "@/lib/types";
 
 const RedeemCode = () => {
@@ -35,7 +35,7 @@ const RedeemCode = () => {
     }
 
     if (codeToRedeem.length !== 6) {
-      const errorMsg = "Invalid code format. Please enter a 6-character code.";
+      const errorMsg = "Please enter a 6-character code.";
       toast({
         title: "Invalid Code",
         description: errorMsg,
@@ -44,8 +44,9 @@ const RedeemCode = () => {
       
       // Redirect back to Shopify if came from Shopify
       if (isFromShopify) {
+        const errorResponse = encodeURIComponent("Invalid Code");
         setTimeout(() => {
-          redirectToShopifyWithError(errorMsg);
+          window.location.href = `https://phraseotomy.com/pages/redeem-code?status=failed&response=${errorResponse}`;
         }, 1000);
       }
       return;
@@ -64,33 +65,24 @@ const RedeemCode = () => {
         // Clear the input
         setRedemptionCode("");
 
-        // If came from Shopify, redirect to play page (same window)
-        if (isFromShopify) {
-          setTimeout(() => {
-            // Redirect to play page on same domain
-            window.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
-          }, 1000); // Small delay to show success message
-        } else {
-          // For manual redemption, open play page in new window
-          setTimeout(() => {
-            const playUrl = 'https://phraseotomy.com/apps/phraseotomy';
-            window.open(playUrl, "_blank");
-          }, 1500);
-        }
+        // Open play page in new window after successful redemption
+        setTimeout(() => {
+          const playUrl = 'https://phraseotomy.com/apps/phraseotomy';
+          window.open(playUrl, "_blank");
+        }, 1500); // Small delay to show success message
       } else {
-        // Error message is already properly formatted from redemption.ts
-        const errorMessage = result.message || "Redemption Failed";
-        
         toast({
           title: "Redemption Failed",
-          description: errorMessage,
+          description: result.message,
           variant: "destructive",
         });
         
         // Redirect back to Shopify with error if came from Shopify
         if (isFromShopify) {
+          const errorMessage = result.message || result.error || "Redemption Failed";
+          const errorResponse = encodeURIComponent(errorMessage);
           setTimeout(() => {
-            redirectToShopifyWithError(errorMessage);
+            window.location.href = `https://phraseotomy.com/pages/redeem-code?status=failed&response=${errorResponse}`;
           }, 1500); // Small delay to show error message
         }
       }
@@ -105,8 +97,9 @@ const RedeemCode = () => {
       
       // Redirect back to Shopify with error if came from Shopify
       if (isFromShopify) {
+        const errorResponse = encodeURIComponent(errorMsg);
         setTimeout(() => {
-          redirectToShopifyWithError(errorMsg);
+          window.location.href = `https://phraseotomy.com/pages/redeem-code?status=failed&response=${errorResponse}`;
         }, 1500);
       }
     } finally {
@@ -120,9 +113,6 @@ const RedeemCode = () => {
       // Check for pending redeem params from Shopify redirect
       const pendingRedeemParams = sessionStorage.getItem('pending_redeem_params');
       if (pendingRedeemParams) {
-        // Keep loading state true to show loader while processing
-        setLoading(true);
-        
         try {
           const redeemParams = JSON.parse(pendingRedeemParams);
           console.log('🎟️ Processing redeem params from Shopify:', redeemParams);
@@ -152,8 +142,9 @@ const RedeemCode = () => {
             });
             
             // Redirect back to Shopify with error
+            const errorResponse = encodeURIComponent(errorMsg);
             setTimeout(() => {
-              redirectToShopifyWithError(errorMsg);
+              window.location.href = `https://phraseotomy.com/pages/redeem-code?status=failed&response=${errorResponse}`;
             }, 1500);
             
             setIsNotLoggedIn(true);
@@ -211,7 +202,6 @@ const RedeemCode = () => {
           setShopDomain(resolvedShopDomain);
           
           // Set pending auto-redeem to trigger after state is set
-          // This will automatically redeem the code
           if (redeemParams.Code) {
             setRedemptionCode(redeemParams.Code);
             setPendingAutoRedeem({
@@ -221,8 +211,7 @@ const RedeemCode = () => {
             });
           }
           
-          // Don't set loading to false here - let the redemption process handle it
-          // The loader will stay until redemption completes
+          setLoading(false);
           return;
         } catch (error) {
           console.error("Error processing redeem params:", error);
@@ -234,8 +223,9 @@ const RedeemCode = () => {
           });
           
           // Redirect back to Shopify with error
+          const errorResponse = encodeURIComponent(errorMsg);
           setTimeout(() => {
-            redirectToShopifyWithError(errorMsg);
+            window.location.href = `https://phraseotomy.com/pages/redeem-code?status=failed&response=${errorResponse}`;
           }, 1500);
           
           setLoading(false);
@@ -336,14 +326,11 @@ const RedeemCode = () => {
 
   // Auto-redeem when pending auto-redeem is set and customer/shopDomain are ready
   useEffect(() => {
-    if (pendingAutoRedeem && customer && shopDomain && !isRedeeming && loading) {
-      // Set loading to false before starting redemption (it was kept true during auth)
-      setLoading(false);
-      // Trigger redemption
+    if (pendingAutoRedeem && customer && shopDomain && !isRedeeming) {
       handleRedeemCode(pendingAutoRedeem.code, pendingAutoRedeem.customerId, pendingAutoRedeem.domain, cameFromShopify);
       setPendingAutoRedeem(null);
     }
-  }, [pendingAutoRedeem, customer, shopDomain, handleRedeemCode, isRedeeming, cameFromShopify, loading]);
+  }, [pendingAutoRedeem, customer, shopDomain, handleRedeemCode, isRedeeming, cameFromShopify]);
 
 
   if (loading) {
@@ -429,7 +416,7 @@ const RedeemCode = () => {
                 />
               </div>
               <Button
-                onClick={() => handleRedeemCode()}
+                onClick={handleRedeemCode}
                 disabled={isRedeeming || redemptionCode.length !== 6}
                 className="w-full"
                 size="lg"
