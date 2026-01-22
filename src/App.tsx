@@ -67,10 +67,6 @@ const queryClient = new QueryClient();
   }
   
   // Handle redeem code redirect from Shopify
-  // But don't redirect if we're already on /play/host (let Play page handle it)
-  const currentHash = window.location.hash;
-  const isOnPlayHost = currentHash.includes('/play/host');
-  
   if (redeemCode && customer_id && shopDomain) {
     const redeemParams = {
       Code: redeemCode,
@@ -81,15 +77,6 @@ const queryClient = new QueryClient();
     
     console.log('🎟️ Redeem code params detected from Shopify:', redeemParams);
     
-    // If on /play/host, let Play page handle it - don't redirect
-    if (isOnPlayHost) {
-      console.log('🎟️ On /play/host, letting Play page handle redeem code');
-      // Store params for Play page to process, but don't redirect
-      sessionStorage.setItem('pending_redeem_params', JSON.stringify(redeemParams));
-      // Don't clean URL or redirect - let Play page handle it
-      return;
-    }
-    
     // Store in sessionStorage for Redeem.tsx to process
     sessionStorage.setItem('pending_redeem_params', JSON.stringify(redeemParams));
     
@@ -97,7 +84,7 @@ const queryClient = new QueryClient();
     const cleanUrl = url.origin + url.pathname + (url.hash ? url.hash.split('?')[0] : '');
     window.history.replaceState({}, '', cleanUrl);
     
-    // Redirect to redeem page (only if not on /play/host)
+    // Redirect to redeem page
     if (!window.location.hash.includes('/redeem')) {
       window.location.hash = '/redeem';
     }
