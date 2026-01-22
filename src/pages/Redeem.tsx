@@ -64,10 +64,19 @@ const RedeemCode = () => {
         // Clear the input
         setRedemptionCode("");
 
-        // Redirect to phraseotomy.com after successful redemption
-        setTimeout(() => {
-          window.location.href = 'https://phraseotomy.com/apps/phraseotomy';
-        }, 1000); // Small delay to show success message
+        // If came from Shopify, redirect to play page (same window)
+        if (isFromShopify) {
+          setTimeout(() => {
+            // Redirect to play page on same domain
+            window.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+          }, 1000); // Small delay to show success message
+        } else {
+          // For manual redemption, open play page in new window
+          setTimeout(() => {
+            const playUrl = 'https://phraseotomy.com/apps/phraseotomy';
+            window.open(playUrl, "_blank");
+          }, 1500);
+        }
       } else {
         // Error message is already properly formatted from redemption.ts
         const errorMessage = result.message || "Redemption Failed";
