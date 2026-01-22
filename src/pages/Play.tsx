@@ -158,47 +158,24 @@ const Play = () => {
   // Initialize from localStorage and verify session
   useEffect(() => {
     const initializeSession = async () => {
-      // Check for embedded config from proxy (primary method)
-      if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
-        setTenant(window.__PHRASEOTOMY_CONFIG__);
-        setShopDomain(window.__PHRASEOTOMY_SHOP__);
-
-        if (window.__PHRASEOTOMY_CUSTOMER__) {
-          setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
-
-          // Store customer data in localStorage for Lobby page
-          localStorage.setItem(
-            "customerData",
-            JSON.stringify({
-              customer_id: window.__PHRASEOTOMY_CUSTOMER__.id,
-              id: window.__PHRASEOTOMY_CUSTOMER__.id,
-              email: window.__PHRASEOTOMY_CUSTOMER__.email,
-              name: window.__PHRASEOTOMY_CUSTOMER__.name,
-              first_name: window.__PHRASEOTOMY_CUSTOMER__.firstName,
-              last_name: window.__PHRASEOTOMY_CUSTOMER__.lastName,
-            }),
-          );
-
-          // Store customer in database
-          storeCustomerInDatabase(
-            window.__PHRASEOTOMY_CUSTOMER__,
-            window.__PHRASEOTOMY_SHOP__,
-            window.__PHRASEOTOMY_CONFIG__.id,
-          );
-        }
-
-        setLoading(false);
-        return;
-      }
-
       const urlParams = getAllUrlParams();
 
-      // Check for redeem code parameters from Shopify redirect
-      // First check URL params, then check sessionStorage (in case URL was cleaned)
+      // PRIORITY: Check for redeem code parameters FIRST (before any other checks)
+      // This handles Shopify redirects to /play/host with redeem code params
       let redeemCodeParam = urlParams.get("Code") || urlParams.get("code");
       let customerIdParam = urlParams.get("CustomerId") || urlParams.get("customer_id");
       let customerEmailParam = urlParams.get("CustomerEmail") || urlParams.get("customer_email");
       let shopDomainParam = urlParams.get("shop_domain");
+
+      console.log('🔍 [PLAY] Checking for redeem code params:', {
+        redeemCodeParam,
+        customerIdParam,
+        customerEmailParam,
+        shopDomainParam,
+        urlParams: Object.fromEntries(urlParams.entries()),
+        hash: window.location.hash,
+        search: window.location.search
+      });
 
       // If not in URL, check sessionStorage (fallback)
       if (!redeemCodeParam || !customerIdParam || !shopDomainParam) {
@@ -206,6 +183,7 @@ const Play = () => {
         if (pendingRedeemParams) {
           try {
             const redeemParams = JSON.parse(pendingRedeemParams);
+            console.log('🔍 [PLAY] Found redeem params in sessionStorage:', redeemParams);
             redeemCodeParam = redeemCodeParam || redeemParams.Code;
             customerIdParam = customerIdParam || redeemParams.CustomerId;
             customerEmailParam = customerEmailParam || redeemParams.CustomerEmail;
@@ -324,6 +302,40 @@ const Play = () => {
           redirectToShopifyWithError(errorMsg);
           return;
         }
+      }
+
+      // Check for embedded config from proxy (primary method)
+      // This runs AFTER redeem code check, so redeem code takes priority
+      if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
+        setTenant(window.__PHRASEOTOMY_CONFIG__);
+        setShopDomain(window.__PHRASEOTOMY_SHOP__);
+
+        if (window.__PHRASEOTOMY_CUSTOMER__) {
+          setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
+
+          // Store customer data in localStorage for Lobby page
+          localStorage.setItem(
+            "customerData",
+            JSON.stringify({
+              customer_id: window.__PHRASEOTOMY_CUSTOMER__.id,
+              id: window.__PHRASEOTOMY_CUSTOMER__.id,
+              email: window.__PHRASEOTOMY_CUSTOMER__.email,
+              name: window.__PHRASEOTOMY_CUSTOMER__.name,
+              first_name: window.__PHRASEOTOMY_CUSTOMER__.firstName,
+              last_name: window.__PHRASEOTOMY_CUSTOMER__.lastName,
+            }),
+          );
+
+          // Store customer in database
+          storeCustomerInDatabase(
+            window.__PHRASEOTOMY_CUSTOMER__,
+            window.__PHRASEOTOMY_SHOP__,
+            window.__PHRASEOTOMY_CONFIG__.id,
+          );
+        }
+
+        setLoading(false);
+        return;
       }
 
       // Check for iframe config from URL parameters (fallback method)

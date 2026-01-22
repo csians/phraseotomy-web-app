@@ -79,29 +79,34 @@ const queryClient = new QueryClient();
       shop_domain: shopDomain
     };
     
-    console.log('🎟️ Redeem code params detected from Shopify:', redeemParams);
+    console.log('🎟️ [APP] Redeem code params detected from Shopify:', redeemParams);
+    console.log('🎟️ [APP] Current hash:', currentHash);
+    console.log('🎟️ [APP] Is on /play/host:', isOnPlayHost);
     
-    // If on /play/host, let Play page handle it - don't redirect
+    // If on /play/host, let Play page handle it - don't redirect or clean URL
     if (isOnPlayHost) {
-      console.log('🎟️ On /play/host, letting Play page handle redeem code');
-      // Store params for Play page to process, but don't redirect
+      console.log('🎟️ [APP] On /play/host, letting Play page handle redeem code - NOT cleaning URL');
+      // Store params for Play page to process as backup, but don't redirect or clean URL
+      // Play page will read directly from URL hash params
       sessionStorage.setItem('pending_redeem_params', JSON.stringify(redeemParams));
-      // Don't clean URL or redirect - let Play page handle it
+      // IMPORTANT: Don't return here - let the code continue so Play page can read params
+      // But don't clean URL or redirect
+    } else {
+      // Not on /play/host - redirect to redeem page
+      console.log('🎟️ [APP] Not on /play/host, redirecting to /redeem');
+      // Store in sessionStorage for Redeem.tsx to process
+      sessionStorage.setItem('pending_redeem_params', JSON.stringify(redeemParams));
+      
+      // Clean URL immediately - remove all query params
+      const cleanUrl = url.origin + url.pathname + (url.hash ? url.hash.split('?')[0] : '');
+      window.history.replaceState({}, '', cleanUrl);
+      
+      // Redirect to redeem page (only if not on /play/host)
+      if (!window.location.hash.includes('/redeem')) {
+        window.location.hash = '/redeem';
+      }
       return;
     }
-    
-    // Store in sessionStorage for Redeem.tsx to process
-    sessionStorage.setItem('pending_redeem_params', JSON.stringify(redeemParams));
-    
-    // Clean URL immediately - remove all query params
-    const cleanUrl = url.origin + url.pathname + (url.hash ? url.hash.split('?')[0] : '');
-    window.history.replaceState({}, '', cleanUrl);
-    
-    // Redirect to redeem page (only if not on /play/host)
-    if (!window.location.hash.includes('/redeem')) {
-      window.location.hash = '/redeem';
-    }
-    return;
   }
   
   const hasLoginParams = shop || customer_id || customer_email || customer_name || rToken;
