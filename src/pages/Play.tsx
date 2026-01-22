@@ -297,28 +297,16 @@ const Play = () => {
               setTenant(mappedTenant);
               setShopDomain(dbTenant.shop_domain);
 
-              // Set customer state - preserve name from localStorage if API doesn't return it
+              // Set customer state
               const parsedCustomerData = JSON.parse(storedCustomerData);
               const customerObj: ShopifyCustomer = {
                 id: payload.customer_id,
-                email: customerData?.customer?.email || parsedCustomerData.email || null,
-                firstName: customerData?.customer?.first_name || parsedCustomerData.first_name || null,
-                lastName: customerData?.customer?.last_name || parsedCustomerData.last_name || null,
-                name: customerData?.customer?.name || parsedCustomerData.name || null,
+                email: parsedCustomerData.email || null,
+                firstName: parsedCustomerData.first_name || null,
+                lastName: parsedCustomerData.last_name || null,
+                name: parsedCustomerData.name || null,
               };
               setCustomer(customerObj);
-              
-              // Update localStorage with API data if available, preserving existing name if API doesn't have it
-              if (customerData?.customer) {
-                const updatedCustomerData = {
-                  ...parsedCustomerData,
-                  email: customerData.customer.email || parsedCustomerData.email,
-                  name: customerData.customer.name || parsedCustomerData.name,
-                  first_name: customerData.customer.first_name || parsedCustomerData.first_name,
-                  last_name: customerData.customer.last_name || parsedCustomerData.last_name,
-                };
-                localStorage.setItem("customerData", JSON.stringify(updatedCustomerData));
-              }
 
               // Store customer in database
               storeCustomerInDatabase(customerObj, dbTenant.shop_domain, dbTenant.id);
