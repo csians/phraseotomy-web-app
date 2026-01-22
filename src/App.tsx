@@ -30,32 +30,12 @@ const queryClient = new QueryClient();
   const searchStr = window.location.search;
   const manualParams = new URLSearchParams(searchStr);
   
-  // Also check params in hash (for HashRouter)
-  let hashParams = new URLSearchParams();
-  if (window.location.hash.includes('?')) {
-    const hashParts = window.location.hash.split('?');
-    if (hashParts[1]) {
-      hashParams = new URLSearchParams(hashParts[1]);
-    }
-  }
-  
-  // Helper to get param from multiple sources
-  const getParam = (key: string, altKey?: string) => {
-    return hashParams.get(key) || hashParams.get(altKey || '') ||
-           manualParams.get(key) || manualParams.get(altKey || '') ||
-           url.searchParams.get(key) || url.searchParams.get(altKey || '');
-  };
-  
-  const shop = getParam('shop');
-  const customer_id = getParam('customer_id', 'CustomerId');
-  const customer_email = getParam('customer_email', 'CustomerEmail');
-  const customer_name = getParam('customer_name');
-  const rToken = getParam('r');
-  const hostParam = getParam('host');
-  
-  // Check for Shopify redeem code parameters (from Shopify redirect after redemption)
-  const redeemCode = getParam('Code', 'code');
-  const shopDomain = getParam('shop_domain');
+  const shop = manualParams.get('shop') || url.searchParams.get('shop');
+  const customer_id = manualParams.get('customer_id') || url.searchParams.get('customer_id');
+  const customer_email = manualParams.get('customer_email') || url.searchParams.get('customer_email');
+  const customer_name = manualParams.get('customer_name') || url.searchParams.get('customer_name');
+  const rToken = manualParams.get('r') || url.searchParams.get('r');
+  const hostParam = manualParams.get('host') || url.searchParams.get('host');
   
   // Check if we're in Shopify Admin context
   const isShopifyAdmin = hostParam || window.location.href.includes('admin.shopify.com');
@@ -64,31 +44,6 @@ const queryClient = new QueryClient();
     if (hostParam) sessionStorage.setItem('shopify_host', hostParam);
     if (shop) sessionStorage.setItem('shopify_admin_shop', shop);
     console.log('🔐 Shopify Admin context detected');
-  }
-  
-  // Handle redeem code redirect from Shopify
-  if (redeemCode && customer_id && shopDomain) {
-    const redeemParams = {
-      Code: redeemCode,
-      CustomerId: customer_id,
-      CustomerEmail: customer_email,
-      shop_domain: shopDomain
-    };
-    
-    console.log('🎟️ Redeem code params detected from Shopify:', redeemParams);
-    
-    // Store in sessionStorage for Redeem.tsx to process
-    sessionStorage.setItem('pending_redeem_params', JSON.stringify(redeemParams));
-    
-    // Clean URL immediately - remove all query params
-    const cleanUrl = url.origin + url.pathname + (url.hash ? url.hash.split('?')[0] : '');
-    window.history.replaceState({}, '', cleanUrl);
-    
-    // Redirect to redeem page
-    if (!window.location.hash.includes('/redeem')) {
-      window.location.hash = '/redeem';
-    }
-    return;
   }
   
   const hasLoginParams = shop || customer_id || customer_email || customer_name || rToken;
