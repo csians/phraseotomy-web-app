@@ -75,20 +75,18 @@ const queryClient = new QueryClient();
       shop_domain: shopDomain
     };
     
-    console.log('🎟️ [APP] Redeem code params detected from Shopify:', redeemParams);
+    console.log('🎟️ Redeem code params detected from Shopify:', redeemParams);
     
-    // Store in sessionStorage for Play.tsx to process
+    // Store in sessionStorage for Redeem.tsx to process
     sessionStorage.setItem('pending_redeem_params', JSON.stringify(redeemParams));
     
-    // Clean URL immediately - remove all query params but keep hash route
-    const currentHash = window.location.hash;
-    const hashRoute = currentHash.includes('?') ? currentHash.split('?')[0] : currentHash;
-    const cleanUrl = url.origin + url.pathname + (hashRoute || '');
+    // Clean URL immediately - remove all query params
+    const cleanUrl = url.origin + url.pathname + (url.hash ? url.hash.split('?')[0] : '');
     window.history.replaceState({}, '', cleanUrl);
     
-    // Redirect to play/host page (Play.tsx will handle redeem code directly)
-    if (!window.location.hash.includes('/play/host')) {
-      window.location.hash = '/play/host';
+    // Redirect to redeem page
+    if (!window.location.hash.includes('/redeem')) {
+      window.location.hash = '/redeem';
     }
     return;
   }

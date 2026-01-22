@@ -23,7 +23,6 @@ import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type Ga
 import { lobbyCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllUrlParams } from "@/lib/urlUtils";
-import { redeemCode, redirectToShopifyWithError } from "@/lib/redemption";
 
 const Play = () => {
   const navigate = useNavigate();
@@ -158,138 +157,6 @@ const Play = () => {
   // Initialize from localStorage and verify session
   useEffect(() => {
     const initializeSession = async () => {
-      const urlParams = getAllUrlParams();
-
-      // PRIORITY: Check for redeem code parameters FIRST (before any other checks)
-      let redeemCodeParam = urlParams.get("Code") || urlParams.get("code");
-      let customerIdParam = urlParams.get("CustomerId") || urlParams.get("customer_id");
-      let customerEmailParam = urlParams.get("CustomerEmail") || urlParams.get("customer_email");
-      let shopDomainParam = urlParams.get("shop_domain");
-
-      // If not in URL, check sessionStorage (fallback)
-      if (!redeemCodeParam || !customerIdParam || !shopDomainParam) {
-        const pendingRedeemParams = sessionStorage.getItem('pending_redeem_params');
-        if (pendingRedeemParams) {
-          try {
-            const redeemParams = JSON.parse(pendingRedeemParams);
-            redeemCodeParam = redeemCodeParam || redeemParams.Code;
-            customerIdParam = customerIdParam || redeemParams.CustomerId;
-            customerEmailParam = customerEmailParam || redeemParams.CustomerEmail;
-            shopDomainParam = shopDomainParam || redeemParams.shop_domain;
-            sessionStorage.removeItem('pending_redeem_params');
-          } catch (e) {
-            console.error('Error parsing pending redeem params:', e);
-          }
-        }
-      }
-
-      if (redeemCodeParam && customerIdParam && shopDomainParam) {
-        console.log('🎟️ [PLAY] Redeem code params detected on Play page:', {
-          Code: redeemCodeParam,
-          CustomerId: customerIdParam,
-          shop_domain: shopDomainParam
-        });
-
-        try {
-          // First, authenticate the customer and generate session token
-          const { data: authData, error: authError } = await supabase.functions.invoke("generate-session-token", {
-            body: {
-              customer_id: customerIdParam,
-              customer_email: customerEmailParam || undefined,
-              shop_domain: shopDomainParam,
-            },
-          });
-
-          if (authError || !authData?.sessionToken) {
-            console.error('Error generating session token:', authError);
-            redirectToShopifyWithError("Authentication failed. Please try again.");
-            return;
-          }
-
-          // Store session token
-          localStorage.setItem("phraseotomy_session_token", authData.sessionToken);
-
-          // Get customer data
-          const customerData = authData.customer || {};
-          const customerObj: ShopifyCustomer = {
-            id: customerIdParam,
-            email: customerEmailParam || customerData.email || null,
-            firstName: customerData.first_name || null,
-            lastName: customerData.last_name || null,
-            name: customerData.name || null,
-          };
-
-          // Store customer data in localStorage
-          localStorage.setItem(
-            "customerData",
-            JSON.stringify({
-              customer_id: customerIdParam,
-              id: customerIdParam,
-              email: customerObj.email,
-              name: customerObj.name,
-              first_name: customerObj.firstName,
-              last_name: customerObj.lastName,
-            }),
-          );
-
-          // Load tenant for this shop
-          const { data: dbTenant } = await supabase
-            .from("tenants")
-            .select("id, name, tenant_key, shop_domain, environment")
-            .eq("shop_domain", shopDomainParam)
-            .eq("is_active", true)
-            .maybeSingle();
-
-          if (!dbTenant) {
-            redirectToShopifyWithError("Shop configuration not found.");
-            return;
-          }
-
-          const mappedTenant: TenantConfig = {
-            id: dbTenant.id,
-            name: dbTenant.name,
-            tenant_key: dbTenant.tenant_key,
-            shop_domain: dbTenant.shop_domain,
-            environment: dbTenant.environment,
-            verified: true,
-          };
-
-          // Now redeem the code
-          const redeemResult = await redeemCode(redeemCodeParam, customerIdParam, shopDomainParam);
-
-          if (!redeemResult.success) {
-            console.error('Redeem code failed:', redeemResult.message);
-            redirectToShopifyWithError(redeemResult.message);
-            return;
-          }
-
-          // Success - clean URL and continue with normal flow
-          const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash ? window.location.hash.split('?')[0] : '');
-          window.history.replaceState({}, '', cleanUrl);
-
-          // Set state and continue
-          setTenant(mappedTenant);
-          setShopDomain(shopDomainParam);
-          setCustomer(customerObj);
-
-          // Store customer in database
-          storeCustomerInDatabase(customerObj, shopDomainParam, dbTenant.id);
-
-          // Show success toast
-          toast({
-            title: "Code Redeemed Successfully! 🎉",
-            description: redeemResult.message || "Your code has been redeemed.",
-          });
-
-          setLoading(false);
-          return;
-        } catch (error) {
-          console.error('Error processing redeem code:', error);
-          redirectToShopifyWithError("An unexpected error occurred. Please try again.");
-          return;
-        }
-      }
-
       // Check for embedded config from proxy (primary method)
       if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
         setTenant(window.__PHRASEOTOMY_CONFIG__);
@@ -322,6 +189,8 @@ const Play = () => {
         setLoading(false);
         return;
       }
+
+      const urlParams = getAllUrlParams();
 
       // Check for iframe config from URL parameters (fallback method)
       const configParam = urlParams.get("config");
