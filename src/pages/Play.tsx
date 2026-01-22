@@ -178,20 +178,12 @@ const Play = () => {
       });
 
       // If not in URL, check sessionStorage (fallback)
-      // This is important because App.tsx may have cleaned the URL
       if (!redeemCodeParam || !customerIdParam || !shopDomainParam) {
         const pendingRedeemParams = sessionStorage.getItem('pending_redeem_params');
-        console.log('🔍 [PLAY] Checking sessionStorage for redeem params:', {
-          hasPendingParams: !!pendingRedeemParams,
-          redeemCodeParam,
-          customerIdParam,
-          shopDomainParam
-        });
-        
         if (pendingRedeemParams) {
           try {
             const redeemParams = JSON.parse(pendingRedeemParams);
-            console.log('✅ [PLAY] Found redeem params in sessionStorage:', redeemParams);
+            console.log('🔍 [PLAY] Found redeem params in sessionStorage:', redeemParams);
             redeemCodeParam = redeemCodeParam || redeemParams.Code;
             customerIdParam = customerIdParam || redeemParams.CustomerId;
             customerEmailParam = customerEmailParam || redeemParams.CustomerEmail;
@@ -199,10 +191,8 @@ const Play = () => {
             // Clear from sessionStorage after reading
             sessionStorage.removeItem('pending_redeem_params');
           } catch (e) {
-            console.error('❌ [PLAY] Error parsing pending redeem params:', e);
+            console.error('Error parsing pending redeem params:', e);
           }
-        } else {
-          console.log('⚠️ [PLAY] No redeem params found in sessionStorage');
         }
       }
 

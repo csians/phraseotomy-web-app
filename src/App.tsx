@@ -46,15 +46,6 @@ const queryClient = new QueryClient();
            url.searchParams.get(key) || url.searchParams.get(altKey || '');
   };
   
-  // Debug: Log all params found
-  console.log('🔍 [APP] All params detected:', {
-    hashParams: Object.fromEntries(hashParams.entries()),
-    manualParams: Object.fromEntries(manualParams.entries()),
-    urlSearchParams: Object.fromEntries(url.searchParams.entries()),
-    currentHash: window.location.hash,
-    currentSearch: window.location.search
-  });
-  
   const shop = getParam('shop');
   const customer_id = getParam('customer_id', 'CustomerId');
   const customer_email = getParam('customer_email', 'CustomerEmail');
@@ -65,15 +56,6 @@ const queryClient = new QueryClient();
   // Check for Shopify redeem code parameters (from Shopify redirect after redemption)
   const redeemCode = getParam('Code', 'code');
   const shopDomain = getParam('shop_domain');
-  
-  console.log('🔍 [APP] Extracted params:', {
-    redeemCode,
-    customer_id,
-    customer_email,
-    shopDomain,
-    shop,
-    rToken
-  });
   
   // Check if we're in Shopify Admin context
   const isShopifyAdmin = hostParam || window.location.href.includes('admin.shopify.com');
@@ -127,22 +109,9 @@ const queryClient = new QueryClient();
     }
   }
   
-  // Don't clean login params if we're on /play/host with redeem code params
-  // (redeem code params include customer_id which would trigger login params cleaning)
   const hasLoginParams = shop || customer_id || customer_email || customer_name || rToken;
-  const isRedeemCodeFlow = redeemCode && customer_id && shopDomain && isOnPlayHost;
   
-  console.log('🔍 [APP] Login params check:', {
-    hasLoginParams,
-    isRedeemCodeFlow,
-    redeemCode,
-    customer_id,
-    shopDomain,
-    isOnPlayHost,
-    willClean: hasLoginParams && !isRedeemCodeFlow
-  });
-  
-  if (hasLoginParams && !isRedeemCodeFlow) {
+  if (hasLoginParams) {
     const params = {
       shop,
       customer_id,
