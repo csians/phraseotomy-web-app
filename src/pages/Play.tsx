@@ -24,6 +24,7 @@ import { lobbyCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllUrlParams } from "@/lib/urlUtils";
 import { redeemCode, redirectToShopifyWithError } from "@/lib/redemption";
+import { ShopThemesDialog } from "@/components/ShopThemesDialog";
 
 const Play = () => {
   const navigate = useNavigate();
@@ -38,6 +39,7 @@ const Play = () => {
   const [lobbyCode, setLobbyCode] = useState("");
   const [availablePacks, setAvailablePacks] = useState<{ id: string; name: string; description: string | null }[]>([]);
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
+  const [showShopThemesDialog, setShowShopThemesDialog] = useState(false);
   const [nameAutoSaveAttempted, setNameAutoSaveAttempted] = useState(false);
 
   const [isJoining, setIsJoining] = useState(false);
@@ -712,21 +714,21 @@ const Play = () => {
                     </div>
                   )}
 
-                  {/* Buy Additional Packs Promo */}
+                  {/* Buy Additional Themes Promo */}
                   <div className="pt-4 border-t border-border">
                     <div className="bg-gradient-to-r from-game-yellow/10 to-game-yellow/5 rounded-lg p-4 border border-game-yellow/20">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="font-semibold text-game-yellow text-sm">🎁 Want more themes?</h4>
-                          <p className="text-xs text-muted-foreground mt-1">Unlock additional packs for more fun!</p>
+                          <h4 className="font-semibold text-game-yellow text-sm">🎨 Want more themes?</h4>
+                          <p className="text-xs text-muted-foreground mt-1">Browse and unlock additional themes!</p>
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
                           className="border-game-yellow text-game-yellow hover:bg-game-yellow hover:text-game-black"
-                          onClick={() => window.open("https://phraseotomy.com", "_blank")}
+                          onClick={() => setShowShopThemesDialog(true)}
                         >
-                          Shop Packs
+                          Shop Themes
                         </Button>
                       </div>
                     </div>
@@ -838,6 +840,17 @@ const Play = () => {
           </Card>
         </div>
       </div>
+
+      {/* Shop Themes Dialog */}
+      {tenant && customer && shopDomain && (
+        <ShopThemesDialog
+          open={showShopThemesDialog}
+          onOpenChange={setShowShopThemesDialog}
+          tenantId={tenant.id}
+          customerId={customer.id}
+          shopDomain={shopDomain}
+        />
+      )}
     </div>
   );
 };

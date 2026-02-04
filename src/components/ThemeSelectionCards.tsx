@@ -45,6 +45,29 @@ const THEME_IMAGES: Record<string, string> = {
   "sci fi": sciFiTileImg,
 };
 
+// Map theme IDs to their images for direct lookup
+const THEME_IMAGES_BY_ID: Record<string, string> = {
+  // Core themes
+  "dd7cb9da-7af3-40d1-8d48-c68cfb63816a": atWorkImg,      // At Work
+  "219a2cd6-2f57-47aa-a326-2587b7612e74": atHomeImg,      // At Home
+  "f9fc1b75-7ae2-4b0f-8be9-cc0ead6f193f": travelImg,      // Travel
+  "64baef58-c0f3-4f75-a3ff-13889b5d862d": lifestyleImg,   // Lifestyle
+  
+  // Premium themes
+  "98c9218d-8b63-4bef-a049-05861b2da98c": adultTileImg,   // Adult
+  "c84fc90d-5d48-43e6-9f3b-2e8a5a4e9b6c": fantasyTileImg, // Fantasy
+  "a1b2c3d4-e5f6-7890-abcd-ef1234567890": horrorTileImg,  // Horror
+  "b2c3d4e5-f6a7-8901-bcde-f12345678901": sciFiTileImg,   // Sci-Fi
+};
+
+// Map theme IDs to their grey images (for locked themes)
+const THEME_IMAGES_GREY_BY_ID: Record<string, string> = {
+  "98c9218d-8b63-4bef-a049-05861b2da98c": adultTileGreyImg,   // Adult
+  "c84fc90d-5d48-43e6-9f3b-2e8a5a4e9b6c": fantasyTileGreyImg, // Fantasy
+  "a1b2c3d4-e5f6-7890-abcd-ef1234567890": horrorTileGreyImg,  // Horror
+  "b2c3d4e5-f6a7-8901-bcde-f12345678901": sciFiTileGreyImg,   // Sci-Fi
+};
+
 // Map theme names to their grey images (for locked themes)
 const THEME_IMAGES_GREY: Record<string, string> = {
   adult: adultTileGreyImg,
@@ -86,7 +109,7 @@ interface ThemeSelectionCardsProps {
   selectedThemeId?: string;
   disabled?: boolean;
   playerName?: string;
-  unlockedPackIds?: string[]; // Pack IDs the customer has unlocked
+  unlockedPackIds?: string[]; 
 }
 
 export function ThemeSelectionCards({
@@ -102,18 +125,16 @@ export function ThemeSelectionCards({
   // Core theme names that are always enabled
   const coreThemeNames = ['At Home', 'At Work', 'Lifestyle', 'Travel'];
   
-  // All themes passed here are already filtered by pack
-  // Filter out "Core" theme and separate base themes and expansion themes
-  const filteredThemes = themes.filter((t) => t.name.toLowerCase() !== 'core');
+  // Filter out "Core" theme and only show unlocked themes
+  const filteredThemes = themes.filter((t) => 
+    t.name.toLowerCase() !== 'core' && t.isUnlocked !== false
+  );
   const baseThemes = filteredThemes.filter((t) => coreThemeNames.includes(t.name));
   const expansionThemes = filteredThemes.filter((t) => !coreThemeNames.includes(t.name));
   
-  // Combine all themes and mark only first 4 as enabled
+  // Combine all unlocked themes
   const allThemes = [...baseThemes, ...expansionThemes];
-  const themesWithEnabledStatus = allThemes.map((theme, index) => ({
-    ...theme,
-    isUnlocked: index < 4, // Only first 4 themes are enabled
-  }));
+  const themesWithEnabledStatus = allThemes;
 
   const renderThemeCard = (theme: ThemeOption) => {
     const IconComponent = iconMap[theme.icon] || Sparkles;
@@ -121,10 +142,10 @@ export function ThemeSelectionCards({
     const isLocked = !theme.isUnlocked;
     const themeNameLower = theme.name.toLowerCase();
     
-    // Get the appropriate image - use grey version if locked and available, otherwise use regular
-    let themeImage = THEME_IMAGES[themeNameLower];
-    if (isLocked && THEME_IMAGES_GREY[themeNameLower]) {
-      themeImage = THEME_IMAGES_GREY[themeNameLower];
+    // Try to get image by ID first, then fallback to name-based lookup
+    let themeImage = THEME_IMAGES_BY_ID[theme.id] || THEME_IMAGES[themeNameLower];
+    if (isLocked && (THEME_IMAGES_GREY_BY_ID[theme.id] || THEME_IMAGES_GREY[themeNameLower])) {
+      themeImage = THEME_IMAGES_GREY_BY_ID[theme.id] || THEME_IMAGES_GREY[themeNameLower];
     }
     
     const isCoreTheme = coreThemeNames.includes(theme.name);

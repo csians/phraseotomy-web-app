@@ -581,16 +581,20 @@ export default function Game() {
     const isStoryteller = session?.current_storyteller_id === currentPlayerId;
     const hasTheme = !!currentTurn?.theme_id;
 
+    // Don't auto-trigger if we're in the middle of theme selection or whisp generation
+    // This prevents duplicate calls when handleThemeSelect already calls handleStartTurn
     if (
       hasTheme &&
       isStoryteller &&
       !hasWhisp &&
       !isGeneratingWhisp &&
-      gamePhase === "storytelling"
+      !isModeTransitioning &&
+      gamePhase === "storytelling" &&
+      currentTurn?.theme_id // Ensure theme_id is actually set and not empty
     ) {
       console.log("Auto-triggering turn start with theme:", currentTurn?.theme_id);
       autoTurnTriggeredRef.current = true;
-      handleStartTurn(currentTurn?.theme_id || "");
+      handleStartTurn(currentTurn.theme_id);
     }
 
     // Reset flag when turn changes
@@ -604,6 +608,7 @@ export default function Game() {
     currentTurn?.whisp,
     gamePhase,
     isGeneratingWhisp,
+    isModeTransitioning,
   ]);
 
   const initializeGame = async (options: RefreshOptions = {}) => {
@@ -1117,6 +1122,7 @@ export default function Game() {
   // Handle theme selection - immediately start turn with unified flow
   // Theme is selected per turn by the storyteller
   const handleThemeSelect = async (themeId: string) => {
+    console.log("🎯 handleThemeSelect called with themeId:", themeId);
     setSelectedThemeId(themeId);
     setIsGeneratingWhisp(true);
     setIsModeTransitioning(true);
@@ -1129,6 +1135,7 @@ export default function Game() {
       });
 
       // Start the turn immediately (start-turn will update the turn with theme_id)
+      console.log("🚀 Calling handleStartTurn with themeId:", themeId);
       await handleStartTurn(themeId);
     } catch (error) {
       console.error("Error selecting theme:", error);
@@ -1144,6 +1151,20 @@ export default function Game() {
 
   // Handle starting a turn - unified flow (no mode selection)
   const handleStartTurn = async (themeId: string) => {
+    console.log("🔥 handleStartTurn called with themeId:", themeId);
+    
+    if (!themeId || themeId.trim() === "") {
+      console.error("❌ handleStartTurn called with empty themeId");
+      toast({
+        title: "Error",
+        description: "No theme selected.",
+        variant: "destructive",
+      });
+      setIsGeneratingWhisp(false);
+      setIsModeTransitioning(false);
+      return;
+    }
+
     try {
       // Get the current turn to ensure we have the latest turn ID
       const { data: gameState } = await supabase.functions.invoke("get-game-state", {
@@ -1634,7 +1655,7 @@ export default function Game() {
                         name: t.name,
                         icon: t.icon,
                         isCore: t.isCore || false,
-                        isUnlocked: t.isUnlocked !== false,
+                        isUnlocked: t.isUnlocked == true,
                         packName: t.packName,
                         packId: t.pack_id,
                       }))}

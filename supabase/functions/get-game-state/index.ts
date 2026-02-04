@@ -63,6 +63,57 @@ Deno.serve(async (req) => {
       console.error("Error fetching themes:", themesError);
     }
 
+    // Base themes that are always unlocked (static)
+    const baseThemeNames = ["At Home", "Lifestyle", "At Work", "Travel"];
+    const baseThemeIds = new Set(
+      (themes || [])
+        .filter(t => baseThemeNames.includes(t.name))
+        .map(t => t.id)
+    );
+
+    // Get customer's email from their ID (since theme_codes.redeemed_by now stores emails)
+    let customerEmail = null;
+    if (playerId) {
+      const { data: customer, error: customerError } = await supabase
+        .from("customers")
+        .select("customer_email")
+        .eq("customer_id", playerId)
+        .maybeSingle();
+      
+      if (!customerError && customer?.customer_email) {
+        customerEmail = customer.customer_email;
+        console.log(`Found customer email for ${playerId}: ${customerEmail}`);
+      } else {
+        console.log(`No customer email found for player ID: ${playerId}`);
+      }
+    }
+
+    // Get customer's unlocked themes from theme_codes (where redeemed_by = customerEmail)
+    let redeemedCodes = [];
+    if (customerEmail) {
+      const { data, error: redeemedCodesError } = await supabase
+        .from("theme_codes")
+        .select("themes_unlocked")
+        .eq("redeemed_by", customerEmail);
+
+      if (redeemedCodesError) {
+        console.error("Error fetching redeemed theme codes:", redeemedCodesError);
+      } else {
+        redeemedCodes = data || [];
+      }
+    }
+
+    // Flatten all themes_unlocked arrays into a set of theme IDs
+    const customerUnlockedThemeIds = new Set<string>();
+    redeemedCodes.forEach(code => {
+      (code.themes_unlocked || []).forEach(themeId => {
+        customerUnlockedThemeIds.add(themeId);
+      });
+    });
+
+    console.log("Customer unlocked themes:", Array.from(customerUnlockedThemeIds));
+    console.log("Base themes (always unlocked):", Array.from(baseThemeIds));
+
     // Get theme_packs junction table to find themes linked to packs_used
     const { data: themePacks, error: themePacksError } = await supabase
       .from("theme_packs")
@@ -78,10 +129,16 @@ Deno.serve(async (req) => {
       (themePacks || []).map(tp => tp.theme_id)
     );
 
-    // Filter themes: show core themes OR themes linked to packs_used
+    // Filter themes: show core themes OR base themes OR customer-unlocked themes OR themes linked to packs_used
     const availableThemes = (themes || []).filter(theme => {
       // Always include core themes
       if (theme.is_core) return true;
+      
+      // Include base themes (always available)
+      if (baseThemeIds.has(theme.id)) return true;
+      
+      // Include customer-unlocked themes
+      if (customerUnlockedThemeIds.has(theme.id)) return true;
       
       // Include themes directly linked to packs_used via pack_id
       if (theme.pack_id && packsUsed.includes(theme.pack_id)) return true;

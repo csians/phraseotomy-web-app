@@ -12,7 +12,6 @@ async function handleThemeCode(
   supabaseAdmin: any,
   normalizedCode: string,
   customerId: string,
-  customerEmail: string,
   shopDomain: string,
   tenant: { id: string },
   themeId?: string,
@@ -34,7 +33,7 @@ async function handleThemeCode(
     .in("status", ["unused", "active"])
     .maybeSingle();
 
-  console.log("🔍 assign-code theme_codes basic check:", {
+  console.log("🔍 [validate-code] theme_codes basic check:", {
     found: !!codeCheck,
     error: codeError,
     code: codeCheck?.code,
@@ -52,7 +51,7 @@ async function handleThemeCode(
   // 2) Get themes from the themes_unlocked column
   const unlockedThemeIds = codeCheck.themes_unlocked || [];
 
-  console.log("🔍 assign-code themes_unlocked from code:", {
+  console.log("🔍 [validate-code] themes_unlocked from code:", {
     unlockedThemeIds,
     hasThemes: unlockedThemeIds.length > 0,
   });
@@ -72,7 +71,7 @@ async function handleThemeCode(
 
   const unlocksRequestedTheme = normalizedUnlockedIds.includes(normalizedThemeId);
 
-  console.log("🔍 assign-code theme ID comparison:", {
+  console.log("🔍 [validate-code] theme ID comparison:", {
     requestedThemeId: normalizedThemeId,
     unlockedThemeIds: normalizedUnlockedIds,
     matchFound: unlocksRequestedTheme,
@@ -92,39 +91,35 @@ async function handleThemeCode(
     );
   }
 
-  // 3) Check if already redeemed
-  // Redeemed by someone else?
-  if (codeCheck.redeemed_at && codeCheck.redeemed_by !== customerEmail) {
+  // 3) Already redeemed checks (for validation only - don't prevent already redeemed codes from being validated)
+  const { data: existingRedemption } = await supabaseAdmin
+    .from("customer_theme_codes")
+    .select("*")
+    .eq("customer_id", customerId)
+    .eq("theme_code_id", codeCheck.id)
+    .maybeSingle();
+
+  if (existingRedemption) {
     return new Response(
-      JSON.stringify({ success: false, error: "Theme code has already been redeemed" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({
+        success: true,
+        message: "Theme already unlocked for this customer",
+        alreadyUnlocked: true,
+        unlockedThemes: ["Theme"],
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
-  // 4) Mark theme_codes as redeemed
-  const { error: updateError } = await supabaseAdmin
-    .from("theme_codes")
-    .update({
-      status: "active",
-      redeemed_by: customerEmail,
-      redeemed_at: new Date().toISOString(),
-    })
-    .eq("id", codeCheck.id);
-
-  if (updateError) {
-    console.error("❌ Error updating theme_codes:", updateError);
-    // non-fatal
-  }
-
-  const unlockedThemes = ["Theme"]; // Simplified for now
-
-  console.log("✅ Theme code validated and redeemed successfully (assign-code)");
+  // For validation, we don't redeem - we just confirm the code is valid
+  console.log("✅ Theme code validated successfully (validate-code)");
 
   return new Response(
     JSON.stringify({
       success: true,
-      message: "Theme code validated and redeemed successfully",
-      unlockedThemes,
+      message: "Theme code is valid and ready to redeem",
+      unlockedThemes: ["Theme"],
+      codeId: codeCheck.id,
     }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
@@ -141,7 +136,7 @@ async function handleLicenseCode(
   shopDomain: string,
   tenant: { id: string; access_token: string },
 ): Promise<Response> {
-  // Find license_code
+  // 1) Find license_code
   const { data: licenseCode, error: codeError } = await supabaseAdmin
     .from("license_codes")
     .select("*")
@@ -157,7 +152,7 @@ async function handleLicenseCode(
     );
   }
 
-  // Update Shopify customer metafield
+  // 2) Update Shopify metafield
   const metafieldData = {
     metafield: {
       namespace: "phraseotomy",
@@ -183,14 +178,17 @@ async function handleLicenseCode(
     const errorText = await shopifyResponse.text();
     console.error("❌ Shopify API error:", errorText);
     return new Response(
-      JSON.stringify({ success: false, error: "Failed to update Shopify metafields" }),
+      JSON.stringify({
+        success: false,
+        error: "Failed to update Shopify metafields",
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
   console.log("✅ Shopify metafield updated");
 
-  // Create customer_licenses if not exists
+  // 3) Create customer_licenses if not exists
   const { data: existingLicense } = await supabaseAdmin
     .from("customer_licenses")
     .select("*")
@@ -214,7 +212,7 @@ async function handleLicenseCode(
 
     if (licenseError) {
       console.error("❌ Error creating customer_licenses:", licenseError);
-      // non-fatal
+      // continue: Shopify metafield is already updated
     } else {
       console.log("✅ Customer license created");
     }
@@ -222,12 +220,12 @@ async function handleLicenseCode(
     console.log("ℹ️ Customer already has this license");
   }
 
-  // Update license_codes row
+  // 4) Update license_codes row
   const { error: updateError } = await supabaseAdmin
     .from("license_codes")
     .update({
-      status: "a", // keep your existing status code
-      redeemed_by: customerEmail,
+      status: "a", // keep your existing status if that's what DB uses
+      redeemed_by: customerId,
       redeemed_at: new Date().toISOString(),
     })
     .eq("id", licenseCode.id);
@@ -251,6 +249,7 @@ async function handleLicenseCode(
 // ---------- ENTRYPOINT ----------
 
 Deno.serve(async (req) => {
+  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
@@ -270,11 +269,13 @@ Deno.serve(async (req) => {
       customerName,
       code,
       shopDomain,
-      codeType = "license",
       themeId,
     } = body;
 
-    console.log("🎯 assign-code-to-customer request:", {
+    // Force codeType to theme for this function
+    const codeType = "theme";
+
+    console.log("🎯 validate-code request:", {
       customerId,
       customerEmail,
       code,
@@ -283,9 +284,9 @@ Deno.serve(async (req) => {
       themeId,
     });
 
-    if (!customerId || !code || !shopDomain) {
+    if (!customerId || !code || !shopDomain || !themeId) {
       return new Response(
-        JSON.stringify({ success: false, error: "Missing required fields" }),
+        JSON.stringify({ success: false, error: "Missing required fields (customerId, code, shopDomain, themeId)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -297,7 +298,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Adjust `is_active` to your real column name if different
+    // Tenant lookup (adjust is_active to your real column)
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from("tenants")
       .select("id, access_token")
@@ -318,7 +319,6 @@ Deno.serve(async (req) => {
         supabaseAdmin,
         normalizedCode,
         customerId,
-        customerEmail,
         shopDomain,
         tenant,
         themeId,
@@ -335,8 +335,9 @@ Deno.serve(async (req) => {
       );
     }
   } catch (error) {
-    console.error("❌ Unexpected error in assign-code-to-customer:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("❌ Unexpected error in validate-code:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
 
     return new Response(
       JSON.stringify({ success: false, error: errorMessage }),

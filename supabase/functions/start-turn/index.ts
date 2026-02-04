@@ -23,6 +23,8 @@ Deno.serve(async (req) => {
   try {
     const { sessionId, turnId, selectedThemeId } = await req.json();
 
+    console.log("🎯 start-turn request:", { sessionId, turnId, selectedThemeId });
+
     if (!sessionId) {
       return new Response(
         JSON.stringify({ error: "Missing sessionId" }),
@@ -51,6 +53,7 @@ Deno.serve(async (req) => {
 
     // Theme must be selected by storyteller at start of each turn
     if (!selectedThemeId) {
+      console.error("❌ Missing selectedThemeId");
       return new Response(
         JSON.stringify({ error: "Theme must be selected by storyteller at start of turn" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -58,6 +61,8 @@ Deno.serve(async (req) => {
     }
 
     const themeId = selectedThemeId;
+
+    console.log("🔍 Looking up theme:", themeId);
 
     // Get the theme details
     const { data: theme, error: themeError } = await supabase
@@ -67,8 +72,9 @@ Deno.serve(async (req) => {
       .single();
 
     if (themeError || !theme) {
+      console.error("❌ Theme not found:", themeError, "themeId:", themeId);
       return new Response(
-        JSON.stringify({ error: "Theme not found" }),
+        JSON.stringify({ error: "Theme not found", themeId, dbError: themeError?.message }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

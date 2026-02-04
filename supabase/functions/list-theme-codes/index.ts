@@ -75,10 +75,97 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('✅ Theme codes loaded:', codes?.length || 0);
+    // Get customer information for redeemed codes
+    const redeemedCustomerIds = codes
+      ?.filter(code => code.redeemed_by)
+      .map(code => code.redeemed_by) || [];
+
+    let customerMap: Record<string, { name: string; email: string }> = {};
+
+    if (redeemedCustomerIds.length > 0) {
+      // Check if redeemed_by contains emails (new format) or customer IDs (old format)
+      const hasEmails = redeemedCustomerIds.some(id => id.includes('@'));
+      
+      if (hasEmails) {
+        // New format: redeemed_by contains emails
+        const { data: customers, error: customersError } = await supabase
+          .from('customers')
+          .select('customer_email, customer_name, first_name, last_name')
+          .in('customer_email', redeemedCustomerIds.filter(id => id.includes('@')))
+          .eq('tenant_id', tenant.id);
+
+        if (!customersError && customers) {
+          customerMap = customers.reduce((acc, customer) => {
+            const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
+            const displayName = customer.customer_name || 
+                               fullName || 
+                               customer.customer_email ||
+                               'Unknown Customer';
+            acc[customer.customer_email] = {
+              name: displayName,
+              email: customer.customer_email
+            };
+            return acc;
+          }, {} as Record<string, { name: string; email: string }>);
+        }
+      } else {
+        // Old format: redeemed_by contains customer IDs
+        const { data: customers, error: customersError } = await supabase
+          .from('customers')
+          .select('customer_id, customer_email, customer_name, first_name, last_name')
+          .in('customer_id', redeemedCustomerIds)
+          .eq('tenant_id', tenant.id);
+
+        if (!customersError && customers) {
+          customerMap = customers.reduce((acc, customer) => {
+            const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
+            const displayName = customer.customer_name || 
+                               fullName ||
+                               customer.customer_email ||
+                               `Customer ${customer.customer_id}`;
+            acc[customer.customer_id] = {
+              name: displayName,
+              email: customer.customer_email || ''
+            };
+            return acc;
+          }, {} as Record<string, { name: string; email: string }>);
+        }
+      }
+    }
+
+    // Enrich codes with customer information
+    const enrichedCodes = codes?.map(code => {
+      if (!code.redeemed_by) {
+        return code; // No redemption data
+      }
+
+      if (customerMap[code.redeemed_by]) {
+        // Found customer information
+        return {
+          ...code,
+          redeemed_by: customerMap[code.redeemed_by].name,
+          customer_email: customerMap[code.redeemed_by].email
+        };
+      } else {
+        // No customer found - keep original value as fallback
+        console.log(`⚠️  No customer found for redeemed_by: ${code.redeemed_by}`);
+        return {
+          ...code,
+          redeemed_by: code.redeemed_by, // Keep original (could be email or customer ID)
+          customer_email: code.redeemed_by.includes('@') ? code.redeemed_by : ''
+        };
+      }
+    }) || [];
+
+    console.log('✅ Theme codes loaded:', enrichedCodes.length);
+    console.log('📊 Customer lookup stats:', {
+      totalRedeemed: redeemedCustomerIds.length,
+      customersFound: Object.keys(customerMap).length,
+      customerMap: Object.keys(customerMap).length > 0 ? customerMap : 'No customers found'
+    });
 
     return new Response(
-      JSON.stringify({ success: true, codes: codes || [] }),
+      JSON.stringify({ success: true, codes: enrichedCodes }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
