@@ -2003,7 +2003,7 @@ export default function Lobby() {
             <CardHeader>
               <CardTitle>Ready to Start?</CardTitle>
               <CardDescription>
-                {players.length < 2
+                {players.length < 4
                   ? "Minimum 4 players required to start the game" 
                   : "Start the game when all players have joined"}
               </CardDescription>
@@ -2013,9 +2013,9 @@ export default function Lobby() {
                 onClick={handleStartGame} 
                 className="w-full" 
                 size="lg"
-                disabled={players.length < 2}
+                disabled={players.length < 4}
               >
-                Start Game {players.length < 2 && `(${players.length}/2 players)`}
+                Start Game {players.length < 4 && `(${players.length}/4 players)`}
               </Button>
             </CardContent>
           </Card>
