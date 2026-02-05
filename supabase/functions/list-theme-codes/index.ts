@@ -75,6 +75,53 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get customer licenses with their license code expiry dates  
+    const { data: customerLicenses, error: customerLicensesError } = await supabase
+      .from('customer_licenses')
+      .select(`
+        customer_id,
+        customer_email,
+        license_code_id,
+        activated_at,
+        license_codes!inner(expires_at)
+      `)
+      .eq('tenant_id', tenant.id)
+      .order('activated_at', { ascending: false });
+
+    if (customerLicensesError) {
+      console.error('Error loading customer licenses:', customerLicensesError);
+    }
+
+    // Create a map of customer -> expiry date from their latest license
+    const customerExpiryMap: Record<string, string | null> = {};
+    
+    if (customerLicenses) {
+      // Group by customer and get the most recent license expiry for each
+      const customerGrouped: Record<string, any[]> = {};
+      
+      customerLicenses.forEach(cl => {
+        if (!customerGrouped[cl.customer_id]) {
+          customerGrouped[cl.customer_id] = [];
+        }
+        customerGrouped[cl.customer_id].push(cl);
+      });
+      
+      // For each customer, use their most recent license expiry
+      Object.entries(customerGrouped).forEach(([customerId, licenses]) => {
+        const latestLicense = licenses[0]; // Already ordered by activated_at desc
+        const expiryDate = latestLicense.license_codes?.expires_at;
+        
+        if (expiryDate) {
+          customerExpiryMap[customerId] = expiryDate;
+          
+          // Also map by email if available
+          if (latestLicense.customer_email) {
+            customerExpiryMap[latestLicense.customer_email] = expiryDate;
+          }
+        }
+      });
+    }
+
     // Get customer information for redeemed codes
     const redeemedCustomerIds = codes
       ?.filter(code => code.redeemed_by)
@@ -83,76 +130,133 @@ Deno.serve(async (req) => {
     let customerMap: Record<string, { name: string; email: string }> = {};
 
     if (redeemedCustomerIds.length > 0) {
-      // Check if redeemed_by contains emails (new format) or customer IDs (old format)
-      const hasEmails = redeemedCustomerIds.some(id => id.includes('@'));
+      // Try multiple lookup strategies to find customer information
       
-      if (hasEmails) {
-        // New format: redeemed_by contains emails
-        const { data: customers, error: customersError } = await supabase
-          .from('customers')
-          .select('customer_email, customer_name, first_name, last_name')
-          .in('customer_email', redeemedCustomerIds.filter(id => id.includes('@')))
-          .eq('tenant_id', tenant.id);
+      // Strategy 1: Look up all customers for this tenant and match by various fields
+      const { data: allCustomers, error: allCustomersError } = await supabase
+        .from('customers')
+        .select('customer_id, customer_email, customer_name, first_name, last_name, staging_customer_id, prod_customer_id')
+        .eq('tenant_id', tenant.id);
 
-        if (!customersError && customers) {
-          customerMap = customers.reduce((acc, customer) => {
-            const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
-            const displayName = customer.customer_name || 
-                               fullName || 
-                               customer.customer_email ||
-                               'Unknown Customer';
-            acc[customer.customer_email] = {
-              name: displayName,
-              email: customer.customer_email
-            };
-            return acc;
-          }, {} as Record<string, { name: string; email: string }>);
-        }
-      } else {
-        // Old format: redeemed_by contains customer IDs
-        const { data: customers, error: customersError } = await supabase
-          .from('customers')
-          .select('customer_id, customer_email, customer_name, first_name, last_name')
-          .in('customer_id', redeemedCustomerIds)
-          .eq('tenant_id', tenant.id);
+      if (!allCustomersError && allCustomers) {
+        // Build comprehensive customer map with multiple lookup keys
+        allCustomers.forEach(customer => {
+          // Build proper customer name with priority: customer_name > full_name > email_username > customer_id
+          const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
+          const emailUsername = customer.customer_email ? customer.customer_email.split('@')[0] : '';
+          
+          let displayName;
+          if (customer.customer_name && customer.customer_name.trim()) {
+            displayName = customer.customer_name.trim();
+          } else if (fullName && fullName !== ' ') {
+            displayName = fullName;
+          } else if (emailUsername) {
+            displayName = emailUsername;
+          } else {
+            displayName = `Customer ${customer.customer_id}`;
+          }
+          
+          const customerInfo = {
+            name: displayName,
+            email: customer.customer_email || '',
+            originalName: customer.customer_name,
+            fullName: fullName || ''
+          };
 
-        if (!customersError && customers) {
-          customerMap = customers.reduce((acc, customer) => {
-            const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
-            const displayName = customer.customer_name || 
-                               fullName ||
-                               customer.customer_email ||
-                               `Customer ${customer.customer_id}`;
-            acc[customer.customer_id] = {
-              name: displayName,
-              email: customer.customer_email || ''
-            };
-            return acc;
-          }, {} as Record<string, { name: string; email: string }>);
-        }
+          // Map by customer_id
+          if (customer.customer_id) {
+            customerMap[customer.customer_id] = customerInfo;
+          }
+          
+          // Map by customer_email
+          if (customer.customer_email) {
+            customerMap[customer.customer_email] = customerInfo;
+          }
+          
+          // Map by environment-specific customer IDs
+          if (customer.staging_customer_id) {
+            customerMap[customer.staging_customer_id] = customerInfo;
+          }
+          
+          if (customer.prod_customer_id) {
+            customerMap[customer.prod_customer_id] = customerInfo;
+          }
+        });
       }
     }
 
-    // Enrich codes with customer information
+    // Enrich codes with customer information and inherited expiry dates
     const enrichedCodes = codes?.map(code => {
+      // For redeemed codes, try to inherit expiry date from customer's license
+      let inheritedExpiryDate = null;
+      
+      if (code.redeemed_by) {
+        // Try to inherit expiry date from customer's license by email matching
+        inheritedExpiryDate = customerExpiryMap[code.redeemed_by];
+        
+        // If no direct match, try case-insensitive email matching
+        if (!inheritedExpiryDate && customerLicenses) {
+          const matchingCustomer = customerLicenses.find(cl => 
+            cl.customer_email?.toLowerCase() === code.redeemed_by?.toLowerCase()
+          );
+          
+          if (matchingCustomer) {
+            inheritedExpiryDate = matchingCustomer.license_codes?.expires_at;
+          }
+        }
+      }
+      
+      // Override expires_at with inherited value from license codes
+      const codeWithInheritedExpiry = {
+        ...code,
+        expires_at: inheritedExpiryDate,
+      };
       if (!code.redeemed_by) {
-        return code; // No redemption data
+        // No redemption data - check if there's a redeemed_at timestamp with missing redeemed_by
+        if (code.redeemed_at) {
+          return {
+            ...codeWithInheritedExpiry,
+            redeemed_by: 'Unknown Customer (missing data)',
+            customer_email: '',
+            customer_lookup_status: 'missing_redeemed_by_data'
+          };
+        }
+        return codeWithInheritedExpiry; // Truly unredeemed code
       }
 
       if (customerMap[code.redeemed_by]) {
         // Found customer information
         return {
-          ...code,
+          ...codeWithInheritedExpiry,
           redeemed_by: customerMap[code.redeemed_by].name,
-          customer_email: customerMap[code.redeemed_by].email
+          customer_email: customerMap[code.redeemed_by].email,
+          customer_lookup_status: 'found_in_database'
         };
       } else {
-        // No customer found - keep original value as fallback
-        console.log(`⚠️  No customer found for redeemed_by: ${code.redeemed_by}`);
+        // No customer found - provide meaningful fallback
+        const isEmail = code.redeemed_by && code.redeemed_by.includes('@');
+        let fallbackName;
+        let fallbackEmail = '';
+        
+        if (isEmail) {
+          // If it's an email, extract username part for display name
+          fallbackName = code.redeemed_by.split('@')[0];
+          fallbackEmail = code.redeemed_by;
+        } else if (code.redeemed_by && code.redeemed_by.startsWith('Customer_')) {
+          // If it's our fallback format, clean it up
+          fallbackName = code.redeemed_by.replace('Customer_', 'Customer ');
+        } else if (code.redeemed_by) {
+          // Assume it's a username or customer name
+          fallbackName = code.redeemed_by;
+        } else {
+          fallbackName = 'Unknown Customer';
+        }
+        
         return {
-          ...code,
-          redeemed_by: code.redeemed_by, // Keep original (could be email or customer ID)
-          customer_email: code.redeemed_by.includes('@') ? code.redeemed_by : ''
+          ...codeWithInheritedExpiry,
+          redeemed_by: fallbackName,
+          customer_email: fallbackEmail,
+          customer_lookup_status: 'not_found_in_database'
         };
       }
     }) || [];
@@ -160,9 +264,24 @@ Deno.serve(async (req) => {
     console.log('✅ Theme codes loaded:', enrichedCodes.length);
     console.log('📊 Customer lookup stats:', {
       totalRedeemed: redeemedCustomerIds.length,
-      customersFound: Object.keys(customerMap).length,
-      customerMap: Object.keys(customerMap).length > 0 ? customerMap : 'No customers found'
+      customersInDatabase: Object.keys(customerMap).length,
+      redeemedByValues: codes?.filter(c => c.redeemed_by).map(c => c.redeemed_by) || [],
+      customerMapKeys: Object.keys(customerMap).slice(0, 5), // Show first 5 keys for debugging
+      notFoundCount: enrichedCodes.filter(c => c.customer_lookup_status === 'not_found_in_database').length
     });
+    
+    // Log specific examples for debugging
+    const redeemedCodes = enrichedCodes.filter(c => c.redeemed_by);
+    if (redeemedCodes.length > 0) {
+      console.log('📋 Sample redeemed codes with customer names:', 
+        redeemedCodes.slice(0, 3).map(c => ({
+          code: c.code,
+          redeemed_by: c.redeemed_by,
+          customer_email: c.customer_email,
+          lookup_status: c.customer_lookup_status
+        }))
+      );
+    }
 
     return new Response(
       JSON.stringify({ success: true, codes: enrichedCodes }),

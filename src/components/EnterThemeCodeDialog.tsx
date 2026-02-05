@@ -152,7 +152,7 @@ export function EnterThemeCodeDialog({
             <Label htmlFor="theme-code">Theme Code</Label>
             <Input
               id="theme-code"
-              placeholder="Enter 6-digit code (e.g., 9466C3)"
+              placeholder="Enter 6-digit code (e.g., POIU12)"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               onKeyPress={handleKeyPress}

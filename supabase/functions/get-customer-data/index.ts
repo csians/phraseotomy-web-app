@@ -16,8 +16,12 @@ async function verifySessionToken(token: string): Promise<{
   exp: number;
 } | null> {
   try {
+    console.log('🔧 Starting token verification...');
     const [payloadB64, signature] = token.split('.');
-    if (!payloadB64 || !signature) return null;
+    if (!payloadB64 || !signature) {
+      console.error('❌ Token format invalid - missing payload or signature');
+      return null;
+    }
 
     // Verify signature
     const encoder = new TextEncoder();
@@ -38,18 +42,25 @@ async function verifySessionToken(token: string): Promise<{
     );
 
     const isValid = await crypto.subtle.verify('HMAC', key, signatureBytes, msgData);
-    if (!isValid) return null;
+    if (!isValid) {
+      console.error('❌ Token signature verification failed');
+      return null;
+    }
 
     // Decode and validate payload
     const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - payloadB64.length % 4) % 4)));
 
     // Check expiration
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp < now) return null;
+    if (payload.exp < now) {
+      console.error('❌ Token has expired:', { exp: payload.exp, now });
+      return null;
+    }
 
+    console.log('✅ Token verification successful');
     return payload;
   } catch (error) {
-    console.error('Token verification error:', error);
+    console.error('❌ Token verification error:', error);
     return null;
   }
 }
@@ -65,22 +76,28 @@ Deno.serve(async (req) => {
 
   try {
     const { sessionToken } = await req.json();
+    console.log('🔑 Received request with token:', sessionToken ? 'Present' : 'Missing');
 
     // Validate session token
     if (!sessionToken) {
+      console.error('❌ No session token provided');
       return new Response(
         JSON.stringify({ error: 'Missing session token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log('🔍 Verifying session token...');
     const payload = await verifySessionToken(sessionToken);
     if (!payload) {
+      console.error('❌ Session token verification failed');
       return new Response(
         JSON.stringify({ error: 'Invalid or expired session token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('✅ Session token verified successfully:', payload);
 
     // Extract validated customer ID and shop domain from token
     const { customer_id: customerId, shop: shopDomain } = payload;
@@ -176,12 +193,96 @@ Deno.serve(async (req) => {
       .eq('status', 'active');
     
     // Transform the data to include packs_unlocked at the license level
-    const transformedLicenses = licenses?.map((license: any) => ({
+    let transformedLicenses = licenses?.map((license: any) => ({
       ...license,
       code: license.license_codes?.code,
       packs_unlocked: license.license_codes?.packs_unlocked || [],
       expires_at: license.license_codes?.expires_at || license.expires_at,
     })) || [];
+
+    // Check if customer has any packs, if not assign base pack
+    console.log(`📦 Customer has ${transformedLicenses.length} licenses`);
+    
+    if (transformedLicenses.length === 0 || !transformedLicenses.some(license => license.packs_unlocked?.length > 0)) {
+      console.log(`🎁 Customer ${customerId} has no packs. Assigning base pack...`);
+
+      // Find the base pack for this tenant (specifically look for pack named "Base")
+      let { data: basePack, error: packError } = await supabase
+        .from('packs')
+        .select('id, name')
+        .eq('tenant_id', tenant.id)
+        .eq('name', 'Base')
+        .single();
+
+      // If no "Base" pack found, try case-insensitive search
+      if (packError || !basePack) {
+        const { data: fallbackPack, error: fallbackError } = await supabase
+          .from('packs')
+          .select('id, name')
+          .eq('tenant_id', tenant.id)
+          .ilike('name', 'base')
+          .single();
+        
+        basePack = fallbackPack;
+        packError = fallbackError;
+      }
+
+      console.log(`🔍 Looking for base pack:`, { basePack, packError });
+
+      if (!packError && basePack) {
+        // Create a license code for the base pack
+        const basePackCode = `AUTO${Date.now().toString().slice(-6)}`;
+        console.log(`🏷️ Creating license code: ${basePackCode}`);
+        
+        const { data: newLicenseCode, error: licenseCodeError } = await supabase
+          .from('license_codes')
+          .insert({
+            code: basePackCode,
+            packs_unlocked: [basePack.name],
+            tenant_id: tenant.id,
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        console.log(`🏷️ License code creation result:`, { newLicenseCode, licenseCodeError });
+
+        if (!licenseCodeError && newLicenseCode) {
+          // Assign the license to the customer
+          const { data: newCustomerLicense, error: customerLicenseError } = await supabase
+            .from('customer_licenses')
+            .insert({
+              customer_id: customerId,
+              license_code_id: newLicenseCode.id,
+              customer_email: customerDetails?.email || '',
+              customer_name: customerDetails?.name || `${customerDetails?.first_name || ''} ${customerDetails?.last_name || ''}`.trim(),
+              shop_domain: shopDomain,
+              tenant_id: tenant.id,
+              status: 'active',
+              activated_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          console.log(`👤 Customer license assignment result:`, { newCustomerLicense, customerLicenseError });
+
+          if (!customerLicenseError && newCustomerLicense) {
+            // Add the new license to the response
+            transformedLicenses = [{
+              ...newCustomerLicense,
+              code: newLicenseCode.code,
+              packs_unlocked: newLicenseCode.packs_unlocked,
+              expires_at: newLicenseCode.expires_at,
+            }];
+            console.log(`✅ Successfully assigned base pack "${basePack.name}" to customer ${customerId}`);
+          }
+        }
+      } else {
+        console.error('❌ No base pack found for tenant:', tenant.id, packError);
+      }
+    } else {
+      console.log(`ℹ️ Customer ${customerId} already has packs assigned`);
+    }
 
     if (licensesError) {
       console.error('Error fetching licenses:', licensesError);

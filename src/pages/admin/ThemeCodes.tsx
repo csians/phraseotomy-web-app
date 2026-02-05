@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Pencil, Trash2, RefreshCw, RotateCcw, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAllUrlParams } from "@/lib/urlUtils";
+import { ThemeCSVImport } from "@/components/admin/ThemeCSVImport";
+
 
 // Extract shop domain from Shopify's host parameter (base64 encoded)
 const extractShopFromHost = (host: string | null): string | null => {
@@ -76,6 +78,7 @@ const ThemeCodes = () => {
   
   // Filter and search state
   const [statusFilter, setStatusFilter] = useState<"all" | "unused" | "active" | "expired">("all");
+  const [themeFilter, setThemeFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Form state for add/edit
@@ -440,12 +443,35 @@ const ThemeCodes = () => {
     }
   };
 
-  // Filter codes based on status filter and search query
+  // Get unique themes from codes for filter dropdown
+  const uniqueThemes = useMemo(() => {
+    const themeSet = new Set<string>();
+    codes.forEach(code => {
+      code.themes_unlocked.forEach(themeId => {
+        const theme = availableThemes.find(t => t.id === themeId);
+        if (theme) {
+          themeSet.add(theme.name);
+        }
+      });
+    });
+    return Array.from(themeSet).sort();
+  }, [codes, availableThemes]);
+
+  // Filter codes based on status filter, theme filter, and search query
   const filteredCodes = useMemo(() => {
     let filtered = codes;
 
     if (statusFilter !== "all") {
       filtered = filtered.filter(code => code.status === statusFilter);
+    }
+
+    if (themeFilter !== "all") {
+      filtered = filtered.filter(code => {
+        return code.themes_unlocked.some(themeId => {
+          const theme = availableThemes.find(t => t.id === themeId);
+          return theme?.name === themeFilter;
+        });
+      });
     }
 
     if (searchQuery.trim()) {
@@ -462,7 +488,7 @@ const ThemeCodes = () => {
     }
 
     return filtered;
-  }, [codes, statusFilter, searchQuery, availableThemes]);
+  }, [codes, statusFilter, themeFilter, searchQuery, availableThemes, uniqueThemes]);
 
   if (tenantLoading) {
     return (
@@ -514,6 +540,7 @@ const ThemeCodes = () => {
               <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
               Refresh
             </Button>
+            <ThemeCSVImport tenantId={tenant.id} onImportComplete={loadCodes} />
             <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
               setIsCreateDialogOpen(open);
               if (!open) {
@@ -588,26 +615,6 @@ const ThemeCodes = () => {
                       Select themes that this code will unlock
                     </p>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="create-expires-at">Expires At (Local Time) - Optional</Label>
-                    <input
-                      id="create-expires-at"
-                      type="datetime-local"
-                      value={formData.expires_at || ""}
-                      onChange={(e) => setFormData({ ...formData, expires_at: e.target.value || null })}
-                      min={(() => {
-                        const now = new Date();
-                        const year = now.getFullYear();
-                        const month = String(now.getMonth() + 1).padStart(2, '0');
-                        const day = String(now.getDate()).padStart(2, '0');
-                        const hours = String(now.getHours()).padStart(2, '0');
-                        const minutes = String(now.getMinutes()).padStart(2, '0');
-                        return `${year}-${month}-${day}T${hours}:${minutes}`;
-                      })()}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                  </div>
                 </div>
                 <DialogFooter>
                   <Button 
@@ -656,6 +663,19 @@ const ThemeCodes = () => {
                 >
                   All
                 </Button>
+                <Select value={themeFilter} onValueChange={setThemeFilter}>
+                  <SelectTrigger className="w-[180px] h-9">
+                    <SelectValue placeholder="Filter by theme" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Themes</SelectItem>
+                    {uniqueThemes.map((themeName) => (
+                      <SelectItem key={themeName} value={themeName}>
+                        {themeName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
                   variant={statusFilter === "unused" ? "default" : "outline"}
                   size="sm"

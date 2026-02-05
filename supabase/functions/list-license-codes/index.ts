@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     console.log('Loading license codes for tenant:', tenant.id);
 
     // List all license codes for the tenant, including previous_code_id
-    const { data: codes, error: codesError } = await supabase
+    const { data: allCodes, error: codesError } = await supabase
       .from('license_codes')
       .select('*, previous_code_id') // Select previous_code_id
       .eq('tenant_id', tenant.id)
@@ -74,6 +74,15 @@ Deno.serve(async (req) => {
         }
       );
     }
+
+    // Filter out license codes that contain "Base" pack (auto-generated codes)
+    const codes = allCodes?.filter(code => {
+      if (!code.packs_unlocked || !Array.isArray(code.packs_unlocked)) {
+        return true; // Keep codes with no packs_unlocked
+      }
+      // Exclude codes that only contain "Base" pack
+      return !(code.packs_unlocked.length === 1 && code.packs_unlocked.includes('Base'));
+    }) || [];
 
     // Get customer emails for redeemed codes
     const redeemedCustomerIds = codes

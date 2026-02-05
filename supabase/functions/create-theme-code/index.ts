@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { code, themes_unlocked, shop_domain, expires_at } = await req.json();
+    const { code, themes_unlocked, shop_domain } = await req.json();
 
     if (!code || !shop_domain) {
       return new Response(
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
         code: normalizedCode,
         themes_unlocked: themes_unlocked || [],
         status: 'unused',
-        expires_at: expires_at || null,
+        expires_at: null,
       })
       .select()
       .single();

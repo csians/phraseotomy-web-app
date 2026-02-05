@@ -13,6 +13,7 @@ async function handleThemeCode(
   normalizedCode: string,
   customerId: string,
   customerEmail: string,
+  customerName: string,
   shopDomain: string,
   tenant: { id: string },
   themeId?: string,
@@ -101,24 +102,53 @@ async function handleThemeCode(
     );
   }
 
-  // 4) Mark theme_codes as redeemed
-  const { error: updateError } = await supabaseAdmin
+  // 4) Get the customer's latest license code expiry date to sync with theme code
+  const { data: customerLicenses, error: licenseError } = await supabaseAdmin
+    .from("customer_licenses")
+    .select("license_code_id, activated_at")
+    .eq("customer_id", customerId)
+    .eq("tenant_id", tenant.id)
+    .order("activated_at", { ascending: false });
+
+  let inheritedExpiryDate = null;
+  
+  if (customerLicenses && customerLicenses.length > 0) {
+    // Get the license code details for the most recent license
+    const latestLicenseCodeId = customerLicenses[0].license_code_id;
+    
+    const { data: licenseCodeData, error: licenseCodeError } = await supabaseAdmin
+      .from("license_codes")
+      .select("expires_at")
+      .eq("id", latestLicenseCodeId)
+      .eq("tenant_id", tenant.id)
+      .single();
+
+    if (licenseCodeData && licenseCodeData.expires_at) {
+      inheritedExpiryDate = licenseCodeData.expires_at;
+    }
+  }
+
+  // 5) Mark theme_codes as redeemed
+  const redeemedByValue = customerEmail || customerName || customerId || `Customer_${customerId}`;
+
+  const updateData = {
+    status: "active",
+    redeemed_by: redeemedByValue,
+    redeemed_at: new Date().toISOString(),
+    expires_at: inheritedExpiryDate,
+  };
+
+  const { error: updateError, data: updateResult } = await supabaseAdmin
     .from("theme_codes")
-    .update({
-      status: "active",
-      redeemed_by: customerEmail,
-      redeemed_at: new Date().toISOString(),
-    })
-    .eq("id", codeCheck.id);
+    .update(updateData)
+    .eq("id", codeCheck.id)
+    .select(); // Return the updated row to verify
 
   if (updateError) {
     console.error("❌ Error updating theme_codes:", updateError);
-    // non-fatal
   }
 
   const unlockedThemes = ["Theme"]; // Simplified for now
-
-  console.log("✅ Theme code validated and redeemed successfully (assign-code)");
 
   return new Response(
     JSON.stringify({
@@ -277,10 +307,14 @@ Deno.serve(async (req) => {
     console.log("🎯 assign-code-to-customer request:", {
       customerId,
       customerEmail,
+      customerName,
       code,
       shopDomain,
       codeType,
       themeId,
+      hasCustomerEmail: !!customerEmail,
+      hasCustomerId: !!customerId,
+      hasCustomerName: !!customerName
     });
 
     if (!customerId || !code || !shopDomain) {
@@ -319,6 +353,7 @@ Deno.serve(async (req) => {
         normalizedCode,
         customerId,
         customerEmail,
+        customerName,
         shopDomain,
         tenant,
         themeId,
