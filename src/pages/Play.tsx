@@ -54,27 +54,27 @@ const Play = () => {
   // Function to extract and format name from email
   const extractNameFromEmail = (email: string | null): string => {
     if (!email) return "";
-    
+
     // Extract part before @
     const emailPrefix = email.split("@")[0];
-    
+
     // Replace special characters (., _, -, +, etc.) with spaces
     const withSpaces = emailPrefix.replace(/[._\-+]/g, " ");
-    
+
     // Split by spaces and capitalize each word
     const words = withSpaces.split(/\s+/).filter(word => word.length > 0);
     const capitalizedWords = words.map(word => {
       if (word.length === 0) return "";
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     });
-    
+
     return capitalizedWords.join(" ");
   };
 
   // Auto-save name from email without showing dialog
   const autoSaveNameFromEmail = async (customerData: ShopifyCustomer, shopDomain: string) => {
     if (!customerData.email) return;
-    
+
     const extractedName = extractNameFromEmail(customerData.email);
     if (!extractedName || extractedName.length < 2) return;
 
@@ -454,7 +454,7 @@ const Play = () => {
         // Extract error message from response body
         // When edge function returns non-2xx, the actual error message is in the response body
         let errorMessage = "Could not join the lobby";
-        
+
         try {
           // Try to parse the error response body from error.context (Response object)
           if (error.context && error.context instanceof Response) {
@@ -489,7 +489,7 @@ const Play = () => {
             console.error("Error parsing error response:", e);
           }
         }
-        
+
         toast({
           title: "Unable to Join",
           description: errorMessage,
@@ -585,7 +585,7 @@ const Play = () => {
   }
 
   const appEnv = import.meta.env.VITE_APP_ENV || "development";
-  
+
   // Filter out expired licenses (safety check - should already be filtered by backend)
   const now = new Date();
   const activeLicenses = licenses.filter(license => {
@@ -595,7 +595,7 @@ const Play = () => {
     }
     return true; // Include licenses without expiration
   });
-  
+
   const hasActiveLicenses = activeLicenses.length > 0;
   const allPacks = Array.from(new Set(activeLicenses.flatMap((l) => l.packs_unlocked)));
   const earliestExpiry = activeLicenses.reduce(
@@ -642,7 +642,6 @@ const Play = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Logo and Branding */}
         <div className="w-full max-w-2xl text-center pt-8">
           <div className="w-20 h-20 mx-auto mb-4 bg-game-yellow rounded-2xl flex items-center justify-center shadow-lg">
             <span className="text-5xl font-black text-game-black">P</span>
@@ -650,16 +649,31 @@ const Play = () => {
           <h1 className="text-4xl font-black text-white mb-2 tracking-wider">PHRASEOTOMY</h1>
           <p className="text-sm text-game-yellow uppercase tracking-widest font-semibold">The Party Game</p>
         </div>
-
-        {/* Main Content */}
-        <div className="w-full max-w-2xl space-y-6">
+          
+        <div className="w-full max-w-2xl space-y-5">
           {/* Welcome message */}
-          <div className="text-center flex items-center justify-center gap-4">
-            <h2 className="text-2xl font-bold text-white">Welcome, {customer?.name || customer?.email}!</h2>
+          <div className="text-center flex items-center justify-center gap-6">
+            <h2 className="text-xl font-bold text-white">Welcome, {customer?.name || customer?.email}!</h2>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               Logout
             </Button>
           </div>
+          {/*PLAY ONLINE */}
+          <div className="w-full max-w-2xl pt-8">
+            <Card className="bg-card border-game-gray">
+              <CardHeader>
+                <CardTitle className="text-lg">
+                  Play Online
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent className="space-y-1">
+                <p>Activate the Core Pack to host online games.</p>
+                <p>Play with friends by sharing your Lobby ID.</p>
+              </CardContent>
+            </Card>
+          </div>
+
 
           {/* Your Packs Card */}
           <Card className="bg-card border-game-gray">
@@ -746,7 +760,7 @@ const Play = () => {
                 Start a new game session and invite friends
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-0\2">
               <Button
                 onClick={handleHostGame}
                 className="w-full bg-game-yellow hover:bg-game-yellow/90 text-game-black font-bold"
