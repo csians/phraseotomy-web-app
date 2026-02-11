@@ -71,6 +71,21 @@ const Play = () => {
     return capitalizedWords.join(" ");
   };
 
+
+  // Fetch customer data and update state
+  const fetchAndSetCustomerData = async (customerId: string, shopDomain: string) => {
+    try {
+      const customerData = await getCustomerData(customerId, shopDomain);
+      if (customerData && customerData.customer) {
+        setCustomer(customerData.customer);
+        setLicenses(customerData.licenses);
+        setSessions(customerData.sessions);
+      }
+    } catch (error) {
+      console.error("Error fetching customer data after name update:", error);
+    }
+  };
+
   // Auto-save name from email without showing dialog
   const autoSaveNameFromEmail = async (customerData: ShopifyCustomer, shopDomain: string) => {
     if (!customerData.email) return;
@@ -92,7 +107,7 @@ const Play = () => {
         return;
       }
 
-      // Update customer state with new name
+      // Update customer state with new name (optimistic)
       const nameParts = extractedName.split(" ");
       setCustomer({
         ...customerData,
@@ -110,6 +125,9 @@ const Play = () => {
         parsed.last_name = nameParts.slice(1).join(" ") || null;
         localStorage.setItem("customerData", JSON.stringify(parsed));
       }
+
+      // Re-fetch customer data from backend to ensure UI is up-to-date
+      await fetchAndSetCustomerData(customerData.id, shopDomain);
 
       console.log("✅ Name auto-saved from email:", extractedName);
     } catch (error) {
