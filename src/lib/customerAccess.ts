@@ -22,44 +22,47 @@ export interface GameSession {
   player_count?: number;
 }
 
-export async function getCustomerLicenses(
+export interface CustomerData {
+  licenses: CustomerLicense[];
+  sessions: GameSession[];
+}
+
+export async function getCustomerData(
   customerId: string,
   shopDomain: string
-): Promise<CustomerLicense[]> {
+): Promise<CustomerData> {
   try {
     const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
       body: { customerId, shopDomain },
     });
 
     if (error) {
-      console.error('Error fetching customer licenses:', error);
-      return [];
+      console.error('Error fetching customer data:', error);
+      return { licenses: [], sessions: [] };
     }
 
-    return data?.licenses || [];
+    return {
+      licenses: data?.licenses || [],
+      sessions: data?.sessions || [],
+    };
   } catch (error) {
     console.error('Error calling get-customer-licenses-sessions function:', error);
-    return [];
+    return { licenses: [], sessions: [] };
   }
+}
+
+export async function getCustomerLicenses(
+  customerId: string,
+  shopDomain: string
+): Promise<CustomerLicense[]> {
+  const data = await getCustomerData(customerId, shopDomain);
+  return data.licenses;
 }
 
 export async function getCustomerSessions(
   customerId: string,
   shopDomain: string
 ): Promise<GameSession[]> {
-  try {
-    const { data, error } = await supabase.functions.invoke('get-customer-licenses-sessions', {
-      body: { customerId, shopDomain },
-    });
-
-    if (error) {
-      console.error('Error fetching customer sessions:', error);
-      return [];
-    }
-
-    return data?.sessions || [];
-  } catch (error) {
-    console.error('Error calling get-customer-licenses-sessions function:', error);
-    return [];
-  }
+  const data = await getCustomerData(customerId, shopDomain);
+  return data.sessions;
 }

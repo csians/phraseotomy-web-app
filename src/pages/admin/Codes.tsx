@@ -98,6 +98,59 @@ const Codes = () => {
     first_name: string | null;
     last_name: string | null;
   }>>([]);
+
+  // Handler for creating a new license code
+  const handleCreateCode = async () => {
+    if (!tenant || !formData.code.trim()) {
+      toast({
+        title: "Error",
+        description: "Code is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const createBody: any = {
+        code: formData.code.trim().toUpperCase(),
+        packs_unlocked: formData.packs,
+        shop_domain: tenant.shop_domain,
+      };
+
+      if (formData.expires_at) {
+        const localDate = new Date(formData.expires_at);
+        createBody.expires_at = localDate.toISOString();
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-license-code', {
+        body: createBody,
+      });
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || 'Failed to create license code');
+      }
+
+      toast({
+        title: "License code created",
+        description: `License code "${formData.code.trim().toUpperCase()}" created successfully`,
+      });
+
+      setIsCreateDialogOpen(false);
+      setFormData({ code: "", packs: [], status: "unused", expires_at: null });
+      await loadCodes();
+    } catch (error) {
+      console.error('Error creating license code:', error);
+      toast({
+        title: "Error creating license code",
+        description: error instanceof Error ? error.message : "Failed to create license code",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   const [selectedCustomer, setSelectedCustomer] = useState<{
     id: string;
     email: string;
@@ -643,6 +696,119 @@ const Codes = () => {
             </Button>
             <CodeExport codes={codes} />
             <CSVImport shopDomain={tenant.shop_domain} onImportComplete={loadCodes} />
+            <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+              setIsCreateDialogOpen(open);
+              if (!open) {
+                setFormData({ code: "", packs: [], status: "unused", expires_at: null });
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button>
+                  + Create License Code
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New License Code</DialogTitle>
+                  <DialogDescription>
+                    Create a new license code to unlock packs for customers
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="create-code">Code Value</Label>
+                    <Input
+                      id="create-code"
+                      value={formData.code}
+                      onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                      placeholder="e.g., PACK-ABC-123"
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the redemption code text
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Pack Association</Label>
+                    <div className="border rounded-md p-4 max-h-48 overflow-y-auto space-y-2">
+                      {availablePacks.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No packs available.</p>
+                      ) : (
+                        availablePacks.map((pack) => (
+                          <div key={pack.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`create-pack-${pack.id}`}
+                              checked={formData.packs.includes(pack.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setFormData({
+                                    ...formData,
+                                    packs: [...formData.packs, pack.id]
+                                  });
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    packs: formData.packs.filter(t => t !== pack.id)
+                                  });
+                                }
+                              }}
+                            />
+                            <Label
+                              htmlFor={`create-pack-${pack.id}`}
+                              className="text-sm font-normal cursor-pointer flex-1"
+                            >
+                              {pack.name}
+                            </Label>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Select packs that this code will unlock
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="create-expires-at">Expires At (Local Time)</Label>
+                    <input
+                      id="create-expires-at"
+                      type="datetime-local"
+                      value={formData.expires_at || ""}
+                      onChange={(e) => setFormData({ ...formData, expires_at: e.target.value || null })}
+                      min={(() => {
+                        const now = new Date();
+                        const year = now.getFullYear();
+                        const month = String(now.getMonth() + 1).padStart(2, '0');
+                        const day = String(now.getDate()).padStart(2, '0');
+                        const hours = String(now.getHours()).padStart(2, '0');
+                        const minutes = String(now.getMinutes()).padStart(2, '0');
+                        return `${year}-${month}-${day}T${hours}:${minutes}`;
+                      })()}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Leave blank for no expiration
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsCreateDialogOpen(false)}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleCreateCode}
+                    disabled={loading || !formData.code.trim()}
+                  >
+                    {loading ? "Creating..." : "Create License Code"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -778,7 +944,12 @@ const Codes = () => {
                       </TableCell>
                       <TableCell>
                         {code.packs_unlocked.length > 0
-                          ? code.packs_unlocked.join(", ")
+                          ? code.packs_unlocked
+                              .map(packId => {
+                                const pack = availablePacks.find(p => p.id === packId);
+                                return pack ? pack.name : packId;
+                              })
+                              .join(", ")
                           : "—"}
                       </TableCell>
                       <TableCell>

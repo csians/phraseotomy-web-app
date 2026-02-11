@@ -71,28 +71,64 @@ Deno.serve(async (req) => {
 
     console.log('Searching with customer IDs:', customerIdsToSearch);
 
-    // Fetch customer licenses - search across all related domains and customer IDs
-    const { data: licenses, error: licensesError } = await supabase
-      .from('customer_licenses')
-      .select(`
-        id,
-        license_code_id,
-        customer_id,
-        customer_name,
-        customer_email,
-        status,
-        activated_at,
-        shop_domain,
-        tenant_id,
-        license_codes (
-          code,
-          packs_unlocked,
-          expires_at
-        )
-      `)
-      .in('customer_id', customerIdsToSearch)
-      .in('shop_domain', domainsToSearch)
-      .eq('status', 'active');
+    // Run all database queries in parallel to reduce total time
+    const [licensesResult, hostedSessionsResult, playerEntriesResult] = await Promise.all([
+      // Fetch customer licenses - search across all related domains and customer IDs
+      supabase
+        .from('customer_licenses')
+        .select(`
+          id,
+          license_code_id,
+          customer_id,
+          customer_name,
+          customer_email,
+          status,
+          activated_at,
+          shop_domain,
+          tenant_id,
+          license_codes (
+            code,
+            packs_unlocked,
+            expires_at
+          )
+        `)
+        .in('customer_id', customerIdsToSearch)
+        .in('shop_domain', domainsToSearch)
+        .eq('status', 'active'),
+      
+      // Fetch hosted game sessions - search across all related domains and customer IDs
+      supabase
+        .from('game_sessions')
+        .select(`
+          id,
+          lobby_code,
+          host_customer_id,
+          host_customer_name,
+          status,
+          packs_used,
+          created_at,
+          started_at,
+          ended_at,
+          shop_domain,
+          tenant_id,
+          game_name
+        `)
+        .in('host_customer_id', customerIdsToSearch)
+        .in('shop_domain', domainsToSearch)
+        .in('status', ['waiting', 'active'])
+        .order('created_at', { ascending: false })
+        .limit(10),
+      
+      // Fetch joined game sessions (where user is a player but not the host)
+      supabase
+        .from('game_players')
+        .select('session_id, player_id')
+        .in('player_id', customerIdsToSearch)
+    ]);
+
+    const { data: licenses, error: licensesError } = licensesResult;
+    const { data: hostedSessions, error: hostedError } = hostedSessionsResult;
+    const { data: playerEntries, error: playerError } = playerEntriesResult;
 
     if (licensesError) {
       console.error('Error fetching licenses:', licensesError);
@@ -105,38 +141,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch hosted game sessions - search across all related domains and customer IDs
-    const { data: hostedSessions, error: hostedError } = await supabase
-      .from('game_sessions')
-      .select(`
-        id,
-        lobby_code,
-        host_customer_id,
-        host_customer_name,
-        status,
-        packs_used,
-        created_at,
-        started_at,
-        ended_at,
-        shop_domain,
-        tenant_id,
-        game_name
-      `)
-      .in('host_customer_id', customerIdsToSearch)
-      .in('shop_domain', domainsToSearch)
-      .in('status', ['waiting', 'active'])
-      .order('created_at', { ascending: false })
-      .limit(10);
-
     if (hostedError) {
       console.error('Error fetching hosted sessions:', hostedError);
     }
-
-    // Fetch joined game sessions (where user is a player but not the host)
-    const { data: playerEntries, error: playerError } = await supabase
-      .from('game_players')
-      .select('session_id, player_id')
-      .in('player_id', customerIdsToSearch);
 
     if (playerError) {
       console.error('Error fetching player entries:', playerError);
@@ -145,57 +152,73 @@ Deno.serve(async (req) => {
     // Get unique session IDs where user is a player
     const joinedSessionIds = [...new Set((playerEntries || []).map(p => p.session_id))];
     
-    // Fetch joined sessions (exclude hosted ones)
+    // Fetch joined sessions (exclude hosted ones) and get player counts in parallel
+    const hostedIds = (hostedSessions || []).map(s => s.id);
+    const nonHostedSessionIds = joinedSessionIds.filter(id => !hostedIds.includes(id));
+    
     let joinedSessions: any[] = [];
-    if (joinedSessionIds.length > 0) {
-      const hostedIds = (hostedSessions || []).map(s => s.id);
-      const nonHostedSessionIds = joinedSessionIds.filter(id => !hostedIds.includes(id));
-      
-      if (nonHostedSessionIds.length > 0) {
-        const { data: joinedData, error: joinedError } = await supabase
-          .from('game_sessions')
-          .select(`
-            id,
-            lobby_code,
-            host_customer_id,
-            host_customer_name,
-            status,
-            packs_used,
-            created_at,
-            started_at,
-            ended_at,
-            shop_domain,
-            tenant_id,
-            game_name
-          `)
-          .in('id', nonHostedSessionIds)
-          .in('status', ['waiting', 'active'])
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        if (joinedError) {
-          console.error('Error fetching joined sessions:', joinedError);
-        } else {
-          joinedSessions = joinedData || [];
-        }
-      }
-    }
-
-    // Get player counts for all sessions
-    const allSessionIds = [
-      ...(hostedSessions || []).map(s => s.id),
-      ...joinedSessions.map(s => s.id),
-    ];
-
     let playerCounts: Record<string, number> = {};
-    if (allSessionIds.length > 0) {
-      const { data: playerCountData } = await supabase
-        .from('game_players')
-        .select('session_id')
-        .in('session_id', allSessionIds);
-
-      if (playerCountData) {
-        playerCounts = playerCountData.reduce((acc: Record<string, number>, p) => {
+    
+    if (nonHostedSessionIds.length > 0 || (hostedSessions || []).length > 0) {
+      // Prepare the queries
+      const parallelQueries: Promise<any>[] = [];
+      
+      // Query for joined sessions (only if there are non-hosted ones)
+      if (nonHostedSessionIds.length > 0) {
+        parallelQueries.push(
+          supabase
+            .from('game_sessions')
+            .select(`
+              id,
+              lobby_code,
+              host_customer_id,
+              host_customer_name,
+              status,
+              packs_used,
+              created_at,
+              started_at,
+              ended_at,
+              shop_domain,
+              tenant_id,
+              game_name
+            `)
+            .in('id', nonHostedSessionIds)
+            .in('status', ['waiting', 'active'])
+            .order('created_at', { ascending: false })
+            .limit(10)
+        );
+      } else {
+        parallelQueries.push(Promise.resolve({ data: null, error: null }));
+      }
+      
+      // Query for player counts for all sessions
+      const allSessionIds = [
+        ...(hostedSessions || []).map(s => s.id),
+        ...nonHostedSessionIds,
+      ];
+      
+      if (allSessionIds.length > 0) {
+        parallelQueries.push(
+          supabase
+            .from('game_players')
+            .select('session_id')
+            .in('session_id', allSessionIds)
+        );
+      } else {
+        parallelQueries.push(Promise.resolve({ data: null, error: null }));
+      }
+      
+      const [joinedResult, playerCountResult] = await Promise.all(parallelQueries);
+      
+      if (joinedResult && joinedResult.data) {
+        joinedSessions = joinedResult.data;
+      }
+      if (joinedResult && joinedResult.error) {
+        console.error('Error fetching joined sessions:', joinedResult.error);
+      }
+      
+      if (playerCountResult && playerCountResult.data) {
+        playerCounts = playerCountResult.data.reduce((acc: Record<string, number>, p) => {
           acc[p.session_id] = (acc[p.session_id] || 0) + 1;
           return acc;
         }, {});

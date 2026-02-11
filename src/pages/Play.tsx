@@ -19,7 +19,7 @@ import {
 
 import type { TenantConfig, ShopifyCustomer } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
-import { getCustomerLicenses, getCustomerSessions, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
+import { getCustomerData, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
 import { lobbyCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllUrlParams } from "@/lib/urlUtils";
@@ -387,9 +387,8 @@ const Play = () => {
           // Get tenant_id for fetching packs
           const tenantId = tenant?.id;
 
-          const [customerLicenses, customerSessions, packsData] = await Promise.all([
-            getCustomerLicenses(customer.id, shopDomain),
-            getCustomerSessions(customer.id, shopDomain),
+          const [customerData, packsData] = await Promise.all([
+            getCustomerData(customer.id, shopDomain),
             tenantId
               ? supabase.from("packs").select("id, name, description").eq("tenant_id", tenantId)
               : Promise.resolve({ data: [], error: null }),
@@ -399,12 +398,12 @@ const Play = () => {
             setAvailablePacks(packsData.data);
           }
 
-          setLicenses(customerLicenses);
-          setSessions(customerSessions);
+          setLicenses(customerData.licenses);
+          setSessions(customerData.sessions);
 
           console.log("✅ Customer data loaded:", {
-            licenses: customerLicenses.length,
-            sessions: customerSessions.length,
+            licenses: customerData.licenses.length,
+            sessions: customerData.sessions.length,
           });
         } catch (error) {
           console.error("Error loading customer data:", error);
