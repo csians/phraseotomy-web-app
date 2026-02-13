@@ -58,6 +58,8 @@ const Codes = () => {
   const { tenant, loading: tenantLoading, error: tenantError } = useTenant(shop);
   
   const [codes, setCodes] = useState<LicenseCode[]>([]);
+
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingCode, setEditingCode] = useState<LicenseCode | null>(null);
   const { toast } = useToast();
