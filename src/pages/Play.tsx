@@ -76,11 +76,7 @@ const Play = () => {
   const fetchAndSetCustomerData = async (customerId: string, shopDomain: string) => {
     try {
       const customerData = await getCustomerData(customerId, shopDomain);
-      if (customerData && customerData.customer) {
-        setCustomer(customerData.customer);
-        setLicenses(customerData.licenses);
-        setSessions(customerData.sessions);
-      }
+
     } catch (error) {
       console.error("Error fetching customer data after name update:", error);
     }
@@ -397,43 +393,56 @@ const Play = () => {
   }, [loading, customer, shopDomain, nameAutoSaveAttempted]);
 
   // Load customer data when logged in
-  useEffect(() => {
-    if (!loading && customer && shopDomain) {
-      const fetchCustomerData = async () => {
-        setDataLoading(true);
-        try {
-          // Get tenant_id for fetching packs
-          const tenantId = tenant?.id;
+ useEffect(() => {
+  if (!loading && customer?.id && shopDomain) {
+    const fetchCustomerData = async () => {
+      setDataLoading(true);
+      try {
+        const tenantId = tenant?.id;
 
-          const [customerData, packsData] = await Promise.all([
-            getCustomerData(customer.id, shopDomain),
-            tenantId
-              ? supabase.from("packs").select("id, name, description").eq("tenant_id", tenantId)
-              : Promise.resolve({ data: [], error: null }),
-          ]);
+        const [customerData, packsData] = await Promise.all([
+          getCustomerData(customer.id, shopDomain),
+          tenantId
+            ? supabase
+                .from("packs")
+                .select("id, name, description")
+                .eq("tenant_id", tenantId)
+            : Promise.resolve({ data: [], error: null }),
+        ]);
 
-          if (packsData.data) {
-            setAvailablePacks(packsData.data);
-          }
-
-          setLicenses(customerData.licenses);
-          setSessions(customerData.sessions);
-
-          console.log("✅ Customer data loaded:", {
-            licenses: customerData.licenses.length,
-            sessions: customerData.sessions.length,
-          });
-        } catch (error) {
-          console.error("Error loading customer data:", error);
-        } finally {
-          setDataLoading(false);
+        if (packsData.data) {
+          setAvailablePacks(packsData.data);
         }
-      };
 
-      fetchCustomerData();
-    }
-  }, [loading, customer, shopDomain]);
+        // Only update customer if something actually changed
+        if (customerData.customer) {
+          setCustomer(prev => {
+            if (!prev) return prev;
 
+            return {
+              id: customerData.customer.id,
+              email: customerData.customer.email ?? prev.email ?? null,
+              name: customerData.customer.name ?? prev.name ?? null,
+              firstName:
+                customerData.customer.first_name ?? prev.firstName ?? null,
+              lastName:
+                customerData.customer.last_name ?? prev.lastName ?? null,
+            };
+          });
+        }
+
+        setLicenses(customerData.licenses);
+        setSessions(customerData.sessions);
+      } catch (error) {
+        console.error("Error loading customer data:", error);
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    fetchCustomerData();
+  }
+}, [loading, customer?.id, shopDomain]); // ✅ depends only on id, not full object
   const handleJoinGame = async () => {
     if (isJoining) return; // Prevent multiple submissions
     setIsJoining(true);
@@ -666,11 +675,11 @@ const Play = () => {
           <h1 className="text-4xl font-black text-white mb-2 tracking-wider">PHRASEOTOMY</h1>
           <p className="text-sm text-game-yellow uppercase tracking-widest font-semibold">The Party Game</p>
         </div>
-          
+
         <div className="w-full max-w-2xl space-y-5">
           {/* Welcome message */}
           <div className="text-center flex items-center justify-center gap-6">
-            <h2 className="text-xl font-bold text-white">Welcome, {customer?.name || customer?.email}!</h2>
+            <h2 className="text-xl font-bold text-white">Welcome, {customer?.name ?? customer?.email ?? "Player"}!</h2>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               Logout
             </Button>

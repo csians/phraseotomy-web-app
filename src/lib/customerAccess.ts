@@ -21,8 +21,15 @@ export interface GameSession {
   is_host: boolean;
   player_count?: number;
 }
-
-export interface CustomerData {
+ 
+export type CustomerData = {
+  customer?: {
+    id: string;
+    email: string | null;
+    name: string | null;
+    first_name: string | null;
+    last_name: string | null;
+  };
   licenses: CustomerLicense[];
   sessions: GameSession[];
 }
@@ -44,6 +51,7 @@ export async function getCustomerData(
     return {
       licenses: data?.licenses || [],
       sessions: data?.sessions || [],
+      customer: data?.customer || undefined,
     };
   } catch (error) {
     console.error('Error calling get-customer-licenses-sessions function:', error);

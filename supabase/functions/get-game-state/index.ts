@@ -161,10 +161,15 @@
         console.error("Error fetching packs:", packsError);
       }
 
-      // Create a mapping of pack names to IDs and filter to player's unlocked packs
+
+      // Create a mapping of pack names to IDs and filter to player's unlocked packs (case-insensitive)
       const playerPackIds = new Set<string>();
       (allPacks || []).forEach(pack => {
-        if (playerPacksUnlocked.has(pack.name)) {
+        if (
+          Array.from(playerPacksUnlocked).some(
+            unlockedName => unlockedName.toLowerCase() === (pack.name || '').toLowerCase()
+          )
+        ) {
           playerPackIds.add(pack.id);
         }
       });
