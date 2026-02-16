@@ -321,12 +321,10 @@ export default function CreateLobby() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Game Settings</CardTitle>
-              <CardDescription>Choose your game packs</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              {/* <CardTitle>Game Settings</CardTitle>
+              <CardDescription>Choose your game packs</CardDescription> */}
               <div className="space-y-2">
-                <Label htmlFor="lobbyName">Game Name</Label>
+                <CardTitle>Game Name</CardTitle>
                 <Input
                   id="lobbyName"
                   required
@@ -337,8 +335,12 @@ export default function CreateLobby() {
                 />
               </div>
 
+            </CardHeader>
+            
+            <CardContent className="space-y-6">
+           
               {/* Game Mode Selection */}
-              <div className="space-y-3">
+              {/* <div className="space-y-3">
                 <Label>Game Mode</Label>
                 <RadioGroup value={gameMode} onValueChange={(v) => setGameMode(v as "live" | "async")}>
                   <div className="flex flex-row gap-3 overflow-x-auto pb-2">
@@ -382,12 +384,12 @@ export default function CreateLobby() {
                     </div>
                   </div>
                 </RadioGroup>
-              </div>
+              </div> */}
 
               {/* Timer Presets (only for Live mode) */}
               {/* Timer settings hidden - using fixed values: 10 min story, 15 min guess */}
 
-              <div className="space-y-4">
+              {/* <div className="space-y-4">
                 <Label>Select Pack</Label>
                 {loadingPacks ? (
                   <div className="space-y-3">
@@ -416,7 +418,6 @@ export default function CreateLobby() {
                             }`}
                             onClick={() => isAvailable && setSelectedPack(pack.id)}
                           >
-                            {/* <RadioGroupItem value={pack.id} id={pack.id} disabled={!isAvailable} className="mt-0.5" /> */}
                             <RadioGroupItem
                               value={pack.id}
                               id={pack.id}
@@ -454,7 +455,7 @@ export default function CreateLobby() {
                     <p>No packs unlocked. Redeem a code to unlock game packs.</p>
                   </div>
                 )}
-              </div>
+              </div> */}
 
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => navigate("/play/host")} className="flex-1">

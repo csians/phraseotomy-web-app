@@ -11,11 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Trash2, RefreshCw, RotateCcw, Plus } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2,Check,ChevronsUpDown, RefreshCw, RotateCcw, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAllUrlParams } from "@/lib/urlUtils";
 import { ThemeCSVImport } from "@/components/admin/ThemeCSVImport";
-
+import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, } from "@/components/ui/command";
 
 // Extract shop domain from Shopify's host parameter (base64 encoded)
 const extractShopFromHost = (host: string | null): string | null => {
@@ -51,31 +52,41 @@ type Theme = {
 
 const ThemeCodes = () => {
   const [searchParams] = useSearchParams();
-  
+
+
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [searchedCustomers, setSearchedCustomers] = useState<any[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<{
+    id: string;
+    email: string;
+    name: string;
+  } | null>(null);
+  const [searchingCustomers, setSearchingCustomers] = useState(false);
   // Get shop from multiple sources
   const shop = useMemo(() => {
     const shopParam = searchParams.get('shop');
     if (shopParam) return shopParam;
-    
+
     const allParams = getAllUrlParams();
     const shopFromAll = allParams.get('shop');
     if (shopFromAll) return shopFromAll;
-    
+
     const hostParam = allParams.get('host');
     const shopFromHost = extractShopFromHost(hostParam);
     if (shopFromHost) return shopFromHost;
-    
+
     return 'testing-cs-store.myshopify.com';
   }, [searchParams]);
-  
+
   const { tenant, loading: tenantLoading, error: tenantError } = useTenant(shop);
-  
+
   const [codes, setCodes] = useState<ThemeCode[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingCode, setEditingCode] = useState<ThemeCode | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { toast } = useToast();
-  
+
   // Filter and search state
   const [statusFilter, setStatusFilter] = useState<"all" | "unused" | "active" | "expired">("all");
   const [themeFilter, setThemeFilter] = useState<string>("all");
@@ -113,7 +124,7 @@ const ThemeCodes = () => {
 
     console.log('Loading theme codes for shop:', tenant.shop_domain);
     setLoading(true);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke('list-theme-codes', {
         body: { shop_domain: tenant.shop_domain },
@@ -174,6 +185,46 @@ const ThemeCodes = () => {
       });
     }
   };
+  const fetchCustomers = async (query: string = "") => {
+    if (!tenant?.shop_domain) {
+      setSearchedCustomers([]);
+      return;
+    }
+
+    setSearchingCustomers(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "search-shopify-customers",
+        {
+          body: {
+            query,
+            shop_domain: tenant.shop_domain,
+          },
+        }
+      );
+
+      if (error || !data?.success) {
+        setSearchedCustomers([]);
+        return;
+      }
+
+      setSearchedCustomers(data.customers || []);
+    } catch {
+      setSearchedCustomers([]);
+    } finally {
+      setSearchingCustomers(false);
+    }
+  };
+  useEffect(() => {
+    if (!customerSearchOpen) return;
+
+    const timer = setTimeout(() => {
+      fetchCustomers(customerSearchQuery);
+    }, 300); // debounce 300ms
+
+    return () => clearTimeout(timer);
+  }, [customerSearchQuery, customerSearchOpen, tenant?.shop_domain]);
 
   const handleEditCode = async () => {
     if (!editingCode || !tenant) return;
@@ -187,54 +238,86 @@ const ThemeCodes = () => {
         shopDomain: tenant.shop_domain,
       };
 
-      // Update code value if provided and different (only for unused codes)
-      if (editingCode.status === 'unused' && formData.code && formData.code.trim() !== editingCode.code) {
+      if (
+        editingCode.status === "unused" &&
+        formData.code.trim() !== editingCode.code
+      ) {
         updateBody.code = formData.code.trim().toUpperCase();
       }
 
-      // Update themes_unlocked if provided (only for unused codes)
-      if (editingCode.status === 'unused' && formData.themes) {
+      if (editingCode.status === "unused") {
         updateBody.themes_unlocked = formData.themes;
       }
 
-      // Handle expiration time for non-expired codes
-      if (editingCode.status !== 'expired' && formData.status !== 'expired') {
+      if (
+        editingCode.status !== "expired" &&
+        formData.status !== "expired"
+      ) {
         if (formData.expires_at) {
-          const localDate = new Date(formData.expires_at);
-          updateBody.expires_at = localDate.toISOString();
+          updateBody.expires_at = new Date(formData.expires_at).toISOString();
         } else {
           updateBody.expires_at = null;
         }
       }
 
-      const { data: updateData, error: updateError } = await supabase.functions.invoke('update-theme-code', {
-        body: updateBody,
-      });
+      // If assigning to a customer, add redeemed_by and redeemed_at
+      if (editingCode.status === "unused" && selectedCustomer) {
+        updateBody.redeemed_by = selectedCustomer.name;
+        updateBody.redeemed_at = selectedCustomer.email;
+        updateBody.customerId = selectedCustomer.id;
+      }
 
-      if (updateError || !updateData?.success) {
-        throw new Error(updateData?.error || 'Failed to update theme code');
+      const { data, error } = await supabase.functions.invoke(
+        "update-theme-code",
+        { body: updateBody }
+      );
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || "Failed to update theme code");
+      }
+
+      // ✅ CUSTOMER ASSIGNMENT
+      if (editingCode.status === "unused" && selectedCustomer) {
+        await supabase.functions.invoke("update-customer-metafield", {
+          body: {
+            customerId: selectedCustomer.id,
+            customerEmail: selectedCustomer.email,
+            code: updateBody.code || editingCode.code,
+            shopDomain: tenant.shop_domain,
+            type: "theme",
+          },
+        });
       }
 
       toast({
         title: "Theme code updated",
-        description: "Theme code updated successfully",
+        description: selectedCustomer
+          ? "Theme code updated and assigned to customer"
+          : "Theme code updated successfully",
       });
 
       setEditingCode(null);
-      setFormData({ code: "", themes: [], status: "unused", expires_at: null });
+      setSelectedCustomer(null);
+      setCustomerSearchQuery("");
+      setSearchedCustomers([]);
+      setFormData({
+        code: "",
+        themes: [],
+        status: "unused",
+        expires_at: null,
+      });
+
       await loadCodes();
-    } catch (error) {
-      console.error('Error updating theme code:', error);
+    } catch (err: any) {
       toast({
         title: "Error updating theme code",
-        description: error instanceof Error ? error.message : "Failed to update theme code",
+        description: err.message,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
-
   const openEditDialog = (code: ThemeCode) => {
     setEditingCode(code);
     let formattedExpiresAt: string | null = null;
@@ -423,15 +506,15 @@ const ThemeCodes = () => {
     const expirationDate = new Date(expiresAt);
     const now = new Date();
     const diffMs = expirationDate.getTime() - now.getTime();
-    
+
     if (diffMs < 0) {
       return <span className="text-destructive">Expired</span>;
     }
-    
+
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (diffDays > 0) {
       return <span className="text-green-600">{diffDays}d {diffHours}h</span>;
     } else if (diffHours > 0) {
@@ -532,8 +615,8 @@ const ThemeCodes = () => {
           </div>
 
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={loadCodes}
               disabled={loading}
             >
@@ -617,14 +700,14 @@ const ThemeCodes = () => {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setIsCreateDialogOpen(false)}
                     disabled={loading}
                   >
                     Cancel
                   </Button>
-                  <Button 
+                  <Button
                     onClick={handleCreateCode}
                     disabled={loading || !formData.code.trim()}
                   >
@@ -654,7 +737,7 @@ const ThemeCodes = () => {
                   className="w-full"
                 />
               </div>
-              
+
               <div className="flex gap-2 flex-wrap">
                 <Button
                   variant={statusFilter === "all" ? "default" : "outline"}
@@ -709,7 +792,7 @@ const ThemeCodes = () => {
               <p className="text-muted-foreground text-center py-8">No theme codes yet. Create your first code to get started.</p>
             ) : filteredCodes.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
-                No codes match your filters. 
+                No codes match your filters.
                 {searchQuery && <span className="block mt-2">Try adjusting your search query or filters.</span>}
               </p>
             ) : (
@@ -731,15 +814,14 @@ const ThemeCodes = () => {
                       <TableCell className="font-mono font-semibold">{code.code}</TableCell>
                       <TableCell>
                         <span
-                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                            code.status === "active"
-                              ? "bg-green-500/10 text-green-500"
-                              : code.status === "unused"
+                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${code.status === "active"
+                            ? "bg-green-500/10 text-green-500"
+                            : code.status === "unused"
                               ? "bg-blue-500/10 text-blue-500"
                               : code.status === "expired"
-                              ? "bg-yellow-500/10 text-yellow-500"
-                              : "bg-red-500/10 text-red-500"
-                          }`}
+                                ? "bg-yellow-500/10 text-yellow-500"
+                                : "bg-red-500/10 text-red-500"
+                            }`}
                         >
                           {code.status}
                         </span>
@@ -768,9 +850,9 @@ const ThemeCodes = () => {
                       <TableCell>
                         {code.themes_unlocked.length > 0
                           ? code.themes_unlocked.map(themeId => {
-                              const theme = availableThemes.find(t => t.id === themeId);
-                              return theme ? `${theme.name}` : themeId;
-                            }).join(", ")
+                            const theme = availableThemes.find(t => t.id === themeId);
+                            return theme ? `${theme.name}` : themeId;
+                          }).join(", ")
                           : "—"}
                       </TableCell>
                       <TableCell>
@@ -820,7 +902,7 @@ const ThemeCodes = () => {
             <DialogHeader>
               <DialogTitle>Edit Theme Code: {editingCode?.code}</DialogTitle>
               <DialogDescription>
-                {editingCode?.status === 'unused' 
+                {editingCode?.status === 'unused'
                   ? 'Edit code value, themes, status, or assign to customer'
                   : 'Update theme code status'}
               </DialogDescription>
@@ -907,6 +989,79 @@ const ThemeCodes = () => {
                 </Select>
               </div>
 
+              {editingCode?.status === "unused" && (
+                <div className="space-y-2">
+                  <Label>Assign Customer (Future-ready)</Label>
+
+                  <Popover
+                    open={customerSearchOpen}
+                    onOpenChange={setCustomerSearchOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between"
+                        aria-expanded={customerSearchOpen} 
+                    >
+                        {selectedCustomer
+                          ? `${selectedCustomer.name} (${selectedCustomer.email})`
+                          : "Search by email or name..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[530px] p-0 bg-popover z-50 overflow-hidden" align="center" side="bottom" avoidCollisions={false}>
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Type email or name..."
+                          value={customerSearchQuery}
+                          onValueChange={setCustomerSearchQuery}
+                        />
+                        <CommandList className="max-h-[100px] overflow-y-auto no-scrollbar">
+                          <CommandEmpty>
+                            {searchingCustomers ? "Searching..." : "No customers found"}
+                          </CommandEmpty>
+
+                          <CommandGroup>
+                            {searchedCustomers.map((customer) => {
+                              const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'No name';
+                              const id = customer.customer_id || customer.id;
+                              const email = customer.customer_email || customer.email;
+
+                              return (
+                                <CommandItem
+                                  key={id}
+                                  value={id}
+                                  onSelect={() => {
+                                    setSelectedCustomer({
+                                      id,
+                                      email,
+                                      name,
+                                    });
+                                    setCustomerSearchOpen(false);
+                                  }}
+                                ><Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedCustomer?.id === id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{name}</span>
+                                    <span className="text-sm text-muted-foreground">
+                                      {email}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
               {/* Expires At - For non-expired codes */}
               {editingCode?.status !== 'expired' && formData.status !== 'expired' && (
                 <div className="space-y-2">
@@ -946,14 +1101,14 @@ const ThemeCodes = () => {
               )}
             </div>
             <DialogFooter>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setEditingCode(null)}
                 disabled={loading}
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleEditCode}
                 disabled={loading}
               >

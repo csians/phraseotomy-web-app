@@ -20,6 +20,7 @@ import {
 import type { TenantConfig, ShopifyCustomer } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
 import { getCustomerData, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
+import { getCustomerThemes } from "@/lib/themeCodeUtils";
 import { lobbyCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllUrlParams } from "@/lib/urlUtils";
@@ -38,6 +39,7 @@ const Play = () => {
   const [dataLoading, setDataLoading] = useState(false);
   const [lobbyCode, setLobbyCode] = useState("");
   const [availablePacks, setAvailablePacks] = useState<{ id: string; name: string; description: string | null }[]>([]);
+  const [unlockedThemes, setUnlockedThemes] = useState<{ id: string; name: string; is_core: boolean }[]>([]);
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
   const [showShopThemesDialog, setShowShopThemesDialog] = useState(false);
   const [nameAutoSaveAttempted, setNameAutoSaveAttempted] = useState(false);
@@ -400,7 +402,7 @@ const Play = () => {
       try {
         const tenantId = tenant?.id;
 
-        const [customerData, packsData] = await Promise.all([
+        const [customerData, packsData, customerThemes] = await Promise.all([
           getCustomerData(customer.id, shopDomain),
           tenantId
             ? supabase
@@ -408,6 +410,7 @@ const Play = () => {
                 .select("id, name, description")
                 .eq("tenant_id", tenantId)
             : Promise.resolve({ data: [], error: null }),
+          getCustomerThemes(customer.id, shopDomain),
         ]);
 
         if (packsData.data) {
@@ -433,6 +436,27 @@ const Play = () => {
 
         setLicenses(customerData.licenses);
         setSessions(customerData.sessions);
+
+        // Parse and set unlocked themes
+        if (Array.isArray(customerThemes)) {
+          // Flatten and extract theme info
+          const themes: { id: string; name: string; is_core: boolean }[] = [];
+          customerThemes.forEach((themeCode: any) => {
+            const themeCodeThemes = themeCode.theme_codes?.theme_code_themes || [];
+            themeCodeThemes.forEach((tt: any) => {
+              if (tt.themes) {
+                themes.push({
+                  id: tt.themes.id,
+                  name: tt.themes.name,
+                  is_core: tt.themes.is_core,
+                });
+              }
+            });
+          });
+          // Remove duplicates by id
+          const uniqueThemes = Array.from(new Map(themes.map(t => [t.id, t])).values());
+          setUnlockedThemes(uniqueThemes);
+        }
       } catch (error) {
         console.error("Error loading customer data:", error);
       } finally {
@@ -442,7 +466,7 @@ const Play = () => {
 
     fetchCustomerData();
   }
-}, [loading, customer?.id, shopDomain]); // ✅ depends only on id, not full object
+}, [loading, customer?.id, shopDomain]);
   const handleJoinGame = async () => {
     if (isJoining) return; // Prevent multiple submissions
     setIsJoining(true);
@@ -612,6 +636,7 @@ const Play = () => {
 
   const appEnv = import.meta.env.VITE_APP_ENV || "development";
 
+
   // Filter out expired licenses (safety check - should already be filtered by backend)
   const now = new Date();
   const activeLicenses = licenses.filter(license => {
@@ -632,6 +657,9 @@ const Play = () => {
     },
     null as Date | null,
   );
+
+  // Unlocked themes display (for demo, can be styled as needed)
+  const unlockedThemeNames = unlockedThemes.map(t => t.name);
 
 
   return (
@@ -668,13 +696,24 @@ const Play = () => {
           </DialogContent>
         </Dialog>
 
-        <div className="w-full max-w-2xl text-center pt-8">
-          <div className="w-20 h-20 mx-auto mb-4 bg-game-yellow rounded-2xl flex items-center justify-center shadow-lg">
-            <span className="text-5xl font-black text-game-black">P</span>
+
+        {/* Unlocked Themes Display */}
+        {unlockedThemes.length > 0 && (
+          <div className="w-full max-w-2xl text-center pt-4">
+            <h3 className="text-lg font-semibold text-game-yellow mb-2">Unlocked Themes</h3>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {unlockedThemes.map(theme => (
+                <Badge
+                  key={theme.id}
+                  variant="secondary"
+                  className="bg-game-yellow/20 text-game-yellow border-game-yellow/30 px-3 py-1"
+                >
+                  ✓ {theme.name}
+                </Badge>
+              ))}
+            </div>
           </div>
-          <h1 className="text-4xl font-black text-white mb-2 tracking-wider">PHRASEOTOMY</h1>
-          <p className="text-sm text-game-yellow uppercase tracking-widest font-semibold">The Party Game</p>
-        </div>
+        )}
 
         <div className="w-full max-w-2xl space-y-5">
           {/* Welcome message */}
@@ -683,9 +722,9 @@ const Play = () => {
             <Button variant="outline" size="sm" onClick={handleLogout}>
               Logout
             </Button>
-          </div>
+          </div> 
           {/*PLAY ONLINE */}
-          <div className="w-full max-w-2xl pt-8">
+          {/* <div className="w-full max-w-2xl pt-8">
             <Card className="bg-card border-game-gray">
               <CardHeader>
                 <CardTitle className="text-lg">
@@ -698,14 +737,15 @@ const Play = () => {
                 <p>Play with friends by sharing your Lobby ID.</p>
               </CardContent>
             </Card>
-          </div>
+          </div> */}
 
 
           {/* Your Packs Card */}
-          <Card className="bg-card border-game-gray">
+          {/* <Card className="bg-card border-game-gray">
             <CardHeader>
               <CardTitle className="text-lg">Your Packs</CardTitle>
             </CardHeader>
+        
             <CardContent className="space-y-4">
               {dataLoading ? (
                 <div className="space-y-2">
@@ -714,7 +754,6 @@ const Play = () => {
                 </div>
               ) : (
                 <>
-                  {/* Unlocked Packs */}
                   <div>
                     <p className="text-xs text-muted-foreground mb-2">Unlocked</p>
                     <div className="flex flex-wrap gap-2">
@@ -733,8 +772,6 @@ const Play = () => {
                       )}
                     </div>
                   </div>
-
-                  {/* Locked Packs */}
                   {availablePacks.filter((p) => !allPacks.includes(p.name)).length > 0 && (
                     <div className="pt-3 border-t border-border">
                       <p className="text-xs text-muted-foreground mb-2">Available to Unlock</p>
@@ -754,7 +791,6 @@ const Play = () => {
                     </div>
                   )}
 
-                  {/* Buy Additional Themes Promo */}
                   <div className="pt-4 border-t border-border">
                     <div className="bg-gradient-to-r from-game-yellow/10 to-game-yellow/5 rounded-lg p-4 border border-game-yellow/20">
                       <div className="flex items-center justify-between">
@@ -776,7 +812,7 @@ const Play = () => {
                 </>
               )}
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Host New Game */}
           <Card className="bg-card border-game-gray">
@@ -809,7 +845,7 @@ const Play = () => {
                   <Skeleton className="h-16 w-full" />
                 </div>
               ) : sessions.length > 0 ? (
-                <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[160px] overflow-y-auto pr-1">
                   {sessions.map((session) => (
                     <div
                       key={session.id}

@@ -377,28 +377,25 @@ const Codes = () => {
     setSearchedCustomers([]);
   };
 
-  const searchCustomers = async (query: string) => {
-    if (!tenant?.shop_domain || query.length < 2) {
+  // Fetch all customers or search by query
+  const fetchCustomers = async (query: string = "") => {
+    if (!tenant?.shop_domain) {
       setSearchedCustomers([]);
       return;
     }
-
     setSearchingCustomers(true);
-    
     try {
       const { data, error } = await supabase.functions.invoke('search-shopify-customers', {
         body: {
-          query,
+          query, // If empty, backend should return all (or first N) customers
           shop_domain: tenant.shop_domain,
         },
       });
-
       if (error || !data?.success) {
         console.error('Error searching customers:', error || data?.error);
         setSearchedCustomers([]);
         return;
       }
-
       setSearchedCustomers(data.customers || []);
     } catch (error) {
       console.error('Error searching customers:', error);
@@ -408,19 +405,21 @@ const Codes = () => {
     }
   };
 
-  // Debounce customer search
+  // Debounce customer search and fetch all on empty
   useEffect(() => {
-    if (customerSearchQuery.length < 2) {
-      setSearchedCustomers([]);
-      return;
-    }
-
+    if (!customerSearchOpen) return;
     const timer = setTimeout(() => {
-      searchCustomers(customerSearchQuery);
+      fetchCustomers(customerSearchQuery);
     }, 300);
-
     return () => clearTimeout(timer);
-  }, [customerSearchQuery, tenant?.shop_domain]);
+  }, [customerSearchQuery, customerSearchOpen, tenant?.shop_domain]);
+
+  // Fetch all customers when dropdown opens
+  useEffect(() => {
+    if (customerSearchOpen && customerSearchQuery === "") {
+      fetchCustomers("");
+    }
+  }, [customerSearchOpen, customerSearchQuery, tenant?.shop_domain]);
 
   const handleAssignCode = async () => {
     if (!assigningCode || !selectedCustomer || !tenant) {
@@ -1115,28 +1114,31 @@ const Codes = () => {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-full p-0 bg-popover z-50" align="start">
+                    <PopoverContent className="w-[530px] p-0 bg-popover z-50 overflow-hidden" align="center" side="bottom" avoidCollisions={false}>
                       <Command shouldFilter={false}>
                         <CommandInput 
                           placeholder="Type email or name..." 
                           value={customerSearchQuery}
                           onValueChange={setCustomerSearchQuery}
                         />
-                        <CommandList>
+                        <CommandList className="max-h-[100px] overflow-y-auto no-scrollbar">
                           <CommandEmpty>
-                            {searchingCustomers ? "Searching..." : customerSearchQuery.length < 2 ? "Type at least 2 characters" : "No customers found"}
+                            {searchingCustomers ? "Searching..." : "No customers found"}
                           </CommandEmpty>
                           <CommandGroup>
                             {searchedCustomers.map((customer) => {
+                              // Use customer_id for key and value
                               const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'No name';
+                              const id = customer.customer_id || customer.id;
+                              const email = customer.customer_email || customer.email;
                               return (
                                 <CommandItem
-                                  key={customer.id}
-                                  value={customer.id}
+                                  key={id}
+                                  value={id}
                                   onSelect={() => {
                                     setSelectedCustomer({
-                                      id: customer.id,
-                                      email: customer.email,
+                                      id,
+                                      email,
                                       name,
                                     });
                                     setCustomerSearchOpen(false);
@@ -1145,12 +1147,12 @@ const Codes = () => {
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0"
+                                      selectedCustomer?.id === id ? "opacity-100" : "opacity-0"
                                     )}
                                   />
                                   <div className="flex flex-col">
                                     <span className="font-medium">{name}</span>
-                                    <span className="text-sm text-muted-foreground">{customer.email}</span>
+                                    <span className="text-sm text-muted-foreground">{email}</span>
                                   </div>
                                 </CommandItem>
                               );
@@ -1281,14 +1283,16 @@ const Codes = () => {
                         <CommandGroup>
                           {searchedCustomers.map((customer) => {
                             const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'No name';
+                            const id = customer.customer_id || customer.id;
+                            const email = customer.customer_email || customer.email;
                             return (
                               <CommandItem
-                                key={customer.id}
-                                value={customer.id}
+                                key={id}
+                                value={id}
                                 onSelect={() => {
                                   setSelectedCustomer({
-                                    id: customer.id,
-                                    email: customer.email,
+                                    id,
+                                    email,
                                     name,
                                   });
                                   setCustomerSearchOpen(false);
@@ -1297,12 +1301,12 @@ const Codes = () => {
                                 <Check
                                   className={cn(
                                     "mr-2 h-4 w-4",
-                                    selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0"
+                                    selectedCustomer?.id === id ? "opacity-100" : "opacity-0"
                                   )}
                                 />
                                 <div className="flex flex-col">
                                   <span className="font-medium">{name}</span>
-                                  <span className="text-sm text-muted-foreground">{customer.email}</span>
+                                  <span className="text-sm text-muted-foreground">{email}</span>
                                 </div>
                               </CommandItem>
                             );
