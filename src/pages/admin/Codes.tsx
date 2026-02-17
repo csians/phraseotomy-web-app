@@ -289,6 +289,15 @@ const Codes = () => {
           }
         }
 
+        // When admin selects a customer, attach code to that customer via update-license-code (redeemed_by / redeemed_at)
+        if (selectedCustomer) {
+          updateBody.assignCustomer = {
+            customerId: selectedCustomer.id,
+            customerEmail: selectedCustomer.email,
+            customerName: selectedCustomer.name,
+          };
+        }
+
         const { data: updateData, error: updateError } = await supabase.functions.invoke('update-license-code', {
           body: updateBody,
         });

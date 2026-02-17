@@ -319,6 +319,10 @@ const Play = () => {
           return;
         }
 
+        // Use licenses and sessions from get-customer-data so UI shows correct packs / host eligibility
+        setLicenses(customerData.licenses || []);
+        setSessions(customerData.sessions || []);
+
         // Decode session token to get customer info
         const [payloadB64] = sessionToken.split(".");
         if (payloadB64) {
@@ -394,48 +398,53 @@ const Play = () => {
     }
   }, [loading, customer, shopDomain, nameAutoSaveAttempted]);
 
-  // Load customer data when logged in
- useEffect(() => {
-  if (!loading && customer?.id && shopDomain) {
-    const fetchCustomerData = async () => {
-      setDataLoading(true);
-      try {
-        const tenantId = tenant?.id;
+  // Load customer data when logged in (use get-customer-data so licenses match session and show correct packs)
+  useEffect(() => {
+    if (!loading && customer?.id && shopDomain) {
+      const fetchCustomerData = async () => {
+        setDataLoading(true);
+        try {
+          const tenantId = tenant?.id;
+          const sessionToken = localStorage.getItem("phraseotomy_session_token");
 
-        const [customerData, packsData, customerThemes] = await Promise.all([
-          getCustomerData(customer.id, shopDomain),
-          tenantId
-            ? supabase
-                .from("packs")
-                .select("id, name, description")
-                .eq("tenant_id", tenantId)
-            : Promise.resolve({ data: [], error: null }),
-          getCustomerThemes(customer.id, shopDomain),
-        ]);
+          const [customerDataResponse, packsData, customerThemes] = await Promise.all([
+            sessionToken
+              ? supabase.functions.invoke("get-customer-data", { body: { sessionToken } })
+              : getCustomerData(customer.id, shopDomain).then((data) => ({ data, error: null })),
+            tenantId
+              ? supabase
+                  .from("packs")
+                  .select("id, name, description")
+                  .eq("tenant_id", tenantId)
+              : Promise.resolve({ data: [], error: null }),
+            getCustomerThemes(customer.id, shopDomain),
+          ]);
 
-        if (packsData.data) {
-          setAvailablePacks(packsData.data);
-        }
+          const customerData = customerDataResponse?.data;
+          const hasError = customerDataResponse?.error != null;
 
-        // Only update customer if something actually changed
-        if (customerData.customer) {
-          setCustomer(prev => {
-            if (!prev) return prev;
+          if (packsData.data) {
+            setAvailablePacks(packsData.data);
+          }
 
-            return {
-              id: customerData.customer.id,
-              email: customerData.customer.email ?? prev.email ?? null,
-              name: customerData.customer.name ?? prev.name ?? null,
-              firstName:
-                customerData.customer.first_name ?? prev.firstName ?? null,
-              lastName:
-                customerData.customer.last_name ?? prev.lastName ?? null,
-            };
-          });
-        }
-
-        setLicenses(customerData.licenses);
-        setSessions(customerData.sessions);
+          if (!hasError && customerData) {
+            if (customerData.customer) {
+              setCustomer(prev => {
+                if (!prev) return prev;
+                return {
+                  id: customerData.customer.id,
+                  email: customerData.customer.email ?? prev.email ?? null,
+                  name: customerData.customer.name ?? prev.name ?? null,
+                  firstName:
+                    customerData.customer.first_name ?? prev.firstName ?? null,
+                  lastName:
+                    customerData.customer.last_name ?? prev.lastName ?? null,
+                };
+              });
+            }
+            setLicenses(customerData.licenses || []);
+            setSessions(customerData.sessions || []);
+          }
 
         // Parse and set unlocked themes
         if (Array.isArray(customerThemes)) {
@@ -725,8 +734,8 @@ const Play = () => {
 
 
           {/* Your Packs Card */}
-          <Card className="bg-card border-game-gray">
-            {/* <CardHeader>
+           <Card className="bg-card border-game-gray">
+            <CardHeader>
               <CardTitle className="text-lg">Your Packs</CardTitle>
             </CardHeader> */}
         
@@ -796,7 +805,7 @@ const Play = () => {
                 </>
               )}
             </CardContent>
-          </Card>
+          </Card> 
 
           {/* Host New Game */}
           <Card className="bg-card border-game-gray">

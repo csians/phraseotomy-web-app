@@ -11,9 +11,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { codeId, status, shopDomain, expires_at, code, packs_unlocked } = await req.json();
+    const { codeId, status, shopDomain, expires_at, code, packs_unlocked, assignCustomer } = await req.json();
 
-    console.log('📝 Updating license code:', { codeId, status, shopDomain, expires_at, code, packs_unlocked });
+    console.log('📝 Updating license code:', { codeId, status, shopDomain, expires_at, code, packs_unlocked, assignCustomer: assignCustomer ? true : false });
 
     if (!codeId || !status || !shopDomain) {
       return new Response(
@@ -108,6 +108,17 @@ Deno.serve(async (req) => {
       // Only clear expiration if expires_at is not explicitly provided
       if (expires_at === undefined) {
         updates.expires_at = null; // Clear expiration when unused (if not provided)
+      }
+    }
+
+    // When admin selects a customer in the UI, attach code to that customer (redeemed_by / redeemed_at)
+    if (assignCustomer && typeof assignCustomer === 'object') {
+      const email = assignCustomer.customerEmail || assignCustomer.customerId;
+      if (email) {
+        updates.redeemed_by = email;
+        updates.redeemed_at = new Date().toISOString();
+        if (status === 'unused') updates.status = 'active'; // attaching to a customer makes the code active
+        console.log('📎 Attaching license code to customer:', email);
       }
     }
 
