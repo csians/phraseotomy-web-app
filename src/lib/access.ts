@@ -61,7 +61,7 @@ export async function loadAccessStatus(shopDomain: string | null): Promise<Acces
     return {
       hasActiveLicense: true,
       licenseExpiresAt: expiresAt,
-      unlockedPacks: ['At Home', 'At Work', 'Travel'],
+      unlockedPacks: [],
       redemptionCode: 'STAGE-TEST-2024',
     };
   }
@@ -74,7 +74,7 @@ export async function loadAccessStatus(shopDomain: string | null): Promise<Acces
     return {
       hasActiveLicense: true,
       licenseExpiresAt: expiresAt,
-      unlockedPacks: ['At Home', 'At Work', 'Travel', 'Party Pack'],
+      unlockedPacks: [],
       redemptionCode: 'PROD-GOLD-2024',
     };
   }

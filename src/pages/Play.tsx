@@ -599,28 +599,12 @@ const Play = () => {
 
 
   const handleLogout = () => {
-    // Get the custom domain from localStorage (e.g., phraseotomy.com) before clearing
-    const storedShopDomain = localStorage.getItem("shop_domain");
-
     // Clear local storage
     localStorage.removeItem("phraseotomy_session_token");
     localStorage.removeItem("customerData");
     localStorage.removeItem("shop_domain");
-
-    // Use the stored custom domain for Shopify logout, or fallback to shopDomain
-    const logoutDomain = storedShopDomain || shopDomain;
-
-    if (logoutDomain) {
-      // Redirect to Shopify logout with return_to pointing back to current deployment domain
-      // Use current origin to stay on staging/production as appropriate
-      const currentAppUrl = `${window.location.origin}${window.location.pathname}#/login`;
-      const returnUrl = encodeURIComponent(currentAppUrl);
-      window.top!.location.href = `https://${logoutDomain}/account/logout?return_to=${returnUrl}`;
-      // window.top!.location.href = `https://${logoutDomain}/apps/phraseotomy`;
-    } else {
-      // Fallback for standalone mode
-      navigate("/login");
-    }
+    // Always redirect to login page after logout
+    navigate("/login");
   };
 
   if (loading) {
@@ -741,10 +725,10 @@ const Play = () => {
 
 
           {/* Your Packs Card */}
-          {/* <Card className="bg-card border-game-gray">
-            <CardHeader>
+          <Card className="bg-card border-game-gray">
+            {/* <CardHeader>
               <CardTitle className="text-lg">Your Packs</CardTitle>
-            </CardHeader>
+            </CardHeader> */}
         
             <CardContent className="space-y-4">
               {dataLoading ? (
@@ -754,7 +738,7 @@ const Play = () => {
                 </div>
               ) : (
                 <>
-                  <div>
+                  {/* <div>
                     <p className="text-xs text-muted-foreground mb-2">Unlocked</p>
                     <div className="flex flex-wrap gap-2">
                       {allPacks.length > 0 ? (
@@ -770,13 +754,13 @@ const Play = () => {
                       ) : (
                         <p className="text-sm text-muted-foreground">No packs unlocked yet</p>
                       )}
-                    </div>
-                  </div>
+                    </div> 
+                  </div>*/}
                   {availablePacks.filter((p) => !allPacks.includes(p.name)).length > 0 && (
                     <div className="pt-3 border-t border-border">
                       <p className="text-xs text-muted-foreground mb-2">Available to Unlock</p>
                       <div className="flex flex-wrap gap-2">
-                        {availablePacks
+                        {/* {availablePacks
                           .filter((p) => !allPacks.includes(p.name))
                           .map((pack) => (
                             <Badge
@@ -786,7 +770,7 @@ const Play = () => {
                             >
                               🔒 {pack.name}
                             </Badge>
-                          ))}
+                          ))} */}
                       </div>
                     </div>
                   )}
@@ -812,7 +796,7 @@ const Play = () => {
                 </>
               )}
             </CardContent>
-          </Card> */}
+          </Card>
 
           {/* Host New Game */}
           <Card className="bg-card border-game-gray">

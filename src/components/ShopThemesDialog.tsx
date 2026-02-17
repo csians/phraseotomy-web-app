@@ -122,7 +122,7 @@ export function ShopThemesDialog({
       const { data: allThemes } = await supabase
         .from("themes")
         .select("id, name")
-        .in("name", ["At Home", "Lifestyle", "At Work", "Travel"]);
+        .in("name", []);
 
       if (allThemes?.length) {
         allThemes.forEach(theme => unlocked.add(theme.id));

@@ -1,15 +1,3 @@
-// Supabase Edge Function URL for this function (after deployment):
-// https://<your-project-id>.supabase.co/functions/v1/update-customer-metafield
-// Example:
-// https://egrwijzbxxhkhrrelsgi.supabase.co/functions/v1/update-customer-metafield
-
-/**
- * Supabase Edge Function: Update Customer Metafield
- * 
- * Adds or updates a license code in a customer's Shopify metafields
- * Requires admin authentication
- */
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -30,10 +18,10 @@ async function updateShopifyCustomerMetafield(
   accessToken: string,
   type: 'license' | 'theme' = 'license'
 ): Promise<void> {
-  // Use shopDomain directly (should be e.g. phraseotomy.myshopify.com)
   const metafieldKey = type === 'theme' ? 'theme_codes' : 'license_codes';
-  // First, get existing metafields
+
   const getUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields.json`;
+
   const getResponse = await fetch(getUrl, {
     method: 'GET',
     headers: {
@@ -41,27 +29,31 @@ async function updateShopifyCustomerMetafield(
       'Content-Type': 'application/json',
     },
   });
+
   if (!getResponse.ok) {
     throw new Error(`Failed to fetch customer metafields: ${getResponse.status}`);
   }
+
   const { metafields } = await getResponse.json();
-  // Check if phraseotomy namespace exists for the correct key
+
   const existingMetafield = metafields?.find(
     (mf: any) => mf.namespace === 'phraseotomy' && mf.key === metafieldKey
   );
+
   let existingCodes: string[] = [];
+
   if (existingMetafield) {
     try {
       existingCodes = JSON.parse(existingMetafield.value);
-    } catch (e) {
+    } catch {
       existingCodes = [];
     }
   }
-  // Add new code if it doesn't exist
+
   if (!existingCodes.includes(code)) {
     existingCodes.push(code);
   }
-  // Update or create metafield
+
   const metafieldData = {
     metafield: {
       namespace: 'phraseotomy',
@@ -70,17 +62,18 @@ async function updateShopifyCustomerMetafield(
       type: 'json',
     }
   };
+
   let updateUrl: string;
   let method: string;
+
   if (existingMetafield) {
-    // Update existing metafield
     updateUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields/${existingMetafield.id}.json`;
     method = 'PUT';
   } else {
-    // Create new metafield
     updateUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields.json`;
     method = 'POST';
   }
+
   const updateResponse = await fetch(updateUrl, {
     method,
     headers: {
@@ -89,6 +82,7 @@ async function updateShopifyCustomerMetafield(
     },
     body: JSON.stringify(metafieldData),
   });
+
   if (!updateResponse.ok) {
     const errorText = await updateResponse.text();
     console.error('Shopify API error:', errorText);
@@ -107,19 +101,14 @@ Deno.serve(async (req) => {
     if (!customerId || !code || !shopDomain) {
       return new Response(
         JSON.stringify({ error: 'customerId, code, and shopDomain are required' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     console.log('📝 Assigning code to customer:', { customerId, code, shopDomain, type });
 
-    // Get tenant configuration
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
       .select('*')
@@ -130,10 +119,7 @@ Deno.serve(async (req) => {
     if (tenantError || !tenant) {
       return new Response(
         JSON.stringify({ error: 'Tenant not found' }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -142,15 +128,12 @@ Deno.serve(async (req) => {
     if (!accessToken) {
       return new Response(
         JSON.stringify({ error: 'Shopify access token not configured' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Verify the code exists and belongs to this tenant
     const codeTable = type === 'theme' ? 'theme_codes' : 'license_codes';
+
     const { data: codeData, error: codeError } = await supabase
       .from(codeTable)
       .select('*')
@@ -161,14 +144,11 @@ Deno.serve(async (req) => {
     if (codeError || !codeData) {
       return new Response(
         JSON.stringify({ error: `${type === 'theme' ? 'Theme' : 'License'} code not found` }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Update customer metafield in Shopify
+    // 1️⃣ Update Shopify metafield
     await updateShopifyCustomerMetafield(
       customerId,
       code,
@@ -177,27 +157,36 @@ Deno.serve(async (req) => {
       type
     );
 
+    // 2️⃣ 🔥 UPDATE DATABASE (THIS WAS MISSING)
+    if (type === 'theme') {
+      await supabase
+        .from('theme_codes')
+        .update({
+          status: 'active',
+          redeemed_by: customerId, // Must match customers.customer_id
+          redeemed_at: new Date().toISOString()
+        })
+        .eq('code', code)
+        .eq('tenant_id', tenant.id);
+    }
+
     console.log('✅ Code assigned successfully:', { customerId, code, type });
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
-        message: `Code ${code} assigned to customer ${customerEmail || customerId}` 
+        message: `Code ${code} assigned to customer ${customerEmail || customerId}`
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error) {
     console.error('Error in update-customer-metafield:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
