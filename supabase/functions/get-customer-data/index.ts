@@ -200,89 +200,10 @@ Deno.serve(async (req) => {
       expires_at: license.license_codes?.expires_at || license.expires_at,
     })) || [];
 
-    // Check if customer has any packs, if not assign base pack
+    // Check if customer has any packs.
+    // Previously, a "Base" pack was auto-assigned here when the customer had no packs.
+    // This behavior has been disabled so that customers with no licenses simply see no packs.
     console.log(`📦 Customer has ${transformedLicenses.length} licenses`);
-    
-    if (transformedLicenses.length === 0 || !transformedLicenses.some(license => license.packs_unlocked?.length > 0)) {
-      console.log(`🎁 Customer ${customerId} has no packs. Assigning base pack...`);
-
-      // Find the base pack for this tenant (specifically look for pack named "Base")
-      let { data: basePack, error: packError } = await supabase
-        .from('packs')
-        .select('id, name')
-        .eq('tenant_id', tenant.id)
-        .eq('name', 'Base')
-        .single();
-
-      // If no "Base" pack found, try case-insensitive search
-      if (packError || !basePack) {
-        const { data: fallbackPack, error: fallbackError } = await supabase
-          .from('packs')
-          .select('id, name')
-          .eq('tenant_id', tenant.id)
-          .ilike('name', 'base')
-          .single();
-        
-        basePack = fallbackPack;
-        packError = fallbackError;
-      }
-
-      console.log(`🔍 Looking for base pack:`, { basePack, packError });
-
-      if (!packError && basePack) {
-        // Create a license code for the base pack
-        const basePackCode = `AUTO${Date.now().toString().slice(-6)}`;
-        console.log(`🏷️ Creating license code: ${basePackCode}`);
-        
-        const { data: newLicenseCode, error: licenseCodeError } = await supabase
-          .from('license_codes')
-          .insert({
-            code: basePackCode,
-            packs_unlocked: [basePack.name],
-            tenant_id: tenant.id,
-            status: 'active',
-          })
-          .select()
-          .single();
-
-        console.log(`🏷️ License code creation result:`, { newLicenseCode, licenseCodeError });
-
-        if (!licenseCodeError && newLicenseCode) {
-          // Assign the license to the customer
-          const { data: newCustomerLicense, error: customerLicenseError } = await supabase
-            .from('customer_licenses')
-            .insert({
-              customer_id: customerId,
-              license_code_id: newLicenseCode.id,
-              customer_email: customerDetails?.email || '',
-              customer_name: customerDetails?.name || `${customerDetails?.first_name || ''} ${customerDetails?.last_name || ''}`.trim(),
-              shop_domain: shopDomain,
-              tenant_id: tenant.id,
-              status: 'active',
-              activated_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-
-          console.log(`👤 Customer license assignment result:`, { newCustomerLicense, customerLicenseError });
-
-          if (!customerLicenseError && newCustomerLicense) {
-            // Add the new license to the response
-            transformedLicenses = [{
-              ...newCustomerLicense,
-              code: newLicenseCode.code,
-              packs_unlocked: newLicenseCode.packs_unlocked,
-              expires_at: newLicenseCode.expires_at,
-            }];
-            console.log(`✅ Successfully assigned base pack "${basePack.name}" to customer ${customerId}`);
-          }
-        }
-      } else {
-        console.error('❌ No base pack found for tenant:', tenant.id, packError);
-      }
-    } else {
-      console.log(`ℹ️ Customer ${customerId} already has packs assigned`);
-    }
 
     if (licensesError) {
       console.error('Error fetching licenses:', licensesError);

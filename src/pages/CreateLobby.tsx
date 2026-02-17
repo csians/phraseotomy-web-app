@@ -103,22 +103,28 @@ export default function CreateLobby() {
           return true; // Include licenses without expiration
         });
 
-        // Extract all unique pack names from active licenses only
-        const licensePackNames = new Set<string>();
+        // Extract all unique pack identifiers from active licenses only.
+        // Historically these were stored as pack names; newer codes may store pack IDs.
+        const licensePackValues = new Set<string>();
         activeLicenses.forEach((license) => {
-
           if (license.packs_unlocked && Array.isArray(license.packs_unlocked)) {
-            license.packs_unlocked.forEach((pack) => licensePackNames.add(pack));
+            license.packs_unlocked.forEach((pack) => licensePackValues.add(pack));
           }
         });
 
-        // Map pack names to pack IDs from database (case-insensitive)
+        // Map license pack values to pack IDs from database.
+        // Support both:
+        // - values that are already pack IDs
+        // - values that are pack names (case-insensitive)
         const availablePackIds = allPacks
-          .filter((pack) =>
-            Array.from(licensePackNames).some(
-              unlockedName => unlockedName.toLowerCase() === (pack.name || '').toLowerCase()
-            )
-          )
+          .filter((pack) => {
+            const values = Array.from(licensePackValues);
+            const asIdMatch = values.includes(pack.id);
+            const asNameMatch = values.some(
+              (v) => v.toLowerCase() === (pack.name || "").toLowerCase()
+            );
+            return asIdMatch || asNameMatch;
+          })
           .map(pack => pack.id);
 
         setAvailablePacks(availablePackIds);

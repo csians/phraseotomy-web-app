@@ -22,10 +22,25 @@
     shopDomain: string,
     accessToken: string
   ): Promise<ShopifyCustomer[]> {
-    const shop = shopDomain.replace('.myshopify.com', '');
+    // Normalise the shop domain so we don't accidentally create invalid
+    // domains like "phraseotomy.com.myshopify.com".
+    // If the value already includes ".myshopify.com", use it as-is.
+    // Otherwise, assume it is the full hostname already (custom domain)
+    // and do not append ".myshopify.com".
+    let shopHost = shopDomain.trim();
+    // Strip protocol if present
+    shopHost = shopHost.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+    if (!shopHost.endsWith('.myshopify.com')) {
+      // Use the hostname exactly as provided by the tenant record
+      // (e.g. "phraseotomy.com")
+      console.log('Using custom shop domain for Shopify Admin API:', shopHost);
+    } else {
+      console.log('Using myshopify domain for Shopify Admin API:', shopHost);
+    }
     
     // Search by email or name using Shopify Admin API
-    const url = `https://${shop}.myshopify.com/admin/api/2024-01/customers/search.json?query=${encodeURIComponent(query)}&limit=20`;
+    const url = `https://${shopHost}/admin/api/2024-01/customers/search.json?query=${encodeURIComponent(query)}&limit=20`;
 
     try {
       const response = await fetch(url, {

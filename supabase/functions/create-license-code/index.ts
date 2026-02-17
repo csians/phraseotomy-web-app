@@ -21,7 +21,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { code, packs_unlocked, shop_domain } = await req.json();
+    const {
+      code,
+      packs_unlocked,
+      shop_domain,
+      expires_at,
+      assignCustomer,
+      status,
+    } = await req.json();
 
     if (!code || !shop_domain) {
       return new Response(
@@ -55,7 +62,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('Creating license code:', { code, tenant_id: tenant.id, packs_unlocked });
+    console.log('Creating license code:', {
+      code,
+      tenant_id: tenant.id,
+      packs_unlocked,
+      expires_at,
+      assignCustomer: assignCustomer ? { customerId: assignCustomer.customerId } : null,
+      status,
+    });
+
+    // If a customer is provided, force the code to be active, otherwise default to provided status or "unused"
+    const effectiveStatus = assignCustomer ? 'active' : (status ?? 'unused');
+
+    // If assigning to a customer and no explicit expires_at was provided,
+    // default to 30 days from now
+    let effectiveExpiresAt: string | null = expires_at || null;
+    if (assignCustomer && !effectiveExpiresAt) {
+      const now = new Date();
+      const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      effectiveExpiresAt = in30Days.toISOString();
+    }
 
     // Insert license code using service role (bypasses RLS)
     const { data: newCode, error: insertError } = await supabase
@@ -64,7 +90,8 @@ Deno.serve(async (req) => {
         tenant_id: tenant.id,
         code: code,
         packs_unlocked: packs_unlocked || [],
-        status: 'unused',
+        status: effectiveStatus,
+        expires_at: effectiveExpiresAt,
       })
       .select()
       .single();
@@ -82,8 +109,53 @@ Deno.serve(async (req) => {
 
     console.log('✅ License code created successfully:', newCode.id);
 
+    let customerLicense: any = null;
+
+    // When assignCustomer is provided, immediately:
+    // 1) mark the code as redeemed_by + redeemed_at
+    // 2) create a customer_licenses row
+    if (assignCustomer?.customerId) {
+      const { customerId, customerEmail, customerName } = assignCustomer;
+
+      const redeemedAt = new Date().toISOString();
+
+      const { error: updateCodeError } = await supabase
+        .from('license_codes')
+        .update({
+          redeemed_by: customerId,
+          redeemed_at: redeemedAt,
+        })
+        .eq('id', newCode.id);
+
+      if (updateCodeError) {
+        console.error('Error updating license_codes with redeemed_by during create-license-code:', updateCodeError);
+      }
+
+      const { data: newCustomerLicense, error: customerLicenseError } = await supabase
+        .from('customer_licenses')
+        .insert({
+          customer_id: customerId,
+          license_code_id: newCode.id,
+          customer_email: customerEmail || '',
+          customer_name: customerName || '',
+          shop_domain,
+          tenant_id: tenant.id,
+          status: 'active',
+          activated_at: redeemedAt,
+        })
+        .select()
+        .single();
+
+      if (customerLicenseError) {
+        console.error('Error creating customer license during create-license-code:', customerLicenseError);
+      } else {
+        customerLicense = newCustomerLicense;
+        console.log('✅ Customer license created during create-license-code:', customerLicense.id);
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: true, code: newCode }),
+      JSON.stringify({ success: true, code: newCode, customer_license: customerLicense }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

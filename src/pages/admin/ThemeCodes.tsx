@@ -56,6 +56,12 @@ const ThemeCodes = () => {
 
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [allCustomers, setAllCustomers] = useState<Array<{
+    id: string;
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+  }>>([]);
   const [searchedCustomers, setSearchedCustomers] = useState<any[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<{
     id: string;
@@ -185,9 +191,10 @@ const ThemeCodes = () => {
       });
     }
   };
-  const fetchCustomers = async (query: string = "") => {
+  // Fetch customers once; frontend handles search/filtering
+  const fetchCustomers = async () => {
     if (!tenant?.shop_domain) {
-      setSearchedCustomers([]);
+      setAllCustomers([]);
       return;
     }
 
@@ -198,33 +205,53 @@ const ThemeCodes = () => {
         "search-shopify-customers",
         {
           body: {
-            query,
+            query: "",
             shop_domain: tenant.shop_domain,
           },
         }
       );
 
       if (error || !data?.success) {
-        setSearchedCustomers([]);
+        setAllCustomers([]);
         return;
       }
 
-      setSearchedCustomers(data.customers || []);
+      setAllCustomers(
+        (data.customers || []).map((c: any) => ({
+          id: c.customer_id || c.id,
+          email: c.customer_email || c.email,
+          first_name: c.first_name ?? null,
+          last_name: c.last_name ?? null,
+        }))
+      );
     } catch {
-      setSearchedCustomers([]);
+      setAllCustomers([]);
     } finally {
       setSearchingCustomers(false);
     }
   };
+  // Frontend filtering over cached customers
   useEffect(() => {
     if (!customerSearchOpen) return;
+    const q = customerSearchQuery.trim().toLowerCase();
+    if (!q) {
+      setSearchedCustomers(allCustomers);
+      return;
+    }
+    const filtered = allCustomers.filter((c) => {
+      const name = [c.first_name, c.last_name].filter(Boolean).join(" ").toLowerCase();
+      const email = (c.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+    setSearchedCustomers(filtered);
+  }, [customerSearchQuery, customerSearchOpen, allCustomers]);
 
-    const timer = setTimeout(() => {
-      fetchCustomers(customerSearchQuery);
-    }, 300); // debounce 300ms
-
-    return () => clearTimeout(timer);
-  }, [customerSearchQuery, customerSearchOpen, tenant?.shop_domain]);
+  // Fetch customers when dropdown is first opened
+  useEffect(() => {
+    if (customerSearchOpen && allCustomers.length === 0) {
+      fetchCustomers();
+    }
+  }, [customerSearchOpen, allCustomers.length, tenant?.shop_domain]);
 
   const handleEditCode = async () => {
     if (!editingCode || !tenant) return;
@@ -991,7 +1018,7 @@ const ThemeCodes = () => {
 
               {editingCode?.status === "unused" && (
                 <div className="space-y-2">
-                  <Label>Assign Customer (Future-ready)</Label>
+                  <Label>Assign Customer</Label>
 
                   <Popover
                     open={customerSearchOpen}
@@ -1010,53 +1037,59 @@ const ThemeCodes = () => {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[530px] p-0 bg-popover z-50 overflow-hidden" align="center" side="bottom" avoidCollisions={false}>
+                    <PopoverContent className="w-[530px] p-0 bg-popover z-50" align="center" side="bottom" avoidCollisions={false}>
                       <Command shouldFilter={false}>
                         <CommandInput
                           placeholder="Type email or name..."
                           value={customerSearchQuery}
                           onValueChange={setCustomerSearchQuery}
                         />
-                        <CommandList className="max-h-[100px] overflow-y-auto no-scrollbar">
-                          <CommandEmpty>
-                            {searchingCustomers ? "Searching..." : "No customers found"}
-                          </CommandEmpty>
+                        <div
+                          className="max-h-[260px] overflow-y-auto"
+                          onWheel={(e) => e.stopPropagation()}
+                        >
+                          <CommandList className="max-h-none">
+                            <CommandEmpty>
+                              {searchingCustomers ? "Searching..." : "No customers found"}
+                            </CommandEmpty>
 
-                          <CommandGroup>
-                            {searchedCustomers.map((customer) => {
-                              const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'No name';
-                              const id = customer.customer_id || customer.id;
-                              const email = customer.customer_email || customer.email;
+                            <CommandGroup>
+                              {searchedCustomers.map((customer) => {
+                                const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'No name';
+                                const id = customer.customer_id || customer.id;
+                                const email = customer.customer_email || customer.email;
 
-                              return (
-                                <CommandItem
-                                  key={id}
-                                  value={id}
-                                  onSelect={() => {
-                                    setSelectedCustomer({
-                                      id,
-                                      email,
-                                      name,
-                                    });
-                                    setCustomerSearchOpen(false);
-                                  }}
-                                ><Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      selectedCustomer?.id === id ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">{name}</span>
-                                    <span className="text-sm text-muted-foreground">
-                                      {email}
-                                    </span>
-                                  </div>
-                                </CommandItem>
-                              );
-                            })}
-                          </CommandGroup>
-                        </CommandList>
+                                return (
+                                  <CommandItem
+                                    key={id}
+                                    value={id}
+                                    onSelect={() => {
+                                      setSelectedCustomer({
+                                        id,
+                                        email,
+                                        name,
+                                      });
+                                      setCustomerSearchOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        selectedCustomer?.id === id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{name}</span>
+                                      <span className="text-sm text-muted-foreground">
+                                        {email}
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </div>
                       </Command>
                     </PopoverContent>
                   </Popover>
