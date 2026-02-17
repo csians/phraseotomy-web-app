@@ -737,7 +737,7 @@ const Play = () => {
            <Card className="bg-card border-game-gray">
             <CardHeader>
               <CardTitle className="text-lg">Your Packs</CardTitle>
-            </CardHeader> */}
+            </CardHeader> 
         
             <CardContent className="space-y-4">
               {dataLoading ? (
