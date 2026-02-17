@@ -45,6 +45,28 @@ const Play = () => {
   const [nameAutoSaveAttempted, setNameAutoSaveAttempted] = useState(false);
 
   const [isJoining, setIsJoining] = useState(false);
+
+  // Code from URL and console: pre-fill lobby code when present (6-char format)
+  useEffect(() => {
+    const urlParams = getAllUrlParams();
+    const codeFromUrl = urlParams.get("Code") || urlParams.get("code");
+    const codeFromConsole = (window as unknown as { __PHRASEOTOMY_LOBBY_CODE__?: string }).__PHRASEOTOMY_LOBBY_CODE__;
+    const code = codeFromUrl || codeFromConsole;
+
+    console.log("🎮 [Play] Code sources:", {
+      fromUrl: codeFromUrl ?? null,
+      fromConsole: codeFromConsole ?? null,
+      resolved: code ?? null,
+    });
+
+    if (code && typeof code === "string" && /^[A-Za-z0-9]{6}$/.test(code.trim())) {
+      const normalized = code.trim().toUpperCase();
+      setLobbyCode(normalized);
+      sessionStorage.setItem("phraseotomy_url_code", normalized);
+      console.log("🎮 [Play] Lobby code set:", normalized);
+    }
+  }, []);
+
   // Check if customer needs to enter their name
   const customerNeedsName = (cust: ShopifyCustomer | null): boolean => {
     if (!cust) return false;
