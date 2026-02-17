@@ -36,7 +36,15 @@ const queryClient = new QueryClient();
   const customer_name = manualParams.get('customer_name') || url.searchParams.get('customer_name');
   const rToken = manualParams.get('r') || url.searchParams.get('r');
   const hostParam = manualParams.get('host') || url.searchParams.get('host');
-  
+  const codeParam = manualParams.get('Code') || manualParams.get('code') || url.searchParams.get('Code') || url.searchParams.get('code');
+  const shopDomainParam = manualParams.get('shop_domain') || url.searchParams.get('shop_domain');
+
+  // Preserve Code in sessionStorage before URL is cleaned (so Play page can use it for lobby pre-fill)
+  if (codeParam && /^[A-Za-z0-9]{6}$/.test(codeParam.trim())) {
+    const normalizedCode = codeParam.trim().toUpperCase();
+    sessionStorage.setItem('phraseotomy_url_code', normalizedCode);
+  }
+
   // Check if we're in Shopify Admin context
   const isShopifyAdmin = hostParam || window.location.href.includes('admin.shopify.com');
   if (isShopifyAdmin) {
@@ -45,23 +53,25 @@ const queryClient = new QueryClient();
     if (shop) sessionStorage.setItem('shopify_admin_shop', shop);
     console.log('🔐 Shopify Admin context detected');
   }
-  
+
   const hasLoginParams = shop || customer_id || customer_email || customer_name || rToken;
-  
+
   if (hasLoginParams) {
     const params = {
       shop,
       customer_id,
       customer_email,
       customer_name,
-      r: rToken
+      r: rToken,
+      Code: codeParam ?? undefined,
+      shop_domain: shopDomainParam ?? undefined,
     };
-    
+
     console.log('🧹 Cleaned URL params at app level:', params);
-    
+
     // Store in sessionStorage for Login.tsx to process
     sessionStorage.setItem('pending_login_params', JSON.stringify(params));
-    
+
     // Clean URL immediately - remove all query params
     const cleanUrl = url.origin + url.pathname + (url.hash ? url.hash.split('?')[0] : '');
     window.history.replaceState({}, '', cleanUrl);

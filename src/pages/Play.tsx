@@ -46,16 +46,18 @@ const Play = () => {
 
   const [isJoining, setIsJoining] = useState(false);
 
-  // Code from URL and console: pre-fill lobby code when present (6-char format)
+  // Code from URL, console, or sessionStorage (set by App.tsx before URL was cleaned)
   useEffect(() => {
     const urlParams = getAllUrlParams();
     const codeFromUrl = urlParams.get("Code") || urlParams.get("code");
     const codeFromConsole = (window as unknown as { __PHRASEOTOMY_LOBBY_CODE__?: string }).__PHRASEOTOMY_LOBBY_CODE__;
-    const code = codeFromUrl || codeFromConsole;
+    const codeFromStorage = sessionStorage.getItem("phraseotomy_url_code");
+    const code = codeFromUrl || codeFromConsole || codeFromStorage;
 
     console.log("🎮 [Play] Code sources:", {
       fromUrl: codeFromUrl ?? null,
       fromConsole: codeFromConsole ?? null,
+      fromStorage: codeFromStorage ?? null,
       resolved: code ?? null,
     });
 
