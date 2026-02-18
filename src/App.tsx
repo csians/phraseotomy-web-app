@@ -67,6 +67,8 @@ const queryClient = new QueryClient();
       shop_domain: shopDomainParam ?? undefined,
     };
 
+    console.log('🔍 [APP] Params:', params);
+
     console.log('🧹 Cleaned URL params at app level:', params);
 
     // Store in sessionStorage for Login.tsx to process
