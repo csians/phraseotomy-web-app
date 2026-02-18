@@ -1535,7 +1535,7 @@ export default function Game() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Header />
+      {/* <Header /> */}
 
       {/* Main content area with responsive layout */}
       <div className="flex-1 flex flex-col md:flex-row">

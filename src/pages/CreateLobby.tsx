@@ -296,7 +296,7 @@ export default function CreateLobby() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Header />
+      {/* <Header /> */}
       <div className="flex-1 p-4">
         <div className="max-w-2xl mx-auto space-y-6 py-8">
           {/* Customer Profile Header */}

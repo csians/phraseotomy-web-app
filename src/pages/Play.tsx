@@ -681,7 +681,7 @@ const Play = () => {
 
   return (
     <div className="min-h-screen-safe bg-game-black flex flex-col">
-      <Header />
+      {/* <Header /> */}
       <div className="flex-1 flex flex-col items-center justify-between px-4 py-8 pb-safe">
 
         {/* Redeem Code Dialog */}
