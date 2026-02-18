@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { fetchCustomerMetafields, parseCustomerAccess } from "@/lib/shopifyCustomer";
 import {
   Dialog,
   DialogContent,
@@ -118,17 +119,37 @@ export function ShopThemesDialog({
     try {
       const unlocked = new Set<string>();
 
-      // 1. Get all themes and mark base pack themes as unlocked (static)
-      const { data: allThemes } = await supabase
-        .from("themes")
-        .select("id, name")
-        .in("name", []);
+      // 1. Fetch assigned packs for this customer
+      const metafields = await fetchCustomerMetafields(customerId, shopDomain);
+      const { packIds } = parseCustomerAccess(metafields); // These are likely pack names (e.g., "Base")
 
-      if (allThemes?.length) {
-        allThemes.forEach(theme => unlocked.add(theme.id));
+      // 2. Get all packs (to map name to id)
+      const { data: allPacks, error: packsError } = await supabase
+        .from("packs")
+        .select("id, name");
+      if (packsError) throw packsError;
+
+      // Map assigned pack names to their UUIDs
+      const assignedPackIds = allPacks && packIds && packIds.length
+        ? allPacks.filter(pack => packIds.includes(pack.name)).map(pack => pack.id)
+        : [];
+
+      // 3. Get all themes
+      const { data: allThemes, error: allThemesError } = await supabase
+        .from("themes")
+        .select("id, pack_id");
+      if (allThemesError) throw allThemesError;
+
+      // 4. Unlock all themes whose pack_id is in assignedPackIds
+      if (allThemes?.length && assignedPackIds?.length) {
+        allThemes.forEach(theme => {
+          if (theme.pack_id && assignedPackIds.includes(theme.pack_id)) {
+            unlocked.add(theme.id);
+          }
+        });
       }
 
-      // 2. Get theme codes redeemed by this customer
+      // 5. Also unlock themes from redeemed theme codes
       const { data: redeemedCodes, error: codeError } = await supabase
         .from("theme_codes")
         .select("themes_unlocked")
