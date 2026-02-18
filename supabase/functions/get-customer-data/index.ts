@@ -7,6 +7,72 @@ const corsHeaders = {
 
 const APP_SECRET = Deno.env.get('APP_SIGNING_SECRET')!;
 
+// Custom domains must resolve to *.myshopify.com for Admin API
+const CUSTOM_DOMAIN_TO_MYSHOPIFY: Record<string, string> = {
+  'phraseotomy.com': 'qxqtbf-21.myshopify.com',
+  'phraseotomy.ourstagingserver.com': 'testing-cs-store.myshopify.com',
+};
+
+function getShopifyApiHost(shopDomain: string): string {
+  const normalized = (shopDomain || '').trim().toLowerCase();
+  if (normalized.endsWith('.myshopify.com')) return normalized;
+  return CUSTOM_DOMAIN_TO_MYSHOPIFY[normalized] || normalized;
+}
+
+/**
+ * Ensure customer has metafield custom.redemption_code = "True" in Shopify.
+ * Only updates if the metafield is missing or value is not "True".
+ */
+async function ensureRedemptionCodeMetafield(
+  customerId: string,
+  apiHost: string,
+  accessToken: string
+): Promise<void> {
+  const getUrl = `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields.json`;
+  const getRes = await fetch(getUrl, {
+    method: 'GET',
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!getRes.ok) {
+    console.warn('⚠️ Failed to fetch metafields for redemption_code check:', getRes.status);
+    return;
+  }
+  const { metafields } = await getRes.json();
+  const existing = metafields?.find((mf: any) => mf.namespace === 'custom' && mf.key === 'redemption_code');
+  if (existing && existing.value === 'True') {
+    return; // already set, do nothing
+  }
+  const body = {
+    metafield: {
+      namespace: 'custom',
+      key: 'redemption_code',
+      value: 'True',
+      type: 'single_line_text_field',
+    },
+  };
+  const url = existing
+    ? `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields/${existing.id}.json`
+    : `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields.json`;
+  const method = existing ? 'PUT' : 'POST';
+  const updateRes = await fetch(url, {
+    method,
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!updateRes.ok) {
+    const errText = await updateRes.text();
+    console.warn('⚠️ Failed to set redemption_code metafield:', updateRes.status, errText);
+    return;
+  }
+  console.log('✅ Set customer metafield custom.redemption_code = True');
+}
+
 /**
  * Verify a signed session token
  */
@@ -123,11 +189,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    const apiHost = getShopifyApiHost(shopDomain);
+
     // Fetch customer details from Shopify Admin API
     let customerDetails = null;
     if (tenant.access_token) {
       try {
-        const shopifyUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}.json`;
+        const shopifyUrl = `https://${apiHost}/admin/api/2024-01/customers/${customerId}.json`;
         console.log('🔍 Fetching customer from Shopify:', { shopifyUrl, customerId, shopDomain });
         
         const shopifyResponse = await fetch(shopifyUrl, {
@@ -228,6 +296,15 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Failed to fetch sessions' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // If customer has any active license (redeemed), ensure Shopify metafield custom.redemption_code = "True"
+    if (transformedLicenses.length > 0 && tenant.access_token) {
+      try {
+        await ensureRedemptionCodeMetafield(customerId, apiHost, tenant.access_token);
+      } catch (e) {
+        console.warn('⚠️ Could not ensure redemption_code metafield:', e);
+      }
     }
 
     console.log('✅ Customer details fetched from Shopify:', customerDetails);
