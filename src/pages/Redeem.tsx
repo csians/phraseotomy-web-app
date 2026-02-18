@@ -143,9 +143,9 @@ const RedeemCode = () => {
         // Clear the input
         setRedemptionCode("");
 
-        // Open play page in new window after successful redemption
+        // Open play page in new window after successful redemption, passing session info as query params
         setTimeout(() => {
-          const playUrl = 'https://phraseotomy.com/apps/phraseotomy';
+          const playUrl = `https://phraseotomy.com/pages/play-online?shop=${encodeURIComponent(shopDomain)}&customer_id=${encodeURIComponent(customer.id)}&customer_name=${encodeURIComponent(customer.name || customer.firstName || "")}&customer_email=${encodeURIComponent(customer.email || "")}`;
           window.open(playUrl, "_blank");
         }, 1500); // Small delay to show success message
       } else {

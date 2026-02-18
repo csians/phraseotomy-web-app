@@ -257,16 +257,20 @@ const Login = () => {
             if (isOnProxyDomain || shopParam === 'phraseotomy.com' || shopParam?.includes('phraseotomy')) {
               // Already on the proxy domain or targeting it, use React Router navigation (no page reload)
               console.log("🚀 Using React Router navigation (already authenticated on target domain)");
-              navigate("/play/host", { replace: true });
+              // Redirect to /play with query params for shop, customer_id, customer_name, customer_email
+              const playUrl = `/play?shop=${encodeURIComponent(shopParam)}&customer_id=${encodeURIComponent(customerIdParam)}&customer_name=${encodeURIComponent(customerName || "")}&customer_email=${encodeURIComponent(email || "")}`;
+              navigate(playUrl, { replace: true });
             } else if (tenant?.proxyPath && tenant?.customShopDomains?.length && window.self === window.top) {
               // Only redirect if we're NOT in an iframe (to avoid cross-origin issues)
-              const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
+              // Redirect to play page with query params
+              const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play?shop=${encodeURIComponent(shopParam)}&customer_id=${encodeURIComponent(customerIdParam)}&customer_name=${encodeURIComponent(customerName || "")}&customer_email=${encodeURIComponent(email || "")}`;
               console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
               window.location.href = proxyUrl;
             } else {
               // Default: use React Router navigation
               console.log("🚀 Navigating to play page on current domain");
-              navigate("/play/host", { replace: true });
+              const playUrl = `/play?shop=${encodeURIComponent(shopParam)}&customer_id=${encodeURIComponent(customerIdParam)}&customer_name=${encodeURIComponent(customerName || "")}&customer_email=${encodeURIComponent(email || "")}`;
+              navigate(playUrl, { replace: true });
             }
             return;
           }
