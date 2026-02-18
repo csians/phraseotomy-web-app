@@ -447,9 +447,11 @@ function generateAppHtml(
     verified: true,
   };
 
-  // Use staging domain for both environments
-  // const baseUrl = "https://phraseotomy.com/apps/phraseotomy";
-  const baseUrl = "https://phraseotomy.ourstagingserver.com";
+  // Use production URL for production tenant so iframe is same-origin with store
+  const baseUrl =
+    tenant.environment === "production"
+      ? "https://phraseotomy.com/apps/phraseotomy"
+      : "https://phraseotomy.ourstagingserver.com";
 
   // Encode configuration as URL parameters (before hash for HashRouter)
   const configParams = new URLSearchParams({

@@ -38,7 +38,7 @@ const tenants: TenantConfig[] = [
     displayName: "Phraseotomy",
     themeColor: "#FBBF24",
     appDomains: ["phraseotomy.com", "phraseotomy.ourstagingserver.com", "localhost"],
-    customShopDomains: ["qxqtbf-21.myshopify.com"], // Shopify sends this domain
+    customShopDomains: ["phraseotomy.com", "qxqtbf-21.myshopify.com"], // phraseotomy.com for redirects (user-facing)
     proxyPath: "/apps/phraseotomy", // Shopify App Proxy path
   },
 ];

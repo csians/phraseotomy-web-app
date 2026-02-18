@@ -76,19 +76,17 @@ const Login = () => {
             if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
               const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
               console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
-              if (window.self !== window.top) {
-                window.top!.location.href = proxyUrl;
-              } else {
-                window.location.href = proxyUrl;
-              }
-            } else {
-              // Staging or no proxy - stay on current domain
-              if (window.self !== window.top) {
-                window.top!.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
-              } else {
-                navigate("/play/host", { replace: true });
-              }
-            }
+              // In cross-origin iframe, window.top.location causes SecurityError.
+              // Always navigate the current frame (works in iframe and top-level).
+              window.location.href = proxyUrl;
+                    } else {
+                      // Staging or no proxy - stay on current domain (navigate frame only)
+                      if (window.self !== window.top) {
+                        window.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+                      } else {
+                        navigate("/play/host", { replace: true });
+                      }
+                    }
           })
           .finally(() => {
             setLoading(false);
@@ -427,15 +425,13 @@ const Login = () => {
                     if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
                       const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
                       console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
-                      if (window.self !== window.top) {
-                        window.top!.location.href = proxyUrl;
-                      } else {
-                        window.location.href = proxyUrl;
-                      }
+                      // In cross-origin iframe, window.top.location causes SecurityError.
+                      // Always navigate the current frame (works in iframe and top-level).
+                      window.location.href = proxyUrl;
                     } else {
                       // Staging or no proxy - stay on current domain
                       if (window.self !== window.top) {
-                        window.top!.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+                        window.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
                       } else {
                         navigate("/play/host", { replace: true });
                       }
