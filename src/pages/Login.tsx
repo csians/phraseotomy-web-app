@@ -114,6 +114,10 @@ const Login = () => {
               config.id,
             );
 
+            try {
+              localStorage.removeItem("phraseotomy_login_token");
+            } catch (_) {}
+
             // Import tenant utilities
             const { getAppUrlForShop, getTenantConfig } = await import("@/lib/tenants");
             const tenant = getTenantConfig(window.__PHRASEOTOMY_SHOP__);
@@ -315,6 +319,11 @@ const Login = () => {
               );
             }
 
+            // Remove one-time login token after successful login
+            try {
+              localStorage.removeItem("phraseotomy_login_token");
+            } catch (_) {}
+
             // Get tenant config to determine redirect URL
             const { getTenantConfig } = await import("@/lib/tenants");
             const tenant = getTenantConfig(shopParam);
@@ -491,6 +500,30 @@ const Login = () => {
                         last_name: customerData.customer?.last_name || null,
                       }),
                     );
+
+                    // Store customer in database (email/name from Shopify via get-customer-data)
+                    const { data: dbTenantForStore } = await supabase
+                      .from("tenants")
+                      .select("id, shop_domain")
+                      .eq("shop_domain", verifiedShop)
+                      .eq("is_active", true)
+                      .maybeSingle();
+                    if (dbTenantForStore) {
+                      await storeCustomerInDatabase(
+                        customerIdParam,
+                        customerData.customer?.email ?? null,
+                        customerData.customer?.name ?? null,
+                        customerData.customer?.first_name ?? null,
+                        customerData.customer?.last_name ?? null,
+                        dbTenantForStore.shop_domain,
+                        dbTenantForStore.id,
+                      );
+                    }
+
+                    // Remove one-time login token after successful login
+                    try {
+                      localStorage.removeItem("phraseotomy_login_token");
+                    } catch (_) {}
 
                     // Get tenant config to determine redirect URL
                     const { getTenantConfig } = await import("@/lib/tenants");

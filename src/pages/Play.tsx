@@ -420,18 +420,34 @@ if (existingData) {
               setTenant(mappedTenant);
               setShopDomain(dbTenant.shop_domain);
 
-              // Set customer state
+              // Prefer get-customer-data (Shopify API) for email/name so DB is not left with NULLs
+              const fromApi = customerData.customer;
               const parsedCustomerData = JSON.parse(storedCustomerData);
               const customerObj: ShopifyCustomer = {
                 id: payload.customer_id,
-                email: parsedCustomerData.email || null,
-                firstName: parsedCustomerData.first_name || null,
-                lastName: parsedCustomerData.last_name || null,
-                name: parsedCustomerData.name || null,
+                email: fromApi?.email ?? parsedCustomerData.email ?? null,
+                firstName: fromApi?.first_name ?? parsedCustomerData.first_name ?? null,
+                lastName: fromApi?.last_name ?? parsedCustomerData.last_name ?? null,
+                name: fromApi?.name ?? parsedCustomerData.name ?? null,
               };
               setCustomer(customerObj);
 
-              // Store customer in database
+              // Persist API customer data to localStorage so future loads have it
+              if (fromApi && (fromApi.email != null || fromApi.name != null)) {
+                localStorage.setItem(
+                  "customerData",
+                  JSON.stringify({
+                    customer_id: payload.customer_id,
+                    id: payload.customer_id,
+                    email: customerObj.email ?? undefined,
+                    name: customerObj.name ?? undefined,
+                    first_name: customerObj.firstName ?? undefined,
+                    last_name: customerObj.lastName ?? undefined,
+                  }),
+                );
+              }
+
+              // Store customer in database (with Shopify email/name when available)
               storeCustomerInDatabase(customerObj, dbTenant.shop_domain, dbTenant.id);
             }
 
