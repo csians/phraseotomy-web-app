@@ -221,6 +221,12 @@ if (existingData) {
     const initializeSession = async () => {
       const urlParams = getAllUrlParams();
 
+      // Name/email from URL (e.g. after login redirect) – use and store in DB, then show
+      const urlCustomerNameRaw = urlParams.get("customer_name") || urlParams.get("customerName") || "";
+      const urlCustomerEmailRaw = urlParams.get("customer_email") || urlParams.get("customerEmail") || "";
+      const urlCustomerName = urlCustomerNameRaw ? decodeURIComponent(urlCustomerNameRaw.replace(/\+/g, " ")).trim() : null;
+      const urlCustomerEmail = urlCustomerEmailRaw ? decodeURIComponent(urlCustomerEmailRaw).trim() : null;
+
       // Capture pending redeem (run after session/APIs are done, not first)
       const redeemCodeFromUrl = urlParams.get("Code") || urlParams.get("code");
       const redeemCustomerIdFromUrl = urlParams.get("CustomerId") || urlParams.get("customer_id");
@@ -256,24 +262,32 @@ if (existingData) {
         setShopDomain(window.__PHRASEOTOMY_SHOP__);
 
         if (window.__PHRASEOTOMY_CUSTOMER__) {
-          setCustomer(window.__PHRASEOTOMY_CUSTOMER__);
+          // Merge URL name/email when present (e.g. after login redirect) and update DB
+          const c = window.__PHRASEOTOMY_CUSTOMER__;
+          const urlFirstName = urlCustomerName ? urlCustomerName.split(" ")[0] : null;
+          const urlLastName = urlCustomerName ? urlCustomerName.split(" ").slice(1).join(" ") : null;
+          const mergedCustomer: ShopifyCustomer = {
+            id: c.id,
+            email: urlCustomerEmail ?? c.email ?? null,
+            name: urlCustomerName ?? c.name ?? null,
+            firstName: urlFirstName ?? c.firstName ?? null,
+            lastName: urlLastName ?? c.lastName ?? null,
+          };
+          setCustomer(mergedCustomer);
 
-          // Store customer data in localStorage for Lobby page
-          localStorage.setItem(
-            "customerData",
-            JSON.stringify({
-              customer_id: window.__PHRASEOTOMY_CUSTOMER__.id,
-              id: window.__PHRASEOTOMY_CUSTOMER__.id,
-              email: window.__PHRASEOTOMY_CUSTOMER__.email,
-              name: window.__PHRASEOTOMY_CUSTOMER__.name,
-              first_name: window.__PHRASEOTOMY_CUSTOMER__.firstName,
-              last_name: window.__PHRASEOTOMY_CUSTOMER__.lastName,
-            }),
-          );
+          const toStore = {
+            customer_id: mergedCustomer.id,
+            id: mergedCustomer.id,
+            email: mergedCustomer.email,
+            name: mergedCustomer.name,
+            first_name: mergedCustomer.firstName,
+            last_name: mergedCustomer.lastName,
+          };
+          localStorage.setItem("customerData", JSON.stringify(toStore));
 
-          // Store customer in database
+          // Store/update in database (including URL name/email when present)
           storeCustomerInDatabase(
-            window.__PHRASEOTOMY_CUSTOMER__,
+            mergedCustomer,
             window.__PHRASEOTOMY_SHOP__,
             window.__PHRASEOTOMY_CONFIG__.id,
           );
@@ -307,23 +321,32 @@ if (existingData) {
           setShopDomain(shopParam);
 
           if (customerData) {
-            setCustomer(customerData);
+            // Merge URL name/email when present and update DB
+            const urlFirstName = urlCustomerName ? urlCustomerName.split(" ")[0] : null;
+            const urlLastName = urlCustomerName ? urlCustomerName.split(" ").slice(1).join(" ") : null;
+            const mergedCustomer: ShopifyCustomer = {
+              id: customerData.id,
+              email: urlCustomerEmail ?? customerData.email ?? null,
+              name: urlCustomerName ?? customerData.name ?? null,
+              firstName: urlFirstName ?? customerData.firstName ?? null,
+              lastName: urlLastName ?? customerData.lastName ?? null,
+            };
+            setCustomer(mergedCustomer);
 
-            // Store customer data in localStorage for Lobby page
             localStorage.setItem(
               "customerData",
               JSON.stringify({
-                customer_id: customerData.id,
-                id: customerData.id,
-                email: customerData.email,
-                name: customerData.name,
-                first_name: customerData.firstName,
-                last_name: customerData.lastName,
+                customer_id: mergedCustomer.id,
+                id: mergedCustomer.id,
+                email: mergedCustomer.email,
+                name: mergedCustomer.name,
+                first_name: mergedCustomer.firstName,
+                last_name: mergedCustomer.lastName,
               }),
             );
 
-            // Store customer in database
-            storeCustomerInDatabase(customerData, shopParam, tenantConfig.id);
+            // Store/update in database (including URL name/email when present)
+            storeCustomerInDatabase(mergedCustomer, shopParam, tenantConfig.id);
           }
 
           // Redeem last: after all APIs
@@ -420,20 +443,23 @@ if (existingData) {
               setTenant(mappedTenant);
               setShopDomain(dbTenant.shop_domain);
 
-              // Prefer get-customer-data (Shopify API) for email/name so DB is not left with NULLs
+              // Prefer URL (post-login) then get-customer-data then localStorage for email/name – store in DB and show
               const fromApi = customerData.customer;
               const parsedCustomerData = JSON.parse(storedCustomerData);
+              const urlFirstName = urlCustomerName ? urlCustomerName.split(" ")[0] : null;
+              const urlLastName = urlCustomerName ? urlCustomerName.split(" ").slice(1).join(" ") : null;
               const customerObj: ShopifyCustomer = {
                 id: payload.customer_id,
-                email: fromApi?.email ?? parsedCustomerData.email ?? null,
-                firstName: fromApi?.first_name ?? parsedCustomerData.first_name ?? null,
-                lastName: fromApi?.last_name ?? parsedCustomerData.last_name ?? null,
-                name: fromApi?.name ?? parsedCustomerData.name ?? null,
+                email: urlCustomerEmail ?? fromApi?.email ?? parsedCustomerData.email ?? null,
+                firstName: urlFirstName ?? fromApi?.first_name ?? parsedCustomerData.first_name ?? null,
+                lastName: urlLastName ?? fromApi?.last_name ?? parsedCustomerData.last_name ?? null,
+                name: urlCustomerName ?? fromApi?.name ?? parsedCustomerData.name ?? null,
               };
               setCustomer(customerObj);
 
-              // Persist API customer data to localStorage so future loads have it
-              if (fromApi && (fromApi.email != null || fromApi.name != null)) {
+              // Persist to localStorage and DB when we have name/email (from URL, API, or existing)
+              const hasCustomerInfo = customerObj.email != null || customerObj.name != null;
+              if (hasCustomerInfo) {
                 localStorage.setItem(
                   "customerData",
                   JSON.stringify({
@@ -447,7 +473,7 @@ if (existingData) {
                 );
               }
 
-              // Store customer in database (with Shopify email/name when available)
+              // Store/update customer in database (URL name/email then API then localStorage – so DB is always updated)
               storeCustomerInDatabase(customerObj, dbTenant.shop_domain, dbTenant.id);
             }
 
