@@ -33,6 +33,40 @@ async function generateAndStoreSessionToken(customerId: string, shopDomain: stri
   }
 }
 
+/**
+ * Store or update customer in the database (so entry exists regardless of redirect/origin).
+ */
+async function storeCustomerInDatabase(
+  customerId: string,
+  customerEmail: string | null,
+  customerName: string | null,
+  firstName: string | null,
+  lastName: string | null,
+  shopDomain: string,
+  tenantId: string
+): Promise<void> {
+  try {
+    const { error } = await supabase.functions.invoke("store-customer", {
+      body: {
+        customer_id: customerId,
+        customer_email: customerEmail ?? undefined,
+        customer_name: customerName ?? undefined,
+        first_name: firstName ?? undefined,
+        last_name: lastName ?? undefined,
+        shop_domain: shopDomain,
+        tenant_id: tenantId,
+      },
+    });
+    if (error) {
+      console.error("Error storing customer on login:", error);
+    } else {
+      console.log("✅ Customer stored/updated in database on login");
+    }
+  } catch (error) {
+    console.error("Error calling store-customer:", error);
+  }
+}
+
 const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -68,6 +102,18 @@ const Login = () => {
         // Generate session token and redirect appropriately
         generateAndStoreSessionToken(customerData.id, window.__PHRASEOTOMY_SHOP__)
           .then(async () => {
+            // Store customer in database before redirect (so entry exists even after cross-origin redirect)
+            const config = window.__PHRASEOTOMY_CONFIG__!;
+            await storeCustomerInDatabase(
+              customerData.id,
+              customerData.email ?? null,
+              customerData.name ?? null,
+              customerData.firstName ?? null,
+              customerData.lastName ?? null,
+              config.shop_domain,
+              config.id,
+            );
+
             // Import tenant utilities
             const { getAppUrlForShop, getTenantConfig } = await import("@/lib/tenants");
             const tenant = getTenantConfig(window.__PHRASEOTOMY_SHOP__);
@@ -224,16 +270,42 @@ const Login = () => {
               });
 
               // Update with fetched data if available
+              const mergedEmail = customerData.customer?.email || email;
+              const mergedName = customerData.customer?.name || customerName;
+              const mergedFirstName = customerData.customer?.first_name || firstName;
+              const mergedLastName = customerData.customer?.last_name || lastName;
               localStorage.setItem(
                 "customerData",
                 JSON.stringify({
                   customer_id: customerIdParam,
                   id: customerIdParam,
-                  email: customerData.customer?.email || email,
-                  name: customerData.customer?.name || customerName,
-                  first_name: customerData.customer?.first_name || firstName,
-                  last_name: customerData.customer?.last_name || lastName,
+                  email: mergedEmail,
+                  name: mergedName,
+                  first_name: mergedFirstName,
+                  last_name: mergedLastName,
                 }),
+              );
+
+              // Store customer in database on login (so entry exists even if redirect loses localStorage)
+              await storeCustomerInDatabase(
+                customerIdParam,
+                mergedEmail,
+                mergedName,
+                mergedFirstName,
+                mergedLastName,
+                dbTenant.shop_domain,
+                dbTenant.id,
+              );
+            } else {
+              // No get-customer-data; store with URL params only so we still create/update the row
+              await storeCustomerInDatabase(
+                customerIdParam,
+                email,
+                customerName,
+                firstName,
+                lastName,
+                dbTenant.shop_domain,
+                dbTenant.id,
               );
             }
 
