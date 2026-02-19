@@ -175,19 +175,20 @@ if (existingData) {
   }
 };
 
-  // Store customer in database on first login
+  // Store customer in database on first login (send URL/API name and email so Supabase is updated)
   const storeCustomerInDatabase = async (customerData: ShopifyCustomer, shopDomain: string, tenantId: string) => {
     try {
+      const body = {
+        customer_id: customerData.id,
+        shop_domain: shopDomain,
+        tenant_id: tenantId,
+        customer_email: customerData.email != null && customerData.email !== "" ? customerData.email : null,
+        customer_name: customerData.name != null && customerData.name !== "" ? customerData.name : null,
+        first_name: customerData.firstName != null && customerData.firstName !== "" ? customerData.firstName : null,
+        last_name: customerData.lastName != null && customerData.lastName !== "" ? customerData.lastName : null,
+      };
       const { data, error } = await supabase.functions.invoke("store-customer", {
-        body: {
-          customer_id: customerData.id,
-          customer_email: customerData.email,
-          customer_name: customerData.name,
-          first_name: customerData.firstName,
-          last_name: customerData.lastName,
-          shop_domain: shopDomain,
-          tenant_id: tenantId,
-        },
+        body,
       });
 
       if (error) {

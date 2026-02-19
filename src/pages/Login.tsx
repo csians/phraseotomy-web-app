@@ -49,12 +49,12 @@ async function storeCustomerInDatabase(
     const { error } = await supabase.functions.invoke("store-customer", {
       body: {
         customer_id: customerId,
-        customer_email: customerEmail ?? undefined,
-        customer_name: customerName ?? undefined,
-        first_name: firstName ?? undefined,
-        last_name: lastName ?? undefined,
         shop_domain: shopDomain,
         tenant_id: tenantId,
+        customer_email: customerEmail != null && customerEmail !== "" ? customerEmail : null,
+        customer_name: customerName != null && customerName !== "" ? customerName : null,
+        first_name: firstName != null && firstName !== "" ? firstName : null,
+        last_name: lastName != null && lastName !== "" ? lastName : null,
       },
     });
     if (error) {

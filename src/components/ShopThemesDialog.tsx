@@ -268,10 +268,10 @@ export function ShopThemesDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
-            Shop Additional Themes
+            Unlock Additional Themes
           </DialogTitle>
           <DialogDescription>
-            Purchase themes not included in your current pack
+            Unlock themes not included in your current pack
           </DialogDescription>
         </DialogHeader>
         

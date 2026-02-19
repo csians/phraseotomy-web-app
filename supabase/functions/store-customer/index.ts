@@ -83,23 +83,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If found by customer_id, customer already exists - update if email/name changed
+    // If found by customer_id, customer already exists - update when email/name provided (e.g. from URL)
     if (existingCustomer) {
       console.log('✅ Customer already exists:', customer_id);
       
-      // Update customer data if email or name is provided and different
       const updateData: any = {};
-      if (customer_email && customer_email !== existingCustomer.customer_email) {
-        updateData.customer_email = customer_email;
+      const hasEmail = customer_email != null && String(customer_email).trim() !== '';
+      const hasName = customer_name != null && String(customer_name).trim() !== '';
+      const hasFirst = first_name != null && String(first_name).trim() !== '';
+      const hasLast = last_name != null && String(last_name).trim() !== '';
+      if (hasEmail) {
+        updateData.customer_email = String(customer_email).trim();
       }
-      if (customer_name) {
-        updateData.customer_name = customer_name;
+      if (hasName) {
+        updateData.customer_name = String(customer_name).trim();
       }
-      if (first_name) {
-        updateData.first_name = first_name;
+      if (hasFirst) {
+        updateData.first_name = String(first_name).trim();
       }
-      if (last_name) {
-        updateData.last_name = last_name;
+      if (hasLast) {
+        updateData.last_name = String(last_name).trim();
       }
       
       // Update environment-specific customer_id if not already set
