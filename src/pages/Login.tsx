@@ -72,21 +72,19 @@ const Login = () => {
             const { getAppUrlForShop, getTenantConfig } = await import("@/lib/tenants");
             const tenant = getTenantConfig(window.__PHRASEOTOMY_SHOP__);
 
-            // For production with Shopify proxy, redirect to proxy URL
-            if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
-              const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
-              console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
-              // In cross-origin iframe, window.top.location causes SecurityError.
-              // Always navigate the current frame (works in iframe and top-level).
-              window.top.location.href = proxyUrl;
-                    } else {
-                      // Staging or no proxy - stay on current domain (navigate frame only)
-                      if (window.self !== window.top) {
-                        window.top.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
-                      } else {
-                        navigate("/play/host", { replace: true });
-                      }
-                    }
+            // For production: full-page redirect to play-online (no #/play/host in URL)
+            if (tenant?.customShopDomains?.length) {
+              const playOnlineUrl = `https://${tenant.customShopDomains[0]}/pages/play-online`;
+              console.log("🚀 Redirecting to play-online (top window):", playOnlineUrl);
+              window.top!.location.href = playOnlineUrl;
+            } else {
+              // Staging or no proxy - stay on current domain
+              if (window.self !== window.top) {
+                window.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+              } else {
+                navigate("/play/host", { replace: true });
+              }
+            }
           })
           .finally(() => {
             setLoading(false);
@@ -258,12 +256,11 @@ const Login = () => {
               // Redirect to /play with query params for shop, customer_id, customer_name, customer_email
               const playUrl = `/play?shop=${encodeURIComponent(shopParam)}&customer_id=${encodeURIComponent(customerIdParam)}&customer_name=${encodeURIComponent(customerName || "")}&customer_email=${encodeURIComponent(email || "")}`;
               navigate(playUrl, { replace: true });
-            } else if (tenant?.proxyPath && tenant?.customShopDomains?.length && window.self === window.top) {
-              // Only redirect if we're NOT in an iframe (to avoid cross-origin issues)
-              // Redirect to play page with query params
-              const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play?shop=${encodeURIComponent(shopParam)}&customer_id=${encodeURIComponent(customerIdParam)}&customer_name=${encodeURIComponent(customerName || "")}&customer_email=${encodeURIComponent(email || "")}`;
-              console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
-              window.top.location.href = proxyUrl;
+            } else if (tenant?.customShopDomains?.length && window.self === window.top) {
+              // Full-page redirect to play-online with params (no #/play/host in URL)
+              const playOnlineUrl = `https://${tenant.customShopDomains[0]}/pages/play-online?shop=${encodeURIComponent(shopParam)}&customer_id=${encodeURIComponent(customerIdParam)}&customer_name=${encodeURIComponent(customerName || "")}&customer_email=${encodeURIComponent(email || "")}`;
+              console.log("🚀 Redirecting to play-online:", playOnlineUrl);
+              window.top.location.href = playOnlineUrl;
             } else {
               // Default: use React Router navigation
               console.log("🚀 Navigating to play page on current domain");
@@ -421,17 +418,15 @@ const Login = () => {
                     const { getTenantConfig } = await import("@/lib/tenants");
                     const tenant = getTenantConfig(verifiedShop);
 
-                    // For production with Shopify proxy, redirect to proxy URL
-                    if (tenant?.proxyPath && tenant?.customShopDomains?.length) {
-                      const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play/host`;
-                      console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
-                      // In cross-origin iframe, window.top.location causes SecurityError.
-                      // Always navigate the current frame (works in iframe and top-level).
-                      window.top.location.href = proxyUrl;
+                    // For production: full-page redirect to play-online (no #/play/host in URL)
+                    if (tenant?.customShopDomains?.length) {
+                      const playOnlineUrl = `https://${tenant.customShopDomains[0]}/pages/play-online`;
+                      console.log("🚀 Redirecting to play-online (top window):", playOnlineUrl);
+                      window.top!.location.href = playOnlineUrl;
                     } else {
                       // Staging or no proxy - stay on current domain
                       if (window.self !== window.top) {
-                        window.top.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+                        window.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
                       } else {
                         navigate("/play/host", { replace: true });
                       }
