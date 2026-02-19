@@ -78,11 +78,11 @@ const Login = () => {
               console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
               // In cross-origin iframe, window.top.location causes SecurityError.
               // Always navigate the current frame (works in iframe and top-level).
-              window.location.href = proxyUrl;
+              window.top.location.href = proxyUrl;
                     } else {
                       // Staging or no proxy - stay on current domain (navigate frame only)
                       if (window.self !== window.top) {
-                        window.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+                        window.top.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
                       } else {
                         navigate("/play/host", { replace: true });
                       }
@@ -263,7 +263,7 @@ const Login = () => {
               // Redirect to play page with query params
               const proxyUrl = `https://${tenant.customShopDomains[0]}${tenant.proxyPath}#/play?shop=${encodeURIComponent(shopParam)}&customer_id=${encodeURIComponent(customerIdParam)}&customer_name=${encodeURIComponent(customerName || "")}&customer_email=${encodeURIComponent(email || "")}`;
               console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
-              window.location.href = proxyUrl;
+              window.top.location.href = proxyUrl;
             } else {
               // Default: use React Router navigation
               console.log("🚀 Navigating to play page on current domain");
@@ -427,11 +427,11 @@ const Login = () => {
                       console.log("🚀 Redirecting to Shopify proxy URL:", proxyUrl);
                       // In cross-origin iframe, window.top.location causes SecurityError.
                       // Always navigate the current frame (works in iframe and top-level).
-                      window.location.href = proxyUrl;
+                      window.top.location.href = proxyUrl;
                     } else {
                       // Staging or no proxy - stay on current domain
                       if (window.self !== window.top) {
-                        window.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+                        window.top.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
                       } else {
                         navigate("/play/host", { replace: true });
                       }
@@ -529,7 +529,7 @@ const Login = () => {
           if (window.self !== window.top) {
             window.top!.location.href = data.loginUrl;
           } else {
-            window.location.href = data.loginUrl;
+            window.top.location.href = data.loginUrl;
           }
         }
       }

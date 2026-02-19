@@ -231,7 +231,7 @@ const Play = () => {
           // Success - redirect to Shopify app page
           console.log('✅ Redeem code successful:', redeemResult.message);
           // window.location.href = 'https://phraseotomy.com/apps/phraseotomy';
-          window.location.href = 'https://phraseotomy.com/pages/play-online';
+          window.top.location.href = 'https://phraseotomy.com/pages/play-online';
           return;
         } catch (error) {
           console.error('❌ Error processing redeem code:', error);

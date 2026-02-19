@@ -114,7 +114,8 @@ const RootRedirect = () => {
       window.location.href.includes('admin.shopify.com');
     
     // Check if accessed via Shopify proxy path
-    const isProxyPath = window.location.pathname.includes('/apps/phraseotomy');
+    console.log('root redirect pathname');
+    const isProxyPath = window.location.pathname.includes('/pages/play-online');
     
     // Check for embedded customer data from iframe
     const customerData = window.__PHRASEOTOMY_CUSTOMER__;

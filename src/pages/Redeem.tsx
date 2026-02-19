@@ -205,7 +205,7 @@ const RedeemCode = () => {
               <Button
                 onClick={() => {
                   // Redirect to phraseotomy.com login page
-                  window.location.href = "https://phraseotomy.com/#/login";
+                  window.top.location.href = "https://phraseotomy.com/#/login";
                 }}
                 className="w-full"
                 size="lg"
