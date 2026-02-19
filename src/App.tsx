@@ -71,6 +71,22 @@ const queryClient = new QueryClient();
     sessionStorage.setItem('phraseotomy_url_code', normalizedCode);
   }
 
+  // If this is a redeem-code flow (Code + customer + shop_domain),
+  // don't clean the URL here – Play.tsx needs these params intact
+  const hasRedeemParams =
+    !!codeParam &&
+    !!shopDomainParam &&
+    !!(
+      manualParams.get('CustomerId') ||
+      manualParams.get('customer_id') ||
+      url.searchParams.get('CustomerId') ||
+      url.searchParams.get('customer_id')
+    );
+  if (hasRedeemParams) {
+    console.log('🎟️ [APP] Redeem flow detected, skipping URL clean so Play.tsx can process params directly');
+    return;
+  }
+
   // Check if we're in Shopify Admin context
   const isShopifyAdmin = hostParam || window.location.href.includes('admin.shopify.com');
   if (isShopifyAdmin) {
