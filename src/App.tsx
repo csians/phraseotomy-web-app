@@ -154,8 +154,9 @@ const RootRedirect = () => {
     const redeemCustomerId = urlParams.get('CustomerId') || urlParams.get('customer_id');
     const redeemShopDomain = urlParams.get('shop_domain');
     if (redeemCodeParam && redeemCustomerId && redeemShopDomain) {
-      console.log('🎟️ [APP] Redeem flow detected in RootRedirect, sending to /play');
-      setRedirectTarget('/play');
+      console.log('🎟️ [APP] Redeem flow detected in RootRedirect, sending to /play/host');
+      // Play page is mounted at /play/host in the HashRouter
+      setRedirectTarget('/play/host');
       return;
     }
     

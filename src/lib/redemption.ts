@@ -27,7 +27,12 @@ export function redirectToShopifyWithError(errorMessage: string): void {
     response: errorMessage,
     url: redirectUrl,
   });
-  window.location.href = redirectUrl;
+  // Use top-level navigation so the whole page (not just iframe) goes to Account
+  if (window.top) {
+    window.top.location.href = redirectUrl;
+  } else {
+    window.location.href = redirectUrl;
+  }
 }
 
 /**
