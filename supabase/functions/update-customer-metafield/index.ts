@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 /**
- * Update customer metafield in Shopify Admin API
+ * Update customer license/theme metafield in Shopify Admin API
  */
 async function updateShopifyCustomerMetafield(
   customerId: string,
@@ -90,6 +90,69 @@ async function updateShopifyCustomerMetafield(
   }
 }
 
+/**
+ * Ensure custom.redemption_code metafield is set to "True" for this customer.
+ * This mirrors the behaviour in get-customer-data so that assigning a code
+ * from the admin also marks the customer as having redemption enabled.
+ */
+async function ensureRedemptionCodeMetafield(
+  customerId: string,
+  shopDomain: string,
+  accessToken: string
+): Promise<void> {
+  const getUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields.json`;
+  const getRes = await fetch(getUrl, {
+    method: 'GET',
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!getRes.ok) {
+    console.warn('⚠️ Failed to fetch metafields for redemption_code check (admin assign):', getRes.status);
+    return;
+  }
+
+  const { metafields } = await getRes.json();
+  const existing = metafields?.find((mf: any) => mf.namespace === 'custom' && mf.key === 'redemption_code');
+
+  if (existing && existing.value === 'True') {
+    return;
+  }
+
+  const body = {
+    metafield: {
+      namespace: 'custom',
+      key: 'redemption_code',
+      value: 'True',
+      type: 'single_line_text_field',
+    },
+  };
+
+  const url = existing
+    ? `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields/${existing.id}.json`
+    : `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields.json`;
+  const method = existing ? 'PUT' : 'POST';
+
+  const updateRes = await fetch(url, {
+    method,
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!updateRes.ok) {
+    const errText = await updateRes.text();
+    console.warn('⚠️ Failed to set redemption_code metafield (admin assign):', updateRes.status, errText);
+    return;
+  }
+
+  console.log('✅ [admin assign] Set customer metafield custom.redemption_code = True');
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -148,7 +211,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 1️⃣ Update Shopify metafield
+    // 1️⃣ Update Shopify metafield for license/theme codes
     await updateShopifyCustomerMetafield(
       customerId,
       code,
@@ -156,6 +219,11 @@ Deno.serve(async (req) => {
       accessToken,
       type
     );
+
+    // 1b️⃣ For license codes, also ensure custom.redemption_code = "True"
+    if (type === 'license') {
+      await ensureRedemptionCodeMetafield(customerId, shopDomain, accessToken);
+    }
 
     // 2️⃣ 🔥 UPDATE DATABASE (THIS WAS MISSING)
     if (type === 'theme') {
