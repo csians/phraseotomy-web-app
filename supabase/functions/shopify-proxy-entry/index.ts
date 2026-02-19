@@ -450,7 +450,7 @@ function generateAppHtml(
   // Use production URL for production tenant so iframe is same-origin with store
   const baseUrl =
     tenant.environment === "production"
-      ? "https://phraseotomy.com/apps/phraseotomy"
+      ? "https://phraseotomy.com/pages/play-online"
       : "https://phraseotomy.ourstagingserver.com";
 
   // Encode configuration as URL parameters (before hash for HashRouter)
