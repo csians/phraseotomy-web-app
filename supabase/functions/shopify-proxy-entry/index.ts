@@ -354,7 +354,7 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: 
   // Choose base URL based on tenant environment
   const baseUrl =
     tenant.environment === "production"
-      ? "https://phraseotomy.com/apps/phraseotomy"
+      ? "https://phraseotomy.com/pages/play-online"
       : "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
   #header-group,.header-group, footer, header {
