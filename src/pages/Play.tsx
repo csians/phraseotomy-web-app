@@ -43,7 +43,7 @@ const Play = () => {
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
   const [showShopThemesDialog, setShowShopThemesDialog] = useState(false);
   const [nameAutoSaveAttempted, setNameAutoSaveAttempted] = useState(false);
-
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
 
   // Code from URL, console, or sessionStorage (set by App.tsx before URL was cleaned)
@@ -99,63 +99,81 @@ const Play = () => {
 
 
   // Fetch customer data and update state
-  const fetchAndSetCustomerData = async (customerId: string, shopDomain: string) => {
-    try {
-      const customerData = await getCustomerData(customerId, shopDomain);
+  // const fetchAndSetCustomerData = async (customerId: string, shopDomain: string) => {
+  //   try {
+  //     const customerData = await getCustomerData(customerId, shopDomain);
 
-    } catch (error) {
-      console.error("Error fetching customer data after name update:", error);
-    }
-  };
+  //     if (customerData?.customer) {
+  //       setCustomer(prev => {
+  //         if (!prev) return prev;
+
+  //         return {
+  //           id: customerData.customer.id,
+  //           email: customerData.customer.email ?? prev.email ?? null,
+  //           name: customerData.customer.name ?? prev.name ?? null,
+  //           firstName: customerData.customer.first_name ?? prev.firstName ?? null,
+  //           lastName: customerData.customer.last_name ?? prev.lastName ?? null,
+  //         };
+  //       });
+  //     }
+
+  //   } catch (error) {
+  //     console.error("Error fetching customer data after name update:", error);
+  //   }
+  // };
 
   // Auto-save name from email without showing dialog
-  const autoSaveNameFromEmail = async (customerData: ShopifyCustomer, shopDomain: string) => {
-    if (!customerData.email) return;
+ const autoSaveNameFromEmail = async (customerData: ShopifyCustomer, shopDomain: string) => {
+  if (!customerData.email) return;
 
-    const extractedName = extractNameFromEmail(customerData.email);
-    if (!extractedName || extractedName.length < 2) return;
+  const extractedName = extractNameFromEmail(customerData.email);
+  if (!extractedName || extractedName.length < 2) return;
 
-    try {
-      const { data, error } = await supabase.functions.invoke("update-customer-name", {
-        body: {
-          customer_id: customerData.id,
-          customer_name: extractedName,
-          shop_domain: shopDomain,
-        },
-      });
+  try {
+    setIsUpdatingName(true); // 🔥 START BLOCKING FETCH
 
-      if (error || data?.error) {
-        console.error("Error auto-saving name:", error || data?.error);
-        return;
-      }
+    const { data, error } = await supabase.functions.invoke("update-customer-name", {
+      body: {
+        customer_id: customerData.id,
+        customer_name: extractedName,
+        shop_domain: shopDomain,
+      },
+    });
 
-      // Update customer state with new name (optimistic)
-      const nameParts = extractedName.split(" ");
-      setCustomer({
-        ...customerData,
+    if (error || data?.error) {
+      console.error("Error auto-saving name:", error || data?.error);
+      return;
+    }
+
+    const nameParts = extractedName.split(" ");
+
+    setCustomer(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
         name: extractedName,
         firstName: nameParts[0],
         lastName: nameParts.slice(1).join(" ") || null,
-      });
+      };
+    });
+    const existingData = localStorage.getItem("customerData");
+if (existingData) {
+  const parsed = JSON.parse(existingData);
+  parsed.name = extractedName;
+  parsed.first_name = nameParts[0];
+  parsed.last_name = nameParts.slice(1).join(" ") || null;
+  localStorage.setItem("customerData", JSON.stringify(parsed));
+}
 
-      // Update localStorage with new name
-      const existingData = localStorage.getItem("customerData");
-      if (existingData) {
-        const parsed = JSON.parse(existingData);
-        parsed.name = extractedName;
-        parsed.first_name = nameParts[0];
-        parsed.last_name = nameParts.slice(1).join(" ") || null;
-        localStorage.setItem("customerData", JSON.stringify(parsed));
-      }
+    
+    console.log("✅ Name auto-saved from email:", extractedName);
 
-      // Re-fetch customer data from backend to ensure UI is up-to-date
-      await fetchAndSetCustomerData(customerData.id, shopDomain);
-
-      console.log("✅ Name auto-saved from email:", extractedName);
-    } catch (error) {
-      console.error("Error auto-saving name:", error);
-    }
-  };
+  } catch (error) {
+    console.error("Error auto-saving name:", error);
+  } finally {
+    setIsUpdatingName(false); // 🔥 ALLOW FETCH AGAIN
+  }
+};
 
   // Store customer in database on first login
   const storeCustomerInDatabase = async (customerData: ShopifyCustomer, shopDomain: string, tenantId: string) => {
@@ -425,7 +443,7 @@ const Play = () => {
 
   // Load customer data when logged in (use get-customer-data so licenses match session and show correct packs)
   useEffect(() => {
-    if (!loading && customer?.id && shopDomain) {
+if (!loading && customer?.id && shopDomain && !isUpdatingName) {
       const fetchCustomerData = async () => {
         setDataLoading(true);
         try {
@@ -456,14 +474,26 @@ const Play = () => {
             if (customerData.customer) {
               setCustomer(prev => {
                 if (!prev) return prev;
+
                 return {
                   id: customerData.customer.id,
                   email: customerData.customer.email ?? prev.email ?? null,
-                  name: customerData.customer.name ?? prev.name ?? null,
+
+                  // 🔥 Only overwrite name if backend actually has one
+                  name:
+                    customerData.customer.name && customerData.customer.name.trim().length > 0
+                      ? customerData.customer.name
+                      : prev.name,
+
                   firstName:
-                    customerData.customer.first_name ?? prev.firstName ?? null,
+                    customerData.customer.first_name && customerData.customer.first_name.trim().length > 0
+                      ? customerData.customer.first_name
+                      : prev.firstName,
+
                   lastName:
-                    customerData.customer.last_name ?? prev.lastName ?? null,
+                    customerData.customer.last_name && customerData.customer.last_name.trim().length > 0
+                      ? customerData.customer.last_name
+                      : prev.lastName,
                 };
               });
             }
@@ -471,36 +501,36 @@ const Play = () => {
             setSessions(customerData.sessions || []);
           }
 
-        // Parse and set unlocked themes
-        if (Array.isArray(customerThemes)) {
-          // Flatten and extract theme info
-          const themes: { id: string; name: string; is_core: boolean }[] = [];
-          customerThemes.forEach((themeCode: any) => {
-            const themeCodeThemes = themeCode.theme_codes?.theme_code_themes || [];
-            themeCodeThemes.forEach((tt: any) => {
-              if (tt.themes) {
-                themes.push({
-                  id: tt.themes.id,
-                  name: tt.themes.name,
-                  is_core: tt.themes.is_core,
-                });
-              }
+          // Parse and set unlocked themes
+          if (Array.isArray(customerThemes)) {
+            // Flatten and extract theme info
+            const themes: { id: string; name: string; is_core: boolean }[] = [];
+            customerThemes.forEach((themeCode: any) => {
+              const themeCodeThemes = themeCode.theme_codes?.theme_code_themes || [];
+              themeCodeThemes.forEach((tt: any) => {
+                if (tt.themes) {
+                  themes.push({
+                    id: tt.themes.id,
+                    name: tt.themes.name,
+                    is_core: tt.themes.is_core,
+                  });
+                }
+              });
             });
-          });
-          // Remove duplicates by id
-          const uniqueThemes = Array.from(new Map(themes.map(t => [t.id, t])).values());
-          setUnlockedThemes(uniqueThemes);
+            // Remove duplicates by id
+            const uniqueThemes = Array.from(new Map(themes.map(t => [t.id, t])).values());
+            setUnlockedThemes(uniqueThemes);
+          }
+        } catch (error) {
+          console.error("Error loading customer data:", error);
+        } finally {
+          setDataLoading(false);
         }
-      } catch (error) {
-        console.error("Error loading customer data:", error);
-      } finally {
-        setDataLoading(false);
-      }
-    };
+      };
 
-    fetchCustomerData();
-  }
-}, [loading, customer?.id, shopDomain]);
+      fetchCustomerData();
+    }
+  }, [loading, customer?.id, shopDomain, isUpdatingName]);
   const handleJoinGame = async () => {
     if (isJoining) return; // Prevent multiple submissions
     setIsJoining(true);
@@ -682,7 +712,7 @@ const Play = () => {
 
   return (
     <div className="min-h-screen-safe bg-game-black flex flex-col">
-      {/* <Header /> */}
+      <Header />
       <div className="flex-1 flex flex-col items-center justify-between px-4 py-8 pb-safe">
 
         {/* Redeem Code Dialog */}
@@ -736,11 +766,11 @@ const Play = () => {
         <div className="w-full max-w-2xl space-y-5">
           {/* Welcome message */}
           <div className="text-center flex items-center justify-center gap-6">
-            <h2 className="text-xl font-bold text-white">Welcome, {customer?.name ?? customer?.email ?? "Player"}!</h2>
+            <h2 className="text-xl font-bold text-white">Welcome, {customer?.name?.trim() ? customer.name : customer?.email || "Player"}!</h2>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               Logout
             </Button>
-          </div> 
+          </div>
           {/*PLAY ONLINE */}
           {/* <div className="w-full max-w-2xl pt-8">
             <Card className="bg-card border-game-gray">
@@ -759,11 +789,11 @@ const Play = () => {
 
 
           {/* Your Packs Card */}
-           <Card className="bg-card border-game-gray">
+          <Card className="bg-card border-game-gray">
             {/* <CardHeader>
               <CardTitle className="text-lg">Your Packs</CardTitle>
             </CardHeader>  */}
-        
+
             <CardContent className="space-y-4">
               {dataLoading ? (
                 <div className="space-y-2">
@@ -830,7 +860,7 @@ const Play = () => {
                 </>
               )}
             </CardContent>
-          </Card> 
+          </Card>
 
           {/* Host New Game */}
           <Card className="bg-card border-game-gray">
