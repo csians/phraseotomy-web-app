@@ -30,10 +30,36 @@ const queryClient = new QueryClient();
   const searchStr = window.location.search;
   const manualParams = new URLSearchParams(searchStr);
   
-  const shop = manualParams.get('shop') || url.searchParams.get('shop');
-  const customer_id = manualParams.get('customer_id') || url.searchParams.get('customer_id');
-  const customer_email = manualParams.get('customer_email') || url.searchParams.get('customer_email');
-  const customer_name = manualParams.get('customer_name') || url.searchParams.get('customer_name');
+  // Normalize shop / customer param names coming from Shopify
+  const shop =
+    manualParams.get('shop') ||
+    url.searchParams.get('shop') ||
+    manualParams.get('shop_domain') ||
+    url.searchParams.get('shop_domain');
+
+  const customer_id =
+    manualParams.get('customer_id') ||
+    url.searchParams.get('customer_id') ||
+    manualParams.get('CustomerId') ||
+    manualParams.get('customerId') ||
+    url.searchParams.get('CustomerId') ||
+    url.searchParams.get('customerId');
+
+  const customer_email =
+    manualParams.get('customer_email') ||
+    url.searchParams.get('customer_email') ||
+    manualParams.get('customerEmail') ||
+    manualParams.get('CustomerEmail') ||
+    url.searchParams.get('customerEmail') ||
+    url.searchParams.get('CustomerEmail');
+
+  const customer_name =
+    manualParams.get('customer_name') ||
+    url.searchParams.get('customer_name') ||
+    manualParams.get('customerName') ||
+    manualParams.get('CustomerName') ||
+    url.searchParams.get('customerName') ||
+    url.searchParams.get('CustomerName');
   const rToken = manualParams.get('r') || url.searchParams.get('r');
   const hostParam = manualParams.get('host') || url.searchParams.get('host');
   const codeParam = manualParams.get('Code') || manualParams.get('code') || url.searchParams.get('Code') || url.searchParams.get('code');
