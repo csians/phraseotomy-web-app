@@ -38,6 +38,9 @@ verify_jwt = false
 [functions.get-customer-metafields]
 verify_jwt = false
 
+[functions.get-customer-from-shopify]
+verify_jwt = false
+
 [functions.update-customer-metafield]
 verify_jwt = false
 

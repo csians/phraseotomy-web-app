@@ -10,6 +10,18 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// Custom domains must resolve to *.myshopify.com for Admin API (avoid phraseotomy.com.myshopify.com / HandshakeFailure)
+const CUSTOM_DOMAIN_TO_MYSHOPIFY: Record<string, string> = {
+  'phraseotomy.com': 'qxqtbf-21.myshopify.com',
+  'phraseotomy.ourstagingserver.com': 'testing-cs-store.myshopify.com',
+};
+
+function getShopifyApiHost(shopDomain: string): string {
+  const normalized = (shopDomain || '').trim().toLowerCase();
+  if (normalized.endsWith('.myshopify.com')) return normalized;
+  return CUSTOM_DOMAIN_TO_MYSHOPIFY[normalized] || normalized;
+}
+
 interface CustomerMetafield {
   id: string;
   namespace: string;
@@ -26,8 +38,8 @@ async function fetchShopifyCustomerMetafields(
   shopDomain: string,
   accessToken: string
 ): Promise<CustomerMetafield[]> {
-  const shop = shopDomain.replace('.myshopify.com', '');
-  const url = `https://${shop}.myshopify.com/admin/api/2024-01/customers/${customerId}/metafields.json`;
+  const apiHost = getShopifyApiHost(shopDomain);
+  const url = `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields.json`;
 
   try {
     const response = await fetch(url, {

@@ -1,5 +1,40 @@
 import { supabase } from '@/integrations/supabase/client';
 
+/** Customer details as returned from Shopify (get-customer-from-shopify API) */
+export interface ShopifyCustomerDetails {
+  id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  name: string | null;
+  phone: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+/**
+ * Fetch customer details from Shopify by customer ID and shop domain.
+ * Uses Shopify Admin API only (not Supabase).
+ */
+export async function getCustomerFromShopify(
+  customerId: string,
+  shopDomain: string
+): Promise<ShopifyCustomerDetails | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('get-customer-from-shopify', {
+      body: { customerId, shopDomain },
+    });
+    if (error) {
+      console.error('Error fetching customer from Shopify:', error);
+      return null;
+    }
+    return data?.customer ?? null;
+  } catch (e) {
+    console.error('Error calling get-customer-from-shopify:', e);
+    return null;
+  }
+}
+
 export interface CustomerLicense {
   id: string;
   license_code_id: string;

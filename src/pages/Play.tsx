@@ -19,7 +19,7 @@ import {
 
 import type { TenantConfig, ShopifyCustomer } from "@/lib/types";
 import { APP_VERSION } from "@/lib/types";
-import { getCustomerData, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
+import { getCustomerData, getCustomerFromShopify, type CustomerLicense, type GameSession } from "@/lib/customerAccess";
 import { getCustomerThemes } from "@/lib/themeCodeUtils";
 import { lobbyCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
@@ -522,7 +522,7 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
           const tenantId = tenant?.id;
           const sessionToken = localStorage.getItem("phraseotomy_session_token");
 
-          const [customerDataResponse, packsData, customerThemes] = await Promise.all([
+          const [customerDataResponse, packsData, customerThemes, shopifyCustomer] = await Promise.all([
             sessionToken
               ? supabase.functions.invoke("get-customer-data", { body: { sessionToken } })
               : getCustomerData(customer.id, shopDomain).then((data) => ({ data, error: null })),
@@ -533,6 +533,7 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
                   .eq("tenant_id", tenantId)
               : Promise.resolve({ data: [], error: null }),
             getCustomerThemes(customer.id, shopDomain),
+            getCustomerFromShopify(customer.id, shopDomain),
           ]);
 
           const customerData = customerDataResponse?.data;
@@ -542,26 +543,44 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
             setAvailablePacks(packsData.data);
           }
 
-          if (!hasError && customerData) {
-            if (customerData.customer) {
-              setCustomer(prev => {
-                if (!prev) return prev;
+          // Merge customer from Shopify (get-customer-from-shopify) – single API by customer id from Shopify
+          if (shopifyCustomer) {
+            setCustomer((prev) => {
+              if (!prev) return prev;
+              return {
+                id: prev.id,
+                email: shopifyCustomer.email ?? prev.email ?? null,
+                name:
+                  shopifyCustomer.name && shopifyCustomer.name.trim().length > 0
+                    ? shopifyCustomer.name
+                    : prev.name,
+                firstName:
+                  shopifyCustomer.first_name && shopifyCustomer.first_name.trim().length > 0
+                    ? shopifyCustomer.first_name
+                    : prev.firstName,
+                lastName:
+                  shopifyCustomer.last_name && shopifyCustomer.last_name.trim().length > 0
+                    ? shopifyCustomer.last_name
+                    : prev.lastName,
+              };
+            });
+          }
 
+          if (!hasError && customerData) {
+            if (customerData.customer && !shopifyCustomer) {
+              setCustomer((prev) => {
+                if (!prev) return prev;
                 return {
                   id: customerData.customer.id,
                   email: customerData.customer.email ?? prev.email ?? null,
-
-                  // 🔥 Only overwrite name if backend actually has one
                   name:
                     customerData.customer.name && customerData.customer.name.trim().length > 0
                       ? customerData.customer.name
                       : prev.name,
-
                   firstName:
                     customerData.customer.first_name && customerData.customer.first_name.trim().length > 0
                       ? customerData.customer.first_name
                       : prev.firstName,
-
                   lastName:
                     customerData.customer.last_name && customerData.customer.last_name.trim().length > 0
                       ? customerData.customer.last_name
