@@ -216,48 +216,39 @@ if (existingData) {
   };
 
   // Initialize from localStorage and verify session
+  // Order: run all APIs first (session, store customer, etc.), then redeem last.
   useEffect(() => {
     const initializeSession = async () => {
       const urlParams = getAllUrlParams();
 
-      // PRIORITY: Check for redeem code parameters FIRST (before any other checks)
-      // This handles Shopify redirects with redeem code params in URL hash
-      const redeemCodeParam = urlParams.get("Code") || urlParams.get("code");
-      const customerIdParam = urlParams.get("CustomerId") || urlParams.get("customer_id");
-      const customerEmailParam = urlParams.get("CustomerEmail") || urlParams.get("customer_email");
-      const shopDomainParam = urlParams.get("shop_domain");
+      // Capture pending redeem (run after session/APIs are done, not first)
+      const redeemCodeFromUrl = urlParams.get("Code") || urlParams.get("code");
+      const redeemCustomerIdFromUrl = urlParams.get("CustomerId") || urlParams.get("customer_id");
+      const redeemShopDomainFromUrl = urlParams.get("shop_domain");
+      const redeemCodeFromStorage = sessionStorage.getItem("phraseotomy_url_code");
+      const pendingRedeemCode = (redeemCodeFromUrl || redeemCodeFromStorage)?.trim().toUpperCase();
 
-      if (redeemCodeParam && customerIdParam && shopDomainParam) {
-        console.log('🎟️ [PLAY] Redeem code params detected on Play page:', {
-          Code: redeemCodeParam,
-          CustomerId: customerIdParam,
-          CustomerEmail: customerEmailParam,
-          shop_domain: shopDomainParam
-        });
-
+      const runPendingRedeem = async (
+        code: string,
+        customerId: string,
+        shopDomain: string
+      ): Promise<boolean> => {
+        if (!code || !customerId || !shopDomain) return false;
         try {
-          // Call redeem-license-code API
-          const redeemResult = await redeemCode(redeemCodeParam, customerIdParam, shopDomainParam);
-
+          const redeemResult = await redeemCode(code, customerId, shopDomain);
           if (!redeemResult.success) {
-            // Failed - redirect to Shopify with error message
-            console.error('❌ Redeem code failed:', redeemResult.message);
             redirectToShopifyWithError(redeemResult.message);
-            return;
+            return true;
           }
-
-          // Success - redirect to Shopify app page
-          console.log('✅ Redeem code successful:', redeemResult.message);
-          // window.location.href = 'https://phraseotomy.com/apps/phraseotomy';
-          window.top.location.href = 'https://phraseotomy.com/pages/play-online';
-          return;
+          sessionStorage.removeItem("phraseotomy_url_code");
+          window.top!.location.href = "https://phraseotomy.com/pages/play-online";
+          return true;
         } catch (error) {
-          console.error('❌ Error processing redeem code:', error);
-          const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
-          redirectToShopifyWithError(errorMessage);
-          return;
+          const msg = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
+          redirectToShopifyWithError(msg);
+          return true;
         }
-      }
+      };
 
       // Check for embedded config from proxy (primary method)
       if (window.__PHRASEOTOMY_CONFIG__ && window.__PHRASEOTOMY_SHOP__) {
@@ -286,6 +277,16 @@ if (existingData) {
             window.__PHRASEOTOMY_SHOP__,
             window.__PHRASEOTOMY_CONFIG__.id,
           );
+        }
+
+        // Redeem last: after all APIs (store customer etc.)
+        if (pendingRedeemCode && window.__PHRASEOTOMY_CUSTOMER__ && window.__PHRASEOTOMY_CONFIG__) {
+          const didRedirect = await runPendingRedeem(
+            pendingRedeemCode,
+            window.__PHRASEOTOMY_CUSTOMER__.id,
+            window.__PHRASEOTOMY_CONFIG__.shop_domain,
+          );
+          if (didRedirect) return;
         }
 
         setLoading(false);
@@ -325,6 +326,16 @@ if (existingData) {
             storeCustomerInDatabase(customerData, shopParam, tenantConfig.id);
           }
 
+          // Redeem last: after all APIs
+          if (pendingRedeemCode && customerData && tenantConfig) {
+            const didRedirect = await runPendingRedeem(
+              pendingRedeemCode,
+              customerData.id,
+              shopParam,
+            );
+            if (didRedirect) return;
+          }
+
           setLoading(false);
           return;
         } catch (error) {
@@ -344,6 +355,14 @@ if (existingData) {
       const storedCustomerData = localStorage.getItem("customerData");
 
       if (!sessionToken || !storedCustomerData) {
+        // If we have redeem params, send user to login first so session is established; then Play will run APIs then redeem
+        if (pendingRedeemCode && redeemCustomerIdFromUrl && redeemShopDomainFromUrl) {
+          navigate(
+            `/login?shop=${encodeURIComponent(redeemShopDomainFromUrl)}&customer_id=${encodeURIComponent(redeemCustomerIdFromUrl)}`,
+            { replace: true },
+          );
+          return;
+        }
         navigate("/login", { replace: true });
         return;
       }
@@ -414,6 +433,16 @@ if (existingData) {
 
               // Store customer in database
               storeCustomerInDatabase(customerObj, dbTenant.shop_domain, dbTenant.id);
+            }
+
+            // Redeem last: after all APIs (get-customer-data, store customer)
+            if (pendingRedeemCode && payload.customer_id && dbTenant?.shop_domain) {
+              const didRedirect = await runPendingRedeem(
+                pendingRedeemCode,
+                payload.customer_id,
+                dbTenant.shop_domain,
+              );
+              if (didRedirect) return;
             }
           }
 

@@ -167,6 +167,12 @@ const Login = () => {
       }
     }
 
+    // If still no r token in URL/pending, use stored login token (e.g. after redirect / redeem flow)
+    if (!token && typeof localStorage !== 'undefined') {
+      token = localStorage.getItem('phraseotomy_login_token');
+      if (token) console.log("📦 Using r token from localStorage (phraseotomy_login_token)");
+    }
+
     console.log(customerNameParam);
 
     // Handle direct login with shop and customer_id (no token)
