@@ -149,6 +149,16 @@ const RootRedirect = () => {
       }
     }
 
+    // If this is a redeem-code flow (Code + customer + shop_domain), send user to Play
+    const redeemCodeParam = urlParams.get('Code') || urlParams.get('code');
+    const redeemCustomerId = urlParams.get('CustomerId') || urlParams.get('customer_id');
+    const redeemShopDomain = urlParams.get('shop_domain');
+    if (redeemCodeParam && redeemCustomerId && redeemShopDomain) {
+      console.log('🎟️ [APP] Redeem flow detected in RootRedirect, sending to /play');
+      setRedirectTarget('/play');
+      return;
+    }
+    
     // Check if accessed from Shopify admin (has 'host' parameter or stored admin context)
     const hostParam = urlParams.get('host');
     const isShopifyAdmin = hostParam || 
