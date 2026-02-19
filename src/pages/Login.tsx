@@ -519,18 +519,23 @@ const Login = () => {
         return;
       }
 
+      // Store generated login token for debugging / later flows
+      if (data?.token) {
+        try {
+          localStorage.setItem("phraseotomy_login_token", data.token);
+        } catch (e) {
+          console.warn("Unable to persist login token to localStorage:", e);
+        }
+      }
+
       if (data?.loginUrl) {
         const app = getAppBridge();
         if (app) {
           const redirect = Redirect.create(app);
           redirect.dispatch(Redirect.Action.REMOTE, data.loginUrl);
         } else {
-          // Use top location for iframe context to avoid CSP frame-ancestors error
-          if (window.self !== window.top) {
-            window.top!.location.href = data.loginUrl;
-          } else {
-            window.top.location.href = data.loginUrl;
-          }
+          // Use top location for iframe context so Shopify login replaces the full page
+          window.top.location.href = data.loginUrl;
         }
       }
     } catch (error) {
