@@ -89,6 +89,8 @@ interface ShopThemesDialogProps {
   tenantId: string;
   customerId: string;
   shopDomain: string;
+  /** Pack IDs unlocked by customer's licenses (e.g. base pack 26e4d904-...) so those themes show as unlocked */
+  unlockedPackIds?: string[];
 }
 
 export function ShopThemesDialog({
@@ -97,6 +99,7 @@ export function ShopThemesDialog({
   tenantId,
   customerId,
   shopDomain,
+  unlockedPackIds = [],
 }: ShopThemesDialogProps) {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(false);
@@ -113,38 +116,50 @@ export function ShopThemesDialog({
       loadUnlockedThemes();
       loadThemeCodes();
     }
-  }, [open, tenantId]);
+  }, [open, tenantId, unlockedPackIds]);
 
   const loadUnlockedThemes = async () => {
     try {
       const unlocked = new Set<string>();
 
-      // 1. Fetch assigned packs for this customer
-      const metafields = await fetchCustomerMetafields(customerId, shopDomain);
-      const { packIds } = parseCustomerAccess(metafields); // These are likely pack names (e.g., "Base")
+      // 1. Pack IDs from customer's licenses (e.g. base pack) – so base pack themes show as unlocked
+      const assignedPackIdsFromLicenses = Array.isArray(unlockedPackIds) ? unlockedPackIds.filter(Boolean) : [];
 
-      // 2. Get all packs (to map name to id)
+      // 2. Fetch assigned packs from metafields (pack names) and map to UUIDs
+      const metafields = await fetchCustomerMetafields(customerId, shopDomain);
+      const { packIds: packNamesFromMetafield } = parseCustomerAccess(metafields);
+
       const { data: allPacks, error: packsError } = await supabase
         .from("packs")
         .select("id, name");
       if (packsError) throw packsError;
 
-      // Map assigned pack names to their UUIDs
-      const assignedPackIds = allPacks && packIds && packIds.length
-        ? allPacks.filter(pack => packIds.includes(pack.name)).map(pack => pack.id)
+      const assignedPackIdsFromMetafield = allPacks && packNamesFromMetafield?.length
+        ? allPacks.filter(pack => packNamesFromMetafield.includes(pack.name)).map(pack => pack.id)
         : [];
 
-      // 3. Get all themes
+      const assignedPackIds = [...new Set([...assignedPackIdsFromLicenses, ...assignedPackIdsFromMetafield])];
+
+      // 3. Get all themes (pack_id and theme_packs for pack association)
       const { data: allThemes, error: allThemesError } = await supabase
         .from("themes")
         .select("id, pack_id");
       if (allThemesError) throw allThemesError;
 
-      // 4. Unlock all themes whose pack_id is in assignedPackIds
+      const { data: themePacks } = await supabase
+        .from("theme_packs")
+        .select("theme_id, pack_id");
+
+      // 4. Unlock themes whose pack is in assignedPackIds (via pack_id or theme_packs)
       if (allThemes?.length && assignedPackIds?.length) {
         allThemes.forEach(theme => {
           if (theme.pack_id && assignedPackIds.includes(theme.pack_id)) {
             unlocked.add(theme.id);
+          }
+        });
+        (themePacks || []).forEach((tp: { theme_id: string; pack_id: string }) => {
+          if (assignedPackIds.includes(tp.pack_id)) {
+            unlocked.add(tp.theme_id);
           }
         });
       }

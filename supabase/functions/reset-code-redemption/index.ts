@@ -1,13 +1,69 @@
 /**
  * Supabase Edge Function: Reset Code Redemption
- * 
- * Resets a license code by removing customer assignment
+ *
+ * Resets a license code by removing customer assignment and clearing
+ * custom.redemption_code when the customer has no remaining codes.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const CUSTOM_DOMAIN_TO_MYSHOPIFY: Record<string, string> = {
+  'phraseotomy.com': 'qxqtbf-21.myshopify.com',
+  'phraseotomy.ourstagingserver.com': 'testing-cs-store.myshopify.com',
+};
+
+function getShopifyApiHost(shopDomain: string): string {
+  const normalized = (shopDomain || '').trim().toLowerCase();
+  if (normalized.endsWith('.myshopify.com')) return normalized;
+  return CUSTOM_DOMAIN_TO_MYSHOPIFY[normalized] || normalized;
+}
+
+/** Set custom.redemption_code to empty when customer has no codes (revoke). */
+async function clearRedemptionCodeMetafield(
+  customerId: string,
+  apiHost: string,
+  accessToken: string
+): Promise<void> {
+  const getUrl = `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields.json`;
+  const getRes = await fetch(getUrl, {
+    method: 'GET',
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!getRes.ok) return;
+  const { metafields } = await getRes.json();
+  const existing = metafields?.find((mf: any) => mf.namespace === 'custom' && mf.key === 'redemption_code');
+  if (!existing) return;
+
+  const putUrl = `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields/${existing.id}.json`;
+  const updateRes = await fetch(putUrl, {
+    method: 'PUT',
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      metafield: {
+        id: existing.id,
+        value: '',
+        type: 'single_line_text_field',
+      },
+    }),
+  });
+  if (updateRes.ok) {
+    console.log('✅ [revoke] Cleared customer metafield custom.redemption_code');
+  }
+}
 
 Deno.serve(async (req) => {
   const corsHeaders = {
@@ -101,11 +157,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If code was redeemed, remove from customer metafield
+    // If code was redeemed, remove from customer metafield and clear redemption_code if no codes left
     if (code.redeemed_by && tenant.access_token) {
+      const apiHost = getShopifyApiHost(shop_domain);
       try {
         const metafieldResponse = await fetch(
-          `https://${shop_domain}/admin/api/2024-01/customers/${code.redeemed_by}/metafields.json`,
+          `https://${apiHost}/admin/api/2024-01/customers/${code.redeemed_by}/metafields.json`,
           {
             headers: {
               'X-Shopify-Access-Token': tenant.access_token,
@@ -125,7 +182,7 @@ Deno.serve(async (req) => {
             const updatedCodes = existingCodes.filter((c: string) => c !== code.code);
 
             await fetch(
-              `https://${shop_domain}/admin/api/2024-01/customers/${code.redeemed_by}/metafields/${licenseMetafield.id}.json`,
+              `https://${apiHost}/admin/api/2024-01/customers/${code.redeemed_by}/metafields/${licenseMetafield.id}.json`,
               {
                 method: 'PUT',
                 headers: {
@@ -140,6 +197,11 @@ Deno.serve(async (req) => {
                 }),
               }
             );
+
+            // When customer has no remaining codes, clear custom.redemption_code (remove True / set empty)
+            if (updatedCodes.length === 0) {
+              await clearRedemptionCodeMetafield(code.redeemed_by, apiHost, tenant.access_token);
+            }
           }
         }
       } catch (error) {

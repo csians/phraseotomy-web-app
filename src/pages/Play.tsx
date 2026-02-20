@@ -1076,6 +1076,7 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
           tenantId={tenant.id}
           customerId={customer.id}
           shopDomain={shopDomain}
+          unlockedPackIds={allPacks}
         />
       )}
     </div>

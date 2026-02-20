@@ -8,6 +8,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Custom domains must resolve to *.myshopify.com for Admin API (avoid HandshakeFailure)
+const CUSTOM_DOMAIN_TO_MYSHOPIFY: Record<string, string> = {
+  'phraseotomy.com': 'qxqtbf-21.myshopify.com',
+  'phraseotomy.ourstagingserver.com': 'testing-cs-store.myshopify.com',
+};
+
+function getShopifyApiHost(shopDomain: string): string {
+  const normalized = (shopDomain || '').trim().toLowerCase();
+  if (normalized.endsWith('.myshopify.com')) return normalized;
+  return CUSTOM_DOMAIN_TO_MYSHOPIFY[normalized] || normalized;
+}
+
 /**
  * Update customer license/theme metafield in Shopify Admin API
  */
@@ -18,9 +30,10 @@ async function updateShopifyCustomerMetafield(
   accessToken: string,
   type: 'license' | 'theme' = 'license'
 ): Promise<void> {
+  const apiHost = getShopifyApiHost(shopDomain);
   const metafieldKey = type === 'theme' ? 'theme_codes' : 'license_codes';
 
-  const getUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields.json`;
+  const getUrl = `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields.json`;
 
   const getResponse = await fetch(getUrl, {
     method: 'GET',
@@ -67,10 +80,10 @@ async function updateShopifyCustomerMetafield(
   let method: string;
 
   if (existingMetafield) {
-    updateUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields/${existingMetafield.id}.json`;
+    updateUrl = `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields/${existingMetafield.id}.json`;
     method = 'PUT';
   } else {
-    updateUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields.json`;
+    updateUrl = `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields.json`;
     method = 'POST';
   }
 
@@ -100,7 +113,8 @@ async function ensureRedemptionCodeMetafield(
   shopDomain: string,
   accessToken: string
 ): Promise<void> {
-  const getUrl = `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields.json`;
+  const apiHost = getShopifyApiHost(shopDomain);
+  const getUrl = `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields.json`;
   const getRes = await fetch(getUrl, {
     method: 'GET',
     headers: {
@@ -131,8 +145,8 @@ async function ensureRedemptionCodeMetafield(
   };
 
   const url = existing
-    ? `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields/${existing.id}.json`
-    : `https://${shopDomain}/admin/api/2024-01/customers/${customerId}/metafields.json`;
+    ? `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields/${existing.id}.json`
+    : `https://${apiHost}/admin/api/2024-01/customers/${customerId}/metafields.json`;
   const method = existing ? 'PUT' : 'POST';
 
   const updateRes = await fetch(url, {
