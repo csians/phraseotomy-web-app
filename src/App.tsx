@@ -230,6 +230,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/play" element={<Play />} />
           <Route path="/play/host" element={<Play />} />
           <Route path="/apps/phraseotomy" element={<Play />} />
           <Route path="/create-lobby" element={<CreateLobby />} />

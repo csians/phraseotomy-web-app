@@ -222,16 +222,24 @@ if (existingData) {
     const initializeSession = async () => {
       const urlParams = getAllUrlParams();
 
-      // Name/email from URL (e.g. after login redirect) – use and store in DB, then show
-      const urlCustomerNameRaw = urlParams.get("customer_name") || urlParams.get("customerName") || "";
-      const urlCustomerEmailRaw = urlParams.get("customer_email") || urlParams.get("customerEmail") || "";
+      // Name/email from URL – support both hash params and main query (e.g. CustomerEmail, CustomerName from Shopify)
+      const urlCustomerNameRaw =
+        urlParams.get("customer_name") ||
+        urlParams.get("customerName") ||
+        urlParams.get("CustomerName") ||
+        "";
+      const urlCustomerEmailRaw =
+        urlParams.get("customer_email") ||
+        urlParams.get("customerEmail") ||
+        urlParams.get("CustomerEmail") ||
+        "";
       const urlCustomerName = urlCustomerNameRaw ? decodeURIComponent(urlCustomerNameRaw.replace(/\+/g, " ")).trim() : null;
       const urlCustomerEmail = urlCustomerEmailRaw ? decodeURIComponent(urlCustomerEmailRaw).trim() : null;
 
       // Capture pending redeem (run after session/APIs are done, not first)
       const redeemCodeFromUrl = urlParams.get("Code") || urlParams.get("code");
       const redeemCustomerIdFromUrl = urlParams.get("CustomerId") || urlParams.get("customer_id");
-      const redeemShopDomainFromUrl = urlParams.get("shop_domain");
+      const redeemShopDomainFromUrl = urlParams.get("shop_domain") || urlParams.get("shop");
       const redeemCodeFromStorage = sessionStorage.getItem("phraseotomy_url_code");
       const pendingRedeemCode = (redeemCodeFromUrl || redeemCodeFromStorage)?.trim().toUpperCase();
 
@@ -379,12 +387,15 @@ if (existingData) {
       const storedCustomerData = localStorage.getItem("customerData");
 
       if (!sessionToken || !storedCustomerData) {
-        // If we have redeem params, send user to login first so session is established; then Play will run APIs then redeem
+        // If we have redeem params, send user to login with URL data so session + store customer get email/name
         if (pendingRedeemCode && redeemCustomerIdFromUrl && redeemShopDomainFromUrl) {
-          navigate(
-            `/login?shop=${encodeURIComponent(redeemShopDomainFromUrl)}&customer_id=${encodeURIComponent(redeemCustomerIdFromUrl)}`,
-            { replace: true },
-          );
+          const loginParams = new URLSearchParams({
+            shop: redeemShopDomainFromUrl,
+            customer_id: redeemCustomerIdFromUrl,
+          });
+          if (urlCustomerEmail) loginParams.set("customer_email", urlCustomerEmail);
+          if (urlCustomerName) loginParams.set("customer_name", urlCustomerName);
+          navigate(`/login?${loginParams.toString()}`, { replace: true });
           return;
         }
         navigate("/login", { replace: true });
