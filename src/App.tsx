@@ -47,7 +47,9 @@ const queryClient = new QueryClient();
 
   const customer_email =
     manualParams.get('customer_email') ||
+    manualParams.get('customer_emal') ||
     url.searchParams.get('customer_email') ||
+    url.searchParams.get('customer_emal') ||
     manualParams.get('customerEmail') ||
     manualParams.get('CustomerEmail') ||
     url.searchParams.get('customerEmail') ||
@@ -74,6 +76,29 @@ const queryClient = new QueryClient();
   if (codeParam && /^[A-Za-z0-9]{6}$/.test(codeParam.trim())) {
     const normalizedCode = codeParam.trim().toUpperCase();
     sessionStorage.setItem('phraseotomy_url_code', normalizedCode);
+  }
+
+  // Persist customer to localStorage as soon as URL has customer_id + email/name (so it's stored even on redeem flow or before clean)
+  if (customer_id && (customer_email || customer_name)) {
+    try {
+      const shopForStorage = shopDomainParam || shop;
+      const firstName = customer_name ? String(customer_name).trim().split(/\s+/)[0] : '';
+      const lastName = customer_name ? String(customer_name).trim().split(/\s+/).slice(1).join(' ') : '';
+      localStorage.setItem(
+        'customerData',
+        JSON.stringify({
+          customer_id,
+          id: customer_id,
+          email: customer_email || undefined,
+          name: customer_name || undefined,
+          first_name: firstName || undefined,
+          last_name: lastName || undefined,
+        }),
+      );
+      if (shopForStorage) localStorage.setItem('shop_domain', shopForStorage);
+    } catch (e) {
+      console.warn('Could not persist customerData to localStorage:', e);
+    }
   }
 
   // If this is a redeem-code flow (Code + customer + shop_domain),

@@ -230,6 +230,7 @@ if (existingData) {
         "";
       const urlCustomerEmailRaw =
         urlParams.get("customer_email") ||
+        urlParams.get("customer_emal") ||
         urlParams.get("customerEmail") ||
         urlParams.get("CustomerEmail") ||
         "";
