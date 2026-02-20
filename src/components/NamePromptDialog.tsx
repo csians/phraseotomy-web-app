@@ -103,7 +103,7 @@ export function NamePromptDialog({
         parsed.name = trimmedName;
         parsed.first_name = nameParts[0];
         parsed.last_name = nameParts.slice(1).join(" ") || null;
-        localStorage.setItem("customerData", JSON.stringify(parsed));
+        // localStorage.setItem("customerData", JSON.stringify(parsed));
       }
 
       onNameSaved(trimmedName);

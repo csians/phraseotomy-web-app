@@ -220,7 +220,7 @@ export default function CreateLobby() {
         firstName: customer.firstName,
         lastName: customer.lastName,
       };
-      localStorage.setItem("customerData", JSON.stringify(customerData));
+      // localStorage.setItem("customerData", JSON.stringify(customerData));
       sessionStorage.setItem("customerData", JSON.stringify(customerData));
 
       // Store player ID specifically for lobby refresh recovery

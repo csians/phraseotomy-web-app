@@ -160,11 +160,29 @@ const Login = () => {
         const parsed = JSON.parse(pendingLoginParams);
         shopParam = parsed.shop || shopParam;
         customerIdParam = parsed.customer_id || customerIdParam;
-        customerNameParam = parsed.customer_name || customerNameParam;
-        customerEmailParam = parsed.customer_email || customerEmailParam;
+        customerNameParam = parsed.customer_name || parsed.customerName || customerNameParam;
+        customerEmailParam = parsed.customer_email || parsed.customerEmail || parsed.customer_emal || customerEmailParam;
         token = parsed.r || token;
         console.log("📦 Using pending login params from sessionStorage:", parsed);
+        // Store in localStorage using the shape the app expects (so Play and store-customer can use name/email)
+        const firstName = (parsed.customer_name || parsed.customerName || "").trim().split(/\s+/)[0] || "";
+        const lastName = (parsed.customer_name || parsed.customerName || "").trim().split(/\s+/).slice(1).join(" ") || "";
+        localStorage.setItem(
+          "customerData",
+          JSON.stringify({
+            customer_id: parsed.customer_id,
+            id: parsed.customer_id,
+            email: parsed.customer_email || parsed.customerEmail || parsed.customer_emal || undefined,
+            name: parsed.customer_name || parsed.customerName || undefined,
+            first_name: firstName || undefined,
+            last_name: lastName || undefined,
+          }),
+        );
         localStorage.setItem("customerData", JSON.stringify(parsed));
+        if (parsed.shop_domain || parsed.shop) {
+          localStorage.setItem("shop_domain", parsed.shop_domain || parsed.shop);
+
+        }
         // Clear after use
         sessionStorage.removeItem('pending_login_params');
       } catch (e) {
@@ -489,20 +507,26 @@ const Login = () => {
                       sessions: customerData.sessions || [],
                     });
 
-                    // Store customer data in localStorage
+                    // Merge URL/pending name and email so we store them when Shopify has no name/email
+                    const mergedEmail = customerData.customer?.email ?? customerEmailParam ?? null;
+                    const mergedName = customerData.customer?.name ?? customerNameParam ?? null;
+                    const mergedFirst = customerData.customer?.first_name ?? (customerNameParam ? customerNameParam.trim().split(/\s+/)[0] : null) ?? null;
+                    const mergedLast = customerData.customer?.last_name ?? (customerNameParam ? customerNameParam.trim().split(/\s+/).slice(1).join(" ") : null) ?? null;
+
+                    // Store customer data in localStorage (URL name/email used when API has none)
                     localStorage.setItem(
                       "customerData",
                       JSON.stringify({
                         customer_id: customerIdParam,
                         id: customerIdParam,
-                        email: customerData.customer?.email || null,
-                        name: customerData.customer?.name || null,
-                        first_name: customerData.customer?.first_name || null,
-                        last_name: customerData.customer?.last_name || null,
+                        email: mergedEmail,
+                        name: mergedName,
+                        first_name: mergedFirst,
+                        last_name: mergedLast,
                       }),
                     );
 
-                    // Store customer in database (email/name from Shopify via get-customer-data)
+                    // Store customer in database (URL name/email so DB is never empty when we have them)
                     const { data: dbTenantForStore } = await supabase
                       .from("tenants")
                       .select("id, shop_domain")
@@ -512,10 +536,10 @@ const Login = () => {
                     if (dbTenantForStore) {
                       await storeCustomerInDatabase(
                         customerIdParam,
-                        customerData.customer?.email ?? null,
-                        customerData.customer?.name ?? null,
-                        customerData.customer?.first_name ?? null,
-                        customerData.customer?.last_name ?? null,
+                        mergedEmail,
+                        mergedName,
+                        mergedFirst,
+                        mergedLast,
                         dbTenantForStore.shop_domain,
                         dbTenantForStore.id,
                       );
@@ -542,6 +566,52 @@ const Login = () => {
                       } else {
                         navigate("/play/host", { replace: true });
                       }
+                    }
+                  } else {
+                    // get-customer-data failed or empty – still store URL name/email so we have data
+                    const urlEmail = customerEmailParam ?? null;
+                    const urlName = customerNameParam ?? null;
+                    const urlFirst = urlName ? urlName.trim().split(/\s+/)[0] : null;
+                    const urlLast = urlName ? urlName.trim().split(/\s+/).slice(1).join(" ") : null;
+                    localStorage.setItem(
+                      "customerData",
+                      JSON.stringify({
+                        customer_id: customerIdParam,
+                        id: customerIdParam,
+                        email: urlEmail,
+                        name: urlName,
+                        first_name: urlFirst,
+                        last_name: urlLast,
+                      }),
+                    );
+                    const { data: dbTenantForStore } = await supabase
+                      .from("tenants")
+                      .select("id, shop_domain")
+                      .eq("shop_domain", verifiedShop)
+                      .eq("is_active", true)
+                      .maybeSingle();
+                    if (dbTenantForStore) {
+                      await storeCustomerInDatabase(
+                        customerIdParam,
+                        urlEmail,
+                        urlName,
+                        urlFirst,
+                        urlLast,
+                        dbTenantForStore.shop_domain,
+                        dbTenantForStore.id,
+                      );
+                    }
+                    try {
+                      localStorage.removeItem("phraseotomy_login_token");
+                    } catch (_) {}
+                    const { getTenantConfig } = await import("@/lib/tenants");
+                    const tenant = getTenantConfig(verifiedShop);
+                    if (tenant?.customShopDomains?.length) {
+                      window.top!.location.href = `https://${tenant.customShopDomains[0]}/pages/play-online`;
+                    } else if (window.self !== window.top) {
+                      window.location.href = `${window.location.origin}${window.location.pathname}#/play/host`;
+                    } else {
+                      navigate("/play/host", { replace: true });
                     }
                   }
 

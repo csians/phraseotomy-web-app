@@ -162,7 +162,7 @@ if (existingData) {
   parsed.name = extractedName;
   parsed.first_name = nameParts[0];
   parsed.last_name = nameParts.slice(1).join(" ") || null;
-  localStorage.setItem("customerData", JSON.stringify(parsed));
+  // localStorage.setItem("customerData", JSON.stringify(parsed));
 }
 
     
@@ -293,7 +293,7 @@ if (existingData) {
             first_name: mergedCustomer.firstName,
             last_name: mergedCustomer.lastName,
           };
-          localStorage.setItem("customerData", JSON.stringify(toStore));
+          // localStorage.setItem("customerData", JSON.stringify(toStore));
 
           // Store/update in database (including URL name/email when present)
           storeCustomerInDatabase(
