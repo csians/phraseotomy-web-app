@@ -164,6 +164,7 @@ const Login = () => {
         customerEmailParam = parsed.customer_email || customerEmailParam;
         token = parsed.r || token;
         console.log("📦 Using pending login params from sessionStorage:", parsed);
+        localStorage.setItem("customerData", JSON.stringify(parsed));
         // Clear after use
         sessionStorage.removeItem('pending_login_params');
       } catch (e) {
