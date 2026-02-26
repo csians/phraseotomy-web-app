@@ -56,6 +56,9 @@ verify_jwt = false
 [functions.get-customer-licenses-sessions]
 verify_jwt = false
 
+[functions.get-customer-licenses]
+verify_jwt = false
+
 [functions.start-turn]
 verify_jwt = false
 

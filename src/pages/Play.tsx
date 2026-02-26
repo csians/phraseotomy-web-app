@@ -24,7 +24,6 @@ import { getCustomerThemes } from "@/lib/themeCodeUtils";
 import { lobbyCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllUrlParams } from "@/lib/urlUtils";
-import { redeemCode, redirectToShopifyWithError } from "@/lib/redemption";
 import { ShopThemesDialog } from "@/components/ShopThemesDialog";
 
 const Play = () => {
@@ -244,26 +243,11 @@ if (existingData) {
       const redeemCodeFromStorage = sessionStorage.getItem("phraseotomy_url_code");
       const pendingRedeemCode = (redeemCodeFromUrl || redeemCodeFromStorage)?.trim().toUpperCase();
 
-      const runPendingRedeem = async (
-        code: string,
-        customerId: string,
-        shopDomain: string
-      ): Promise<boolean> => {
-        if (!code || !customerId || !shopDomain) return false;
-        try {
-          const redeemResult = await redeemCode(code, customerId, shopDomain);
-          if (!redeemResult.success) {
-            redirectToShopifyWithError(redeemResult.message);
-            return true;
-          }
-          sessionStorage.removeItem("phraseotomy_url_code");
-          window.top!.location.href = "https://phraseotomy.com/pages/play-online";
-          return true;
-        } catch (error) {
-          const msg = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
-          redirectToShopifyWithError(msg);
-          return true;
-        }
+      // Redemption is now handled on Shopify side; just redirect to play page
+      const redirectAfterRedeemFlow = (): boolean => {
+        sessionStorage.removeItem("phraseotomy_url_code");
+        window.top!.location.href = "https://phraseotomy.com/pages/play-online";
+        return true;
       };
 
       // Check for embedded config from proxy (primary method)
@@ -303,14 +287,10 @@ if (existingData) {
           );
         }
 
-        // Redeem last: after all APIs (store customer etc.)
+        // Redeem flow: redirect to Shopify play page (redemption handled on Shopify side)
         if (pendingRedeemCode && window.__PHRASEOTOMY_CUSTOMER__ && window.__PHRASEOTOMY_CONFIG__) {
-          const didRedirect = await runPendingRedeem(
-            pendingRedeemCode,
-            window.__PHRASEOTOMY_CUSTOMER__.id,
-            window.__PHRASEOTOMY_CONFIG__.shop_domain,
-          );
-          if (didRedirect) return;
+          redirectAfterRedeemFlow();
+          return;
         }
 
         setLoading(false);
@@ -359,14 +339,10 @@ if (existingData) {
             storeCustomerInDatabase(mergedCustomer, shopParam, tenantConfig.id);
           }
 
-          // Redeem last: after all APIs
+          // Redeem flow: redirect to Shopify play page (redemption handled on Shopify side)
           if (pendingRedeemCode && customerData && tenantConfig) {
-            const didRedirect = await runPendingRedeem(
-              pendingRedeemCode,
-              customerData.id,
-              shopParam,
-            );
-            if (didRedirect) return;
+            redirectAfterRedeemFlow();
+            return;
           }
 
           setLoading(false);
@@ -490,14 +466,10 @@ if (existingData) {
               storeCustomerInDatabase(customerObj, dbTenant.shop_domain, dbTenant.id);
             }
 
-            // Redeem last: after all APIs (get-customer-data, store customer)
+            // Redeem flow: redirect to Shopify play page (redemption handled on Shopify side)
             if (pendingRedeemCode && payload.customer_id && dbTenant?.shop_domain) {
-              const didRedirect = await runPendingRedeem(
-                pendingRedeemCode,
-                payload.customer_id,
-                dbTenant.shop_domain,
-              );
-              if (didRedirect) return;
+              redirectAfterRedeemFlow();
+              return;
             }
           }
 

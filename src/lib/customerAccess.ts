@@ -45,6 +45,17 @@ export interface CustomerLicense {
   expires_at: string | null;
 }
 
+/** License info from get-customer-licenses API (code, packs, expiry, active status) */
+export interface CustomerLicenseStatus {
+  code: string | null;
+  packs_unlocked: string[];
+  packs_with_names: { id: string; name: string }[];
+  expires_at: string | null;
+  is_active: boolean;
+  activated_at: string | null;
+  license_code_id: string;
+}
+
 export interface GameSession {
   id: string;
   lobby_code: string;
@@ -108,4 +119,25 @@ export async function getCustomerSessions(
 ): Promise<GameSession[]> {
   const data = await getCustomerData(customerId, shopDomain);
   return data.sessions;
+}
+
+/**
+ * Fetch customer license status: which codes are unlocked, expire times, and which are active.
+ * Uses get-customer-licenses API.
+ */
+export async function getCustomerLicenseStatus(
+  customerId: string,
+  shopDomain: string
+): Promise<{ customer_id: string; licenses: CustomerLicenseStatus[] }> {
+  const { data, error } = await supabase.functions.invoke('get-customer-licenses', {
+    body: { customerId, shopDomain },
+  });
+  if (error) {
+    console.error('Error fetching customer license status:', error);
+    return { customer_id: customerId, licenses: [] };
+  }
+  return {
+    customer_id: data?.customer_id ?? customerId,
+    licenses: data?.licenses ?? [],
+  };
 }
