@@ -181,11 +181,26 @@ Deno.serve(async (req) => {
 
     console.log('✅ Code redeemed successfully');
 
+    // Fetch pack names for response
+    const packIds = licenseCode.packs_unlocked || [];
+    const packNamesMap: Record<string, string> = {};
+    if (packIds.length > 0) {
+      const { data: packs } = await supabaseAdmin
+        .from('packs')
+        .select('id, name')
+        .in('id', packIds);
+      (packs || []).forEach((p) => {
+        packNamesMap[p.id] = p.name ?? p.id;
+      });
+    }
+    const packNames = packIds.map((id: string) => packNamesMap[id] ?? id);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Code redeemed! Unlocked packs: ${licenseCode.packs_unlocked.join(', ')}`,
-        packsUnlocked: licenseCode.packs_unlocked || []
+        message: `Code redeemed! Unlocked packs: ${packNames.join(', ')}`,
+        packsUnlocked: packNames,
+        packsUnlockedIds: packIds
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
