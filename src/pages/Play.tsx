@@ -742,8 +742,22 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
     localStorage.removeItem("phraseotomy_session_token");
     localStorage.removeItem("customerData");
     localStorage.removeItem("shop_domain");
-    // Always redirect to login page after logout
-    navigate("/login");
+    // Also log out from Shopify by redirecting to Shopify's logout URL
+    let shop = shopDomain;
+    if (!shop) {
+      // Try to get from localStorage if not in state
+      shop = localStorage.getItem("shop_domain");
+    }
+    if (shop) {
+      // Remove protocol if present
+      shop = shop.replace(/^https?:\/\//, "");
+      // Remove trailing slashes
+      shop = shop.replace(/\/$/, "");
+      window.top.location.href = `https://${shop}/account/logout`;
+    } else {
+      // Fallback: just go to login page
+      navigate("/login");
+    }
   };
 
   if (loading) {
