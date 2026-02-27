@@ -6,7 +6,7 @@
  */
 
 const APP_SECRET = Deno.env.get('APP_SIGNING_SECRET') || 'change-this-secret';
-const TOKEN_TTL_SECONDS = 300; // 5 minutes
+const TOKEN_TTL_SECONDS = 600; // 10 minutes
 
 interface TokenPayload {
   shop: string;

@@ -7,7 +7,7 @@
  * secure edge functions.
  */
 
-const TOKEN_TTL_SECONDS = 300; // 5 minutes
+const TOKEN_TTL_SECONDS = 600; // 10 minutes
 
 export interface TokenPayload {
   shop: string;

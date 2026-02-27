@@ -4,7 +4,7 @@ const corsHeaders = {
 };
 
 const APP_SECRET = Deno.env.get("APP_SIGNING_SECRET")!;
-const TOKEN_TTL_SECONDS = 300; // 5 minutes
+const TOKEN_TTL_SECONDS = 600; // 10 minutes
 
 async function generateSignedToken(shopDomain: string): Promise<string> {
   const expires = Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS;
