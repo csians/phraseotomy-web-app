@@ -696,10 +696,17 @@ const Login = () => {
 
 
   if (loading) {
-    // Show a blank screen or spinner while loading/auth state is being checked
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-primary"></div>
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-full" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
