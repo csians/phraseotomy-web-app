@@ -114,26 +114,6 @@ const Login = () => {
               config.id,
             );
 
-            // Check if the customer has an unlocked pack (bypass Go to Game)
-            try {
-              const { data: customerInfo, error } = await supabase.functions.invoke("get-customer-data", {
-                body: { customerId: customerData.id, shopDomain: window.__PHRASEOTOMY_SHOP__ },
-              });
-              if (!error && customerInfo && Array.isArray(customerInfo.licenses) && customerInfo.licenses.length > 0) {
-                // At least one pack/license is unlocked, redirect directly to play-online
-                const { getTenantConfig } = await import("@/lib/tenants");
-                const tenant = getTenantConfig(window.__PHRASEOTOMY_SHOP__);
-                if (tenant?.customShopDomains?.length) {
-                  const playOnlineUrl = `https://${tenant.customShopDomains[0]}/pages/play-online`;
-                  console.log("🚀 Directly redirecting to play-online (pack unlocked):", playOnlineUrl);
-                  window.top!.location.href = playOnlineUrl;
-                  return;
-                }
-              }
-            } catch (e) {
-              console.error("Error checking unlocked packs:", e);
-            }
-
             // Import tenant utilities
             const { getAppUrlForShop, getTenantConfig } = await import("@/lib/tenants");
             const tenant = getTenantConfig(window.__PHRASEOTOMY_SHOP__);
