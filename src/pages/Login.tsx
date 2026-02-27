@@ -114,10 +114,6 @@ const Login = () => {
               config.id,
             );
 
-            try {
-              localStorage.removeItem("phraseotomy_login_token");
-            } catch (_) {}
-
             // Import tenant utilities
             const { getAppUrlForShop, getTenantConfig } = await import("@/lib/tenants");
             const tenant = getTenantConfig(window.__PHRASEOTOMY_SHOP__);
@@ -190,12 +186,7 @@ const Login = () => {
       }
     }
 
-    // If still no r token in URL/pending, use stored login token (e.g. after redirect / redeem flow)
-    if (!token && typeof localStorage !== 'undefined') {
-      token = localStorage.getItem('phraseotomy_login_token');
-      if (token) console.log("📦 Using r token from localStorage (phraseotomy_login_token)");
-    }
-
+    // r token comes from URL only (Shopify redirect passes it)
     console.log(customerNameParam);
 
     // Handle direct login with shop and customer_id (no token)
@@ -337,11 +328,6 @@ const Login = () => {
                 dbTenant.id,
               );
             }
-
-            // Remove one-time login token after successful login
-            try {
-              localStorage.removeItem("phraseotomy_login_token");
-            } catch (_) {}
 
             // Get tenant config to determine redirect URL
             const { getTenantConfig } = await import("@/lib/tenants");
@@ -545,11 +531,6 @@ const Login = () => {
                       );
                     }
 
-                    // Remove one-time login token after successful login
-                    try {
-                      localStorage.removeItem("phraseotomy_login_token");
-                    } catch (_) {}
-
                     // Get tenant config to determine redirect URL
                     const { getTenantConfig } = await import("@/lib/tenants");
                     const tenant = getTenantConfig(verifiedShop);
@@ -601,9 +582,6 @@ const Login = () => {
                         dbTenantForStore.id,
                       );
                     }
-                    try {
-                      localStorage.removeItem("phraseotomy_login_token");
-                    } catch (_) {}
                     const { getTenantConfig } = await import("@/lib/tenants");
                     const tenant = getTenantConfig(verifiedShop);
                     if (tenant?.customShopDomains?.length) {
@@ -694,15 +672,6 @@ const Login = () => {
           variant: "destructive",
         });
         return;
-      }
-
-      // Store generated login token for debugging / later flows
-      if (data?.token) {
-        try {
-          localStorage.setItem("phraseotomy_login_token", data.token);
-        } catch (e) {
-          console.warn("Unable to persist login token to localStorage:", e);
-        }
       }
 
       if (data?.loginUrl) {

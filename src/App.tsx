@@ -62,11 +62,10 @@ const queryClient = new QueryClient();
     manualParams.get('CustomerName') ||
     url.searchParams.get('customerName') ||
     url.searchParams.get('CustomerName');
-  // r token: prefer URL, then fallback to localStorage (for returning users / redeem flow)
+  // r token: from URL only (Shopify redirect passes it)
   const rToken =
     manualParams.get('r') ||
     url.searchParams.get('r') ||
-    (typeof localStorage !== 'undefined' ? localStorage.getItem('phraseotomy_login_token') : null) ||
     null;
   const hostParam = manualParams.get('host') || url.searchParams.get('host');
   const codeParam = manualParams.get('Code') || manualParams.get('code') || url.searchParams.get('Code') || url.searchParams.get('code');
