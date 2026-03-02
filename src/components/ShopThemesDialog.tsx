@@ -76,13 +76,6 @@ interface Theme {
   pack_id: string | null;
 }
 
-interface ThemeCode {
-  id: string;
-  code: string;
-  status: string;
-  themes: { id: string; name: string; icon: string; color: string | null }[];
-}
-
 interface ShopThemesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -107,14 +100,12 @@ export function ShopThemesDialog({
   const [showThemeCodeDialog, setShowThemeCodeDialog] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<{ id: string; name: string } | null>(null);
   const [unlockedThemeIds, setUnlockedThemeIds] = useState<Set<string>>(new Set());
-  const [themeCodes, setThemeCodes] = useState<ThemeCode[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     if (open && tenantId) {
       loadThemes();
       loadUnlockedThemes();
-      loadThemeCodes();
     }
   }, [open, tenantId, unlockedPackIds]);
 
@@ -184,40 +175,6 @@ export function ShopThemesDialog({
     }
   };
 
-  const loadThemeCodes = async () => {
-    try {
-      const { data: unusedCodes } = await supabase
-        .from("theme_codes")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .eq("status", "unused");
-
-      const { data: activeCodes } = await supabase
-        .from("theme_codes")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .eq("status", "active");
-
-      const foundCodes = unusedCodes?.length > 0 ? unusedCodes : activeCodes || [];
-      
-      if (foundCodes.length > 0) {
-        const unredeemed = foundCodes.filter(code => !code.redeemed_at);
-        const formattedCodes = unredeemed.map(code => ({
-          id: code.id,
-          code: code.code,
-          status: code.status,
-          themes: [{ id: '', name: 'Theme code available', icon: '🎯', color: '#64748b' }]
-        }));
-
-        setThemeCodes(formattedCodes);
-      } else {
-        setThemeCodes([]);
-      }
-    } catch (error) {
-      console.error("Error loading theme codes:", error);
-    }
-  };
-
   const loadThemes = async () => {
     setLoading(true);
     try {
@@ -248,9 +205,7 @@ export function ShopThemesDialog({
   };
 
   const handleThemeUnlocked = () => {
-    // Reload unlocked themes
     loadUnlockedThemes();
-    loadThemeCodes(); // Refresh codes list
     setShowThemeCodeDialog(false);
     setSelectedTheme(null);
   };

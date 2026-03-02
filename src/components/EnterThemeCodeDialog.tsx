@@ -47,12 +47,11 @@ export function EnterThemeCodeDialog({
       });
       return;
     }
- if (!customerId || !shopDomain || !tenantId || !themeId) {
-    console.error("Missing required fields for validate-theme-code:", {
+ if (!customerId || !shopDomain || !tenantId) {
+    console.error("Missing required fields for redeem-theme-code:", {
       customerId,
       shopDomain,
       tenantId,
-      themeId,
     });
     toast({
       title: "Configuration error",
@@ -66,14 +65,11 @@ export function EnterThemeCodeDialog({
   setIsSubmitting(true);
 
     try {
-      // Call the dedicated theme code validation function
-      const { data, error } = await supabase.functions.invoke("validate-theme-code", {
+      const { data, error } = await supabase.functions.invoke("redeem-theme-code", {
         body: {
           code: normalizedCode,
           customerId,
           shopDomain,
-          codeType: "theme",
-          themeId,
         },
       });
 
@@ -81,37 +77,18 @@ export function EnterThemeCodeDialog({
         throw new Error(data?.error || error?.message || "Invalid theme code");
       }
 
-      // If code is already unlocked, just show success
+      const themeNames = data.themesUnlocked?.join(", ") || "themes";
       if (data.alreadyUnlocked) {
         toast({
           title: "Already Unlocked! 🎉",
-          description: `"${themeName}" theme is already available!`,
+          description: `${themeNames} ${data.themesUnlocked?.length > 1 ? "are" : "is"} already available!`,
         });
-        onThemeUnlocked();
-        setCode("");
-        onOpenChange(false);
-        return;
+      } else {
+        toast({
+          title: "Theme Unlocked! 🎉",
+          description: `Successfully unlocked ${themeNames}!`,
+        });
       }
-
-      // Code is valid, now assign/redeem it
-      const { data: assignData, error: assignError } = await supabase.functions.invoke("assign-code-to-customer", {
-        body: {
-          code: normalizedCode,
-          customerId,
-          shopDomain,
-          codeType: "theme",
-          themeId,
-        },
-      });
-
-      if (assignError || !assignData?.success) {
-        throw new Error(assignData?.error || assignError?.message || "Failed to unlock theme");
-      }
-
-      toast({
-        title: "Theme Unlocked! 🎉",
-        description: `Successfully unlocked "${themeName}" theme!`,
-      });
 
       onThemeUnlocked();
       setCode("");

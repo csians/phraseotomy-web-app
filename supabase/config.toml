@@ -26,6 +26,9 @@ verify_jwt = false
 [functions.get-customer-data]
 verify_jwt = false
 
+[functions.check-auth-status]
+verify_jwt = false
+
 [functions.create-license-code]
 verify_jwt = false
 
@@ -48,6 +51,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.redeem-license-code]
+verify_jwt = false
+
+[functions.redeem-theme-code]
 verify_jwt = false
 
 [functions.assign-code-to-customer]

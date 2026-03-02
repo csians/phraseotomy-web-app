@@ -879,23 +879,29 @@ export default function Lobby() {
         body: { sessionId, customerId: currentCustomerId },
       });
 
-      // Check for "Session not found" error
+      // Check for "Session not found" error (API returns various formats)
+      const sessionErrorMsg = data?.error || error?.message || "";
       const isSessionNotFound =
         error?.status === 404 ||
         error?.message?.includes("Session not found") ||
+        error?.message?.includes("Session was not found") ||
         error?.context?.error?.includes("Session not found") ||
         (error?.context?.statusCode === 404) ||
-        data?.error === "Session not found";
+        sessionErrorMsg?.includes("Session not found") ||
+        sessionErrorMsg?.includes("Session was not found") ||
+        !data?.session;
 
-      if (error || isSessionNotFound || !data?.session) {
-        if (isSessionNotFound || data?.error === "Session not found" || !data?.session) {
-          console.error("Session not found - redirecting to /play/host");
-          toast({
-            title: "Session not found",
-            description: "This game session doesn't exist or you don't have access to it",
-            variant: "destructive",
-          });
-          // Always clear loading on error/navigation
+      if (error || isSessionNotFound) {
+        if (isSessionNotFound) {
+          console.warn("Session not found - redirecting to /play/host");
+          // Only show toast on initial load; silent redirect for background refreshes
+          if (showLoadingState) {
+            toast({
+              title: "Session not found",
+              description: "This game session doesn't exist or has ended",
+              variant: "destructive",
+            });
+          }
           setLoading(false);
           navigate("/play/host", { replace: true });
           return;
@@ -1009,19 +1015,22 @@ export default function Lobby() {
       console.error("Error fetching lobby data:", errors);
       
       // Check for "Session not found" error in catch block
+      const errMsg = errors?.message || errors?.context?.error || "";
       const isSessionNotFound =
         errors?.status === 404 ||
-        errors?.message?.includes("Session not found") ||
-        errors?.context?.error?.includes("Session not found") ||
+        errMsg?.includes("Session not found") ||
+        errMsg?.includes("Session was not found") ||
         (errors?.context?.statusCode === 404);
 
       if (isSessionNotFound) {
-        console.error("Session not found in catch block - redirecting to /play/host");
-        toast({
-          title: "Session not found",
-          description: "This game session doesn't exist or you don't have access to it",
-          variant: "destructive",
-        });
+        console.warn("Session not found in catch block - redirecting to /play/host");
+        if (showLoadingState) {
+          toast({
+            title: "Session not found",
+            description: "This game session doesn't exist or has ended",
+            variant: "destructive",
+          });
+        }
         setLoading(false);
         navigate("/play/host", { replace: true });
         return;
