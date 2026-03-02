@@ -2,12 +2,6 @@
  * Shopify customer session cookie - set by Shopify when customer logs in.
  * Removed by Shopify when customer logs out.
  * Supports both flat format and nested customer_data format.
- *
- * IMPORTANT: Cookies are domain-scoped. The customer_data cookie is set for
- * phraseotomy.com. If the app runs on phraseotomy.ourstagingserver.com,
- * document.cookie will be empty for this domain - the cookie is NOT accessible.
- * To use cookie-based auth, the app must be served from phraseotomy.com
- * (e.g. via phraseotomy.com/pages/play-online through the Shopify proxy).
  */
 const COOKIE_NAMES = ['_customer_session_from_shopify', 'customer_data'];
 
