@@ -150,9 +150,25 @@ const Login = () => {
     const shopFromStorage = localStorage.getItem('shop_domain');
     const isProxyPath = window.location.pathname.includes('/pages/play-online');
 
+    console.log('🔍 [Login] Cookie auto-login check:', {
+      hasCookieCustomer: !!cookieCustomer,
+      hasStored: !!stored,
+      hasSessionToken: !!sessionToken,
+      isProxyPath,
+      pathname: window.location.pathname,
+      shopFromStorage,
+      hostname: window.location.hostname,
+    });
+
     if ((cookieCustomer || stored) && !sessionToken && isProxyPath) {
       const customerData = cookieCustomer || (stored ? JSON.parse(stored) : null);
       const shopParam = shopFromStorage || getTenantByAppDomain(window.location.hostname)?.shopDomain;
+
+      console.log('🔍 [Login] Cookie login params:', {
+        hasCustomerData: !!customerData,
+        customerId: customerData?.id,
+        shopParam,
+      });
 
       if (customerData?.id && shopParam) {
         console.log("🔄 Auto-login from Shopify cookie");
@@ -179,6 +195,7 @@ const Login = () => {
             }
 
             if (!dbTenant) {
+              console.log('🔍 [Login] Cookie auto-login: tenant not found for', resolvedShopDomain, shopParam);
               setLoading(false);
               return;
             }
@@ -188,6 +205,7 @@ const Login = () => {
             });
 
             if (sessionError || !sessionData?.sessionToken) {
+              console.log('🔍 [Login] Cookie auto-login: session token failed', sessionError, sessionData);
               setLoading(false);
               return;
             }
@@ -218,7 +236,11 @@ const Login = () => {
         };
         handleCookieLogin();
         return;
+      } else {
+        console.log('🔍 [Login] Cookie auto-login skipped: missing customerId or shopParam');
       }
+    } else {
+      console.log('🔍 [Login] Cookie auto-login conditions not met');
     }
 
     // Check sessionStorage first for params (cleaned at app level), then fall back to URL params

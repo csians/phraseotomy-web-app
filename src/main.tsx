@@ -60,7 +60,15 @@ if (guestSessionParam) {
 
 // On play-online path: if no Shopify cookie, clear session (logout from Shopify = logout from app)
 const isPlayOnlinePath = typeof window !== 'undefined' && window.location.pathname.includes('/pages/play-online');
-if (isPlayOnlinePath && !getCustomerFromShopifyCookie()) {
+const cookieCustomerCheck = getCustomerFromShopifyCookie();
+console.log('🔍 [INIT] Cookie check:', {
+  isPlayOnlinePath,
+  pathname: typeof window !== 'undefined' ? window.location.pathname : '',
+  hasCookieCustomer: !!cookieCustomerCheck,
+  cookieCustomer: cookieCustomerCheck ? { id: cookieCustomerCheck.customer_id } : null,
+});
+if (isPlayOnlinePath && !cookieCustomerCheck) {
+  console.log('🔍 [INIT] No cookie on play-online, clearing session');
   localStorage.removeItem('customerData');
   localStorage.removeItem('phraseotomy_session_token');
   localStorage.removeItem('shop_domain');
@@ -69,7 +77,7 @@ if (isPlayOnlinePath && !getCustomerFromShopifyCookie()) {
 
 // If no URL customer param, check Shopify cookie (set when customer logs in via Shopify)
 if (!customerParam) {
-  const cookieCustomer = getCustomerFromShopifyCookie();
+  const cookieCustomer = cookieCustomerCheck || getCustomerFromShopifyCookie();
   if (cookieCustomer) {
     console.log('🔍 [INIT] Customer data from Shopify cookie');
     const name = [cookieCustomer.customer_first_name, cookieCustomer.customer_last_name].filter(Boolean).join(' ') || undefined;
