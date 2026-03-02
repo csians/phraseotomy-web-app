@@ -392,14 +392,18 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string, tenant: { env
 <script nonce="${nonce}">
 (function(){
   var m = document.cookie.match(/customer_data=([^;]+)/);
-  if (!m) return;
+  if (!m) { console.log('[PHRASEOTOMY] No customer_data cookie found'); return; }
+  var raw = m[1];
   var data;
   try {
-    data = JSON.parse(decodeURIComponent(m[1]));
-    if (data && data.customer_data) data = data.customer_data;
-    var id = data && (data.customer_id || data.id);
-    if (!id || typeof id !== 'string') return;
-  } catch (e) { return; }
+    data = JSON.parse(decodeURIComponent(raw));
+  } catch (e1) {
+    try { data = JSON.parse(atob(raw)); } catch (e2) { console.log('[PHRASEOTOMY] Cookie parse failed:', e1, e2); return; }
+  }
+  if (data && data.customer_data) data = data.customer_data;
+  var id = data && (data.customer_id || data.id);
+  if (!id || typeof id !== 'string') { console.log('[PHRASEOTOMY] No customer_id in cookie'); return; }
+  console.log('[PHRASEOTOMY] Cookie found, passing to iframe');
   var customer = {
     id: data.customer_id || data.id,
     customer_id: data.customer_id || data.id,

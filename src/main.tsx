@@ -5,6 +5,25 @@ import { getAllUrlParams } from "./lib/urlUtils";
 import { getCustomerFromShopifyCookie } from "./lib/cookieUtils";
 import { getTenantByAppDomain } from "./lib/tenants";
 
+// When visiting ourstagingserver.com directly, there's no parent to postMessage the cookie.
+// Redirect to phraseotomy.com so the proxy returns the page with the parent script.
+let isRedirecting = false;
+if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com" && window.self === window.top) {
+  const urlParams = getAllUrlParams();
+  const hasCustomer = !!urlParams.get("customer") || !!urlParams.get("customer_id");
+  const hasSession = !!localStorage.getItem("phraseotomy_session_token");
+  const pathname = window.location.pathname;
+  const isRootOrLogin = pathname === "/" || pathname === "" || pathname.includes("login");
+  if (!hasCustomer && !hasSession && isRootOrLogin) {
+    const tenant = getTenantByAppDomain(window.location.hostname);
+    if (tenant?.shopDomain === "phraseotomy.com") {
+      console.log("🔀 [INIT] Redirecting to phraseotomy.com so parent can pass cookie via postMessage");
+      window.location.replace("https://phraseotomy.com/pages/play-online");
+      isRedirecting = true;
+    }
+  }
+}
+
 // When iframe origin (ourstagingserver.com) is outside top-level (phraseotomy.com),
 // the parent reads the cookie and postMessages it. Listen for that.
 const ALLOWED_ORIGINS = ["https://phraseotomy.com", "https://phraseotomy.ourstagingserver.com"];
@@ -124,4 +143,12 @@ if (!customerParam) {
   }
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  isRedirecting ? (
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-[#fbbf24]">
+      Redirecting…
+    </div>
+  ) : (
+    <App />
+  )
+);
