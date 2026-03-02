@@ -11,6 +11,7 @@ import { DebugInfo } from "@/components/DebugInfo";
 import type { TenantConfig } from "@/lib/types";
 import { getAllUrlParams } from "@/lib/urlUtils";
 import { getTenantByAppDomain } from "@/lib/tenants";
+import { setCustomerDataCookie } from "@/lib/cookieUtils";
 
 /**
  * Generate and store a session token for authenticated customer
@@ -286,7 +287,9 @@ const Login = () => {
         localStorage.setItem("customerData", JSON.stringify(parsed));
         if (parsed.shop_domain || parsed.shop) {
           localStorage.setItem("shop_domain", parsed.shop_domain || parsed.shop);
-
+        }
+        if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+          setCustomerDataCookie(parsed);
         }
         // Clear after use
         sessionStorage.removeItem('pending_login_params');
@@ -385,6 +388,9 @@ const Login = () => {
             
             localStorage.setItem("customerData", JSON.stringify(immediateCustomerData));
             localStorage.setItem("shop_domain", shopParam);
+            if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+              setCustomerDataCookie(immediateCustomerData);
+            }
 
             // Fetch full customer data in background for additional info
             const { data: customerData, error: customerError } = await supabase.functions.invoke("get-customer-data", {
@@ -403,17 +409,18 @@ const Login = () => {
               const mergedName = customerData.customer?.name || customerName;
               const mergedFirstName = customerData.customer?.first_name || firstName;
               const mergedLastName = customerData.customer?.last_name || lastName;
-              localStorage.setItem(
-                "customerData",
-                JSON.stringify({
-                  customer_id: customerIdParam,
-                  id: customerIdParam,
-                  email: mergedEmail,
-                  name: mergedName,
-                  first_name: mergedFirstName,
-                  last_name: mergedLastName,
-                }),
-              );
+              const mergedCustomerData = {
+                customer_id: customerIdParam,
+                id: customerIdParam,
+                email: mergedEmail,
+                name: mergedName,
+                first_name: mergedFirstName,
+                last_name: mergedLastName,
+              };
+              localStorage.setItem("customerData", JSON.stringify(mergedCustomerData));
+              if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+                setCustomerDataCookie(mergedCustomerData);
+              }
 
               // Store customer in database on login (so entry exists even if redirect loses localStorage)
               await storeCustomerInDatabase(

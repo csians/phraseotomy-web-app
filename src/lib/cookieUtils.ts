@@ -67,3 +67,40 @@ export function getCustomerFromShopifyCookie(): ShopifyCustomerCookie | null {
   console.log('🍪 [cookieUtils] No customer cookie found');
   return null;
 }
+
+/**
+ * Set customer_data cookie on the current domain (staging).
+ * Used when we receive customer data via URL/postMessage so we can read it on subsequent visits.
+ */
+export function setCustomerDataCookie(customer: {
+  id?: string;
+  customer_id?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
+  customer_email?: string;
+  customer_first_name?: string;
+  customer_last_name?: string;
+}): void {
+  if (typeof document === 'undefined') return;
+  const id = customer.customer_id || customer.id;
+  if (!id) return;
+  const payload = {
+    customer_id: id,
+    customer_email: customer.customer_email || customer.email,
+    customer_first_name: customer.customer_first_name ?? customer.firstName ?? customer.first_name,
+    customer_last_name: customer.customer_last_name ?? customer.lastName ?? customer.last_name,
+  };
+  const value = encodeURIComponent(JSON.stringify(payload));
+  document.cookie = `customer_data=${value}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+}
+
+/**
+ * Clear customer_data cookie (e.g. on logout).
+ */
+export function clearCustomerDataCookie(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = "customer_data=; path=/; max-age=0";
+}

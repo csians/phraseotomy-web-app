@@ -2,7 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { getAllUrlParams } from "./lib/urlUtils";
-import { getCustomerFromShopifyCookie } from "./lib/cookieUtils";
+import { getCustomerFromShopifyCookie, setCustomerDataCookie, clearCustomerDataCookie } from "./lib/cookieUtils";
 import { getTenantByAppDomain } from "./lib/tenants";
 
 // When visiting ourstagingserver.com directly, there's no parent to postMessage the cookie.
@@ -45,6 +45,9 @@ window.addEventListener("message", (e) => {
   (window as any).__PHRASEOTOMY_CUSTOMER__ = customerData;
   const tenant = getTenantByAppDomain(window.location.hostname);
   if (tenant?.shopDomain) localStorage.setItem("shop_domain", tenant.shopDomain);
+  if (window.location.hostname === "phraseotomy.ourstagingserver.com") {
+    setCustomerDataCookie(customerData);
+  }
   console.log("✅ [INIT] Customer from parent postMessage (cookie)");
   window.dispatchEvent(new CustomEvent("phraseotomy:customer-from-parent"));
 });
@@ -85,6 +88,9 @@ if (customerParam) {
     } else {
       // Regular customer - store in localStorage
       localStorage.setItem('customerData', JSON.stringify(customerData));
+      if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+        setCustomerDataCookie(customerData);
+      }
       console.log('✅ [INIT] Customer data stored');
     }
     
@@ -117,6 +123,9 @@ if (isPlayOnlinePath && !cookieCustomerCheck) {
   localStorage.removeItem('phraseotomy_session_token');
   localStorage.removeItem('shop_domain');
   if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
+  if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+    clearCustomerDataCookie();
+  }
 }
 
 // If no URL customer param, check Shopify cookie (set when customer logs in via Shopify)
@@ -138,6 +147,9 @@ if (!customerParam) {
     const tenant = getTenantByAppDomain(window.location.hostname);
     if (tenant?.shopDomain) {
       localStorage.setItem('shop_domain', tenant.shopDomain);
+    }
+    if (window.location.hostname === "phraseotomy.ourstagingserver.com") {
+      setCustomerDataCookie(cookieCustomer);
     }
     console.log('✅ [INIT] Customer from cookie stored');
   }
