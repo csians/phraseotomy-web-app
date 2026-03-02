@@ -234,13 +234,21 @@ function getCookie(name: string) {
 
 const App = () => {
   useEffect(() => {
-    const rawCustomerData = getCookie('customer_data');
-    if (rawCustomerData) {
-      const decoded = decodeURIComponent(rawCustomerData);
-      const parsed = JSON.parse(decoded);
-      console.log(parsed);
-    } else {
+    const checkCookie = () => {
+      const rawCustomerData = getCookie('customer_data');
+      if (rawCustomerData) {
+        const decoded = decodeURIComponent(rawCustomerData);
+        const parsed = JSON.parse(decoded);
+        console.log(parsed);
+        return true;
+      }
       console.log('customer_data not found');
+      return false;
+    };
+
+    if (!checkCookie()) {
+      const timeoutId = setTimeout(() => checkCookie(), 10000);
+      return () => clearTimeout(timeoutId);
     }
   }, []);
 
