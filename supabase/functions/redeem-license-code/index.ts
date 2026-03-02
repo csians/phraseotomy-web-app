@@ -5,6 +5,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const RELATED_SHOP_DOMAINS: Record<string, string[]> = {
+  'phraseotomy.com': ['phraseotomy.com', 'qxqtbf-21.myshopify.com'],
+  'qxqtbf-21.myshopify.com': ['phraseotomy.com', 'qxqtbf-21.myshopify.com', 'phraseotomy.ourstagingserver.com'],
+  'testing-cs-store.myshopify.com': ['testing-cs-store.myshopify.com'],
+  'phraseotomy.ourstagingserver.com': ['testing-cs-store.myshopify.com'],
+};
+
+function getRelatedDomains(shopDomain: string): string[] {
+  return RELATED_SHOP_DOMAINS[shopDomain.toLowerCase()] || [shopDomain];
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -125,6 +136,55 @@ Deno.serve(async (req) => {
     if (existingLicense) {
       return new Response(
         JSON.stringify({ success: false, error: 'ALREADY_REDEEMED', message: 'You have already redeemed this code.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if all packs from this code are already active for this customer
+    const domainsToSearch = getRelatedDomains(shopDomain);
+    const { data: customerRecord } = await supabaseAdmin
+      .from('customers')
+      .select('customer_id, staging_customer_id, prod_customer_id')
+      .or(`customer_id.eq.${customerId},staging_customer_id.eq.${customerId},prod_customer_id.eq.${customerId}`)
+      .in('shop_domain', domainsToSearch)
+      .limit(1)
+      .single();
+
+    const customerIdsToSearch = [customerId];
+    if (customerRecord) {
+      [customerRecord.customer_id, customerRecord.staging_customer_id, customerRecord.prod_customer_id]
+        .filter(Boolean)
+        .forEach((id: string) => {
+          if (!customerIdsToSearch.includes(id)) customerIdsToSearch.push(id);
+        });
+    }
+
+    const { data: existingLicenses } = await supabaseAdmin
+      .from('customer_licenses')
+      .select('license_code_id, license_codes (packs_unlocked, expires_at)')
+      .in('customer_id', customerIdsToSearch)
+      .in('shop_domain', domainsToSearch)
+      .eq('status', 'active');
+
+    const now = new Date();
+    const alreadyActivePackIds = new Set<string>();
+    (existingLicenses || []).forEach((cl) => {
+      const lc = Array.isArray(cl.license_codes) ? cl.license_codes[0] : cl.license_codes;
+      if (!lc) return;
+      const expiresAt = lc.expires_at ? new Date(lc.expires_at) : null;
+      if (expiresAt && expiresAt < now) return; // skip expired
+      (lc.packs_unlocked ?? []).forEach((id: string) => alreadyActivePackIds.add(id));
+    });
+
+    const newPackIds = licenseCode.packs_unlocked || [];
+    const allAlreadyActive = newPackIds.length > 0 && newPackIds.every((id: string) => alreadyActivePackIds.has(id));
+    if (allAlreadyActive) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'PACKS_ALREADY_ACTIVE',
+          message: 'You already have access to all packs from this code.',
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

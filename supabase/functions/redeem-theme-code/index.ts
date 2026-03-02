@@ -15,6 +15,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const RELATED_SHOP_DOMAINS: Record<string, string[]> = {
+  'phraseotomy.com': ['phraseotomy.com', 'qxqtbf-21.myshopify.com'],
+  'qxqtbf-21.myshopify.com': ['phraseotomy.com', 'qxqtbf-21.myshopify.com', 'phraseotomy.ourstagingserver.com'],
+  'testing-cs-store.myshopify.com': ['testing-cs-store.myshopify.com'],
+  'phraseotomy.ourstagingserver.com': ['testing-cs-store.myshopify.com'],
+};
+
+function getRelatedDomains(shopDomain: string): string[] {
+  return RELATED_SHOP_DOMAINS[shopDomain.toLowerCase()] || [shopDomain];
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -103,6 +114,18 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existingCtc) {
+      // Extend expiry when customer re-redeems (30 days from now)
+      const extendsExpiresAt = new Date();
+      extendsExpiresAt.setDate(extendsExpiresAt.getDate() + 30);
+      const { error: extendError } = await supabase
+        .from('theme_codes')
+        .update({ expires_at: extendsExpiresAt.toISOString() })
+        .eq('id', themeCode.id);
+
+      if (extendError) {
+        console.error('Error extending theme code expiry:', extendError);
+      }
+
       const { data: packs } = await supabase
         .from('themes')
         .select('id, name')
@@ -111,10 +134,11 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'Theme code already redeemed',
+          message: 'Theme code already redeemed. Access extended.',
           alreadyUnlocked: true,
           themesUnlocked: themeNames,
           themesUnlockedWithNames: (packs || []).map((p) => ({ id: p.id, name: p.name })),
+          expiresAt: extendsExpiresAt.toISOString(),
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -124,6 +148,56 @@ Deno.serve(async (req) => {
     if (themeCode.redeemed_at && themeCode.redeemed_by && themeCode.redeemed_by !== customerId) {
       return new Response(
         JSON.stringify({ success: false, error: 'Theme code has already been redeemed' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if all themes from this code are already active for this customer (via other theme codes)
+    const domainsToSearch = getRelatedDomains(shopDomain);
+    const { data: customerRecord } = await supabase
+      .from('customers')
+      .select('customer_id, staging_customer_id, prod_customer_id')
+      .or(`customer_id.eq.${customerId},staging_customer_id.eq.${customerId},prod_customer_id.eq.${customerId}`)
+      .in('shop_domain', domainsToSearch)
+      .limit(1)
+      .single();
+
+    const customerIdsToSearch = [customerId];
+    if (customerRecord) {
+      [customerRecord.customer_id, customerRecord.staging_customer_id, customerRecord.prod_customer_id]
+        .filter(Boolean)
+        .forEach((id: string) => {
+          if (!customerIdsToSearch.includes(id)) customerIdsToSearch.push(id);
+        });
+    }
+
+    const { data: existingThemeCodes } = await supabase
+      .from('customer_theme_codes')
+      .select('theme_code_id, theme_codes (themes_unlocked, expires_at)')
+      .in('customer_id', customerIdsToSearch)
+      .in('shop_domain', domainsToSearch)
+      .eq('status', 'active')
+      .neq('theme_code_id', themeCode.id);
+
+    const now = new Date();
+    const alreadyActiveThemeIds = new Set<string>();
+    (existingThemeCodes || []).forEach((ctc) => {
+      const tc = Array.isArray(ctc.theme_codes) ? ctc.theme_codes[0] : ctc.theme_codes;
+      if (!tc) return;
+      const expiresAt = tc.expires_at ? new Date(tc.expires_at) : null;
+      if (expiresAt && expiresAt < now) return;
+      (tc.themes_unlocked ?? []).forEach((id: string) => alreadyActiveThemeIds.add(id));
+    });
+
+    const newThemeIds = unlockedThemeIds;
+    const allAlreadyActive = newThemeIds.length > 0 && newThemeIds.every((id: string) => alreadyActiveThemeIds.has(id));
+    if (allAlreadyActive) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'THEMES_ALREADY_ACTIVE',
+          message: 'You already have access to all themes from this code.',
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -147,6 +221,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Set expires_at to 30 days from now when redeeming
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
     // Update theme_codes
     const { error: updateError } = await supabase
       .from('theme_codes')
@@ -154,34 +232,48 @@ Deno.serve(async (req) => {
         status: 'active',
         redeemed_by: customerId,
         redeemed_at: new Date().toISOString(),
+        expires_at: expiresAt.toISOString(),
       })
       .eq('id', themeCode.id);
 
     if (updateError) {
       console.error('Error updating theme_codes:', updateError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to update theme code' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Fetch theme names
-    const { data: themes } = await supabase
-      .from('themes')
-      .select('id, name')
-      .in('id', unlockedThemeIds);
-    const themeNames = (themes || []).map((t) => t.name);
-    const themesWithNames = (themes || []).map((t) => ({ id: t.id, name: t.name ?? t.id }));
+    // Fetch theme names (safely handle empty or invalid IDs)
+    let themeNames: string[] = [];
+    let themesWithNames: { id: string; name: string }[] = [];
+    if (unlockedThemeIds.length > 0) {
+      const { data: themes } = await supabase
+        .from('themes')
+        .select('id, name')
+        .in('id', unlockedThemeIds);
+      themeNames = (themes || []).map((t) => t.name ?? t.id);
+      themesWithNames = (themes || []).map((t) => ({ id: t.id, name: t.name ?? t.id }));
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         message: `Code redeemed! Unlocked themes: ${themeNames.join(', ')}`,
         themesUnlocked: themeNames,
-        themesUnlockedWithNames,
+        themesUnlockedWithNames: themesWithNames,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error('redeem-theme-code error:', err);
     return new Response(
-      JSON.stringify({ success: false, error: 'An unexpected error occurred' }),
+      JSON.stringify({
+        success: false,
+        error: 'An unexpected error occurred',
+        details: errMsg,
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

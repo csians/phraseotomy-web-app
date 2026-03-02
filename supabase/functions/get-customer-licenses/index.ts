@@ -1,11 +1,15 @@
 /**
  * Supabase Edge Function: Get Customer Licenses
  *
- * Returns which license codes a customer has unlocked, their expire times,
- * and which licenses are currently active.
+ * Returns which license codes a customer has unlocked (packs) and which theme
+ * codes they have redeemed (themes), with expire times and active status.
  *
  * Request body: { customerId: string, shopDomain: string }
- * Response: { customer_id, licenses: [{ code, packs_unlocked, packs_with_names, expires_at, is_active, activated_at }] }
+ * Response: {
+ *   customer_id,
+ *   licenses: [{ code, packs_unlocked, packs_with_names, expires_at, is_active, activated_at }],
+ *   theme_codes: [{ code, themes_unlocked, themes_with_names, expires_at, redeemed_at, is_active }]
+ * }
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
@@ -28,6 +32,11 @@ const RELATED_SHOP_DOMAINS: Record<string, string[]> = {
 
 function getRelatedDomains(shopDomain: string): string[] {
   return RELATED_SHOP_DOMAINS[shopDomain] || [shopDomain];
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(s: string): boolean {
+  return UUID_REGEX.test(s);
 }
 
 Deno.serve(async (req) => {
@@ -78,11 +87,13 @@ Deno.serve(async (req) => {
         status,
         activated_at,
         shop_domain,
+        tenant_id,
         license_codes (
           code,
           packs_unlocked,
           expires_at,
-          status
+          status,
+          tenant_id
         )
       `)
       .in('customer_id', customerIdsToSearch)
@@ -110,13 +121,36 @@ Deno.serve(async (req) => {
     const packIdList = Array.from(packIds);
     const packNamesMap: Record<string, string> = {};
     if (packIdList.length > 0) {
-      const { data: packs } = await supabase
-        .from('packs')
-        .select('id, name')
-        .in('id', packIdList);
-      (packs || []).forEach((p) => {
-        packNamesMap[p.id] = p.name ?? p.id;
-      });
+      const uuidList = packIdList.filter(isUuid);
+      const nameList = packIdList.filter((id) => !isUuid(id));
+
+      if (uuidList.length > 0) {
+        const { data: packsById } = await supabase
+          .from('packs')
+          .select('id, name')
+          .in('id', uuidList);
+        (packsById || []).forEach((p) => {
+          packNamesMap[p.id] = p.name ?? p.id;
+        });
+      }
+
+      if (nameList.length > 0) {
+        const tenantId = (licenses || [])[0]?.tenant_id;
+        if (tenantId) {
+          const { data: packsByName } = await supabase
+            .from('packs')
+            .select('id, name')
+            .eq('tenant_id', tenantId)
+            .in('name', nameList);
+          (packsByName || []).forEach((p) => {
+            packNamesMap[p.id] = p.name ?? p.id;
+            packNamesMap[p.name] = p.name;
+          });
+        }
+        nameList.forEach((name) => {
+          if (!(name in packNamesMap)) packNamesMap[name] = name;
+        });
+      }
     }
 
     const formatted = (licenses || []).map((cl) => {
@@ -141,10 +175,113 @@ Deno.serve(async (req) => {
       };
     });
 
+    // Filter licenses: only include entries that add packs not already active from another license
+    const seenPackIds = new Set<string>();
+    const filteredLicenses: typeof formatted = [];
+    for (const lic of formatted.sort((a, b) => new Date(a.activated_at || 0).getTime() - new Date(b.activated_at || 0).getTime())) {
+      const newPackIds = (lic.packs_unlocked ?? []).filter((id: string) => !seenPackIds.has(id));
+      if (newPackIds.length === 0) continue;
+      newPackIds.forEach((id: string) => seenPackIds.add(id));
+      filteredLicenses.push({
+        ...lic,
+        packs_unlocked: newPackIds,
+        packs_with_names: lic.packs_with_names.filter((p) => newPackIds.includes(p.id)),
+      });
+    }
+
+    // Fetch theme codes redeemed by this customer
+    const { data: customerThemeCodes, error: themeCodesError } = await supabase
+      .from('customer_theme_codes')
+      .select(`
+        theme_code_id,
+        activated_at,
+        theme_codes (
+          code,
+          themes_unlocked,
+          expires_at,
+          redeemed_at
+        )
+      `)
+      .in('customer_id', customerIdsToSearch)
+      .in('shop_domain', domainsToSearch)
+      .eq('status', 'active');
+
+    if (themeCodesError) {
+      console.error('Error fetching customer theme codes:', themeCodesError);
+      return new Response(
+        JSON.stringify({ error: themeCodesError.message }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const themeIds = new Set<string>();
+    (customerThemeCodes || []).forEach((ctc) => {
+      const tc = Array.isArray(ctc.theme_codes) ? ctc.theme_codes[0] : ctc.theme_codes;
+      (tc?.themes_unlocked ?? []).forEach((id: string) => themeIds.add(id));
+    });
+
+    const themeNamesMap: Record<string, string> = {};
+    const themeIdList = Array.from(themeIds);
+    if (themeIdList.length > 0) {
+      const { data: themes } = await supabase
+        .from('themes')
+        .select('id, name')
+        .in('id', themeIdList);
+      (themes || []).forEach((t) => {
+        themeNamesMap[t.id] = t.name ?? t.id;
+      });
+    }
+
+    const formattedThemeCodes = (customerThemeCodes || []).map((ctc) => {
+      const tc = Array.isArray(ctc.theme_codes) ? ctc.theme_codes[0] : ctc.theme_codes;
+      const expiresAt = tc?.expires_at ? new Date(tc.expires_at) : null;
+      const isExpired = expiresAt ? expiresAt < now : false;
+      const isActive = !isExpired;
+      const themeIdsForCode = tc?.themes_unlocked ?? [];
+      const themes_with_names = themeIdsForCode.map((id: string) => ({
+        id,
+        name: themeNamesMap[id] ?? id,
+      }));
+      const themes_unlocked = themes_with_names.map((t) => t.name);
+
+      return {
+        code: tc?.code ?? null,
+        themes_unlocked,
+        themes_with_names,
+        expires_at: tc?.expires_at ?? null,
+        redeemed_at: tc?.redeemed_at ?? ctc.activated_at ?? null,
+        is_active: isActive,
+      };
+    });
+
+    // Filter theme_codes: only include entries that add themes not already active from another code
+    const seenThemeIds = new Set<string>();
+    const filteredThemeCodes: { code: string | null; themes_unlocked: string[]; themes_with_names: { id: string; name: string }[]; expires_at: string | null; redeemed_at: string | null; is_active: boolean }[] = [];
+    for (const tc of formattedThemeCodes.sort(
+      (a, b) => new Date(a.redeemed_at || 0).getTime() - new Date(b.redeemed_at || 0).getTime()
+    )) {
+      const tcThemeIds = tc.themes_with_names.map((t) => t.id);
+      const newThemeIds = tcThemeIds.filter((id) => !seenThemeIds.has(id));
+      if (newThemeIds.length === 0) continue;
+      newThemeIds.forEach((id) => seenThemeIds.add(id));
+      filteredThemeCodes.push({
+        code: tc.code,
+        themes_unlocked: tc.themes_with_names.filter((t) => newThemeIds.includes(t.id)).map((t) => t.name),
+        themes_with_names: tc.themes_with_names.filter((t) => newThemeIds.includes(t.id)),
+        expires_at: tc.expires_at,
+        redeemed_at: tc.redeemed_at,
+        is_active: tc.is_active,
+      });
+    }
+
     return new Response(
       JSON.stringify({
         customer_id: customerId,
-        licenses: formatted,
+        licenses: filteredLicenses,
+        theme_codes: filteredThemeCodes,
       }),
       {
         status: 200,

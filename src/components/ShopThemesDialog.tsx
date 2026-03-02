@@ -155,17 +155,20 @@ export function ShopThemesDialog({
         });
       }
 
-      // 5. Also unlock themes from redeemed theme codes
+      // 5. Also unlock themes from redeemed theme codes (only non-expired)
       const { data: redeemedCodes, error: codeError } = await supabase
         .from("theme_codes")
-        .select("themes_unlocked")
-        .eq("redeemed_by", customerId);
+        .select("themes_unlocked, expires_at")
+        .eq("redeemed_by", customerId)
+        .eq("status", "active");
 
       if (!codeError && redeemedCodes?.length) {
-        redeemedCodes.forEach(code => {
-          (code.themes_unlocked || []).forEach(themeId => {
-            unlocked.add(themeId);
-          });
+        const now = new Date();
+        redeemedCodes.forEach((code: { themes_unlocked?: string[]; expires_at?: string | null }) => {
+          const isExpired = code.expires_at ? new Date(code.expires_at) < now : false;
+          if (!isExpired) {
+            (code.themes_unlocked || []).forEach((themeId: string) => unlocked.add(themeId));
+          }
         });
       }
 

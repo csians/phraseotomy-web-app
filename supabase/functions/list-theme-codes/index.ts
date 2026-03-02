@@ -75,53 +75,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get customer licenses with their license code expiry dates  
-    const { data: customerLicenses, error: customerLicensesError } = await supabase
-      .from('customer_licenses')
-      .select(`
-        customer_id,
-        customer_email,
-        license_code_id,
-        activated_at,
-        license_codes!inner(expires_at)
-      `)
-      .eq('tenant_id', tenant.id)
-      .order('activated_at', { ascending: false });
-
-    if (customerLicensesError) {
-      console.error('Error loading customer licenses:', customerLicensesError);
-    }
-
-    // Create a map of customer -> expiry date from their latest license
-    const customerExpiryMap: Record<string, string | null> = {};
-
-    if (customerLicenses) {
-      // Group by customer and get the most recent license expiry for each
-      const customerGrouped: Record<string, any[]> = {};
-
-      customerLicenses.forEach(cl => {
-        if (!customerGrouped[cl.customer_id]) {
-          customerGrouped[cl.customer_id] = [];
-        }
-        customerGrouped[cl.customer_id].push(cl);
-      });
-
-      // For each customer, use their most recent license expiry
-      Object.entries(customerGrouped).forEach(([customerId, licenses]) => {
-        const latestLicense = licenses[0]; // Already ordered by activated_at desc
-        const expiryDate = latestLicense.license_codes?.expires_at;
-
-        if (expiryDate) {
-          customerExpiryMap[customerId] = expiryDate;
-
-          // Also map by email if available
-          if (latestLicense.customer_email) {
-            customerExpiryMap[latestLicense.customer_email] = expiryDate;
-          }
-        }
-      });
-    }
-
     // Get customer information for redeemed codes
     // Get unique redeemed customer IDs
     const redeemedCustomerIds = [
@@ -159,31 +112,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Enrich codes with customer information and inherited expiry dates
+    // Enrich codes with customer information
+    // Theme codes use their own expires_at (set when redeeming, extended on re-redeem).
+    // Do NOT override with license expiry - theme codes have independent expiry.
     const enrichedCodes = codes?.map(code => {
-      // For redeemed codes, try to inherit expiry date from customer's license
-      let inheritedExpiryDate = null;
-
-      if (code.redeemed_by) {
-        // Try to inherit expiry date from customer's license by email matching
-        inheritedExpiryDate = customerExpiryMap[code.redeemed_by];
-
-        // If no direct match, try case-insensitive email matching
-        if (!inheritedExpiryDate && customerLicenses) {
-          const matchingCustomer = customerLicenses.find(cl =>
-            cl.customer_email?.toLowerCase() === code.redeemed_by?.toLowerCase()
-          );
-
-          if (matchingCustomer) {
-            inheritedExpiryDate = matchingCustomer.license_codes?.expires_at;
-          }
-        }
-      }
-
-      // Override expires_at with inherited value from license codes
       const codeWithInheritedExpiry = {
         ...code,
-        expires_at: inheritedExpiryDate,
+        // Use theme_codes.expires_at - it is set/updated by redeem-theme-code
+        expires_at: code.expires_at ?? null,
       };
       if (!code.redeemed_by) {
         // No redemption data - check if there's a redeemed_at timestamp with missing redeemed_by
