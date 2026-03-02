@@ -5,6 +5,31 @@ import { getAllUrlParams } from "./lib/urlUtils";
 import { getCustomerFromShopifyCookie } from "./lib/cookieUtils";
 import { getTenantByAppDomain } from "./lib/tenants";
 
+// When iframe origin (ourstagingserver.com) is outside top-level (phraseotomy.com),
+// the parent reads the cookie and postMessages it. Listen for that.
+const ALLOWED_ORIGINS = ["https://phraseotomy.com", "https://phraseotomy.ourstagingserver.com"];
+window.addEventListener("message", (e) => {
+  if (!ALLOWED_ORIGINS.includes(e.origin)) return;
+  const msg = e.data;
+  if (msg?.type !== "PHRASEOTOMY_CUSTOMER_FROM_COOKIE" || !msg?.payload) return;
+  const p = msg.payload;
+  const customerData = {
+    id: p.id || p.customer_id,
+    customer_id: p.customer_id || p.id,
+    email: p.email,
+    name: p.name,
+    firstName: p.firstName,
+    lastName: p.lastName,
+  };
+  if (!customerData.id) return;
+  localStorage.setItem("customerData", JSON.stringify(customerData));
+  (window as any).__PHRASEOTOMY_CUSTOMER__ = customerData;
+  const tenant = getTenantByAppDomain(window.location.hostname);
+  if (tenant?.shopDomain) localStorage.setItem("shop_domain", tenant.shopDomain);
+  console.log("✅ [INIT] Customer from parent postMessage (cookie)");
+  window.dispatchEvent(new CustomEvent("phraseotomy:customer-from-parent"));
+});
+
 // Initialize customer data: first from URL params, then from Shopify cookie
 const urlParams = getAllUrlParams();
 const customerParam = urlParams.get('customer');

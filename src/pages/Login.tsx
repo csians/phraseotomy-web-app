@@ -74,6 +74,13 @@ const Login = () => {
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [customerFromParentAt, setCustomerFromParentAt] = useState(0);
+
+  useEffect(() => {
+    const onCustomerFromParent = () => setCustomerFromParentAt((n) => n + 1);
+    window.addEventListener("phraseotomy:customer-from-parent", onCustomerFromParent);
+    return () => window.removeEventListener("phraseotomy:customer-from-parent", onCustomerFromParent);
+  }, []);
 
   useEffect(() => {
     const urlParams = getAllUrlParams();
@@ -149,6 +156,7 @@ const Login = () => {
     const sessionToken = localStorage.getItem('phraseotomy_session_token');
     const shopFromStorage = localStorage.getItem('shop_domain');
     const isProxyPath = window.location.pathname.includes('/pages/play-online');
+    const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
 
     console.log('🔍 [Login] Cookie auto-login check:', {
       hasCookieCustomer: !!cookieCustomer,
@@ -160,7 +168,7 @@ const Login = () => {
       hostname: window.location.hostname,
     });
 
-    if ((cookieCustomer || stored) && !sessionToken && isProxyPath) {
+    if ((cookieCustomer || stored) && !sessionToken && (isProxyPath || isInIframe)) {
       const customerData = cookieCustomer || (stored ? JSON.parse(stored) : null);
       const shopParam = shopFromStorage || getTenantByAppDomain(window.location.hostname)?.shopDomain;
 
@@ -747,7 +755,7 @@ const Login = () => {
 
       fetchTenant();
     }
-  }, [navigate, toast]);
+  }, [navigate, toast, customerFromParentAt]);
 
   const handleLogin = async () => {
     console.log("shopDomainshopDomain", shopDomain);
