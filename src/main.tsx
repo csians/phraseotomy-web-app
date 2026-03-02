@@ -5,7 +5,26 @@ import { getAllUrlParams } from "./lib/urlUtils";
 import { getCustomerFromShopifyCookie } from "./lib/cookieUtils";
 import { getTenantByAppDomain } from "./lib/tenants";
 
-// Initialize customer data: first from URL params, then from Shopify cookie
+// Redirect when app runs on staging domain but user needs production store cookie
+// Cookies are domain-scoped: customer_data on phraseotomy.com is NOT readable from phraseotomy.ourstagingserver.com
+let isRedirecting = false;
+if (typeof window !== 'undefined' && window.location.hostname === 'phraseotomy.ourstagingserver.com') {
+  const urlParams = getAllUrlParams();
+  const hasCustomerFromUrl = !!urlParams.get('customer') || !!urlParams.get('customer_id');
+  const cookieCustomer = getCustomerFromShopifyCookie();
+  const pathname = window.location.pathname;
+  const isRootOrPlay = pathname === '/' || pathname === '' || pathname.includes('play-online');
+  if (!hasCustomerFromUrl && !cookieCustomer && isRootOrPlay) {
+    const tenant = getTenantByAppDomain(window.location.hostname);
+    if (tenant?.shopDomain === 'phraseotomy.com') {
+      console.log('🔀 [INIT] Redirecting to phraseotomy.com so cookie can be read (domain-scoped)');
+      window.location.replace('https://phraseotomy.com/pages/play-online');
+      isRedirecting = true;
+    }
+  }
+}
+
+// Initialize customer data: first from URL params, then from Shopify cookie (skip if redirecting)
 const urlParams = getAllUrlParams();
 const customerParam = urlParams.get('customer');
 const guestSessionParam = urlParams.get('guestSession');
@@ -99,4 +118,12 @@ if (!customerParam) {
   }
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  isRedirecting ? (
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-[#fbbf24]">
+      Redirecting to phraseotomy.com…
+    </div>
+  ) : (
+    <App />
+  )
+);

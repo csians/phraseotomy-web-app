@@ -196,9 +196,33 @@ Deno.serve(async (req) => {
 
 
     // Extract customer ID and other data from Shopify proxy parameters
-    const customerId = queryParams.get("logged_in_customer_id") || null;
-    const customerNameFromProxy = queryParams.get("customer_name") || null;
-    const customerEmailFromProxy = queryParams.get("customer_email") || null;
+    let customerId = queryParams.get("logged_in_customer_id") || null;
+    let customerNameFromProxy = queryParams.get("customer_name") || null;
+    let customerEmailFromProxy = queryParams.get("customer_email") || null;
+
+    // Fallback: read customer_data from Cookie header (when proxy params missing but customer is logged in via store)
+    if (!customerId) {
+      const cookieHeader = req.headers.get("Cookie") || req.headers.get("cookie");
+      if (cookieHeader) {
+        const customerDataMatch = cookieHeader.match(/customer_data=([^;]+)/);
+        if (customerDataMatch) {
+          try {
+            const decoded = decodeURIComponent(customerDataMatch[1]);
+            const parsed = JSON.parse(decoded) as Record<string, unknown>;
+            const data = (parsed?.customer_data as Record<string, unknown>) || parsed;
+            const id = data?.customer_id ?? data?.id;
+            if (id && typeof id === "string") {
+              customerId = id;
+              customerNameFromProxy = [data.customer_first_name, data.customer_last_name].filter(Boolean).join(" ") || null;
+              customerEmailFromProxy = (data.customer_email as string) || (data.email as string) || null;
+              console.log("🔍 [CUSTOMER_COOKIE] Found customer from cookie:", customerId);
+            }
+          } catch (e) {
+            console.log("🔍 [CUSTOMER_COOKIE] Parse error:", e);
+          }
+        }
+      }
+    }
     
     console.log("🔍 [CUSTOMER_ID] Extracted customerId:", customerId);
     console.log("🔍 [CUSTOMER_ID] customer_name from proxy:", customerNameFromProxy);
@@ -350,10 +374,9 @@ Deno.serve(async (req) => {
  * Generate login redirect HTML for unauthenticated users
  */
 function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: string): string {
-  console.log("hiiii");
-  // Choose base URL based on tenant environment
-  const baseUrl =
-    tenant.environment === "production"
+  // Choose base URL based on tenant environment (used if we add redirect link)
+  const _baseUrl =
+    environment === "production"
       ? "https://phraseotomy.com/pages/play-online"
       : "https://phraseotomy.ourstagingserver.com";
   return `<style nonce="${crypto.randomUUID()}">
