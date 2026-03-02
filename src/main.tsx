@@ -8,14 +8,14 @@ import { getTenantByAppDomain } from "./lib/tenants";
 // When visiting ourstagingserver.com directly, there's no parent to postMessage the cookie.
 // Redirect to phraseotomy.com so the proxy returns the page with the parent script.
 let isRedirecting = false;
-if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com" && window.self === window.top) {
+if (typeof window !== "undefined" && window.top.location.hostname === "phraseotomy.ourstagingserver.com" && window.self === window.top) {
   const urlParams = getAllUrlParams();
   const hasCustomer = !!urlParams.get("customer") || !!urlParams.get("customer_id");
   const hasSession = !!localStorage.getItem("phraseotomy_session_token");
-  const pathname = window.location.pathname;
+  const pathname = window.top.location.pathname;
   const isRootOrLogin = pathname === "/" || pathname === "" || pathname.includes("login");
   if (!hasCustomer && !hasSession && isRootOrLogin) {
-    const tenant = getTenantByAppDomain(window.location.hostname);
+    const tenant = getTenantByAppDomain(window.top.location.hostname);
     if (tenant?.shopDomain === "phraseotomy.com") {
       window.top.location.replace("https://phraseotomy.com/pages/play-online");
       isRedirecting = true;
