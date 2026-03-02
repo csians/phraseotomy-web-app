@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
     // Return HTML with application/liquid content type so Shopify renders it
     const headers = new Headers({
       "Content-Type": "application/liquid",
-      "Content-Security-Policy": "frame-ancestors https://phraseotomy.com https://*.phraseotomy.com https://phraseotomy.ourstagingserver.com https://*.vercel.app https://admin.shopify.com https://*.myshopify.com 'self'",
+      "Content-Security-Policy": "frame-ancestors https://phraseotomy.com https://*.phraseotomy.com https://phraseotomy.ourstagingserver.com https://admin.shopify.com https://*.myshopify.com 'self'",
     });
 
     // Pass token and customer data to app
