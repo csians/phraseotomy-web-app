@@ -75,7 +75,7 @@ export async function loadAccessStatus(shopDomain: string | null): Promise<Acces
       hasActiveLicense: true,
       licenseExpiresAt: expiresAt,
       unlockedPacks: [],
-      redemptionCode: 'PROD-GOLD-2024',
+      redemptionCode: 'PROD-BASE-2024',
     };
   }
 

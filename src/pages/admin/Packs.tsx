@@ -120,7 +120,10 @@ export default function Packs() {
       if (themesRes.error) throw themesRes.error;
       if (themePacksRes.error) throw themePacksRes.error;
       
-      setPacks((packsRes.data || []) as Pack[]);
+      // Exclude Gold and Premium packs (removed - only Base, Core, and others)
+      const excludedPackNames = ['Gold', 'Premium'];
+      const filteredPacks = (packsRes.data || []).filter((p: Pack) => !excludedPackNames.includes(p.name));
+      setPacks(filteredPacks as Pack[]);
       setAllThemes(themesRes.data || []);
       setThemePacks((themePacksRes.data || []).map(tp => ({
         ...tp,

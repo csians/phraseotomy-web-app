@@ -45,17 +45,18 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
     
     // Support both "Code" and "code" column names
     const codeKey = headerMap.get("code");
-    // Support "Pack" column (comma-separated like "Base, Gold, Premium")
+    // Support "Pack" column (comma-separated like "Base, Core")
     const packKey = headerMap.get("pack");
 
     if (!codeKey || !packKey) {
       throw new Error("File must have columns: Code, Pack");
     }
 
+    const excludedPackNames = ['Gold', 'Premium'];
     return data.map(row => {
       const packNamesRaw = String(row[packKey] || "");
-      // Split by comma and trim each pack name
-      const packNames = packNamesRaw.split(",").map(p => p.trim()).filter(p => p);
+      // Split by comma and trim each pack name; exclude removed packs (Gold, Premium)
+      const packNames = packNamesRaw.split(",").map(p => p.trim()).filter(p => p && !excludedPackNames.includes(p));
       
       return {
         code: String(row[codeKey] || "").toUpperCase().trim(),
@@ -77,7 +78,7 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
         const lines = text.trim().split("\n");
         const headers = lines[0].split(",").map(h => h.trim());
         const data = lines.slice(1).map(line => {
-          // Handle CSV with commas inside pack values (e.g., "Base, Gold, Premium")
+          // Handle CSV with commas inside pack values (e.g., "Base, Core")
           const values: string[] = [];
           let current = '';
           let inQuotes = false;
@@ -181,7 +182,7 @@ export const CSVImport = ({ shopDomain, onImportComplete }: CSVImportProps) => {
         <DialogHeader>
           <DialogTitle>Import License Codes</DialogTitle>
           <DialogDescription>
-            Upload a CSV or XLSX file with Code and Pack columns (Pack can be comma-separated like "Base, Gold, Premium")
+            Upload a CSV or XLSX file with Code and Pack columns (Pack can be comma-separated like "Base, Core")
           </DialogDescription>
         </DialogHeader>
 

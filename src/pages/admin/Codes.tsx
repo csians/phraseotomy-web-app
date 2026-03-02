@@ -1023,8 +1023,8 @@ const Codes = () => {
               <TableHead>Redeemed By</TableHead>
               <TableHead>Redeemed At</TableHead>
               <TableHead>Expires At</TableHead>
-              <TableHead>Generated From</TableHead>
-              <TableHead>Packs Unlocked</TableHead>
+              {/* <TableHead>Generated From</TableHead> */}
+              {/* <TableHead>Packs Unlocked</TableHead> */}
               <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1068,18 +1068,17 @@ const Codes = () => {
                           <div className="text-xs text-muted-foreground">{formatDate(code.expires_at)}</div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      {/* <TableCell>
                         {(code as any).previous_code ? (
                           <div className="text-xs text-muted-foreground">
                             {(code as any).previous_code}
                             <br />
-                            {/* <span className="font-mono text-[0.65rem]">{(code as any).previous_code_id_display}</span> */}
                           </div>
                         ) : (
                           "—"
                         )}
-                      </TableCell>
-                      <TableCell>
+                      </TableCell> */}
+                      {/* <TableCell>
                         {code.packs_unlocked.length > 0
                           ? code.packs_unlocked
                               .map(packId => {
@@ -1088,7 +1087,7 @@ const Codes = () => {
                               })
                               .join(", ")
                           : "—"}
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {(code.status === "unused" || code.status === "active") && (
