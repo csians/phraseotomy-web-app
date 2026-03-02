@@ -15,7 +15,8 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store" }
+        { "key": "Cache-Control", "value": "no-store" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors https://phraseotomy.com https://*.phraseotomy.com https://phraseotomy.ourstagingserver.com https://admin.shopify.com https://*.myshopify.com 'self'" }
       ]
     }
   ]
