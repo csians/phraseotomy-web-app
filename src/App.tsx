@@ -95,9 +95,7 @@ const queryClient = new QueryClient();
         }),
       );
       if (shopForStorage) localStorage.setItem('shop_domain', shopForStorage);
-    } catch (e) {
-      console.warn('Could not persist customerData to localStorage:', e);
-    }
+    } catch (e) {}
   }
 
   // If this is a redeem-code flow (Code + customer + shop_domain),
@@ -112,7 +110,6 @@ const queryClient = new QueryClient();
       url.searchParams.get('customer_id')
     );
   if (hasRedeemParams) {
-    console.log('🎟️ [APP] Redeem flow detected, skipping URL clean so Play.tsx can process params directly');
     return;
   }
 
@@ -122,7 +119,6 @@ const queryClient = new QueryClient();
     sessionStorage.setItem('shopify_admin_context', 'true');
     if (hostParam) sessionStorage.setItem('shopify_host', hostParam);
     if (shop) sessionStorage.setItem('shopify_admin_shop', shop);
-    console.log('🔐 Shopify Admin context detected');
   }
 
   const hasLoginParams = shop || customer_id || customer_email || customer_name || rToken;
@@ -137,10 +133,6 @@ const queryClient = new QueryClient();
       Code: codeParam ?? undefined,
       shop_domain: shopDomainParam ?? undefined,
     };
-
-    console.log('🔍 [APP] Params:', params);
-
-    console.log('🧹 Cleaned URL params at app level:', params);
 
     // Store in sessionStorage for Login.tsx to process
     sessionStorage.setItem('pending_login_params', JSON.stringify(params));
@@ -162,7 +154,6 @@ const RootRedirect = () => {
     // If we're on any other path, don't redirect - let React Router handle it
     // Also exclude redeem-code path to prevent redirects
     if (currentPath !== '/' && currentPath !== '' && currentPath !== '/redeem') {
-      console.log('Not on root path, skipping RootRedirect:', currentPath);
       setRedirectTarget(null); // Don't redirect, let React Router handle it
       return;
     }
@@ -172,7 +163,6 @@ const RootRedirect = () => {
       const currentLobbySession = sessionStorage.getItem('current_lobby_session') || localStorage.getItem('current_lobby_session');
       const lobbyPlayerId = sessionStorage.getItem('lobby_player_id') || localStorage.getItem('lobby_player_id');
       if (currentLobbySession && lobbyPlayerId) {
-        console.log('Active lobby session found, redirecting to lobby');
         setRedirectTarget(`/lobby/${currentLobbySession}`);
         return;
       }
@@ -183,8 +173,6 @@ const RootRedirect = () => {
     const redeemCustomerId = urlParams.get('CustomerId') || urlParams.get('customer_id');
     const redeemShopDomain = urlParams.get('shop_domain');
     if (redeemCodeParam && redeemCustomerId && redeemShopDomain) {
-      console.log('🎟️ [APP] Redeem flow detected in RootRedirect, sending to /play/host');
-      // Play page is mounted at /play/host in the HashRouter
       setRedirectTarget('/play/host');
       return;
     }
@@ -196,7 +184,6 @@ const RootRedirect = () => {
       window.location.href.includes('admin.shopify.com');
     
     // Check if accessed via Shopify proxy path
-    console.log('root redirect pathname');
     const isProxyPath = window.location.pathname.includes('/pages/play-online');
     
     // Check for embedded customer data from iframe
@@ -208,27 +195,22 @@ const RootRedirect = () => {
     
     // If in Shopify admin context, go to admin panel
     if (isShopifyAdmin) {
-      console.log('Accessed from Shopify admin, redirecting to /admin');
       setRedirectTarget('/admin');
     }
     // If accessed via proxy path and authenticated, go to play page
     else if (isProxyPath && (customerData || (storedCustomerData && sessionToken))) {
-      console.log('Accessed via proxy path, redirecting to /play/host');
       setRedirectTarget('/play/host');
     }
     // If customer is authenticated via iframe, go to play page
     else if (customerData) {
-      console.log('Customer authenticated via iframe, redirecting to /play/host');
       setRedirectTarget('/play/host');
     }
     // If session exists in localStorage (standalone mode after iframe login)
     else if (storedCustomerData && sessionToken) {
-      console.log('Existing session found, redirecting to /play/host');
       setRedirectTarget('/play/host');
     }
     // Otherwise, go to login
     else {
-      console.log('No session found, redirecting to /login');
       setRedirectTarget('/login');
     }
   }, []);
@@ -245,7 +227,24 @@ const RootRedirect = () => {
   return <Navigate to={redirectTarget} replace />;
 };
 
-const App = () => (
+function getCookie(name: string) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : null;
+}
+
+const App = () => {
+  useEffect(() => {
+    const rawCustomerData = getCookie('customer_data');
+    if (rawCustomerData) {
+      const decoded = decodeURIComponent(rawCustomerData);
+      const parsed = JSON.parse(decoded);
+      console.log(parsed);
+    } else {
+      console.log('customer_data not found');
+    }
+  }, []);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -272,6 +271,7 @@ const App = () => (
       </HashRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
