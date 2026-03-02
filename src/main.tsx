@@ -39,6 +39,8 @@ window.addEventListener("message", (e) => {
     name: p.name,
     firstName: p.firstName,
     lastName: p.lastName,
+    first_name: p.firstName ?? p.first_name,
+    last_name: p.lastName ?? p.last_name,
   };
   if (!customerData.id) return;
   localStorage.setItem("customerData", JSON.stringify(customerData));

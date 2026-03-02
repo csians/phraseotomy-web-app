@@ -223,8 +223,8 @@ const Login = () => {
               customerData.id,
               customerData.email ?? null,
               customerData.name ?? null,
-              customerData.first_name ?? null,
-              customerData.last_name ?? null,
+              customerData.first_name ?? customerData.firstName ?? null,
+              customerData.last_name ?? customerData.lastName ?? null,
               dbTenant.shop_domain,
               dbTenant.id,
             );
