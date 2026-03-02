@@ -2,8 +2,10 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { getAllUrlParams } from "./lib/urlUtils";
+import { getCustomerFromShopifyCookie } from "./lib/cookieUtils";
+import { getTenantByAppDomain } from "./lib/tenants";
 
-// Initialize customer data from URL parameters (passed from Shopify proxy iframe)
+// Initialize customer data: first from URL params, then from Shopify cookie
 const urlParams = getAllUrlParams();
 const customerParam = urlParams.get('customer');
 const guestSessionParam = urlParams.get('guestSession');
@@ -54,6 +56,39 @@ if (guestSessionParam) {
   console.log('🔍 [INIT] Storing guest session:', guestSessionParam);
   sessionStorage.setItem('current_lobby_session', guestSessionParam);
   localStorage.setItem('current_lobby_session', guestSessionParam);
+}
+
+// On play-online path: if no Shopify cookie, clear session (logout from Shopify = logout from app)
+const isPlayOnlinePath = typeof window !== 'undefined' && window.location.pathname.includes('/pages/play-online');
+if (isPlayOnlinePath && !getCustomerFromShopifyCookie()) {
+  localStorage.removeItem('customerData');
+  localStorage.removeItem('phraseotomy_session_token');
+  localStorage.removeItem('shop_domain');
+  if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
+}
+
+// If no URL customer param, check Shopify cookie (set when customer logs in via Shopify)
+if (!customerParam) {
+  const cookieCustomer = getCustomerFromShopifyCookie();
+  if (cookieCustomer) {
+    console.log('🔍 [INIT] Customer data from Shopify cookie');
+    const name = [cookieCustomer.customer_first_name, cookieCustomer.customer_last_name].filter(Boolean).join(' ') || undefined;
+    const customerData = {
+      id: cookieCustomer.customer_id,
+      customer_id: cookieCustomer.customer_id,
+      email: cookieCustomer.customer_email,
+      name,
+      firstName: cookieCustomer.customer_first_name,
+      lastName: cookieCustomer.customer_last_name,
+    };
+    localStorage.setItem('customerData', JSON.stringify(customerData));
+    (window as any).__PHRASEOTOMY_CUSTOMER__ = customerData;
+    const tenant = getTenantByAppDomain(window.location.hostname);
+    if (tenant?.shopDomain) {
+      localStorage.setItem('shop_domain', tenant.shopDomain);
+    }
+    console.log('✅ [INIT] Customer from cookie stored');
+  }
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

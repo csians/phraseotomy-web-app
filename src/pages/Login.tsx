@@ -10,6 +10,7 @@ import { Redirect } from "@shopify/app-bridge/actions";
 import { DebugInfo } from "@/components/DebugInfo";
 import type { TenantConfig } from "@/lib/types";
 import { getAllUrlParams } from "@/lib/urlUtils";
+import { getTenantByAppDomain } from "@/lib/tenants";
 
 /**
  * Generate and store a session token for authenticated customer
@@ -140,6 +141,84 @@ const Login = () => {
 
       setLoading(false);
       return;
+    }
+
+    // Auto-login when customer data is in cookie (from Shopify login) but no session token yet
+    const cookieCustomer = window.__PHRASEOTOMY_CUSTOMER__ || null;
+    const stored = localStorage.getItem('customerData');
+    const sessionToken = localStorage.getItem('phraseotomy_session_token');
+    const shopFromStorage = localStorage.getItem('shop_domain');
+    const isProxyPath = window.location.pathname.includes('/pages/play-online');
+
+    if ((cookieCustomer || stored) && !sessionToken && isProxyPath) {
+      const customerData = cookieCustomer || (stored ? JSON.parse(stored) : null);
+      const shopParam = shopFromStorage || getTenantByAppDomain(window.location.hostname)?.shopDomain;
+
+      if (customerData?.id && shopParam) {
+        console.log("🔄 Auto-login from Shopify cookie");
+        const handleCookieLogin = async () => {
+          try {
+            const { resolveShopDomain } = await import("@/lib/tenants");
+            const resolvedShopDomain = resolveShopDomain(shopParam);
+
+            let { data: dbTenant } = await supabase
+              .from("tenants")
+              .select("id, shop_domain")
+              .eq("shop_domain", resolvedShopDomain)
+              .eq("is_active", true)
+              .maybeSingle();
+
+            if (!dbTenant && resolvedShopDomain !== shopParam) {
+              const { data: alt } = await supabase
+                .from("tenants")
+                .select("id, shop_domain")
+                .eq("shop_domain", shopParam)
+                .eq("is_active", true)
+                .maybeSingle();
+              dbTenant = alt;
+            }
+
+            if (!dbTenant) {
+              setLoading(false);
+              return;
+            }
+
+            const { data: sessionData, error: sessionError } = await supabase.functions.invoke("generate-session-token", {
+              body: { customerId: customerData.id, shopDomain: dbTenant.shop_domain },
+            });
+
+            if (sessionError || !sessionData?.sessionToken) {
+              setLoading(false);
+              return;
+            }
+
+            localStorage.setItem("phraseotomy_session_token", sessionData.sessionToken);
+            await storeCustomerInDatabase(
+              customerData.id,
+              customerData.email ?? null,
+              customerData.name ?? null,
+              customerData.first_name ?? null,
+              customerData.last_name ?? null,
+              dbTenant.shop_domain,
+              dbTenant.id,
+            );
+
+            const { getTenantConfig } = await import("@/lib/tenants");
+            const tenantConfig = getTenantConfig(shopParam);
+            if (tenantConfig?.customShopDomains?.length) {
+              window.location.href = `https://${tenantConfig.customShopDomains[0]}/pages/play-online`;
+            } else {
+              navigate("/play/host", { replace: true });
+            }
+          } catch (e) {
+            console.error("Cookie auto-login failed:", e);
+          } finally {
+            setLoading(false);
+          }
+        };
+        handleCookieLogin();
+        return;
+      }
     }
 
     // Check sessionStorage first for params (cleaned at app level), then fall back to URL params
