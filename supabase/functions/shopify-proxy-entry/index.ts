@@ -205,12 +205,12 @@ Deno.serve(async (req) => {
     console.log("🔍 [CUSTOMER_ID] customer_email from proxy:", customerEmailFromProxy);
     console.log("🔍 [CUSTOMER_ID] Will fetch from Shopify API with this ID:", customerId);
 
-    // If no customer from proxy, show login page (or app with cookie auto-login if cookie exists)
+    // If no customer is logged in, show login page
     if (!customerId) {
-      console.log("No customer from proxy, showing login page (parent script will check cookie)");
+      console.log("No customer logged in, showing login page");
       const loginUrl = `https://${shop}/customer_authentication/login?return_to=/pages/app-redirect`;
 
-      return new Response(generateLoginRedirectHtml(loginUrl, shop, tenant), {
+      return new Response(generateLoginRedirectHtml(loginUrl, shop, tenant.environment), {
         status: 200,
         headers: { "Content-Type": "application/liquid" },
       });
@@ -348,82 +348,83 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Generate login redirect HTML for unauthenticated users.
- * When customer_data cookie exists (same origin), auto-login by showing app iframe and postMessaging customer.
+ * Generate login redirect HTML for unauthenticated users
  */
-function generateLoginRedirectHtml(loginUrl: string, shop: string, tenant: { environment: string; shop_domain: string; tenant_key: string; id: string; name: string }): string {
-  const baseUrl = "https://phraseotomy.ourstagingserver.com";
-  const configParams = new URLSearchParams({
-    config: JSON.stringify({
-      id: tenant.id,
-      name: tenant.name,
-      tenant_key: tenant.tenant_key,
-      shop_domain: tenant.shop_domain,
-      environment: tenant.environment,
-      verified: true,
-    }),
-    shop: tenant.shop_domain,
-  });
-  const appUrl = `${baseUrl}/?${configParams.toString()}#/play/host`;
-  const nonce = crypto.randomUUID();
-  return `<style nonce="${nonce}">
-  #header-group,.header-group, footer, header { display: none !important; }
-  body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #fbbf24; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-  .login-prompt { text-align: center; max-width: 400px; padding: 40px; }
-  .logo { width: 80px; height: 80px; margin: 0 auto 24px; background: #fbbf24; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 48px; font-weight: 900; color: #0a0a0a; }
-  h1 { font-size: 32px; margin: 0 0 16px 0; font-weight: 800; }
-  p { font-size: 16px; margin: 0 0 24px 0; opacity: 0.8; }
-  .login-btn { display: inline-block; padding: 16px 32px; background: #fbbf24; color: #0a0a0a; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; width: 100%; box-sizing: border-box; border: none; cursor: pointer; }
-  .login-btn:hover { transform: scale(1.05); }
-  .phraseotomy-wrapper { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }
-  .phraseotomy-frame { width: 100%; height: 100%; border: none; }
+function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: string): string {
+  console.log("hiiii");
+  // Choose base URL based on tenant environment
+  const baseUrl =
+    tenant.environment === "production"
+      ? "https://phraseotomy.com/pages/play-online"
+      : "https://phraseotomy.ourstagingserver.com";
+  return `<style nonce="${crypto.randomUUID()}">
+  #header-group,.header-group, footer, header {
+    display: none !important;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a0a;
+    color: #fbbf24;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .login-prompt {
+    text-align: center;
+    max-width: 400px;
+    padding: 40px;
+  }
+  .logo {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    background: #fbbf24;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    font-weight: 900;
+    color: #0a0a0a;
+  }
+  h1 {
+    font-size: 32px;
+    margin: 0 0 16px 0;
+    font-weight: 800;
+  }
+  p {
+    font-size: 16px;
+    margin: 0 0 24px 0;
+    opacity: 0.8;
+  }
+  .login-btn {
+    display: inline-block;
+    padding: 16px 32px;
+    background: #fbbf24;
+    color: #0a0a0a;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 16px;
+    transition: transform 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+    border: none;
+    cursor: pointer;
+  }
+  .login-btn:hover {
+    transform: scale(1.05);
+  }
 </style>
-<div id="login-prompt" class="login-prompt">
+<div class="login-prompt">
   <div class="logo">P</div>
   <h1>PHRASEOTOMY</h1>
   <p>Log in to your account to play the game</p>
   <a href="${loginUrl}" class="login-btn">Log In</a>
-</div>
-<div id="phraseotomy-wrapper" class="phraseotomy-wrapper" style="display:none;">
-  <iframe id="phraseotomy-frame" class="phraseotomy-frame" src="${appUrl}" allow="camera; microphone; autoplay; fullscreen" title="Phraseotomy"></iframe>
-</div>
-<script nonce="${nonce}">
-(function(){
-  function getCookie(name) {
-    var m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return m ? m[2] : null;
-  }
-  var raw = getCookie('customer_data');
-  if (!raw) return;
-  var data;
-  try {
-    data = JSON.parse(decodeURIComponent(raw));
-  } catch (e1) {
-    try { data = JSON.parse(atob(raw)); } catch (e2) { return; }
-  }
-  if (data && data.customer_data) data = data.customer_data;
-  var id = data && (data.customer_id || data.id);
-  if (!id || typeof id !== 'string') return;
-  var customer = {
-    id: data.customer_id || data.id,
-    customer_id: data.customer_id || data.id,
-    email: data.customer_email || data.email,
-    name: [data.customer_first_name, data.customer_last_name].filter(Boolean).join(' ') || undefined,
-    firstName: data.customer_first_name || data.first_name,
-    lastName: data.customer_last_name || data.last_name
-  };
-  document.getElementById('login-prompt').style.display = 'none';
-  document.getElementById('phraseotomy-wrapper').style.display = 'block';
-  var iframe = document.getElementById('phraseotomy-frame');
-  function send() {
-    try {
-      iframe.contentWindow.postMessage({ type: 'PHRASEOTOMY_CUSTOMER_FROM_COOKIE', payload: customer }, '${baseUrl.replace(/\/$/, '')}');
-    } catch (e) {}
-  }
-  iframe.onload = send;
-  if (iframe.contentWindow) send();
-})();
-</script>`;
+</div>`;
 }
 
 /**

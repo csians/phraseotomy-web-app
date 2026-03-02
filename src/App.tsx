@@ -153,26 +153,8 @@ const queryClient = new QueryClient();
 
 const RootRedirect = () => {
   const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
-  const [waitingForCookie, setWaitingForCookie] = useState(
-    typeof window !== "undefined" && window.self !== window.top && !localStorage.getItem("phraseotomy_session_token")
-  );
 
   useEffect(() => {
-    const onReceived = () => setWaitingForCookie(false);
-    window.addEventListener("phraseotomy:customer-from-parent", onReceived);
-    return () => window.removeEventListener("phraseotomy:customer-from-parent", onReceived);
-  }, []);
-
-  useEffect(() => {
-    if (waitingForCookie) {
-      const t = setTimeout(() => setWaitingForCookie(false), 2000);
-      return () => clearTimeout(t);
-    }
-  }, [waitingForCookie]);
-
-  useEffect(() => {
-    if (waitingForCookie) return;
-
     const currentPath = window.location.hash.replace('#', '');
     const urlParams = getAllUrlParams();
     
@@ -234,12 +216,7 @@ const RootRedirect = () => {
       console.log('Accessed via proxy path, redirecting to /play/host');
       setRedirectTarget('/play/host');
     }
-    // If customer from postMessage/cookie but no session yet, go to login for auto-login
-    else if (customerData && !sessionToken) {
-      console.log('Customer from cookie/postMessage, redirecting to /login for auto-login');
-      setRedirectTarget('/login');
-    }
-    // If customer is authenticated via iframe with session
+    // If customer is authenticated via iframe, go to play page
     else if (customerData) {
       console.log('Customer authenticated via iframe, redirecting to /play/host');
       setRedirectTarget('/play/host');
@@ -261,8 +238,8 @@ const RootRedirect = () => {
     return null; // Let React Router handle the route
   }
 
-  if (!redirectTarget || waitingForCookie) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-[#fbbf24]">Loading…</div>;
+  if (!redirectTarget) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
   return <Navigate to={redirectTarget} replace />;
