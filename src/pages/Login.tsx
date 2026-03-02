@@ -232,7 +232,7 @@ const Login = () => {
             const { getTenantConfig } = await import("@/lib/tenants");
             const tenantConfig = getTenantConfig(shopParam);
             if (tenantConfig?.customShopDomains?.length) {
-              window.location.href = `https://${tenantConfig.customShopDomains[0]}/pages/play-online`;
+              window.top.location.href = `https://${tenantConfig.customShopDomains[0]}/pages/play-online`;
             } else {
               navigate("/play/host", { replace: true });
             }
