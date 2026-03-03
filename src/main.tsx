@@ -31,6 +31,9 @@ window.addEventListener("message", (e) => {
   if (!ALLOWED_ORIGINS.includes(e.origin)) return;
   const msg = e.data;
   if (msg?.type !== "PHRASEOTOMY_CUSTOMER_FROM_COOKIE" || !msg?.payload) return;
+  // URL customer_id takes precedence (fresh login) – don't overwrite with parent cookie
+  const urlParams = getAllUrlParams();
+  if (urlParams.get("customer_id") || urlParams.get("customer")) return;
   const p = msg.payload;
   const rawId = p.id || p.customer_id;
   const normalizedId = normalizeCustomerId(rawId) || String(rawId ?? "");
@@ -57,15 +60,49 @@ window.addEventListener("message", (e) => {
 // Initialize customer data: first from URL params, then from Shopify cookie
 const urlParams = getAllUrlParams();
 const customerParam = urlParams.get('customer');
+const customerIdParam = urlParams.get('customer_id');
+const customerNameParam = urlParams.get('customer_name') || urlParams.get('customerName') || urlParams.get('CustomerName');
+const customerEmailParam = urlParams.get('customer_email') || urlParams.get('customerEmail') || urlParams.get('CustomerEmail');
+const shopParam = urlParams.get('shop') || urlParams.get('shop_domain');
 const guestSessionParam = urlParams.get('guestSession');
 
 console.log('🔍 [INIT] URL parameters:', {
   hasCustomer: !!customerParam,
+  hasCustomerId: !!customerIdParam,
   hasGuestSession: !!guestSessionParam,
   customerParam: customerParam?.substring(0, 100), // Log first 100 chars
 });
 
-if (customerParam) {
+// Handle customer_id in URL (e.g. iframe: ?customer_id=24118108225884&customer_name=...&customer_email=...)
+if (customerIdParam && !customerParam) {
+  const normalizedId = normalizeCustomerId(customerIdParam) || String(customerIdParam);
+  const urlName = customerNameParam ? decodeURIComponent(customerNameParam.replace(/\+/g, ' ')).trim() : null;
+  const urlEmail = customerEmailParam ? decodeURIComponent(customerEmailParam).trim() : null;
+  const firstName = urlName ? urlName.split(' ')[0] : undefined;
+  const lastName = urlName ? (urlName.split(' ').slice(1).join(' ') || undefined) : undefined;
+  const customerData = {
+    id: normalizedId,
+    customer_id: normalizedId,
+    email: urlEmail ?? undefined,
+    name: urlName ?? undefined,
+    firstName,
+    lastName,
+  };
+  // Clear old customer data before storing new (different account login)
+  localStorage.removeItem('customerData');
+  localStorage.removeItem('phraseotomy_session_token');
+  if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
+  if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+    clearCustomerDataCookie();
+  }
+  localStorage.setItem('customerData', JSON.stringify(customerData));
+  (window as any).__PHRASEOTOMY_CUSTOMER__ = customerData;
+  if (shopParam) localStorage.setItem('shop_domain', shopParam);
+  if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+    setCustomerDataCookie(customerData);
+  }
+  console.log('✅ [INIT] Customer data from URL customer_id stored');
+} else if (customerParam) {
   try {
     const customerData = JSON.parse(customerParam);
     console.log('🔍 [INIT] Parsed customer data:', customerData);
@@ -142,8 +179,8 @@ if (isPlayOnlinePath && !cookieCustomerCheck) {
   }
 }
 
-// If no URL customer param, check Shopify cookie (set when customer logs in via Shopify)
-if (!customerParam) {
+// If no URL customer/customer_id param, check Shopify cookie (set when customer logs in via Shopify)
+if (!customerParam && !customerIdParam) {
   const cookieCustomer = cookieCustomerCheck || getCustomerFromShopifyCookie();
   if (cookieCustomer) {
     console.log('🔍 [INIT] Customer data from Shopify cookie');
