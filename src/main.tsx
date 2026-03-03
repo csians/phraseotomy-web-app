@@ -70,6 +70,14 @@ if (customerParam) {
     const customerData = JSON.parse(customerParam);
     console.log('🔍 [INIT] Parsed customer data:', customerData);
     
+    // New customer from URL (e.g. after Shopify login) – clear old customer data first
+    localStorage.removeItem('customerData');
+    localStorage.removeItem('phraseotomy_session_token');
+    if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
+    if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+      clearCustomerDataCookie();
+    }
+    
     // If this is a guest user, store their data properly
     if (customerData.isGuest || customerData.id?.startsWith('guest_')) {
       console.log('🔍 [INIT] Guest user detected, storing guest data');

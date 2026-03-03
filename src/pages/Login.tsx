@@ -11,7 +11,7 @@ import { DebugInfo } from "@/components/DebugInfo";
 import type { TenantConfig } from "@/lib/types";
 import { getAllUrlParams, normalizeCustomerId } from "@/lib/urlUtils";
 import { getTenantByAppDomain } from "@/lib/tenants";
-import { setCustomerDataCookie } from "@/lib/cookieUtils";
+import { setCustomerDataCookie, clearCustomerDataCookie } from "@/lib/cookieUtils";
 
 /**
  * Generate and store a session token for authenticated customer
@@ -270,6 +270,13 @@ const Login = () => {
         customerEmailParam = parsed.customer_email || parsed.customerEmail || parsed.customer_emal || customerEmailParam;
         token = parsed.r || token;
         console.log("📦 Using pending login params from sessionStorage:", parsed);
+        // Clear old customer data before storing new (fresh login)
+        localStorage.removeItem("customerData");
+        localStorage.removeItem("phraseotomy_session_token");
+        if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
+        if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+          clearCustomerDataCookie();
+        }
         // Store in localStorage using the shape the app expects (so Play and store-customer can use name/email)
         const firstName = (parsed.customer_name || parsed.customerName || "").trim().split(/\s+/)[0] || "";
         const lastName = (parsed.customer_name || parsed.customerName || "").trim().split(/\s+/).slice(1).join(" ") || "";
@@ -307,6 +314,13 @@ const Login = () => {
       
       const handleDirectLogin = async () => {
         try {
+          // Clear old customer data before storing new (fresh login from URL)
+          localStorage.removeItem("customerData");
+          localStorage.removeItem("phraseotomy_session_token");
+          if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
+          if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+            clearCustomerDataCookie();
+          }
           // Resolve custom domain to .myshopify.com domain
           const { resolveShopDomain } = await import("@/lib/tenants");
 
@@ -576,6 +590,13 @@ const Login = () => {
             // Handle customer_id from URL (after Shopify login)
             if (customerIdParam && verifiedShop) {
               console.log("👤 Customer ID detected in URL:", customerIdParam);
+              // Clear old customer data before storing new (fresh login)
+              localStorage.removeItem("customerData");
+              localStorage.removeItem("phraseotomy_session_token");
+              if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
+              if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+                clearCustomerDataCookie();
+              }
 
               // Generate session token for this customer
               try {
