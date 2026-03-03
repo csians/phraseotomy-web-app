@@ -80,9 +80,6 @@ const queryClient = new QueryClient();
   // Persist customer to localStorage as soon as URL has customer_id + email/name (so it's stored even on redeem flow or before clean)
   if (customer_id && (customer_email || customer_name)) {
     try {
-      // Clear old customer data before storing new (different account login)
-      localStorage.removeItem('customerData');
-      localStorage.removeItem('phraseotomy_session_token');
       const shopForStorage = shopDomainParam || shop;
       const firstName = customer_name ? String(customer_name).trim().split(/\s+/)[0] : '';
       const lastName = customer_name ? String(customer_name).trim().split(/\s+/).slice(1).join(' ') : '';
