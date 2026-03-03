@@ -1,4 +1,15 @@
 /**
+ * Normalize customer ID to string format for consistent API usage.
+ * Extracts numeric part from Shopify GID (gid://shopify/Customer/123) or returns string as-is.
+ */
+export function normalizeCustomerId(id: string | number | null | undefined): string {
+  if (id == null) return "";
+  const s = String(id);
+  const gidMatch = s.match(/gid:\/\/shopify\/Customer\/(\d+)/);
+  return gidMatch ? gidMatch[1] : s;
+}
+
+/**
  * Parse URL parameters from both before and after the hash
  * This handles both BrowserRouter and HashRouter cases
  */

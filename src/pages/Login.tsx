@@ -9,7 +9,7 @@ import { getAppBridge } from "@/lib/appBridge";
 import { Redirect } from "@shopify/app-bridge/actions";
 import { DebugInfo } from "@/components/DebugInfo";
 import type { TenantConfig } from "@/lib/types";
-import { getAllUrlParams } from "@/lib/urlUtils";
+import { getAllUrlParams, normalizeCustomerId } from "@/lib/urlUtils";
 import { getTenantByAppDomain } from "@/lib/tenants";
 import { setCustomerDataCookie } from "@/lib/cookieUtils";
 
@@ -210,7 +210,7 @@ const Login = () => {
             }
 
             const { data: sessionData, error: sessionError } = await supabase.functions.invoke("generate-session-token", {
-              body: { customerId: customerData.id, shopDomain: dbTenant.shop_domain },
+              body: { customerId: normalizeCustomerId(customerData.id) || customerData.id, shopDomain: dbTenant.shop_domain },
             });
 
             if (sessionError || !sessionData?.sessionToken) {
@@ -352,7 +352,7 @@ const Login = () => {
 
           // Generate session token for this customer (use resolved shop domain)
           const { data: sessionData, error: sessionError } = await supabase.functions.invoke("generate-session-token", {
-            body: { customerId: customerIdParam, shopDomain: resolvedShopDomain },
+            body: { customerId: normalizeCustomerId(customerIdParam) || customerIdParam, shopDomain: resolvedShopDomain },
           });
 
           if (sessionError) {
@@ -376,10 +376,11 @@ const Login = () => {
             const lastName = customerName ? customerName.split(' ').slice(1).join(' ') : null;
             const email = customerEmailParam ? decodeURIComponent(customerEmailParam) : null;
 
-            // Store customer data from URL immediately
+            // Store customer data from URL immediately (normalize ID for consistent API usage)
+            const normalizedId = normalizeCustomerId(customerIdParam) || customerIdParam;
             const immediateCustomerData = {
-              customer_id: customerIdParam,
-              id: customerIdParam,
+              customer_id: normalizedId,
+              id: normalizedId,
               email: email,
               name: customerName,
               first_name: firstName,
@@ -410,8 +411,8 @@ const Login = () => {
               const mergedFirstName = customerData.customer?.first_name || firstName;
               const mergedLastName = customerData.customer?.last_name || lastName;
               const mergedCustomerData = {
-                customer_id: customerIdParam,
-                id: customerIdParam,
+                customer_id: normalizedId,
+                id: normalizedId,
                 email: mergedEmail,
                 name: mergedName,
                 first_name: mergedFirstName,
@@ -581,7 +582,7 @@ const Login = () => {
                 const { data: sessionData, error: sessionError } = await supabase.functions.invoke(
                   "generate-session-token",
                   {
-                    body: { customerId: customerIdParam, shopDomain: verifiedShop },
+                    body: { customerId: normalizeCustomerId(customerIdParam) || customerIdParam, shopDomain: verifiedShop },
                   },
                 );
 

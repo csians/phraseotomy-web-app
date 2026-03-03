@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { getAllUrlParams } from "./lib/urlUtils";
+import { getAllUrlParams, normalizeCustomerId } from "./lib/urlUtils";
 import { getCustomerFromShopifyCookie, setCustomerDataCookie, clearCustomerDataCookie } from "./lib/cookieUtils";
 import { getTenantByAppDomain } from "./lib/tenants";
 
@@ -32,9 +32,11 @@ window.addEventListener("message", (e) => {
   const msg = e.data;
   if (msg?.type !== "PHRASEOTOMY_CUSTOMER_FROM_COOKIE" || !msg?.payload) return;
   const p = msg.payload;
+  const rawId = p.id || p.customer_id;
+  const normalizedId = normalizeCustomerId(rawId) || String(rawId ?? "");
   const customerData = {
-    id: p.id || p.customer_id,
-    customer_id: p.customer_id || p.id,
+    id: normalizedId,
+    customer_id: normalizedId,
     email: p.email,
     name: p.name,
     firstName: p.firstName,
@@ -81,21 +83,25 @@ if (customerParam) {
       sessionStorage.setItem('guest_player_name', guestName);
       localStorage.setItem('guest_player_name', guestName);
       
+      (window as any).__PHRASEOTOMY_CUSTOMER__ = customerData;
       console.log('✅ [INIT] Guest data stored:', {
         playerId: customerData.id,
         playerName: guestName,
       });
     } else {
-      // Regular customer - store in localStorage
-      localStorage.setItem('customerData', JSON.stringify(customerData));
+      // Normalize id/customer_id to string so APIs get consistent format (URL may send number)
+      const normalized = {
+        ...customerData,
+        id: String(customerData.id ?? customerData.customer_id ?? ''),
+        customer_id: String(customerData.customer_id ?? customerData.id ?? ''),
+      };
+      localStorage.setItem('customerData', JSON.stringify(normalized));
+      (window as any).__PHRASEOTOMY_CUSTOMER__ = normalized;
       if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
-        setCustomerDataCookie(customerData);
+        setCustomerDataCookie(normalized);
       }
       console.log('✅ [INIT] Customer data stored');
     }
-    
-    // Set global variable for App.tsx to check
-    (window as any).__PHRASEOTOMY_CUSTOMER__ = customerData;
   } catch (error) {
     console.error('❌ [INIT] Failed to parse customer data:', error);
   }

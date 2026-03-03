@@ -23,7 +23,7 @@ import { getCustomerData, getCustomerFromShopify, type CustomerLicense, type Gam
 import { getCustomerThemes } from "@/lib/themeCodeUtils";
 import { lobbyCodeSchema, validateInput } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
-import { getAllUrlParams } from "@/lib/urlUtils";
+import { getAllUrlParams, normalizeCustomerId } from "@/lib/urlUtils";
 import { ShopThemesDialog } from "@/components/ShopThemesDialog";
 
 const Play = () => {
@@ -177,8 +177,9 @@ if (existingData) {
   // Store customer in database on first login (send URL/API name and email so Supabase is updated)
   const storeCustomerInDatabase = async (customerData: ShopifyCustomer, shopDomain: string, tenantId: string) => {
     try {
+      const normalizedId = normalizeCustomerId(customerData.id);
       const body = {
-        customer_id: customerData.id,
+        customer_id: normalizedId,
         shop_domain: shopDomain,
         tenant_id: tenantId,
         customer_email: customerData.email != null && customerData.email !== "" ? customerData.email : null,
@@ -196,13 +197,16 @@ if (existingData) {
         if (data?.customer) {
           const existingData = localStorage.getItem("customerData");
           const existing = existingData ? JSON.parse(existingData) : {};
-
+          // Preserve customer_id and id from URL – never overwrite with staging/prod IDs from DB
+          const preservedId = existing.customer_id || existing.id || normalizedId;
           localStorage.setItem(
             "customerData",
             JSON.stringify({
               ...existing,
+              customer_id: preservedId,
+              id: preservedId,
               db_id: data.customer.id,
-              email: data?.customer?.customer_email,
+              email: data?.customer?.customer_email ?? existing.email,
               staging_customer_id: data.customer.staging_customer_id,
               prod_customer_id: data.customer.prod_customer_id,
               is_new: data.is_new,
@@ -261,7 +265,7 @@ if (existingData) {
           const urlFirstName = urlCustomerName ? urlCustomerName.split(" ")[0] : null;
           const urlLastName = urlCustomerName ? urlCustomerName.split(" ").slice(1).join(" ") : null;
           const mergedCustomer: ShopifyCustomer = {
-            id: c.id,
+            id: normalizeCustomerId(c.id) || String(c.id ?? c.customer_id ?? ""),
             email: urlCustomerEmail ?? c.email ?? null,
             name: urlCustomerName ?? c.name ?? null,
             firstName: urlFirstName ?? c.firstName ?? null,
@@ -311,11 +315,11 @@ if (existingData) {
           setShopDomain(shopParam);
 
           if (customerData) {
-            // Merge URL name/email when present and update DB
+            // Merge URL name/email when present and update DB; normalize id for consistent API usage
             const urlFirstName = urlCustomerName ? urlCustomerName.split(" ")[0] : null;
             const urlLastName = urlCustomerName ? urlCustomerName.split(" ").slice(1).join(" ") : null;
             const mergedCustomer: ShopifyCustomer = {
-              id: customerData.id,
+              id: normalizeCustomerId(customerData.id) || String(customerData.id ?? customerData.customer_id),
               email: urlCustomerEmail ?? customerData.email ?? null,
               name: urlCustomerName ?? customerData.name ?? null,
               firstName: urlFirstName ?? customerData.firstName ?? null,
@@ -323,11 +327,12 @@ if (existingData) {
             };
             setCustomer(mergedCustomer);
 
+            const customerIdForStorage = mergedCustomer.id;
             localStorage.setItem(
               "customerData",
               JSON.stringify({
-                customer_id: mergedCustomer.id,
-                id: mergedCustomer.id,
+                customer_id: customerIdForStorage,
+                id: customerIdForStorage,
                 email: mergedCustomer.email,
                 name: mergedCustomer.name,
                 first_name: mergedCustomer.firstName,
@@ -554,8 +559,11 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
             if (customerData.customer && !shopifyCustomer) {
               setCustomer((prev) => {
                 if (!prev) return prev;
+                // Preserve URL customer id – API may return GID or different format
+                const urlId = prev.id ? normalizeCustomerId(prev.id) : "";
+                const idToUse = urlId || normalizeCustomerId(customerData.customer.id);
                 return {
-                  id: customerData.customer.id,
+                  id: idToUse,
                   email: customerData.customer.email ?? prev.email ?? null,
                   name:
                     customerData.customer.name && customerData.customer.name.trim().length > 0
