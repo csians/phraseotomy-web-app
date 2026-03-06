@@ -101,8 +101,8 @@ Deno.serve(async (req) => {
         selected_theme_id: themeId || null,
         game_mode: gameMode || "live",
         timer_preset: timerPreset || null,
-        story_time_seconds: storyTimeSeconds || 600,
-        guess_time_seconds: guessTimeSeconds || 420,
+        story_time_seconds: storyTimeSeconds || 93600,
+        guess_time_seconds: guessTimeSeconds ?? 46800,
         turn_mode: turnMode || null,
       })
       .select()

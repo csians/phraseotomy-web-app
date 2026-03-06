@@ -28,11 +28,11 @@ export default function CreateLobby() {
   const [gameMode, setGameMode] = useState<"live" | "async">("live");
   const [timerPreset, setTimerPreset] = useState<"quick" | "normal" | "extended">("normal");
 
-  // Fixed timer values: 10 min story, 15 hours guess
+  // Fixed timer values: 26 hours story/theme selection, 13 hours guess
   const TIMER_PRESETS = {
-    quick: { story: 600, guess: 54000, label: "Quick (10 min / 15 hrs)" },
-    normal: { story: 600, guess: 54000, label: "Normal (10 min / 15 hrs)" },
-    extended: { story: 600, guess: 54000, label: "Extended (10 min / 15 hrs)" },
+    quick: { story: 93600, guess: 46800, label: "Quick (26 hrs / 13 hrs)" },
+    normal: { story: 93600, guess: 46800, label: "Normal (26 hrs / 13 hrs)" },
+    extended: { story: 93600, guess: 46800, label: "Extended (26 hrs / 13 hrs)" },
   };
 
   // Get customer and shop info from location state or window
