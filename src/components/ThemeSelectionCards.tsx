@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import {
   Briefcase, Home, Plane, Bike, Wine, Rocket, Skull, Sparkles,
-  Music, Gamepad2, Heart, Camera, LucideIcon,
+  Music, Gamepad2, Heart, Camera, Lock, LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -125,10 +125,8 @@ export function ThemeSelectionCards({
   // Core theme names that are always enabled
   const coreThemeNames = ['At Home', 'At Work', 'Lifestyle', 'Travel'];
   
-  // Filter out "Core" theme and only show unlocked themes
-  const filteredThemes = themes.filter((t) => 
-    t.name.toLowerCase() !== 'core' && t.isUnlocked !== false
-  );
+  // Keep all real themes visible (exclude only synthetic "Core" grouping rows).
+  const filteredThemes = themes.filter((t) => t.name.toLowerCase() !== 'core');
   const baseThemes = filteredThemes.filter((t) => coreThemeNames.includes(t.name));
   const expansionThemes = filteredThemes.filter((t) => !coreThemeNames.includes(t.name));
   
@@ -158,7 +156,7 @@ export function ThemeSelectionCards({
         onMouseLeave={() => setHoveredTheme(null)}
         disabled={isLocked || disabled}
         className={cn(
-          "relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-200 shadow-md",
+          "relative aspect-square rounded-xl overflow-hidden border-2 transition-all duration-200 shadow-md",
           "flex flex-col justify-between p-4",
           isSelected
             ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background scale-105 shadow-lg"
@@ -186,6 +184,13 @@ export function ThemeSelectionCards({
 
         {/* Overlay gradient for text readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+
+        {/* Lock indicator for disabled themes */}
+        {isLocked && (
+          <div className="absolute top-3 right-3 z-20 rounded-full bg-black/70 p-2 border border-white/20">
+            <Lock className="h-4 w-4 text-white" />
+          </div>
+        )}
 
         {/* Content - only show theme name if NO image exists */}
         {!themeImage && (

@@ -196,35 +196,28 @@
         (themePacks || []).map(tp => tp.theme_id)
       );
 
-      // Filter themes: show core themes OR base themes OR customer-unlocked themes OR themes linked to player's packs
-      const availableThemes = (themes || []).filter(theme => {
-        // Always include core themes
-        if (theme.is_core) return true;
-        
-        // Include base themes (always available)
-        if (baseThemeIds.has(theme.id)) return true;
-        
-        // Include customer-unlocked themes (from redeemed theme codes)
-        if (customerUnlockedThemeIds.has(theme.id)) return true;
-        
-        // Include themes directly linked to player's packs via pack_id
-        if (theme.pack_id && playerPackIds.has(theme.pack_id)) return true;
-        
-        // Include themes linked via theme_packs junction table to player's packs
-        if (themeIdsInPlayerPacks.has(theme.id)) return true;
-        
-        return false;
+      // Return all themes and compute per-theme unlock state.
+      // Locked themes are shown to the player but cannot be selected.
+      const processedThemes = (themes || []).map(theme => {
+        const isUnlocked =
+          theme.is_core ||
+          baseThemeIds.has(theme.id) ||
+          customerUnlockedThemeIds.has(theme.id) ||
+          (theme.pack_id ? playerPackIds.has(theme.pack_id) : false) ||
+          themeIdsInPlayerPacks.has(theme.id);
+
+        return {
+          ...theme,
+          isCore: theme.is_core,
+          isUnlocked,
+          packName: theme.pack?.name || null,
+        };
       });
 
-      console.log(`Filtered ${availableThemes.length} themes from ${themes?.length || 0} total themes based on player's packs:`, Array.from(playerPackIds));
-
-      // Process themes to add unlock status (all filtered themes are unlocked for this game)
-      const processedThemes = availableThemes.map(theme => ({
-        ...theme,
-        isCore: theme.is_core,
-        isUnlocked: true, // All filtered themes are available for this game
-        packName: theme.pack?.name || null,
-      }));
+      const unlockedThemeCount = processedThemes.filter(theme => theme.isUnlocked).length;
+      console.log(
+        `Computed theme access for ${processedThemes.length} themes (${unlockedThemeCount} unlocked, ${processedThemes.length - unlockedThemeCount} locked)`
+      );
 
       // Get current turn if exists - get the LATEST one for this round/storyteller
       console.log("Fetching turn for session:", sessionId, "round:", session.current_round, "storyteller:", session.current_storyteller_id);
