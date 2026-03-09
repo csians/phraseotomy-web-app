@@ -75,14 +75,6 @@ interface IconItemLocal {
   color?: string | null;
 }
 
-interface ThemeElement {
-  id: string;
-  name: string;
-  icon: string;
-  image_url?: string | null;
-  color?: string | null;
-}
-
 type GamePhase = "selecting_theme" | "storytelling" | "guessing" | "scoring";
 
 export default function Game() {
@@ -108,7 +100,6 @@ export default function Game() {
   const [roundResultMessage, setRoundResultMessage] = useState<{ correct: boolean; message: string } | null>(null);
   const [isModeTransitioning, setIsModeTransitioning] = useState(false);
   const [selectedTurnMode, setSelectedTurnMode] = useState<"audio" | "elements" | null>(null);
-  const [themeElementsForSelection, setThemeElementsForSelection] = useState<ThemeElement[]>([]);
   const [coreElementsForSelection, setCoreElementsForSelection] = useState<IconItem[]>([]);
   const [currentWhisp, setCurrentWhisp] = useState<string>("");
   const [answeredPlayerIds, setAnsweredPlayerIds] = useState<string[]>([]); // Track which players have answered for current turn
@@ -1195,8 +1186,7 @@ export default function Game() {
       };
       setCurrentTurn(turnWithTheme);
 
-      // Store theme elements and core elements for the unified interface
-      setThemeElementsForSelection(data.themeElements || []);
+      // Store auto-assigned icons for the unified interface (5 total)
       setCoreElementsForSelection(data.coreElements || []);
       setCurrentWhisp(data.whisp || "");
 
@@ -1698,7 +1688,6 @@ export default function Game() {
               isStoryteller={isStoryteller}
               storytellerName={players.find((p) => p.player_id === session.current_storyteller_id)?.name || "Player"}
               sendWebSocketMessage={sendWebSocketMessage}
-              themeElements={themeElementsForSelection}
               coreElements={coreElementsForSelection}
             />
           )}

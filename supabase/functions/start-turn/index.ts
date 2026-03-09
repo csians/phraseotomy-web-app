@@ -15,6 +15,19 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
+interface ThemeElementRow {
+  id: string;
+  name: string;
+  icon: string;
+  image_url: string | null;
+  color: string | null;
+}
+
+interface CoreElementRow extends ThemeElementRow {
+  theme_id: string;
+  core_element_type: "feelings" | "events" | null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -79,7 +92,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get ALL visual elements from the selected theme, then shuffle and pick 20 random
+    // Get ALL visual elements from the selected theme.
+    // We will build a 36-element pool and then auto-pick 3 icons from that pool.
     const { data: allThemeElements, error: themeElementsError } = await supabase
       .from("elements")
       .select("id, name, icon, image_url, color")
@@ -90,9 +104,9 @@ Deno.serve(async (req) => {
       console.error("Error fetching theme elements:", themeElementsError);
     }
 
-    // Shuffle and limit to 20 random elements for Step 1
-    const shuffledThemeElements = shuffleArray(allThemeElements || []);
-    const themeElements = shuffledThemeElements.slice(0, 20);
+    const shuffledThemeElements = shuffleArray<ThemeElementRow>((allThemeElements || []) as ThemeElementRow[]);
+    const themeElementPool = shuffledThemeElements.slice(0, 36);
+    const selectedThemeElements = shuffleArray(themeElementPool).slice(0, 3);
 
     // Get core elements (from all is_core=true themes) - we want 1 "feeling" + 1 "event" when possible
     const { data: coreThemes, error: coreThemesError } = await supabase
@@ -104,10 +118,10 @@ Deno.serve(async (req) => {
       console.error("Error fetching core themes:", coreThemesError);
     }
 
-    let selectedCoreElements: any[] = [];
+    let selectedCoreElements: CoreElementRow[] = [];
 
     if (coreThemes && coreThemes.length > 0) {
-      const coreThemeIds = coreThemes.map((t) => t.id);
+      const coreThemeIds = coreThemes.map((t: { id: string }) => t.id);
 
       const { data: elements, error: elementsError } = await supabase
         .from("elements")
@@ -116,8 +130,9 @@ Deno.serve(async (req) => {
         .eq("is_whisp", false);
 
       if (!elementsError && elements && elements.length > 0) {
+        const typedElements = elements as CoreElementRow[];
         // Exclude elements from the currently selected theme to avoid duplicates
-        const allCoreElements = elements.filter((e) => e.theme_id !== themeId);
+        const allCoreElements = typedElements.filter((e) => e.theme_id !== themeId);
 
         // Group elements by core_element_type (element-level, not theme-level)
         const feelingElements = allCoreElements.filter((e) =>
@@ -126,33 +141,55 @@ Deno.serve(async (req) => {
         const eventElements = allCoreElements.filter((e) =>
           e.core_element_type === "events"
         );
+        const feelingPool = shuffleArray(feelingElements).slice(0, 36);
+        const eventPool = shuffleArray(eventElements).slice(0, 36);
 
         // Helper to pick 1 random element from a list
-        const pickOneRandom = (arr: any[]): any | null => {
+        const pickOneRandom = (arr: CoreElementRow[]): CoreElementRow | null => {
           if (!arr || arr.length === 0) return null;
           const idx = Math.floor(Math.random() * arr.length);
           return arr[idx];
         };
 
-        const feelingChoice = pickOneRandom(feelingElements);
-        const eventChoice = pickOneRandom(eventElements);
+        const feelingChoice = pickOneRandom(feelingPool);
+        const eventChoice = pickOneRandom(eventPool);
 
         if (feelingChoice && eventChoice) {
           // Ideal case: 1 feeling + 1 event
           selectedCoreElements = [feelingChoice, eventChoice];
         } else {
-          // Fallback: behave like before and just pick any 2 core elements
+          // Fallback: keep the game running even if one type has insufficient data.
           const shuffledCoreElements = shuffleArray(allCoreElements);
           selectedCoreElements = shuffledCoreElements.slice(0, 2);
         }
       }
     }
 
-    console.log("Theme elements available:", themeElements?.length || 0);
+    console.log("Theme element pool size:", themeElementPool?.length || 0);
+    console.log("Auto-selected theme elements:", selectedThemeElements.map((e) => e.name));
     console.log(
       "Core elements selected (target: 1 feeling + 1 event, fallback any 2):",
       selectedCoreElements.map((e) => e.name),
     );
+
+    const selectedIconsForTurn = shuffleArray([
+      ...selectedThemeElements.map((e) => ({
+        id: e.id,
+        name: e.name,
+        icon: e.icon,
+        image_url: e.image_url,
+        color: e.color,
+        isFromCore: false,
+      })),
+      ...selectedCoreElements.map((e) => ({
+        id: e.id,
+        name: e.name,
+        icon: e.icon,
+        image_url: e.image_url,
+        color: e.color,
+        isFromCore: true,
+      })),
+    ]);
 
     // Pick a random whisp element from the theme
     console.log("Selecting whisp from theme elements:", theme.name);
@@ -195,8 +232,9 @@ Deno.serve(async (req) => {
     
     const existingTurn = existingTurns && existingTurns.length > 0 ? existingTurns[0] : null;
 
-    // Core element IDs (the 2 random ones that are auto-selected)
-    const coreElementIds = selectedCoreElements.map(e => e.id);
+    // Store all 5 auto-assigned icons at turn start: 3 theme + 1 feelings + 1 events.
+    const selectedIconIds = selectedIconsForTurn.map((e) => e.id);
+    const selectedIconOrder = selectedIconsForTurn.map((_, idx) => idx);
     
     if (existingTurn) {
       console.log("Updating existing turn:", existingTurn.id);
@@ -205,9 +243,8 @@ Deno.serve(async (req) => {
         .update({ 
           whisp: generatedWhisp,
           theme_id: themeId,
-          // Store only the core element IDs initially - storyteller will add their 3 selections
-          selected_icon_ids: coreElementIds,
-          icon_order: [0, 1], // Initial order for the 2 core elements
+          selected_icon_ids: selectedIconIds,
+          icon_order: selectedIconOrder,
         })
         .eq("id", existingTurn.id)
         .select()
@@ -228,8 +265,8 @@ Deno.serve(async (req) => {
         .update({ 
           whisp: generatedWhisp,
           theme_id: themeId,
-          selected_icon_ids: coreElementIds,
-          icon_order: [0, 1],
+          selected_icon_ids: selectedIconIds,
+          icon_order: selectedIconOrder,
         })
         .eq("id", turnId)
         .select()
@@ -253,8 +290,8 @@ Deno.serve(async (req) => {
           storyteller_id: session.current_storyteller_id,
           theme_id: themeId,
           whisp: generatedWhisp,
-          selected_icon_ids: coreElementIds,
-          icon_order: [0, 1],
+          selected_icon_ids: selectedIconIds,
+          icon_order: selectedIconOrder,
         })
         .select()
         .single();
@@ -271,25 +308,15 @@ Deno.serve(async (req) => {
 
     // Theme is per-turn, not stored at session level
 
-    // Prepare core elements with isFromCore flag
-    const coreElementsWithFlag = selectedCoreElements.map(e => ({ 
-      id: e.id,
-      name: e.name,
-      icon: e.icon,
-      image_url: e.image_url,
-      color: e.color,
-      isFromCore: true,
-    }));
-
     return new Response(
       JSON.stringify({ 
         turn,
         whisp: generatedWhisp,
         theme: theme,
-        // ALL theme elements for the storyteller to choose 3 from
-        themeElements: themeElements || [],
-        // The 2 random core elements (auto-selected)
-        coreElements: coreElementsWithFlag,
+        // Keep the 36-element pool for debugging/observability in client state.
+        themeElements: themeElementPool || [],
+        // Client uses this as the full draggable list (5 total).
+        coreElements: selectedIconsForTurn,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

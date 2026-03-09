@@ -48,7 +48,6 @@ interface UnifiedStorytellingInterfaceProps {
   isStoryteller: boolean;
   storytellerName: string;
   sendWebSocketMessage: (msg: any) => void;
-  themeElements: ThemeElement[];
   coreElements: IconItem[];
 }
 
@@ -136,11 +135,9 @@ export function UnifiedStorytellingInterface({
   isStoryteller,
   storytellerName,
   sendWebSocketMessage,
-  themeElements,
   coreElements,
 }: UnifiedStorytellingInterfaceProps) {
   const { toast } = useToast();
-  const [selectedElements, setSelectedElements] = useState<ThemeElement[]>([]);
   const [orderedElements, setOrderedElements] = useState<IconItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -156,8 +153,6 @@ export function UnifiedStorytellingInterface({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const MAX_SELECTIONS = 3;
-  const canSelectMore = selectedElements.length < MAX_SELECTIONS;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -172,16 +167,7 @@ export function UnifiedStorytellingInterface({
   );
 
   useEffect(() => {
-    const themeIconItems: IconItem[] = selectedElements.map((e) => ({
-      id: e.id,
-      name: e.name,
-      icon: e.icon,
-      image_url: e.image_url,
-      color: e.color,
-      isFromCore: false,
-    }));
-
-    const allElements = [...themeIconItems, ...coreElements];
+    const allElements = [...coreElements];
 
     setOrderedElements((previousOrder) => {
       if (previousOrder.length === 0) {
@@ -194,23 +180,7 @@ export function UnifiedStorytellingInterface({
       const newItems = allElements.filter((item) => !keptIds.has(item.id));
       return [...kept, ...newItems];
     });
-  }, [selectedElements, coreElements]);
-
-  const handleElementClick = (element: ThemeElement) => {
-    const isSelected = selectedElements.some((e) => e.id === element.id);
-
-    if (isSelected) {
-      setSelectedElements((prev) => prev.filter((e) => e.id !== element.id));
-    } else if (canSelectMore) {
-      setSelectedElements((prev) => [...prev, element]);
-    } else {
-      toast({
-        title: "Selection Limit",
-        description: "You can only select 3 elements from the theme",
-        variant: "destructive",
-      });
-    }
-  };
+  }, [coreElements]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -316,19 +286,10 @@ export function UnifiedStorytellingInterface({
       return;
     }
 
-    if (selectedElements.length !== MAX_SELECTIONS) {
-      toast({
-        title: "Select 3 Elements",
-        description: "Please select exactly 3 theme elements before submitting.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (orderedElements.length !== MAX_SELECTIONS + coreElements.length) {
+    if (orderedElements.length !== coreElements.length) {
       toast({
         title: "Arrange Elements",
-        description: "Please arrange your selected and core elements before submitting.",
+        description: "Please arrange the assigned elements before submitting.",
         variant: "destructive",
       });
       return;
@@ -450,86 +411,15 @@ export function UnifiedStorytellingInterface({
 
           <div className="space-y-5">
             <div className="text-center">
-              <h3 className="text-lg font-semibold">Select 3 Theme Elements</h3>
+              <h3 className="text-lg font-semibold">Your 5 Auto-assigned Icons</h3>
               <p className="text-sm text-muted-foreground">
-                Pick 3 theme elements, then arrange all icons in the order you will describe them ({selectedElements.length}/{MAX_SELECTIONS} selected)
+                3 theme icons + 1 emotion icon + 1 event icon are assigned automatically each turn.
               </p>
             </div>
 
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Core Elements (Auto-selected)</p>
-              <div className="flex flex-wrap gap-3 justify-center">
-                {coreElements.map((element) => {
-                  const bgColor = element.color || "#8B5CF6";
-                  return (
-                    <div
-                      key={element.id}
-                      className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-primary/50 bg-primary/5"
-                    >
-                      <div
-                        className="h-12 w-12 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: bgColor }}
-                      >
-                        {element.image_url ? (
-                          <img
-                            src={element.image_url}
-                            alt={element.name}
-                            className="h-7 w-7 object-contain"
-                            style={{ filter: "brightness(0) invert(1)" }}
-                          />
-                        ) : (
-                          <Sparkles className="h-5 w-5 text-white" />
-                        )}
-                      </div>
-                      <span className="text-xs font-medium">{element.name}</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">Core</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Theme Elements (Select 3)</p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                {themeElements.map((element) => {
-                  const isSelected = selectedElements.some((e) => e.id === element.id);
-                  const bgColor = element.color || "#6B7280";
-
-                  return (
-                    <button
-                      key={element.id}
-                      onClick={() => handleElementClick(element)}
-                      disabled={!canSelectMore && !isSelected}
-                      className={cn(
-                        "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all",
-                        isSelected
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50 bg-card",
-                        !canSelectMore && !isSelected && "opacity-50 cursor-not-allowed"
-                      )}
-                    >
-                      <div
-                        className="h-12 w-12 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: bgColor }}
-                      >
-                        {element.image_url ? (
-                          <img
-                            src={element.image_url}
-                            alt={element.name}
-                            className="h-7 w-7 object-contain"
-                            style={{ filter: "brightness(0) invert(1)" }}
-                          />
-                        ) : (
-                          <Sparkles className="h-5 w-5 text-white" />
-                        )}
-                      </div>
-                      <span className="text-xs font-medium text-center">{element.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <p className="text-center text-sm text-muted-foreground">
+              You only need to drag and reorder these icons before recording your story.
+            </p>
           </div>
 
           <div className="space-y-3">
