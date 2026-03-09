@@ -1173,7 +1173,7 @@ export default function Game() {
         },
         () => {
           console.log("Player deleted from game, refreshing...");
-          // Do not refresh scoreboard on every guess; recap flow handles final score refresh.
+          debouncedRefresh({ showLoading: false });
         },
       )
       .on(
