@@ -159,14 +159,14 @@ const RootRedirect = () => {
     }
     
     // Only check for active lobby session from root path
-    if (currentPath === '/' || currentPath === '') {
-      const currentLobbySession = sessionStorage.getItem('current_lobby_session') || localStorage.getItem('current_lobby_session');
-      const lobbyPlayerId = sessionStorage.getItem('lobby_player_id') || localStorage.getItem('lobby_player_id');
-      if (currentLobbySession && lobbyPlayerId) {
-        setRedirectTarget(`/lobby/${currentLobbySession}`);
-        return;
-      }
-    }
+    // if (currentPath === '/' || currentPath === '') {
+    //   const currentLobbySession = sessionStorage.getItem('current_lobby_session') || localStorage.getItem('current_lobby_session');
+    //   const lobbyPlayerId = sessionStorage.getItem('lobby_player_id') || localStorage.getItem('lobby_player_id');
+    //   if (currentLobbySession && lobbyPlayerId) {
+    //     setRedirectTarget(`/lobby/${currentLobbySession}`);
+    //     return;
+    //   }
+    // }
 
     // If this is a redeem-code flow (Code + customer + shop_domain), send user to Play
     const redeemCodeParam = urlParams.get('Code') || urlParams.get('code');
