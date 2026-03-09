@@ -850,9 +850,9 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
           {/* Welcome message */}
           <div className="text-center flex items-center justify-center gap-6">
             <h2 className="text-xl font-bold text-white">Welcome, {customer?.name?.trim() ? customer.name : customer?.email || "Player"}!</h2>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
+            {/* <Button variant="outline" size="sm" onClick={handleLogout}>
               Logout
-            </Button>
+            </Button> */}
           </div>
           {/*PLAY ONLINE */}
           {/* <div className="w-full max-w-2xl pt-8">
@@ -872,11 +872,11 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
 
 
           {/* Your Packs Card */}
-          <Card className="bg-card border-game-gray">
+          {/* <Card className="bg-card border-game-gray"> */}
             {/* <CardHeader>
               <CardTitle className="text-lg">Your Packs</CardTitle>
             </CardHeader>  */}
-
+{/* 
             <CardContent className="space-y-4">
               {dataLoading ? (
                 <div className="space-y-2">
@@ -884,7 +884,7 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <>
+                <> */}
                   {/* <div>
                     <p className="text-xs text-muted-foreground mb-2">Unlocked</p>
                     <div className="flex flex-wrap gap-2">
@@ -903,10 +903,10 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
                       )}
                     </div> 
                   </div>*/}
-                  {availablePacks.filter((p) => !allPacks.includes(p.name)).length > 0 && (
+                  {/* {availablePacks.filter((p) => !allPacks.includes(p.name)).length > 0 && (
                     <div className="pt-3 border-t border-border">
                       <p className="text-xs text-muted-foreground mb-2">Available to Unlock</p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2"> */}
                         {/* {availablePacks
                           .filter((p) => !allPacks.includes(p.name))
                           .map((pack) => (
@@ -918,11 +918,11 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
                               🔒 {pack.name}
                             </Badge>
                           ))} */}
-                      </div>
+                      {/* </div>
                     </div>
-                  )}
+                  )} */}
 
-                  <div className="pt-4 border-t border-border">
+                  {/* <div className="pt-4 border-t border-border">
                     <div className="bg-gradient-to-r from-game-yellow/10 to-game-yellow/5 rounded-lg p-4 border border-game-yellow/20">
                       <div className="flex items-center justify-between">
                         <div>
@@ -939,11 +939,11 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
                         </Button>
                       </div>
                     </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                  </div> */}
+                {/* </>
+              )} */}
+            {/* </CardContent>
+          </Card> */}
 
           {/* Host New Game */}
           <Card className="bg-card border-game-gray">

@@ -300,7 +300,7 @@ export default function CreateLobby() {
       <div className="flex-1 p-4">
         <div className="max-w-2xl mx-auto space-y-6 py-8">
           {/* Customer Profile Header */}
-          {customer && (
+          {/* {customer && (
             <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-4">
@@ -318,7 +318,7 @@ export default function CreateLobby() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          )} */}
 
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold">Create New Game</h1>
@@ -479,7 +479,7 @@ export default function CreateLobby() {
             </CardContent>
           </Card>
 
-          <Card className="bg-muted/50">
+          {/* <Card className="bg-muted/50">
             <CardContent className="pt-6">
               <div className="text-sm text-muted-foreground space-y-1">
                 <p>
@@ -490,7 +490,7 @@ export default function CreateLobby() {
                 </p>
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
         </div>
       </div>
     </div>

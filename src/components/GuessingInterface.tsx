@@ -656,7 +656,7 @@ export function GuessingInterface({
             )}
 
             {/* Element arrangement hint */}
-            {selectedIcons.length > 0 && (
+            {/* {selectedIcons.length > 0 && (
               <div className="bg-primary/10 p-6 rounded-lg text-center">
                 <p className="text-lg font-medium text-primary">
                   🔍 Study the element order above — it's your clue!
@@ -665,7 +665,7 @@ export function GuessingInterface({
                   {storytellerName} arranged these elements to hint at the wisp word.
                 </p>
               </div>
-            )}
+            )} */}
 
             {/* Guess Input */}
             <div>
@@ -711,11 +711,11 @@ export function GuessingInterface({
             </div>
 
             {/* Tips */}
-            <div className="bg-muted/50 p-4 rounded-lg">
+            {/* <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm text-muted-foreground text-center">
                 💡 Look at the arranged elements{turnMode === "audio" ? " and listen to the story" : ""}. The wisp is a single word related to the theme "{theme.name}". Your guess must be at least 3 characters long.
               </p>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
       </div>

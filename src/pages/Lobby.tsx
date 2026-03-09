@@ -933,17 +933,60 @@ export default function Lobby() {
       // Set audio files from the response (edge function fetches them if user is host)
       setAudioFiles(data.audioFiles || []);
 
-      // Fetch pack names if packs_used has IDs
-      if (data.session?.packs_used && data.session.packs_used.length > 0) {
-        const { data: packsData, error: packsError } = await supabase
-          .from("packs")
-          .select("name")
-          .in("id", data.session.packs_used);
+      // Fetch only themes redeemed by the current player (exclude default/base themes).
+      if (currentPlayerId) {
+        const possibleRedeemers = new Set<string>([currentPlayerId, `Customer_${currentPlayerId}`]);
 
-        if (!packsError && packsData) {
-          setPackNames(packsData.map((p) => p.name));
+        // Add customer email/name variants when available (theme_codes.redeemed_by can store these forms).
+        try {
+          const { data: customerRecord } = await supabase
+            .from("customers")
+            .select("customer_email, customer_name")
+            .eq("customer_id", currentPlayerId)
+            .maybeSingle();
+
+          if (customerRecord?.customer_email) {
+            possibleRedeemers.add(customerRecord.customer_email);
+          }
+          if (customerRecord?.customer_name) {
+            possibleRedeemers.add(customerRecord.customer_name);
+          }
+        } catch (error) {
+          console.error("Error fetching customer aliases for redeemed themes:", error);
+        }
+
+        const { data: redeemedCodes, error: redeemedCodesError } = await supabase
+          .from("theme_codes")
+          .select("themes_unlocked")
+          .in("redeemed_by", Array.from(possibleRedeemers))
+          .eq("status", "active");
+
+        if (!redeemedCodesError && redeemedCodes) {
+          const redeemedThemeIds = Array.from(
+            new Set(
+              redeemedCodes.flatMap((code: any) =>
+                Array.isArray(code?.themes_unlocked) ? code.themes_unlocked : []
+              )
+            )
+          );
+
+          if (redeemedThemeIds.length > 0) {
+            const { data: redeemedThemes, error: redeemedThemesError } = await supabase
+              .from("themes")
+              .select("name")
+              .in("id", redeemedThemeIds);
+
+            if (!redeemedThemesError && redeemedThemes) {
+              setPackNames(redeemedThemes.map((t) => t.name));
+            } else {
+              console.error("Error fetching redeemed theme names:", redeemedThemesError);
+              setPackNames([]);
+            }
+          } else {
+            setPackNames([]);
+          }
         } else {
-          console.error("Error fetching pack names:", packsError);
+          console.error("Error fetching redeemed theme codes:", redeemedCodesError);
           setPackNames([]);
         }
       } else {
@@ -1920,13 +1963,13 @@ export default function Lobby() {
               {isHost && (
                 <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
                   <p className="text-sm font-semibold text-primary">
-                    Share this code with other players to join:{" "}
+                    {" "}
                     <span className="text-lg font-bold">{session?.lobby_code}</span>
                   </p>
                 </div>
               )}
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Packs:</p>
+                <p className="text-sm text-muted-foreground">Expansion themes redeemed</p>
                 <p className="text-sm font-medium">{packNames.length > 0 ? packNames.join(", ") : "None"}</p>
               </div>
               {session?.selected_theme_id && (
