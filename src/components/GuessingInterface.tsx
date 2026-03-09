@@ -540,6 +540,7 @@ export function GuessingInterface({
           roundNumber: next_round.roundNumber,
           newStorytellerId: next_round.newStorytellerId,
           newStorytellerName: next_round.newStorytellerName,
+          completedTurnId: turnId,
           secretElement: whisp,
           wasCorrect: correct === true,
           players: next_round.players || [],

@@ -572,7 +572,6 @@ export default function Game() {
               description: `${message.playerName} submitted a guess`,
             });
           }
-          debouncedRefresh({ showLoading: false });
           break;
 
         case "correct_answer":
@@ -587,7 +586,7 @@ export default function Game() {
           showTurnRecap(
             message.secretElement,
             message.players,
-            currentTurn?.id,
+            message.completedTurnId || currentTurn?.id,
             typeof message.wasCorrect === "boolean" ? message.wasCorrect : undefined,
           );
           break;
@@ -1174,7 +1173,7 @@ export default function Game() {
         },
         () => {
           console.log("Player deleted from game, refreshing...");
-          debouncedRefresh({ showLoading: false });
+          // Do not refresh scoreboard on every guess; recap flow handles final score refresh.
         },
       )
       .on(
@@ -1217,13 +1216,7 @@ export default function Game() {
           // Find player name from current players state (only if player is in this session)
           const guessingPlayer = players.find((p) => p.player_id === guessPlayerId);
 
-          // If player is not in current session, ignore this guess
-          if (!guessingPlayer) {
-            console.log("Ignoring guess from player not in current session:", guessPlayerId);
-            return;
-          }
-
-          const playerName = guessingPlayer.name;
+          const playerName = guessingPlayer?.name || "A player";
 
           // Update answered players list
           setAnsweredPlayerIds((prev) => {
@@ -1572,12 +1565,8 @@ export default function Game() {
       return;
     }
 
-    // If player answered correctly but not all players have answered yet, don't show transition message
-    // The message will be shown via WebSocket or polling when all players have answered
-    // Don't refresh if round transition is active
-    if (roundTransitionTriggeredRef.current === null) {
-      initializeGame({ showLoading: false }); // Don't show loading for user action refreshes
-    }
+    // Do not refresh immediately after each individual submission.
+    // Recap flow will refresh and update scoreboard once all required players have answered.
   };
 
   // Handle storyteller timer expiry - skip the round
@@ -1634,6 +1623,7 @@ export default function Game() {
           roundNumber: data.next_round.roundNumber,
           newStorytellerId: data.next_round.newStorytellerId,
           newStorytellerName: data.next_round.newStorytellerName,
+          completedTurnId: currentTurn?.id,
         });
         // Only refresh if game continues
         initializeGame({ showLoading: false }); // Silent refresh after skip
@@ -1702,6 +1692,7 @@ export default function Game() {
           roundNumber: data.next_round.roundNumber,
           newStorytellerId: data.next_round.newStorytellerId,
           newStorytellerName: data.next_round.newStorytellerName,
+          completedTurnId: currentTurn?.id,
         });
         // Only refresh if game continues
         initializeGame({ showLoading: false }); // Silent refresh after auto-submit
