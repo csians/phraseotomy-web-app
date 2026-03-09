@@ -45,6 +45,7 @@ export function StorytellingInterface({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const MAX_RECORDING_TIME = 180; // 3 minutes in seconds
+  const MIN_RECORDING_TIME = 20; // 20 seconds minimum
 
   useEffect(() => {
     setOrderedIcons(selectedIcons);
@@ -163,6 +164,15 @@ export function StorytellingInterface({
       toast({
         title: "No Recording",
         description: "Please record your story first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (recordingTime < MIN_RECORDING_TIME) {
+      toast({
+        title: "Recording Too Short",
+        description: `Recording must be at least ${MIN_RECORDING_TIME} seconds.`,
         variant: "destructive",
       });
       return;

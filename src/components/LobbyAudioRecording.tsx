@@ -21,6 +21,7 @@ export const LobbyAudioRecording = ({ onRecordingComplete, isUploading, sendWebS
   const recordingStartTime = useRef<number>(0);
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
   const MAX_RECORDING_TIME = 180; // 3 minutes in seconds
+  const MIN_RECORDING_TIME = 20; // 20 seconds minimum
 
   useEffect(() => {
     return () => {
@@ -138,6 +139,15 @@ export const LobbyAudioRecording = ({ onRecordingComplete, isUploading, sendWebS
   const handleSaveRecording = async () => {
     if (!recordedAudio) return;
 
+    if (recordedAudio.duration < MIN_RECORDING_TIME) {
+      toast({
+        title: "Recording Too Short",
+        description: `Recording must be at least ${MIN_RECORDING_TIME} seconds.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       // Call the parent handler with the audio blob
@@ -192,7 +202,7 @@ export const LobbyAudioRecording = ({ onRecordingComplete, isUploading, sendWebS
           <Mic className="h-5 w-5" />
           Record Audio
         </CardTitle>
-        <CardDescription>Record audio for this game (maximum 3 minutes)</CardDescription>
+        <CardDescription>Record audio for this game (minimum 20 seconds, maximum 3 minutes)</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col items-center gap-4">
@@ -266,7 +276,7 @@ export const LobbyAudioRecording = ({ onRecordingComplete, isUploading, sendWebS
 
         <p className="text-xs text-muted-foreground text-center">
           {recordedAudio
-            ? "Listen to your recording before saving"
+            ? `Listen to your recording before saving (minimum ${MIN_RECORDING_TIME} seconds)`
             : "Recording will automatically stop after 3 minutes"}
         </p>
       </CardContent>

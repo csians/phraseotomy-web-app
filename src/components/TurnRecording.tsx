@@ -22,6 +22,7 @@ export const TurnRecording = ({
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const { toast } = useToast();
   const recordingStartTime = useRef<number>(0);
+  const MIN_RECORDING_TIME = 20;
 
   const startRecording = async () => {
     try {
@@ -41,6 +42,16 @@ export const TurnRecording = ({
       recorder.onstop = async () => {
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
         const durationSeconds = (Date.now() - recordingStartTime.current) / 1000;
+
+        if (durationSeconds < MIN_RECORDING_TIME) {
+          toast({
+            title: "Recording Too Short",
+            description: `Recording must be at least ${MIN_RECORDING_TIME} seconds.`,
+            variant: "destructive",
+          });
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         
         await uploadRecording(audioBlob, durationSeconds, 'audio/webm');
 

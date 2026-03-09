@@ -41,6 +41,7 @@ export function GuessingInterface({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLockedOut, setIsLockedOut] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [pendingGuessers, setPendingGuessers] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -433,6 +434,61 @@ export function GuessingInterface({
     hasTriggeredTransitionRef.current = false;
   }, [roundNumber]);
 
+  // Track which players still need to submit guesses after this player is done.
+  useEffect(() => {
+    if (!turnId || (!hasSubmitted && !isLockedOut)) {
+      setPendingGuessers([]);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const fetchPendingGuessers = async () => {
+      try {
+        const { data: turnData } = await supabase
+          .from("game_turns")
+          .select("storyteller_id")
+          .eq("id", turnId)
+          .maybeSingle();
+
+        if (!turnData || isCancelled) return;
+
+        const { data: sessionPlayers } = await supabase
+          .from("game_players")
+          .select("player_id, name, turn_order")
+          .eq("session_id", sessionId)
+          .order("turn_order", { ascending: true });
+
+        if (!sessionPlayers || isCancelled) return;
+
+        const { data: allGuesses } = await supabase
+          .from("game_guesses")
+          .select("player_id")
+          .eq("turn_id", turnId);
+
+        if (isCancelled) return;
+
+        const guessedPlayerIds = new Set(allGuesses?.map((g) => g.player_id) || []);
+        const pendingNames = sessionPlayers
+          .filter((p) => p.player_id !== turnData.storyteller_id)
+          .filter((p) => !guessedPlayerIds.has(p.player_id))
+          .map((p) => p.name);
+
+        setPendingGuessers(pendingNames);
+      } catch (error) {
+        console.error("Error fetching pending guessers:", error);
+      }
+    };
+
+    fetchPendingGuessers();
+    const interval = setInterval(fetchPendingGuessers, 2000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [turnId, sessionId, hasSubmitted, isLockedOut]);
+
   const togglePlayPause = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -679,14 +735,19 @@ export function GuessingInterface({
                 <div className="bg-destructive/10 border-2 border-destructive/50 rounded-lg p-8 text-center">
                   <p className="text-lg font-semibold text-destructive mb-2">❌ Wrong Guess!</p>
                   <p className="text-sm text-muted-foreground">
-                    Wait for the next round to guess again. Other players are still guessing!
+                    Wait for the next round to guess again.
+                    {pendingGuessers.length > 0
+                      ? ` Waiting for: ${pendingGuessers.join(", ")}`
+                      : " Other players are still guessing!"}
                   </p>
                 </div>
               ) : hasSubmitted ? (
                 <div className="bg-green-500/10 border-2 border-green-500/50 rounded-lg p-8 text-center">
                   <p className="text-lg font-semibold text-green-600 mb-2">✓ Guess Submitted!</p>
                   <p className="text-sm text-muted-foreground">
-                    Waiting for other players to finish guessing...
+                    {pendingGuessers.length > 0
+                      ? `Waiting for: ${pendingGuessers.join(", ")}`
+                      : "Waiting for other players to finish guessing..."}
                   </p>
                 </div>
               ) : (

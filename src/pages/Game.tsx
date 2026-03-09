@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useGameWebSocket } from "@/hooks/useGameWebSocket";
 import { Scoreboard } from "@/components/Scoreboard";
-import { UnifiedStorytellingInterface } from "@/components/UnifiedStorytellingInterface";
+import { UnifiedStorytellingInterface } from "../components/UnifiedStorytellingInterface";
 import { GuessingInterface } from "@/components/GuessingInterface";
 import { ThemeSelectionCards } from "@/components/ThemeSelectionCards";
 import { GameTimer } from "@/components/GameTimer";
@@ -1529,6 +1529,10 @@ export default function Game() {
 
   const isStoryteller = currentPlayerId === session.current_storyteller_id;
   const currentPlayer = players.find((p) => p.player_id === currentPlayerId);
+  const pendingGuesserNames = players
+    .filter((p) => p.player_id !== session.current_storyteller_id)
+    .filter((p) => !answeredPlayerIds.includes(p.player_id))
+    .map((p) => p.name);
 
   // Debug render state (only log once when phase changes)
   // console.log("🎮 [RENDER DEBUG] gamePhase:", gamePhase, "isStoryteller:", isStoryteller);
@@ -1547,6 +1551,7 @@ export default function Game() {
             totalRounds={session.total_rounds}
             currentStorytellerId={session.current_storyteller_id}
             answeredPlayerIds={answeredPlayerIds}
+            showGuessStatus={gamePhase === "guessing"}
             timerElement={
               !gameCompleted && gamePhase === "selecting_theme" && session.story_time_seconds && currentTurn ? (
                 <GameTimer
@@ -1748,7 +1753,11 @@ export default function Game() {
             <div className="w-full flex items-start justify-center px-2 py-2 sm:min-h-screen sm:items-center sm:p-4">
               <div className="text-center max-w-2xl w-full">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-1 sm:mb-2">Players are guessing...</h2>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-0">Watch the scoreboard to see who gets it right!</p>
+                <p className="text-sm sm:text-base md:text-lg font-semibold text-primary mb-2 sm:mb-0">
+                  {pendingGuesserNames.length > 0
+                    ? `Waiting for: ${pendingGuesserNames.join(", ")}`
+                    : "All players have submitted. Finalizing round..."}
+                </p>
                 {currentTurn?.whisp && (
                   <p className="mt-2 sm:mt-4 text-sm sm:text-base md:text-lg">
                     Your wisp was: <span className="font-bold text-primary">{currentTurn.whisp}</span>
