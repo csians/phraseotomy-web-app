@@ -333,30 +333,6 @@ export function GuessingInterface({
         
         if (!turnData) return;
         
-        // If turn is completed, all players have answered
-        if (turnData.completed_at) {
-          // Check if current player got it right
-          const { data: myGuess } = await supabase
-            .from("game_guesses")
-            .select("points_earned")
-            .eq("turn_id", turnId)
-            .eq("player_id", playerId)
-            .maybeSingle();
-          
-          const wasCorrect = myGuess?.points_earned === 1;
-          const whisp = turnData.whisp || "";
-          
-          // Mark as triggered and stop polling
-          hasTriggeredTransitionRef.current = true;
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-          }
-          
-          onAllPlayersAnswered(whisp, wasCorrect);
-          return;
-        }
-        
         // Check if all non-storyteller players have answered
         const { data: sessionPlayers } = await supabase
           .from("game_players")
@@ -379,11 +355,8 @@ export function GuessingInterface({
         const allAnswered = nonStorytellerPlayers.length > 0 && 
                            uniqueAnswers.size >= nonStorytellerPlayers.length;
         
-        // Only trigger if all players answered AND turn is completed
-        // Don't show dialog if turn is not yet marked as completed
-        // The backend will mark it complete when the last player submits
-        if (allAnswered && turnData.whisp && turnData.completed_at) {
-          // All players answered AND turn is completed
+        // Trigger recap only after all non-storyteller players have submitted guesses.
+        if (allAnswered && turnData.whisp) {
           const { data: myGuess } = await supabase
             .from("game_guesses")
             .select("points_earned")
@@ -706,16 +679,7 @@ export function GuessingInterface({
                 )}
               </div>
 
-              {hasSubmitted ? (
-                <div className="bg-green-500/10 border-2 border-green-500/50 rounded-lg p-8 text-center">
-                  <p className="text-lg font-semibold text-green-600 mb-2">✓ Guess Submitted!</p>
-                  <p className="text-sm text-muted-foreground">
-                    {pendingGuessers.length > 0
-                      ? `Waiting for: ${pendingGuessers.join(", ")}`
-                      : "Waiting for other players to finish guessing..."}
-                  </p>
-                </div>
-              ) : (
+              {hasSubmitted ? null : (
                 <div className="space-y-4">
                   <Input
                     value={guess}

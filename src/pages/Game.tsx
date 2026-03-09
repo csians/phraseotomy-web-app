@@ -1123,8 +1123,10 @@ export default function Game() {
               return;
             }
 
-            console.log("🎯 Turn completed - showing recap for all players");
-            showTurnRecap(newRow?.whisp || currentTurn?.whisp || undefined, players, turnId);
+            // completed_at is set when storyteller submits story, not when all guesses are in.
+            // Recap is triggered from game_guesses final-answer logic instead.
+            console.log("🎯 Turn updated to completed_at - waiting for all guesses before recap");
+            debouncedRefresh({ bypassStoryPause: true, showLoading: false });
             return;
           }
 
@@ -1239,31 +1241,49 @@ export default function Game() {
             });
           }
 
-          // If this was the final required guess for the current turn, show recap for everyone.
-          if (guessTurnId && currentTurn?.id === guessTurnId && recapShownTurnRef.current !== guessTurnId) {
+          // If this was the final required guess for the turn, show recap for everyone.
+          if (guessTurnId && recapShownTurnRef.current !== guessTurnId) {
             try {
-              const storytellerId = currentTurn?.storyteller_id || session?.current_storyteller_id;
-              if (storytellerId) {
-                const { data: sessionPlayers } = await supabase
-                  .from("game_players")
-                  .select("player_id")
-                  .eq("session_id", sessionId);
+              const { data: turnMeta } = await supabase
+                .from("game_turns")
+                .select("session_id, storyteller_id, whisp")
+                .eq("id", guessTurnId)
+                .maybeSingle();
 
-                const totalGuessers = (sessionPlayers || []).filter((p: { player_id: string }) => p.player_id !== storytellerId).length;
+              if (!turnMeta || turnMeta.session_id !== sessionId || !turnMeta.storyteller_id) {
+                return;
+              }
 
-                const { data: allGuesses } = await supabase
-                  .from("game_guesses")
-                  .select("player_id")
-                  .eq("turn_id", guessTurnId);
+              const { data: sessionPlayers } = await supabase
+                .from("game_players")
+                .select("player_id")
+                .eq("session_id", sessionId);
 
-                const answeredCount = new Set((allGuesses || []).map((g: { player_id: string }) => g.player_id)).size;
+              const eligibleGuessers = new Set(
+                (sessionPlayers || [])
+                  .map((p: { player_id: string }) => p.player_id)
+                  .filter((id: string) => id !== turnMeta.storyteller_id)
+              );
 
-                if (totalGuessers > 0 && answeredCount >= totalGuessers) {
-                  // Small delay helps ensure score updates are committed before recap fetches latest players.
-                  setTimeout(() => {
-                    showTurnRecap(currentTurn?.whisp || undefined, players, guessTurnId);
-                  }, 250);
-                }
+              const { data: allGuesses } = await supabase
+                .from("game_guesses")
+                .select("player_id")
+                .eq("turn_id", guessTurnId);
+
+              const answeredGuessers = new Set(
+                (allGuesses || [])
+                  .map((g: { player_id: string }) => g.player_id)
+                  .filter((id: string) => eligibleGuessers.has(id))
+              );
+
+              const allRequiredAnswered =
+                eligibleGuessers.size > 0 && answeredGuessers.size === eligibleGuessers.size;
+
+              if (allRequiredAnswered) {
+                // Small delay helps ensure score updates are committed before recap fetches latest players.
+                setTimeout(() => {
+                  showTurnRecap(turnMeta.whisp || undefined, players, guessTurnId);
+                }, 250);
               }
             } catch (error) {
               console.error("Error checking final guess for recap:", error);
