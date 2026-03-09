@@ -222,6 +222,31 @@ export default function Game() {
 
       let recapPlayers = (playersData && playersData.length > 0 ? playersData : players).slice();
       recapPlayers.sort((a, b) => (b.score || 0) - (a.score || 0));
+      let recapWhisp = secretElement || currentTurn?.whisp || "?";
+
+      // Fetch the latest turn whisp directly from DB so recap always shows it.
+      try {
+        const { data: turnData, error: turnError } = await supabase
+          .from("game_turns")
+          .select("whisp")
+          .eq("id", recapTurnId)
+          .maybeSingle();
+
+        if (!turnError && turnData?.whisp) {
+          recapWhisp = turnData.whisp;
+        }
+      } catch (error) {
+        console.error("Error fetching recap whisp:", error);
+      }
+
+      // Safety: decode if value is still encoded.
+      if (typeof recapWhisp === "string" && recapWhisp.startsWith("_ENC_")) {
+        try {
+          recapWhisp = atob(recapWhisp.substring(5));
+        } catch (error) {
+          console.error("Error decoding recap whisp:", error);
+        }
+      }
 
       // Pull freshest scores from DB so recap and sidebar scoreboard reflect point changes immediately.
       try {
@@ -280,7 +305,7 @@ export default function Game() {
       setTurnRecap({
         turnId: recapTurnId,
         icons: selectedIcons,
-        whisp: secretElement || currentTurn?.whisp || "?",
+        whisp: recapWhisp,
         players: recapPlayers,
         roundNumber: session?.current_round || 1,
         totalRounds: session?.total_rounds || 1,
@@ -1098,13 +1123,8 @@ export default function Game() {
               return;
             }
 
-            console.log("🎯 Turn completed - refreshing silently (no dialog)");
-            roundTransitionTriggeredRef.current = turnId;
-            // Clear transition trigger immediately and refresh silently
-            setTimeout(() => {
-              roundTransitionTriggeredRef.current = null;
-              debouncedRefresh({ bypassStoryPause: true, showLoading: false });
-            }, 100);
+            console.log("🎯 Turn completed - showing recap for all players");
+            showTurnRecap(newRow?.whisp || currentTurn?.whisp || undefined, players, turnId);
             return;
           }
 
