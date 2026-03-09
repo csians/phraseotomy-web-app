@@ -39,7 +39,6 @@ export function GuessingInterface({
   const { toast } = useToast();
   const [guess, setGuess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLockedOut, setIsLockedOut] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [pendingGuessers, setPendingGuessers] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -93,8 +92,6 @@ export function GuessingInterface({
         if (turnData?.storyteller_id === playerId) {
           console.log("Player is storyteller - skipping guess check and resetting state");
           lastCheckedRoundRef.current = roundNumber;
-          // Reset state to prevent showing wrong answer dialog
-          setIsLockedOut(false);
           setHasSubmitted(false);
           setGuess("");
           return;
@@ -104,8 +101,6 @@ export function GuessingInterface({
         if (!turnData?.completed_at) {
           console.log("Turn not completed yet - skipping guess check");
           lastCheckedRoundRef.current = roundNumber;
-          // Reset state to prevent showing wrong answer dialog
-          setIsLockedOut(false);
           setHasSubmitted(false);
           return;
         }
@@ -135,15 +130,10 @@ export function GuessingInterface({
             console.log("Player already submitted guess for this round");
             hasSubmittedThisTurnRef.current = true;
             setHasSubmitted(true);
-            // If points_earned is 0, they guessed wrong
-            if (existingGuess.points_earned === 0) {
-              setIsLockedOut(true);
-            }
           } else {
             // No existing guess - reset state only if we haven't submitted in this turn
             if (!previousSubmittedState) {
               setGuess("");
-              setIsLockedOut(false);
               setHasSubmitted(false);
             }
           }
@@ -154,7 +144,6 @@ export function GuessingInterface({
           // No turn data yet - reset state only if we haven't submitted
           if (!previousSubmittedState) {
             setGuess("");
-            setIsLockedOut(false);
             setHasSubmitted(false);
           }
         }
@@ -436,7 +425,7 @@ export function GuessingInterface({
 
   // Track which players still need to submit guesses after this player is done.
   useEffect(() => {
-    if (!turnId || (!hasSubmitted && !isLockedOut)) {
+    if (!turnId || !hasSubmitted) {
       setPendingGuessers([]);
       return;
     }
@@ -487,7 +476,7 @@ export function GuessingInterface({
       isCancelled = true;
       clearInterval(interval);
     };
-  }, [turnId, sessionId, hasSubmitted, isLockedOut]);
+  }, [turnId, sessionId, hasSubmitted]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -536,7 +525,7 @@ export function GuessingInterface({
       return;
     }
 
-    if (isLockedOut || hasSubmitted) {
+    if (hasSubmitted) {
       toast({
         title: "Already Answered",
         description: "You already submitted a guess. Wait for the next round!",
@@ -566,21 +555,10 @@ export function GuessingInterface({
       hasSubmittedThisTurnRef.current = true;
       setHasSubmitted(true);
 
-      if (correct === true) {
-        toast({
-          title: "🎉 Correct!",
-          description: `You guessed "${trimmedGuess}" and earned ${points_earned} points!`,
-        });
-        // Correct guess: lock via hasSubmitted (no "wrong" lockout UI)
-      } else {
-        setIsLockedOut(true);
-        toast({
-          title: "❌ Wrong Answer!",
-          description: `"${trimmedGuess}" is not correct. Wait for the next round!`,
-          variant: "destructive",
-          duration: 5000,
-        });
-      }
+      toast({
+        title: "Guess Submitted",
+        description: "Waiting for all players to finish...",
+      });
       
       // Broadcast round result to all players when all have answered (non-game-completing round)
       if (all_players_answered && !game_completed && next_round && sendWebSocketMessage) {
@@ -591,6 +569,7 @@ export function GuessingInterface({
           newStorytellerName: next_round.newStorytellerName,
           secretElement: whisp,
           wasCorrect: correct === true,
+          players: next_round.players || [],
         });
       }
       
@@ -610,7 +589,7 @@ export function GuessingInterface({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !isSubmitting && !isLockedOut && !hasSubmitted && guess.trim().length >= 3) {
+    if (e.key === "Enter" && !isSubmitting && !hasSubmitted && guess.trim().length >= 3) {
       e.preventDefault();
       handleSubmitGuess();
     }
@@ -720,28 +699,14 @@ export function GuessingInterface({
                 <h3 className="text-lg font-semibold">
                   What's the wisp word? (1 point):
                 </h3>
-                {(isLockedOut || hasSubmitted) && (
-                  <div className={`text-sm font-medium px-3 py-1 rounded-full ${
-                    isLockedOut 
-                      ? "bg-red-500/10 text-red-600" 
-                      : "bg-green-500/10 text-green-600"
-                  }`}>
-                    {isLockedOut ? "🔒 Locked this round" : "✓ Submitted"}
+                {hasSubmitted && (
+                  <div className="text-sm font-medium px-3 py-1 rounded-full bg-green-500/10 text-green-600">
+                    ✓ Submitted
                   </div>
                 )}
               </div>
-              
-              {isLockedOut ? (
-                <div className="bg-destructive/10 border-2 border-destructive/50 rounded-lg p-8 text-center">
-                  <p className="text-lg font-semibold text-destructive mb-2">❌ Wrong Guess!</p>
-                  <p className="text-sm text-muted-foreground">
-                    Wait for the next round to guess again.
-                    {pendingGuessers.length > 0
-                      ? ` Waiting for: ${pendingGuessers.join(", ")}`
-                      : " Other players are still guessing!"}
-                  </p>
-                </div>
-              ) : hasSubmitted ? (
+
+              {hasSubmitted ? (
                 <div className="bg-green-500/10 border-2 border-green-500/50 rounded-lg p-8 text-center">
                   <p className="text-lg font-semibold text-green-600 mb-2">✓ Guess Submitted!</p>
                   <p className="text-sm text-muted-foreground">
@@ -755,26 +720,26 @@ export function GuessingInterface({
                   <Input
                     value={guess}
                     onChange={(e) => {
-                      // Prevent changes if already submitted or locked out
-                      if (!hasSubmitted && !isLockedOut) {
+                      // Prevent changes if already submitted
+                      if (!hasSubmitted) {
                         setGuess(e.target.value);
                       }
                     }}
                     onKeyPress={handleKeyPress}
                     placeholder="Type your guess here... (min 3 characters)"
                     className="text-lg py-6"
-                    disabled={isSubmitting || hasSubmitted || isLockedOut}
-                    autoFocus={!hasSubmitted && !isLockedOut}
+                    disabled={isSubmitting || hasSubmitted}
+                    autoFocus={!hasSubmitted}
                     minLength={3}
                   />
                   <Button
                     onClick={handleSubmitGuess}
-                    disabled={isSubmitting || hasSubmitted || isLockedOut || !guess.trim() || guess.trim().length < 3}
+                    disabled={isSubmitting || hasSubmitted || !guess.trim() || guess.trim().length < 3}
                     size="lg"
                     className="w-full"
                   >
                     <Send className="mr-2 h-5 w-5" />
-                    {isSubmitting ? "Submitting..." : hasSubmitted || isLockedOut ? "Already Submitted" : "Submit Guess"}
+                    {isSubmitting ? "Submitting..." : hasSubmitted ? "Already Submitted" : "Submit Guess"}
                   </Button>
                 </div>
               )}

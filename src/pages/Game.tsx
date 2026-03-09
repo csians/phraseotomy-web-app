@@ -56,6 +56,7 @@ interface GameSession {
 interface Turn {
   id: string;
   theme_id: string;
+  storyteller_id?: string;
   whisp: string | null;
   recording_url: string | null;
   completed_at: string | null;
@@ -64,6 +65,17 @@ interface Turn {
   selected_icon_ids?: string[];
   icon_order?: number[];
   turn_mode?: "audio" | "elements";
+}
+
+interface TurnRecap {
+  turnId: string;
+  icons: IconItem[];
+  whisp: string;
+  players: Player[];
+  roundNumber: number;
+  totalRounds: number;
+  guessOutcome: "correct" | "wrong" | "storyteller" | "not_answered";
+  playerOutcomes: Record<string, "correct" | "wrong" | "storyteller" | "not_answered">;
 }
 
 interface IconItemLocal {
@@ -97,7 +109,7 @@ export default function Game() {
   const [gameWinner, setGameWinner] = useState<Player | null>(null);
   const [isTieGame, setIsTieGame] = useState(false);
   const [isRoundTransitioning, setIsRoundTransitioning] = useState(false);
-  const [roundResultMessage, setRoundResultMessage] = useState<{ correct: boolean; message: string } | null>(null);
+  const [turnRecap, setTurnRecap] = useState<TurnRecap | null>(null);
   const [isModeTransitioning, setIsModeTransitioning] = useState(false);
   const [selectedTurnMode, setSelectedTurnMode] = useState<"audio" | "elements" | null>(null);
   const [coreElementsForSelection, setCoreElementsForSelection] = useState<IconItem[]>([]);
@@ -120,6 +132,8 @@ export default function Game() {
   // Track if timer callbacks have been triggered for current turn to prevent loops
   const storyTimeUpTriggeredRef = useRef<string>("");
   const guessTimeUpTriggeredRef = useRef<string>("");
+  const recapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recapShownTurnRef = useRef<string | null>(null);
   // Broadcast channel ref for sending Realtime messages
   const broadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -180,6 +194,156 @@ export default function Game() {
       lastRefreshRef.current = Date.now();
       initializeGame({ bypassStoryPause: true, showLoading: false });
     }, 100); // Shorter delay for immediate transition
+  }, []);
+
+  const showTurnRecap = useCallback(
+    async (
+      secretElement?: string,
+      playersData?: Player[],
+      turnIdOverride?: string,
+      wasCorrectFallback?: boolean,
+    ) => {
+      const recapTurnId = turnIdOverride || currentTurn?.id;
+      if (!recapTurnId) {
+        return;
+      }
+
+      if (recapShownTurnRef.current === recapTurnId) {
+        return;
+      }
+
+      recapShownTurnRef.current = recapTurnId;
+      roundTransitionTriggeredRef.current = recapTurnId;
+
+      if (recapTimerRef.current) {
+        clearTimeout(recapTimerRef.current);
+        recapTimerRef.current = null;
+      }
+
+      let recapPlayers = (playersData && playersData.length > 0 ? playersData : players).slice();
+      recapPlayers.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+      // Pull freshest scores from DB so recap and sidebar scoreboard reflect point changes immediately.
+      try {
+        if (sessionId) {
+          const { data: latestPlayers, error: latestPlayersError } = await supabase
+            .from("game_players")
+            .select("id, name, player_id, score, turn_order")
+            .eq("session_id", sessionId)
+            .order("turn_order", { ascending: true });
+
+          if (!latestPlayersError && latestPlayers && latestPlayers.length > 0) {
+            recapPlayers = [...latestPlayers].sort((a, b) => (b.score || 0) - (a.score || 0));
+            setPlayers(recapPlayers);
+          }
+        }
+      } catch (error) {
+        console.error("Error refreshing recap scoreboard:", error);
+      }
+
+      const isStoryteller = session?.current_storyteller_id === currentPlayerId;
+      const storytellerIdForTurn = currentTurn?.storyteller_id || session?.current_storyteller_id;
+      const playerOutcomes: TurnRecap["playerOutcomes"] = {};
+
+      recapPlayers.forEach((player) => {
+        playerOutcomes[player.player_id] =
+          storytellerIdForTurn && player.player_id === storytellerIdForTurn ? "storyteller" : "not_answered";
+      });
+
+      let guessOutcome: TurnRecap["guessOutcome"] =
+        (playerOutcomes[currentPlayerId] as TurnRecap["guessOutcome"]) || (isStoryteller ? "storyteller" : "not_answered");
+
+      if (!isStoryteller && typeof wasCorrectFallback === "boolean") {
+        guessOutcome = wasCorrectFallback ? "correct" : "wrong";
+        playerOutcomes[currentPlayerId] = guessOutcome;
+      }
+
+      try {
+        const { data: guesses, error: guessesError } = await supabase
+          .from("game_guesses")
+          .select("player_id, points_earned")
+          .eq("turn_id", recapTurnId);
+
+        if (!guessesError && guesses) {
+          guesses.forEach((guess: { player_id: string; points_earned: number | null }) => {
+            if (playerOutcomes[guess.player_id] !== "storyteller") {
+              playerOutcomes[guess.player_id] = (guess.points_earned || 0) > 0 ? "correct" : "wrong";
+            }
+          });
+          guessOutcome =
+            (playerOutcomes[currentPlayerId] as TurnRecap["guessOutcome"]) || guessOutcome;
+        }
+      } catch (error) {
+        console.error("Error loading recap player outcomes:", error);
+      }
+
+      setTurnRecap({
+        turnId: recapTurnId,
+        icons: selectedIcons,
+        whisp: secretElement || currentTurn?.whisp || "?",
+        players: recapPlayers,
+        roundNumber: session?.current_round || 1,
+        totalRounds: session?.total_rounds || 1,
+        guessOutcome,
+        playerOutcomes,
+      });
+      setIsRoundTransitioning(true);
+
+      // Resolve per-player result from DB so each player sees their own correct/wrong status.
+      if (!isStoryteller && typeof wasCorrectFallback !== "boolean") {
+        try {
+          const { data: myGuess } = await supabase
+            .from("game_guesses")
+            .select("points_earned")
+            .eq("turn_id", recapTurnId)
+            .eq("player_id", currentPlayerId)
+            .maybeSingle();
+
+          const resolvedOutcome: TurnRecap["guessOutcome"] =
+            myGuess == null ? "not_answered" : (myGuess.points_earned || 0) > 0 ? "correct" : "wrong";
+
+          setTurnRecap((prev) =>
+            prev && prev.turnId === recapTurnId
+              ? {
+                  ...prev,
+                  guessOutcome: resolvedOutcome,
+                  playerOutcomes: {
+                    ...prev.playerOutcomes,
+                    [currentPlayerId]: resolvedOutcome,
+                  },
+                }
+              : prev
+          );
+        } catch (error) {
+          console.error("Error resolving recap guess outcome:", error);
+        }
+      }
+
+      recapTimerRef.current = setTimeout(() => {
+        setIsRoundTransitioning(false);
+        setTurnRecap(null);
+        roundTransitionTriggeredRef.current = null;
+        initializeGame({ showLoading: false });
+      }, 6000);
+    },
+    [
+      currentPlayerId,
+      currentTurn?.id,
+      currentTurn?.whisp,
+      players,
+      selectedIcons,
+      session?.current_round,
+      session?.current_storyteller_id,
+      session?.total_rounds,
+    ]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (recapTimerRef.current) {
+        clearTimeout(recapTimerRef.current);
+      }
+    };
   }, []);
 
   // Get current player ID from storage - must be defined before getCurrentPlayerInfo
@@ -378,32 +542,29 @@ export default function Game() {
 
         case "guess_submitted":
           if (message.playerId !== currentPlayerId) {
-            if (message.isCorrect) {
-              toast({
-                title: "Correct Answer! 🎉",
-                description: `${message.playerName} got it right!`,
-              });
-            } else {
-              toast({
-                title: "Guess Made",
-                description: `${message.playerName} made a guess`,
-              });
-            }
+            toast({
+              title: "Guess Submitted",
+              description: `${message.playerName} submitted a guess`,
+            });
           }
           debouncedRefresh({ showLoading: false });
           break;
 
         case "correct_answer":
           toast({
-            title: "Round Complete! 🏆",
-            description: `${message.winnerName} got it right! The answer was "${message.secretElement}"`,
+            title: "Round Complete",
+            description: "Preparing recap...",
           });
           debouncedRefresh({ showLoading: false });
           break;
 
         case "next_turn":
-          // Skip showing round transition dialog - just refresh silently
-          debouncedRefresh({ showLoading: false });
+          showTurnRecap(
+            message.secretElement,
+            message.players,
+            currentTurn?.id,
+            typeof message.wasCorrect === "boolean" ? message.wasCorrect : undefined,
+          );
           break;
 
         case "round_result":
@@ -742,6 +903,8 @@ export default function Game() {
       }
 
       setSelectedIcons(data.selectedIcons || []);
+      // Keep storyteller drag list hydrated from server state so icons persist across refresh/reconnect.
+      setCoreElementsForSelection(data.selectedIcons || []);
       // Themes are now filtered by packs_used from session, no need for unlockedPackIds
 
       // Determine game phase based on turn state
@@ -1056,6 +1219,37 @@ export default function Game() {
             });
           }
 
+          // If this was the final required guess for the current turn, show recap for everyone.
+          if (guessTurnId && currentTurn?.id === guessTurnId && recapShownTurnRef.current !== guessTurnId) {
+            try {
+              const storytellerId = currentTurn?.storyteller_id || session?.current_storyteller_id;
+              if (storytellerId) {
+                const { data: sessionPlayers } = await supabase
+                  .from("game_players")
+                  .select("player_id")
+                  .eq("session_id", sessionId);
+
+                const totalGuessers = (sessionPlayers || []).filter((p: { player_id: string }) => p.player_id !== storytellerId).length;
+
+                const { data: allGuesses } = await supabase
+                  .from("game_guesses")
+                  .select("player_id")
+                  .eq("turn_id", guessTurnId);
+
+                const answeredCount = new Set((allGuesses || []).map((g: { player_id: string }) => g.player_id)).size;
+
+                if (totalGuessers > 0 && answeredCount >= totalGuessers) {
+                  // Small delay helps ensure score updates are committed before recap fetches latest players.
+                  setTimeout(() => {
+                    showTurnRecap(currentTurn?.whisp || undefined, players, guessTurnId);
+                  }, 250);
+                }
+              }
+            } catch (error) {
+              console.error("Error checking final guess for recap:", error);
+            }
+          }
+
           debouncedRefresh({ showLoading: false });
         },
       )
@@ -1256,28 +1450,9 @@ export default function Game() {
       determineWinnerAndTies(playersData);
       fetchLifetimePoints(playersData);
 
-      if (isSubmittingPlayer && playerWasCorrect !== undefined && playerWasCorrect !== null) {
-        // ✅ Only last player: open dialog with correct/wrong + answer
-        setRoundResultMessage({
-          correct: playerWasCorrect === true,
-          message:
-            playerWasCorrect === true
-              ? `Correct! The answer was ${secretElement}`
-              : `Wrong Answer. The answer was ${secretElement}`,
-        });
-        setIsRoundTransitioning(true);
-
-        setTimeout(() => {
-          setIsRoundTransitioning(false);
-          setRoundResultMessage(null);
-          gameCompletedRef.current = true;
-          setGameCompleted(true);
-        }, 7000);
-      } else {
-        // ❌ Everyone else: DO NOT open the dialog, just mark completed (or delay without dialog)
-        gameCompletedRef.current = true;
-        setGameCompleted(true);
-      }
+      // No immediate right/wrong reveal on game completion.
+      gameCompletedRef.current = true;
+      setGameCompleted(true);
     },
     [currentPlayerId, determineWinnerAndTies, fetchLifetimePoints]
   );
@@ -1352,10 +1527,8 @@ export default function Game() {
 
     // If all players answered but game continues (next round), skip dialog and refresh silently
     if (nextRound && nextRound.newStorytellerId && !gameCompletedFromGuess && allPlayersAnswered === true) {
-      console.log("📢 Round complete, refreshing silently (no dialog)");
-      // Clear transition trigger and refresh
-      roundTransitionTriggeredRef.current = null;
-      setTimeout(() => initializeGame({ showLoading: false }), 100);
+      console.log("📢 Round complete, showing recap");
+      showTurnRecap(whisp, nextRound.players || players, currentTurn?.id, wasCorrect);
       return;
     }
 
@@ -1729,11 +1902,8 @@ export default function Game() {
               sendWebSocketMessage={sendWebSocketMessage}
               turnId={currentTurn.id}
               onAllPlayersAnswered={(whisp, wasCorrect) => {
-                // Skip showing round transition dialog - refresh silently
-                console.log("✅ All players answered - refreshing silently (no dialog), wasCorrect:", wasCorrect);
-                // Clear transition trigger and refresh
-                roundTransitionTriggeredRef.current = null;
-                debouncedRefresh({ bypassStoryPause: true, showLoading: false });
+                console.log("✅ All players answered - showing recap");
+                showTurnRecap(whisp, players, currentTurn.id, wasCorrect);
               }}
             />
           )}
@@ -1758,59 +1928,105 @@ export default function Game() {
         </main>
       </div>
 
-      {/* Round Transition Dialog - Shows final round result before winner announcement - CANNOT BE SKIPPED */}
+      {/* Turn Recap Dialog - shown after each completed turn */}
       <Dialog open={isRoundTransitioning} onOpenChange={() => { }}>
         <DialogContent
-          className="sm:max-w-md"
+          className="sm:max-w-2xl"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
           hideCloseButton
         >
-          <div className="flex flex-col items-center justify-center py-8 space-y-6">
-            <div className={`h-16 w-16 rounded-full flex items-center justify-center ${roundResultMessage?.message?.includes('Game Complete')
-              ? 'bg-primary/20'
-              : roundResultMessage?.correct
-                ? 'bg-green-500/20'
-                : 'bg-red-500/20'
-              }`}>
-              <span className="text-3xl">
-                {roundResultMessage?.message?.includes('Game Complete')
-                  ? '🎊'
-                  : roundResultMessage?.correct
-                    ? '✅'
-                    : '❌'}
-              </span>
+          <div className="py-4 space-y-5">
+            <div className="text-center space-y-1">
+              <h2 className="text-2xl font-bold text-foreground">Turn Recap</h2>
+              <p className="text-sm text-muted-foreground">
+                Round {turnRecap?.roundNumber || session?.current_round || 1} of {turnRecap?.totalRounds || session?.total_rounds || 1} complete
+              </p>
             </div>
-            <div className="text-center space-y-3">
-              <h2 className="text-2xl font-bold text-foreground">
-                {roundResultMessage?.message?.includes('Game Complete')
-                  ? 'Game Complete!'
-                  : roundResultMessage?.correct
-                    ? 'Correct!'
-                    : 'Wrong Answer'}
-              </h2>
-              {roundResultMessage && (
-                <p className={`text-lg ${roundResultMessage.message?.includes('Game Complete')
-                  ? 'text-primary'
-                  : roundResultMessage.correct
-                    ? 'text-green-500'
-                    : 'text-red-500'
-                  }`}>
-                  {roundResultMessage.message}
-                </p>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-center text-muted-foreground">5 Icons Used</p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {(turnRecap?.icons || []).map((icon) => (
+                  <div key={icon.id} className="flex flex-col items-center gap-1">
+                    <div
+                      className="h-12 w-12 rounded-full flex items-center justify-center overflow-hidden"
+                      style={{ backgroundColor: icon.color || (icon.isFromCore ? "#8B5CF6" : "#6B7280") }}
+                    >
+                      {icon.image_url ? (
+                        <img
+                          src={icon.image_url}
+                          alt={icon.name}
+                          className="h-7 w-7 object-contain"
+                          style={{ filter: "brightness(0) invert(1)" }}
+                        />
+                      ) : (
+                        <span className="text-white text-xs font-semibold">{icon.name.slice(0, 1)}</span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground max-w-[72px] text-center truncate">{icon.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 text-center">
+              <p className="text-xs text-muted-foreground">The Wisp</p>
+              <p className="text-xl font-bold text-primary">{turnRecap?.whisp || "?"}</p>
+            </div>
+
+            <div className="bg-muted/40 border rounded-lg p-3 text-center">
+              <p className="text-xs text-muted-foreground">Your Answer Result</p>
+              {turnRecap?.guessOutcome === "correct" && (
+                <p className="text-lg font-semibold text-green-600">Correct</p>
               )}
-              {!roundResultMessage && (
-                <p className="text-sm text-muted-foreground animate-pulse">
-                  Calculating final results...
-                </p>
+              {turnRecap?.guessOutcome === "wrong" && (
+                <p className="text-lg font-semibold text-red-600">Wrong</p>
+              )}
+              {turnRecap?.guessOutcome === "storyteller" && (
+                <p className="text-lg font-semibold text-primary">You were the storyteller</p>
+              )}
+              {turnRecap?.guessOutcome === "not_answered" && (
+                <p className="text-lg font-semibold text-muted-foreground">No guess submitted</p>
               )}
             </div>
-            <div className="flex gap-1">
-              <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-center text-muted-foreground">Scoreboard (After This Turn)</p>
+              <div className="space-y-1">
+                {(turnRecap?.players || []).map((p, idx) => (
+                  <div key={p.player_id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                    <span className="text-sm flex items-center gap-2">
+                      {idx + 1}. {p.name}
+                      {turnRecap?.playerOutcomes?.[p.player_id] === "correct" && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">Correct</span>
+                      )}
+                      {turnRecap?.playerOutcomes?.[p.player_id] === "wrong" && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-600">Wrong</span>
+                      )}
+                      {turnRecap?.playerOutcomes?.[p.player_id] === "storyteller" && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">Storyteller</span>
+                      )}
+                      {turnRecap?.playerOutcomes?.[p.player_id] === "not_answered" && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">No Guess</span>
+                      )}
+                    </span>
+                    <span className="font-semibold text-primary">{p.score || 0} pts</span>
+                  </div>
+                ))}
+              </div>
             </div>
+
+            <div className="text-center text-xs text-muted-foreground">
+              Moving to the next turn...
+            </div>
+
+            {!turnRecap && (
+              <div className="text-center py-2">
+                <p className="text-sm text-muted-foreground animate-pulse">Preparing recap...</p>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

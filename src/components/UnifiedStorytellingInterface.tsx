@@ -416,10 +416,6 @@ export function UnifiedStorytellingInterface({
                 3 theme icons + 1 emotion icon + 1 event icon are assigned automatically each turn.
               </p>
             </div>
-
-            <p className="text-center text-sm text-muted-foreground">
-              You only need to drag and reorder these icons before recording your story.
-            </p>
           </div>
 
           <div className="space-y-3">
