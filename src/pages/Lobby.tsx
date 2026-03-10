@@ -1942,10 +1942,10 @@ export default function Lobby() {
                 </AlertDialogContent>
               </AlertDialog>
 
-              <Button variant="outline" size="sm" onClick={handleJoinAnotherGame}>
+              {/* <Button variant="outline" size="sm" onClick={handleJoinAnotherGame}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Join Another Game
-              </Button>
+              </Button> */}
             </div>
           )}
         </div>
