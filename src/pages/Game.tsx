@@ -115,6 +115,11 @@ export default function Game() {
   const [coreElementsForSelection, setCoreElementsForSelection] = useState<IconItem[]>([]);
   const [currentWhisp, setCurrentWhisp] = useState<string>("");
   const [answeredPlayerIds, setAnsweredPlayerIds] = useState<string[]>([]); // Track which players have answered for current turn
+  const [frozenGuessScores, setFrozenGuessScores] = useState<{
+    turnId: string;
+    scores: Record<string, number>;
+  } | null>(null);
+  const [hasSeenRecapForTurn, setHasSeenRecapForTurn] = useState(false);
 
   // Refs to track completion state for use in callbacks (avoid stale closures)
   const gameCompletedRef = useRef(false);
@@ -214,6 +219,7 @@ export default function Game() {
 
       recapShownTurnRef.current = recapTurnId;
       roundTransitionTriggeredRef.current = recapTurnId;
+      setHasSeenRecapForTurn(false);
 
       if (recapTimerRef.current) {
         clearTimeout(recapTimerRef.current);
@@ -347,6 +353,7 @@ export default function Game() {
       recapTimerRef.current = setTimeout(() => {
         setIsRoundTransitioning(false);
         setTurnRecap(null);
+        setHasSeenRecapForTurn(true);
         roundTransitionTriggeredRef.current = null;
         initializeGame({ showLoading: false });
       }, 6000);
@@ -1702,6 +1709,32 @@ export default function Game() {
     }
   }, [sessionId, currentTurn, session, currentPlayerId, gameCompleted, players, sendWebSocketMessage, toast]);
 
+  // Keep scoreboard scores frozen during guessing so points are only revealed
+  // after every non-storyteller player has submitted.
+  useEffect(() => {
+    if (gamePhase === "guessing" && currentTurn?.id) {
+      setFrozenGuessScores((prev) => {
+        if (prev?.turnId === currentTurn.id) {
+          return prev;
+        }
+
+        const scoresSnapshot: Record<string, number> = {};
+        players.forEach((player) => {
+          scoresSnapshot[player.player_id] = player.score || 0;
+        });
+
+        return {
+          turnId: currentTurn.id,
+          scores: scoresSnapshot,
+        };
+      });
+      setHasSeenRecapForTurn(false);
+      return;
+    }
+
+    setFrozenGuessScores(null);
+  }, [gamePhase, currentTurn?.id, players]);
+
   // Only show the global loading screen before we have a session.
   // Once the game has loaded, avoid replacing the UI with "Loading game..."
   // during background refreshes of get-game-state.
@@ -1723,6 +1756,21 @@ export default function Game() {
 
   const isStoryteller = currentPlayerId === session.current_storyteller_id;
   const currentPlayer = players.find((p) => p.player_id === currentPlayerId);
+  const requiredGuesserIds = players
+    .filter((p) => p.player_id !== session.current_storyteller_id)
+    .map((p) => p.player_id);
+  const allRequiredGuessersAnswered =
+    requiredGuesserIds.length > 0 &&
+    requiredGuesserIds.every((playerId) => answeredPlayerIds.includes(playerId));
+  const shouldShowLiveScores =
+    gamePhase !== "guessing" ||
+    (allRequiredGuessersAnswered && hasSeenRecapForTurn && !isRoundTransitioning);
+  const scoreboardPlayers = !shouldShowLiveScores && frozenGuessScores
+    ? players.map((player) => ({
+        ...player,
+        score: frozenGuessScores.scores[player.player_id] ?? player.score,
+      }))
+    : players;
   const pendingGuesserNames = players
     .filter((p) => p.player_id !== session.current_storyteller_id)
     .filter((p) => !answeredPlayerIds.includes(p.player_id))
@@ -1740,7 +1788,7 @@ export default function Game() {
         {/* Scoreboard - top on mobile, sidebar on desktop */}
         <aside className="w-full md:w-64 lg:w-80 flex-shrink-0 p-2 md:p-4 md:sticky md:top-0 md:h-[calc(100vh-64px)] md:overflow-y-auto">
           <Scoreboard
-            players={players}
+            players={scoreboardPlayers}
             currentRound={session.current_round}
             totalRounds={session.total_rounds}
             currentStorytellerId={session.current_storyteller_id}
