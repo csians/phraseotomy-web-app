@@ -232,20 +232,84 @@ export default function Game() {
       let recapPlayers = (playersData && playersData.length > 0 ? playersData : players).slice();
       recapPlayers.sort((a, b) => (b.score || 0) - (a.score || 0));
       let recapWhisp = secretElement || currentTurn?.whisp || "?";
+      let storytellerIdForTurn = currentTurn?.storyteller_id || session?.current_storyteller_id;
+      let recapIcons: IconItem[] = [...selectedIcons];
 
-      // Fetch the latest turn whisp directly from DB so recap always shows it.
+      // Fetch recap metadata from DB; retry briefly because selected icons can arrive just after story submission.
       try {
-        const { data: turnData, error: turnError } = await supabase
-          .from("game_turns")
-          .select("whisp")
-          .eq("id", recapTurnId)
-          .maybeSingle();
+        let turnData: {
+          whisp: string | null;
+          storyteller_id: string | null;
+          selected_icon_ids: string[] | null;
+        } | null = null;
 
-        if (!turnError && turnData?.whisp) {
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const { data, error } = await supabase
+            .from("game_turns")
+            .select("whisp, storyteller_id, selected_icon_ids")
+            .eq("id", recapTurnId)
+            .maybeSingle();
+
+          if (!error && data) {
+            turnData = data;
+            if ((data.selected_icon_ids || []).length > 0) {
+              break;
+            }
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+
+        if (turnData?.whisp) {
           recapWhisp = turnData.whisp;
+        }
+
+        if (turnData?.storyteller_id) {
+          storytellerIdForTurn = turnData.storyteller_id;
+        }
+
+        const turnIconIds = turnData?.selected_icon_ids || [];
+        if (turnIconIds.length > 0) {
+          const iconById = new Map<string, IconItem>(
+            selectedIcons.map((icon) => [String(icon.id), icon])
+          );
+
+          const missingIconIds = turnIconIds.filter((id) => !iconById.has(String(id)));
+          if (missingIconIds.length > 0) {
+            const { data: missingIconRows, error: missingIconError } = await supabase
+              .from("elements")
+              .select("id, name, icon, image_url, color")
+              .in("id", missingIconIds);
+
+            if (!missingIconError && missingIconRows) {
+              missingIconRows.forEach((row) => {
+                iconById.set(String(row.id), {
+                  id: row.id,
+                  name: row.name,
+                  icon: row.icon,
+                  image_url: row.image_url || undefined,
+                  color: row.color || undefined,
+                  isFromCore: false,
+                });
+              });
+            }
+          }
+
+          const orderedTurnIcons = turnIconIds
+            .map((id) => iconById.get(String(id)))
+            .filter((icon): icon is IconItem => !!icon);
+
+          if (orderedTurnIcons.length > 0) {
+            recapIcons = orderedTurnIcons;
+          }
         }
       } catch (error) {
         console.error("Error fetching recap whisp:", error);
+      }
+
+      // Final fallback: keep recap from appearing empty if icon ids have not landed yet.
+      if (recapIcons.length === 0 && recapTurnId === currentTurn?.id && coreElementsForSelection.length > 0) {
+        recapIcons = [...coreElementsForSelection];
       }
 
       // Safety: decode if value is still encoded.
@@ -275,19 +339,19 @@ export default function Game() {
         console.error("Error refreshing recap scoreboard:", error);
       }
 
-      const isStoryteller = session?.current_storyteller_id === currentPlayerId;
-      const storytellerIdForTurn = currentTurn?.storyteller_id || session?.current_storyteller_id;
+      const isStorytellerForRecap =
+        !!storytellerIdForTurn && String(storytellerIdForTurn) === String(currentPlayerId);
       const playerOutcomes: TurnRecap["playerOutcomes"] = {};
 
       recapPlayers.forEach((player) => {
         playerOutcomes[player.player_id] =
-          storytellerIdForTurn && player.player_id === storytellerIdForTurn ? "storyteller" : "not_answered";
+          storytellerIdForTurn && String(player.player_id) === String(storytellerIdForTurn) ? "storyteller" : "not_answered";
       });
 
       let guessOutcome: TurnRecap["guessOutcome"] =
-        (playerOutcomes[currentPlayerId] as TurnRecap["guessOutcome"]) || (isStoryteller ? "storyteller" : "not_answered");
+        (playerOutcomes[currentPlayerId] as TurnRecap["guessOutcome"]) || (isStorytellerForRecap ? "storyteller" : "not_answered");
 
-      if (!isStoryteller && typeof wasCorrectFallback === "boolean") {
+      if (!isStorytellerForRecap && typeof wasCorrectFallback === "boolean") {
         guessOutcome = wasCorrectFallback ? "correct" : "wrong";
         playerOutcomes[currentPlayerId] = guessOutcome;
       }
@@ -313,7 +377,7 @@ export default function Game() {
 
       setTurnRecap({
         turnId: recapTurnId,
-        icons: selectedIcons,
+        icons: recapIcons,
         whisp: recapWhisp,
         players: recapPlayers,
         roundNumber: Math.min(
@@ -329,7 +393,7 @@ export default function Game() {
       setIsRoundTransitioning(true);
 
       // Resolve per-player result from DB so each player sees their own correct/wrong status.
-      if (!isStoryteller && typeof wasCorrectFallback !== "boolean") {
+      if (!isStorytellerForRecap && typeof wasCorrectFallback !== "boolean") {
         try {
           const { data: myGuess } = await supabase
             .from("game_guesses")
@@ -372,6 +436,7 @@ export default function Game() {
       currentTurn?.whisp,
       players,
       selectedIcons,
+      coreElementsForSelection,
       session?.current_round,
       session?.current_storyteller_id,
       session?.total_rounds,

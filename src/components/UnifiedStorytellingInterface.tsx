@@ -409,14 +409,14 @@ export function UnifiedStorytellingInterface({
             <p className="text-xs text-muted-foreground mt-2">Don't say this word. Describe it using your selected elements.</p>
           </div>
 
-          <div className="space-y-5">
+          {/* <div className="space-y-5">
             <div className="text-center">
               <h3 className="text-lg font-semibold">Your 5 Auto-assigned Icons</h3>
               <p className="text-sm text-muted-foreground">
                 3 theme icons + 1 emotion icon + 1 event icon are assigned automatically each turn.
               </p>
             </div>
-          </div>
+          </div> */}
 
           <div className="space-y-3">
             <div className="text-center">
