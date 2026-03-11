@@ -5,6 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const GAME_ROUNDS_PER_GAME = 4;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -56,7 +58,7 @@ Deno.serve(async (req) => {
     }
 
     const firstPlayer = allPlayers[0];
-    const totalRounds = allPlayers.length;
+    const totalRounds = allPlayers.length * GAME_ROUNDS_PER_GAME;
 
     // Update game session to start the game
     const updateData: any = {

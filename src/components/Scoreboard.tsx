@@ -13,6 +13,8 @@ interface ScoreboardProps {
   players: Player[];
   currentRound: number;
   totalRounds: number;
+  currentTurnInRound?: number;
+  turnsPerRound?: number;
   currentStorytellerId?: string;
   timerElement?: React.ReactNode;
   answeredPlayerIds?: string[]; // Array of player_ids who have answered for current round
@@ -23,6 +25,8 @@ export function Scoreboard({
   players,
   currentRound,
   totalRounds,
+  currentTurnInRound,
+  turnsPerRound,
   currentStorytellerId,
   timerElement,
   answeredPlayerIds = [],
@@ -40,9 +44,12 @@ export function Scoreboard({
       <CardHeader className="space-y-1 pb-2 pt-3">
         <CardTitle className="flex items-center justify-between gap-0">
           <span>Scoreboard</span>
-          <span className="text-sm font-normal text-muted-foreground whitespace-nowrap">
-            Round {currentRound} of {totalRounds}
-          </span>
+          <div className="text-right text-sm font-normal text-muted-foreground whitespace-nowrap">
+            <div>Round {currentRound} of {totalRounds}</div>
+            {currentTurnInRound && turnsPerRound ? (
+              <div className="text-xs">Turn {currentTurnInRound} of {turnsPerRound}</div>
+            ) : null}
+          </div>
         </CardTitle>
         {timerElement && (
           <div className="md:hidden flex justify-end -mt-0.5">

@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
           console.log("Game completed due to storyteller leaving");
         } else {
           // Advance to next storyteller
-          const nextStorytellerIndex = (currentRound - 1) % remainingPlayers.length;
+          const nextStorytellerIndex = (nextRound - 1) % remainingPlayers.length;
           const nextStoryteller = remainingPlayers[nextStorytellerIndex] || remainingPlayers[0];
           
           // Complete current turn if exists

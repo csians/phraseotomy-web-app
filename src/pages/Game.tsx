@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Loader2, Trophy, ArrowLeft } from "lucide-react";
 import Header from "@/components/Header";
 import type { IconItem } from "@/components/IconSelectionPanel";
-import { set } from "date-fns";
+
+const GAME_ROUNDS_PER_GAME = 4;
 
 
 interface Player {
@@ -74,6 +75,8 @@ interface TurnRecap {
   players: Player[];
   roundNumber: number;
   totalRounds: number;
+  turnInRound: number;
+  turnsPerRound: number;
   guessOutcome: "correct" | "wrong" | "storyteller" | "not_answered";
   playerOutcomes: Record<string, "correct" | "wrong" | "storyteller" | "not_answered">;
 }
@@ -313,8 +316,13 @@ export default function Game() {
         icons: selectedIcons,
         whisp: recapWhisp,
         players: recapPlayers,
-        roundNumber: session?.current_round || 1,
-        totalRounds: session?.total_rounds || 1,
+        roundNumber: Math.min(
+          GAME_ROUNDS_PER_GAME,
+          Math.ceil((session?.current_round || 1) / Math.max(recapPlayers.length, 1))
+        ),
+        totalRounds: GAME_ROUNDS_PER_GAME,
+        turnInRound: ((session?.current_round || 1) - 1) % Math.max(recapPlayers.length, 1) + 1,
+        turnsPerRound: Math.max(recapPlayers.length, 1),
         guessOutcome,
         playerOutcomes,
       });
@@ -1775,6 +1783,12 @@ export default function Game() {
     .filter((p) => p.player_id !== session.current_storyteller_id)
     .filter((p) => !answeredPlayerIds.includes(p.player_id))
     .map((p) => p.name);
+  const turnsPerRound = Math.max(players.length, 1);
+  const gameRoundNumber = Math.min(
+    GAME_ROUNDS_PER_GAME,
+    Math.ceil((session.current_round || 1) / turnsPerRound)
+  );
+  const currentTurnInRound = ((session.current_round || 1) - 1) % turnsPerRound + 1;
 
   // Debug render state (only log once when phase changes)
   // console.log("🎮 [RENDER DEBUG] gamePhase:", gamePhase, "isStoryteller:", isStoryteller);
@@ -1789,8 +1803,10 @@ export default function Game() {
         <aside className="w-full md:w-64 lg:w-80 flex-shrink-0 p-2 md:p-4 md:sticky md:top-0 md:h-[calc(100vh-64px)] md:overflow-y-auto">
           <Scoreboard
             players={scoreboardPlayers}
-            currentRound={session.current_round}
-            totalRounds={session.total_rounds}
+            currentRound={gameRoundNumber}
+            totalRounds={GAME_ROUNDS_PER_GAME}
+            currentTurnInRound={currentTurnInRound}
+            turnsPerRound={turnsPerRound}
             currentStorytellerId={session.current_storyteller_id}
             answeredPlayerIds={answeredPlayerIds}
             showGuessStatus={gamePhase === "guessing"}
@@ -2020,7 +2036,9 @@ export default function Game() {
             <div className="text-center space-y-1">
               <h2 className="text-2xl font-bold text-foreground">Turn Recap</h2>
               <p className="text-sm text-muted-foreground">
-                Round {turnRecap?.roundNumber || session?.current_round || 1} of {turnRecap?.totalRounds || session?.total_rounds || 1} complete
+                Round {turnRecap?.roundNumber || gameRoundNumber} of {turnRecap?.totalRounds || GAME_ROUNDS_PER_GAME} complete
+                {" - "}
+                Turn {turnRecap?.turnInRound || currentTurnInRound} of {turnRecap?.turnsPerRound || turnsPerRound}
               </p>
             </div>
 

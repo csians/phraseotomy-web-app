@@ -79,7 +79,9 @@ Deno.serve(async (req) => {
         );
       }
 
-      const nextStoryteller = allPlayers.find(p => p.turn_order === nextRound);
+      // Rotate storyteller order once rounds exceed player count.
+      const nextStorytellerIndex = (nextRound - 1) % allPlayers.length;
+      const nextStoryteller = allPlayers[nextStorytellerIndex];
       
       if (nextStoryteller) {
         // Create new turn for next round

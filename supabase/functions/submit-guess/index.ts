@@ -229,8 +229,9 @@ Deno.serve(async (req) => {
           if (playersError || !allPlayers || allPlayers.length === 0) {
             console.error("Error fetching players for round advancement:", playersError);
           } else {
-            // Find the player with turn_order matching the next round
-            const nextStoryteller = allPlayers.find(p => p.turn_order === nextRound);
+            // Rotate storyteller order once rounds exceed player count.
+            const nextStorytellerIndex = (nextRound - 1) % allPlayers.length;
+            const nextStoryteller = allPlayers[nextStorytellerIndex];
             
             if (nextStoryteller) {
               // Create a new turn record for the next round

@@ -137,7 +137,11 @@ Deno.serve(async (req) => {
             .eq("session_id", sessionId)
             .order("turn_order", { ascending: true });
 
-          const nextStoryteller = allPlayers?.find(p => p.turn_order === nextRound);
+          let nextStoryteller = undefined;
+          if (allPlayers && allPlayers.length > 0) {
+            const nextStorytellerIndex = (nextRound - 1) % allPlayers.length;
+            nextStoryteller = allPlayers[nextStorytellerIndex];
+          }
           
           if (nextStoryteller) {
             // Create new turn without theme - storyteller will select at start of turn
