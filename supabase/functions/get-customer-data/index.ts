@@ -281,21 +281,42 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch game sessions for this customer
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('game_sessions')
-      .select('*')
-      .eq('host_customer_id', customerId)
-      .eq('shop_domain', shopDomain)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    // Fetch sessions where this customer is a participant (host or player).
+    // Step 1: find all session_ids from game_players for this customer.
+    const { data: playerEntries, error: playerEntriesError } = await supabase
+      .from('game_players')
+      .select('session_id')
+      .eq('player_id', customerId);
 
-    if (sessionsError) {
-      console.error('Error fetching sessions:', sessionsError);
+    if (playerEntriesError) {
+      console.error('Error fetching player entries for sessions:', playerEntriesError);
       return new Response(
         JSON.stringify({ error: 'Failed to fetch sessions' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    const sessionIds = Array.from(new Set((playerEntries || []).map((p: any) => p.session_id))).filter(Boolean);
+
+    let sessions: any[] = [];
+    if (sessionIds.length > 0) {
+      const { data: sessionRows, error: sessionsError } = await supabase
+        .from('game_sessions')
+        .select('*')
+        .in('id', sessionIds)
+        .eq('shop_domain', shopDomain)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (sessionsError) {
+        console.error('Error fetching sessions:', sessionsError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch sessions' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      sessions = sessionRows || [];
     }
 
     // If customer has any active license (redeemed), ensure Shopify metafield custom.redemption_code = "True"
