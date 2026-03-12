@@ -1,3 +1,4 @@
+import React from "react";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,6 +82,22 @@ interface TurnRecap {
   playerOutcomes: Record<string, "correct" | "wrong" | "storyteller" | "not_answered">;
 }
 
+interface RoundSummaryRow {
+  playerId: string;
+  name: string;
+  turnPoints: number[];
+  roundTotal: number;
+  cumulativeTotal: number;
+}
+
+interface RoundSummary {
+  actualRoundNumber: number;
+  totalRounds: number;
+  turnsPerRound: number;
+  turnStorytellerIds: string[];
+  rows: RoundSummaryRow[];
+}
+
 interface IconItemLocal {
   id: string;
   name: string;
@@ -91,6 +108,22 @@ interface IconItemLocal {
 }
 
 type GamePhase = "selecting_theme" | "storytelling" | "guessing" | "scoring";
+
+// --- Types for cumulative round summary ---
+interface CumulativeRoundSummaryRow {
+  playerId: string;
+  name: string;
+  roundTurnPoints: number[][]; // [round][turn]
+  roundTotals: number[]; // [round]
+  total: number;
+}
+
+interface CumulativeRoundSummary {
+  rounds: number;
+  turnsPerRound: number;
+  rows: CumulativeRoundSummaryRow[];
+  allTurns: { id: string; round_number: number; storyteller_id?: string }[];
+}
 
 export default function Game() {
   const { sessionId } = useParams();
@@ -113,6 +146,121 @@ export default function Game() {
   const [isTieGame, setIsTieGame] = useState(false);
   const [isRoundTransitioning, setIsRoundTransitioning] = useState(false);
   const [turnRecap, setTurnRecap] = useState<TurnRecap | null>(null);
+  const [isRoundSummaryOpen, setIsRoundSummaryOpen] = useState(false);
+  // --- Cumulative round summary state ---
+  const [cumulativeRoundSummary, setCumulativeRoundSummary] = useState<CumulativeRoundSummary | null>(null);
+  // Build cumulative round summary up to the current round
+  const buildCumulativeRoundSummary = useCallback(
+    async (currentRoundNumber: number, playersData: Player[]): Promise<CumulativeRoundSummary | null> => {
+      if (!sessionId || playersData.length === 0) {
+        return null;
+      }
+      const turnsPerRound = Math.max(playersData.length, 1);
+      const totalRounds = Math.max(
+        1,
+        Math.ceil((session?.total_rounds || GAME_ROUNDS_PER_GAME * turnsPerRound) / turnsPerRound)
+      );
+      // Fetch all turns up to and including the current round
+      const maxTurnNumber = currentRoundNumber * turnsPerRound;
+      try {
+        const { data: allTurns, error: allTurnsError } = await supabase
+          .from("game_turns")
+          .select("id, round_number, storyteller_id")
+          .eq("session_id", sessionId)
+          .lte("round_number", maxTurnNumber)
+          .order("round_number", { ascending: true });
+        if (allTurnsError || !allTurns || allTurns.length === 0) {
+          console.error("Error loading all turns for cumulative summary:", allTurnsError);
+          return null;
+        }
+        const turnIds = allTurns.map((turn) => turn.id);
+        const { data: guesses, error: guessesError } = await supabase
+          .from("game_guesses")
+          .select("turn_id, player_id, points_earned")
+          .in("turn_id", turnIds);
+        if (guessesError) {
+          console.error("Error loading guesses for cumulative summary:", guessesError);
+          return null;
+        }
+        // Map: turnId -> { playerId -> points } (with storyteller bonus for wrong guesses)
+        const pointsByTurn = new Map();
+        // Build a map of turnId -> storytellerId for all turns
+        const storytellerByTurn = new Map();
+        allTurns.forEach((turn) => {
+          if (turn && turn.id && turn.storyteller_id) {
+            storytellerByTurn.set(turn.id, turn.storyteller_id);
+          }
+        });
+        (guesses || []).forEach((guess) => {
+          const turnPoints = pointsByTurn.get(guess.turn_id) || new Map();
+          const guessPoints = guess.points_earned || 0;
+          turnPoints.set(guess.player_id, (turnPoints.get(guess.player_id) || 0) + guessPoints);
+          // If guess was wrong, give 1 point to the storyteller for this turn
+          if (guessPoints === 0) {
+            const storytellerId = storytellerByTurn.get(guess.turn_id);
+            if (storytellerId) {
+              turnPoints.set(storytellerId, (turnPoints.get(storytellerId) || 0) + 1);
+            }
+          }
+          pointsByTurn.set(guess.turn_id, turnPoints);
+        });
+        // Build per-player, per-round, per-turn points (with bonus for storyteller)
+        const rows = playersData.map((player) => {
+          const roundTurnPoints = [];
+          const roundTotals = [];
+          let total = 0;
+          for (let r = 0; r < currentRoundNumber; r++) {
+            const turnPoints = [];
+            let roundSum = 0;
+            for (let t = 0; t < turnsPerRound; t++) {
+              const turnIndex = r * turnsPerRound + t;
+              const turn = allTurns[turnIndex];
+              if (turn) {
+                const pts = pointsByTurn.get(turn.id)?.get(player.player_id) || 0;
+                turnPoints.push(pts);
+                roundSum += pts;
+              } else {
+                turnPoints.push(0);
+              }
+            }
+            roundTurnPoints.push(turnPoints);
+            roundTotals.push(roundSum);
+            total += roundSum;
+          }
+          return {
+            playerId: player.player_id,
+            name: player.name,
+            roundTurnPoints,
+            roundTotals,
+            total,
+          };
+        });
+        return {
+          rounds: currentRoundNumber,
+          turnsPerRound,
+          rows,
+          allTurns,
+        };
+      } catch (error) {
+        console.error("Error building cumulative round summary:", error);
+        return null;
+      }
+    },
+    [session?.total_rounds, sessionId]
+  );
+  // // When round summary should be shown, build cumulative summary up to current round
+  // useEffect(() => {
+  //   if (isRoundSummaryOpen && session && players.length > 0) {
+  //     const turnsPerRound = Math.max(players.length, 1);
+  //     const currentRoundNumber = Math.min(
+  //       GAME_ROUNDS_PER_GAME,
+  //       Math.ceil((session.current_round || 1) / turnsPerRound)
+  //     );
+  //     buildCumulativeRoundSummary(currentRoundNumber, players).then(setCumulativeRoundSummary);
+  //   } else {
+  //     setCumulativeRoundSummary(null);
+  //   }
+  // }, [isRoundSummaryOpen, session, players, buildCumulativeRoundSummary]);
   const [isModeTransitioning, setIsModeTransitioning] = useState(false);
   const [selectedTurnMode, setSelectedTurnMode] = useState<"audio" | "elements" | null>(null);
   const [coreElementsForSelection, setCoreElementsForSelection] = useState<IconItem[]>([]);
@@ -124,6 +272,8 @@ export default function Game() {
   } | null>(null);
   const [hasSeenRecapForTurn, setHasSeenRecapForTurn] = useState(false);
 
+
+  {/* Icons Recap */ }
   // Refs to track completion state for use in callbacks (avoid stale closures)
   const gameCompletedRef = useRef(false);
   const isAnnouncingWinnerRef = useRef(false);
@@ -131,6 +281,7 @@ export default function Game() {
   const isStorytellerActiveRef = useRef(false); // Prevent polling during storytelling
   const roundTransitionTriggeredRef = useRef<string | null>(null); // Prevent duplicate round transitions
   const gameCompletionResultShownRef = useRef(false); // Prevent duplicate game completion result displays
+  const isRoundSummaryOpenRef = useRef(false);
   const [lifetimePoints, setLifetimePoints] = useState<Record<string, number>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
@@ -148,10 +299,14 @@ export default function Game() {
   type RefreshOptions = { bypassStoryPause?: boolean; showLoading?: boolean };
 
   // Debounced refresh to prevent infinite loops
+
+  {/* Whisp Recap */ }
   const debouncedRefresh = useCallback((options: RefreshOptions = {}) => {
     const bypassStoryPause = options.bypassStoryPause === true;
     // Default to false - only show loading if explicitly requested (initial load only)
     const showLoading = options.showLoading === true;
+
+    {/* Player Outcome Recap */ }
 
     // Don't refresh if game is completed, announcing winner, selecting mode, storyteller is active, or round is transitioning
     if (
@@ -167,6 +322,8 @@ export default function Game() {
 
     const now = Date.now();
     // Prevent refreshing more than once per second
+
+    {/* Scoreboard Recap */ }
     if (now - lastRefreshRef.current < 1000) {
       return;
     }
@@ -193,6 +350,18 @@ export default function Game() {
     // Clear the storyteller active flag since story is submitted
     isStorytellerActiveRef.current = false;
 
+    <div className="text-center text-xs text-muted-foreground">
+      Moving to the next turn...
+    </div>
+
+    {
+      !turnRecap && (
+        <div className="text-center py-2">
+          <p className="text-sm text-muted-foreground animate-pulse">Preparing recap...</p>
+        </div>
+      )
+    }
+
     if (refreshDebounceRef.current) {
       clearTimeout(refreshDebounceRef.current);
     }
@@ -203,6 +372,96 @@ export default function Game() {
       initializeGame({ bypassStoryPause: true, showLoading: false });
     }, 100); // Shorter delay for immediate transition
   }, []);
+
+  const buildRoundSummary = useCallback(
+    async (actualRoundNumber: number, playersData: Player[]): Promise<RoundSummary | null> => {
+      if (!sessionId || playersData.length === 0) {
+        return null;
+      }
+
+      const turnsPerRound = Math.max(playersData.length, 1);
+      const totalRounds = Math.max(
+        1,
+        Math.ceil((session?.total_rounds || GAME_ROUNDS_PER_GAME * turnsPerRound) / turnsPerRound)
+      );
+      const roundStartTurn = (actualRoundNumber - 1) * turnsPerRound + 1;
+      const roundEndTurn = roundStartTurn + turnsPerRound - 1;
+
+      try {
+        const { data: roundTurns, error: roundTurnsError } = await supabase
+          .from("game_turns")
+          .select("id, round_number, storyteller_id")
+          .eq("session_id", sessionId)
+          .gte("round_number", roundStartTurn)
+          .lte("round_number", roundEndTurn)
+          .order("round_number", { ascending: true });
+
+        if (roundTurnsError || !roundTurns || roundTurns.length === 0) {
+          console.error("Error loading round summary turns:", roundTurnsError);
+          return null;
+        }
+
+        const turnIds = roundTurns.map((turn) => turn.id);
+        const storytellerByTurn = new Map<string, string>(
+          roundTurns.map((turn) => [turn.id, turn.storyteller_id])
+        );
+        const pointsByTurn = new Map<string, Map<string, number>>();
+
+        const { data: guesses, error: guessesError } = await supabase
+          .from("game_guesses")
+          .select("turn_id, player_id, points_earned")
+          .in("turn_id", turnIds);
+
+        if (guessesError) {
+          console.error("Error loading round summary guesses:", guessesError);
+          return null;
+        }
+
+        (guesses || []).forEach((guess) => {
+          const turnPoints = pointsByTurn.get(guess.turn_id) || new Map<string, number>();
+          const guessPoints = guess.points_earned || 0;
+
+          turnPoints.set(guess.player_id, (turnPoints.get(guess.player_id) || 0) + guessPoints);
+
+          if (guessPoints === 0) {
+            const storytellerId = storytellerByTurn.get(guess.turn_id);
+            if (storytellerId) {
+              turnPoints.set(storytellerId, (turnPoints.get(storytellerId) || 0) + 1);
+            }
+          }
+
+          pointsByTurn.set(guess.turn_id, turnPoints);
+        });
+
+        const rows = [...playersData]
+          .sort((a, b) => (b.score || 0) - (a.score || 0))
+          .map((player) => {
+            const turnPoints = roundTurns.map((turn) => pointsByTurn.get(turn.id)?.get(player.player_id) || 0);
+            const roundTotal = turnPoints.reduce((sum, value) => sum + value, 0);
+
+            return {
+              playerId: player.player_id,
+              name: player.name,
+              turnPoints,
+              roundTotal,
+              cumulativeTotal: player.score || 0,
+            };
+          });
+
+        return {
+          actualRoundNumber,
+          totalRounds,
+          turnsPerRound,
+          turnStorytellerIds: roundTurns.map((turn) => turn.storyteller_id),
+          rows,
+        };
+      } catch (error) {
+        console.error("Error building round summary:", error);
+        return null;
+      }
+    },
+    [session?.total_rounds, sessionId]
+  );
 
   const showTurnRecap = useCallback(
     async (
@@ -234,6 +493,7 @@ export default function Game() {
       let recapWhisp = secretElement || currentTurn?.whisp || "?";
       let storytellerIdForTurn = currentTurn?.storyteller_id || session?.current_storyteller_id;
       let recapIcons: IconItem[] = [...selectedIcons];
+      let recapTurnNumber = session?.current_round || 1;
 
       // Fetch recap metadata from DB; retry briefly because selected icons can arrive just after story submission.
       try {
@@ -241,12 +501,13 @@ export default function Game() {
           whisp: string | null;
           storyteller_id: string | null;
           selected_icon_ids: string[] | null;
+          round_number: number | null;
         } | null = null;
 
         for (let attempt = 0; attempt < 4; attempt++) {
           const { data, error } = await supabase
             .from("game_turns")
-            .select("whisp, storyteller_id, selected_icon_ids")
+            .select("whisp, storyteller_id, selected_icon_ids, round_number")
             .eq("id", recapTurnId)
             .maybeSingle();
 
@@ -266,6 +527,10 @@ export default function Game() {
 
         if (turnData?.storyteller_id) {
           storytellerIdForTurn = turnData.storyteller_id;
+        }
+
+        if (typeof turnData?.round_number === "number") {
+          recapTurnNumber = turnData.round_number;
         }
 
         const turnIconIds = turnData?.selected_icon_ids || [];
@@ -341,6 +606,14 @@ export default function Game() {
 
       const isStorytellerForRecap =
         !!storytellerIdForTurn && String(storytellerIdForTurn) === String(currentPlayerId);
+      const turnsPerRound = Math.max(recapPlayers.length, 1);
+      const totalRounds = Math.max(
+        1,
+        Math.ceil((session?.total_rounds || GAME_ROUNDS_PER_GAME * turnsPerRound) / turnsPerRound)
+      );
+      const actualRoundNumber = Math.min(totalRounds, Math.ceil(recapTurnNumber / turnsPerRound));
+      const turnInRound = ((recapTurnNumber - 1) % turnsPerRound) + 1;
+      const isFinalTurnOfGame = actualRoundNumber === GAME_ROUNDS_PER_GAME && turnInRound === turnsPerRound;
       const playerOutcomes: TurnRecap["playerOutcomes"] = {};
 
       recapPlayers.forEach((player) => {
@@ -375,22 +648,47 @@ export default function Game() {
         console.error("Error loading recap player outcomes:", error);
       }
 
+
+      // Show round summary dialog after last turn in a round (including after last round)
+      const isLastTurnOfRound = turnInRound === turnsPerRound;
+      if (isLastTurnOfRound && recapPlayers.length > 0) {
+        const turnsPerRoundForSummary = Math.max(recapPlayers.length, 1);
+        const currentRoundNumber = Math.min(
+          GAME_ROUNDS_PER_GAME,
+          Math.ceil(((session?.current_round || 1) as number) / turnsPerRoundForSummary)
+        );
+
+        try {
+          const summary = await buildCumulativeRoundSummary(
+            currentRoundNumber,
+            recapPlayers
+          );
+          if (summary) {
+            setCumulativeRoundSummary(summary);
+          }
+        } catch (error) {
+          console.error("Error building cumulative round summary:", error);
+        }
+      }
       setTurnRecap({
         turnId: recapTurnId,
         icons: recapIcons,
         whisp: recapWhisp,
         players: recapPlayers,
-        roundNumber: Math.min(
-          GAME_ROUNDS_PER_GAME,
-          Math.ceil((session?.current_round || 1) / Math.max(recapPlayers.length, 1))
-        ),
-        totalRounds: GAME_ROUNDS_PER_GAME,
-        turnInRound: ((session?.current_round || 1) - 1) % Math.max(recapPlayers.length, 1) + 1,
-        turnsPerRound: Math.max(recapPlayers.length, 1),
+        roundNumber: actualRoundNumber,
+        totalRounds,
+        turnInRound,
+        turnsPerRound,
         guessOutcome,
         playerOutcomes,
       });
-      setIsRoundTransitioning(true);
+
+      // If this is the final turn of the final round AND the game is already marked completed,
+      // do not open the separate Turn Recap dialog. Instead, let the existing Game Over dialog
+      // render the recap + final scoreboard using this turnRecap / cumulativeRoundSummary data.
+      if (!(isFinalTurnOfGame && gameCompletedRef.current)) {
+        setIsRoundTransitioning(true);
+      }
 
       // Resolve per-player result from DB so each player sees their own correct/wrong status.
       if (!isStorytellerForRecap && typeof wasCorrectFallback !== "boolean") {
@@ -408,13 +706,13 @@ export default function Game() {
           setTurnRecap((prev) =>
             prev && prev.turnId === recapTurnId
               ? {
-                  ...prev,
-                  guessOutcome: resolvedOutcome,
-                  playerOutcomes: {
-                    ...prev.playerOutcomes,
-                    [currentPlayerId]: resolvedOutcome,
-                  },
-                }
+                ...prev,
+                guessOutcome: resolvedOutcome,
+                playerOutcomes: {
+                  ...prev.playerOutcomes,
+                  [currentPlayerId]: resolvedOutcome,
+                },
+              }
               : prev
           );
         } catch (error) {
@@ -422,26 +720,34 @@ export default function Game() {
         }
       }
 
-      recapTimerRef.current = setTimeout(() => {
+      recapTimerRef.current = setTimeout(async () => {
+        const isFinalTurn =
+          actualRoundNumber === GAME_ROUNDS_PER_GAME &&
+          turnInRound === turnsPerRound;
+
+        // For the final turn when the game is already completed, keep the Game Over
+        // dialog open with recap + scoreboard and skip closing/refreshing.
+        if (isFinalTurn && gameCompletedRef.current) {
+          return;
+        }
+
         setIsRoundTransitioning(false);
-        setTurnRecap(null);
+
+        if (!isFinalTurn) {
+          setTurnRecap(null);
+        }
+
         setHasSeenRecapForTurn(true);
         roundTransitionTriggeredRef.current = null;
         initializeGame({ showLoading: false });
       }, 6000);
-    },
-    [
-      currentPlayerId,
-      currentTurn?.id,
-      currentTurn?.whisp,
-      players,
-      selectedIcons,
-      coreElementsForSelection,
-      session?.current_round,
-      session?.current_storyteller_id,
-      session?.total_rounds,
-    ]
+    },  [currentTurn, players, selectedIcons, session, currentPlayerId, buildCumulativeRoundSummary, coreElementsForSelection]
   );
+  // useEffect(() => {
+  useEffect(() => {
+    isRoundSummaryOpenRef.current = isRoundSummaryOpen;
+  }, [isRoundSummaryOpen]);
+  // }, [isRoundSummaryOpen]);
 
   useEffect(() => {
     return () => {
@@ -795,7 +1101,7 @@ export default function Game() {
 
           // Don't process if already showing result (use ref to prevent race conditions)
           // WebSocket should be the primary source for synchronized display - skip poll if WebSocket already handled it
-          if (gameCompletionResultShownRef.current || isRoundTransitioning || isAnnouncingWinnerRef.current || gameCompletedRef.current) {
+          if (gameCompletionResultShownRef.current || isRoundTransitioning || isRoundSummaryOpen || isAnnouncingWinnerRef.current || gameCompletedRef.current) {
             console.log("Already showing game completion result via WebSocket, skipping poll fallback");
             return;
           }
@@ -933,19 +1239,27 @@ export default function Game() {
         return;
       }
 
-      // If session is expired/completed, show winner dialog
+      // If session is expired/completed, delay winner dialog until after last round summary
       if (data.session?.status === "expired" || data.session?.status === "completed") {
         console.log("Game already completed, status:", data.session.status);
         setSession(data.session);
         setPlayers(data.players || []);
-
-        // Find winner (or detect tie) and show completion dialog
         determineWinnerAndTies(data.players || []);
-        setGameCompleted(true);
-
-        // Fetch lifetime points for completed game
         fetchLifetimePoints(data.players || []);
-        // Always clear loading
+        // Instead of showing result now, set a flag to show after round summary
+        setTimeout(() => {
+          if (!isRoundTransitioning && !isRoundSummaryOpen) {
+            setGameCompleted(true);
+          } else {
+            // Poll until both dialogs are closed
+            const poll = setInterval(() => {
+              if (!isRoundTransitioning && !isRoundSummaryOpen) {
+                setGameCompleted(true);
+                clearInterval(poll);
+              }
+            }, 200);
+          }
+        }, 0);
         setLoading(false);
         return;
       }
@@ -1125,7 +1439,7 @@ export default function Game() {
 
             // Don't process if already showing result (use ref to prevent race conditions)
             // WebSocket should be the primary source for synchronized display - skip realtime if WebSocket already handled it
-            if (gameCompletionResultShownRef.current || isAnnouncingWinnerRef.current || gameCompletedRef.current || isRoundTransitioning) {
+            if (gameCompletionResultShownRef.current || isAnnouncingWinnerRef.current || gameCompletedRef.current || isRoundTransitioning || isRoundSummaryOpen) {
               console.log("Already showing game completion result via WebSocket, skipping realtime event");
               return;
             }
@@ -1385,7 +1699,7 @@ export default function Game() {
         console.log("🎉 Received game_completed broadcast via Realtime:", payload);
 
         // Don't process if already showing result (use ref to prevent race conditions)
-        if (gameCompletionResultShownRef.current || isAnnouncingWinnerRef.current || gameCompletedRef.current || isRoundTransitioning) {
+        if (gameCompletionResultShownRef.current || isAnnouncingWinnerRef.current || gameCompletedRef.current || isRoundTransitioning || isRoundSummaryOpen) {
           console.log("Already showing game completion result, skipping Realtime broadcast");
           return;
         }
@@ -1450,7 +1764,7 @@ export default function Game() {
   // Handle starting a turn - unified flow (no mode selection)
   const handleStartTurn = async (themeId: string) => {
     console.log("🔥 handleStartTurn called with themeId:", themeId);
-    
+
     if (!themeId || themeId.trim() === "") {
       console.error("❌ handleStartTurn called with empty themeId");
       toast({
@@ -1527,7 +1841,7 @@ export default function Game() {
     }
   };
 
-    const handleStoryComplete = () => {
+  const handleStoryComplete = () => {
     // Allow polling again after storyteller finishes
     isStorytellerActiveRef.current = false;
     toast({
@@ -1837,12 +2151,12 @@ export default function Game() {
     requiredGuesserIds.every((playerId) => answeredPlayerIds.includes(playerId));
   const shouldShowLiveScores =
     gamePhase !== "guessing" ||
-    (allRequiredGuessersAnswered && hasSeenRecapForTurn && !isRoundTransitioning);
+    (allRequiredGuessersAnswered && hasSeenRecapForTurn && !isRoundTransitioning && !isRoundSummaryOpen);
   const scoreboardPlayers = !shouldShowLiveScores && frozenGuessScores
     ? players.map((player) => ({
-        ...player,
-        score: frozenGuessScores.scores[player.player_id] ?? player.score,
-      }))
+      ...player,
+      score: frozenGuessScores.scores[player.player_id] ?? player.score,
+    }))
     : players;
   const pendingGuesserNames = players
     .filter((p) => p.player_id !== session.current_storyteller_id)
@@ -1952,9 +2266,9 @@ export default function Game() {
 
         {/* Game Content */}
         <main className="flex-1 p-4">
-        
-        {/* Mode Transition Loading Overlay - prevents flicker during mode selection */}
-            {/* {isModeTransitioning && (
+
+          {/* Mode Transition Loading Overlay - prevents flicker during mode selection */}
+          {/* {isModeTransitioning && (
             <div className="min-h-screen flex items-center justify-center">
               <div className="flex flex-col items-center justify-center py-12 gap-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -1962,7 +2276,7 @@ export default function Game() {
               </div>
             </div>
           )} */}
-        
+
           {/* Theme Selection Phase - Storyteller chooses theme */}
           {gamePhase === "selecting_theme" && isStoryteller && (
             <div className="min-h-screen flex items-center justify-center p-4">
@@ -2088,105 +2402,164 @@ export default function Game() {
         </main>
       </div>
 
-      {/* Turn Recap Dialog - shown after each completed turn */}
+
+      {/* Turn Recap Dialog - shown after each completed turn, and merged with Round Summary if last turn of round */}
       <Dialog open={isRoundTransitioning} onOpenChange={() => { }}>
         <DialogContent
-          className="sm:max-w-2xl"
+          className="sm:max-w-5xl"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
           hideCloseButton
         >
           <div className="py-4 space-y-5">
-            <div className="text-center space-y-1">
-              <h2 className="text-2xl font-bold text-foreground">Turn Recap</h2>
-              <p className="text-sm text-muted-foreground">
-                Round {turnRecap?.roundNumber || gameRoundNumber} of {turnRecap?.totalRounds || GAME_ROUNDS_PER_GAME} complete
-                {" - "}
-                Turn {turnRecap?.turnInRound || currentTurnInRound} of {turnRecap?.turnsPerRound || turnsPerRound}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-center text-muted-foreground">5 Icons Used</p>
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                {(turnRecap?.icons || []).map((icon) => (
-                  <div key={icon.id} className="flex flex-col items-center gap-1">
-                    <div
-                      className="h-12 w-12 rounded-full flex items-center justify-center overflow-hidden"
-                      style={{ backgroundColor: icon.color || (icon.isFromCore ? "#8B5CF6" : "#6B7280") }}
-                    >
-                      {icon.image_url ? (
-                        <img
-                          src={icon.image_url}
-                          alt={icon.name}
-                          className="h-7 w-7 object-contain"
-                          style={{ filter: "brightness(0) invert(1)" }}
-                        />
-                      ) : (
-                        <span className="text-white text-xs font-semibold">{icon.name.slice(0, 1)}</span>
-                      )}
+            {/* Turn Recap Section - always shown */}
+            {turnRecap && (
+              <div className="mb-6">
+                <div className="bg-background border border-[#28222e] rounded-2xl shadow-2xl p-6 max-w-2xl mx-auto">
+                  <h2 className="text-2xl font-extrabold mb-4 text-center tracking-wide text-[#ffe066] drop-shadow-lg">Turn Recap</h2>
+                  <div className="flex flex-col items-center gap-4">
+                    {/* Icons shown for the turn */}
+                    <div className="flex gap-4 mb-3 rounded-xl px-5 py-4 w-full justify-center" style={{ background: 'rgba(20, 20, 20, 0.65)', backdropFilter: 'blur(4px)' }}>
+                      {turnRecap.icons.map((icon) => (
+                        <div key={icon.id} className="flex flex-col items-center">
+                          {icon.image_url ? (
+                            <img
+                              src={icon.image_url}
+                              alt={icon.name}
+                              className="h-10 w-10 rounded-full drop-shadow-lg"
+                              style={{ background: icon.color || '#bdbdbd', objectFit: 'contain' }}
+                            />
+                          ) : (
+                            <span className="text-4xl drop-shadow-lg" style={{ color: '#ffffff' }}>{icon.icon}</span>
+                          )}
+                          <span className="text-xs mt-1 text-[#ffe066]">{icon.name}</span>
+                        </div>
+                      ))}
                     </div>
-                    <span className="text-[11px] text-muted-foreground max-w-[72px] text-center truncate">{icon.name}</span>
+                    {/* Whisp/Secret word */}
+                    <div className="mb-2 text-center">
+                      <div className="text-sm font-medium text-[#bdbdbd] mb-1">The Wisp</div>
+                      <span className="inline-block bg-[#3a2f1b] text-[#ffe066] font-extrabold px-6 py-2 rounded-lg text-2xl tracking-wide shadow-md border-2 border-[#ffe066]">
+                        {turnRecap.whisp}
+                      </span>
+                    </div>
+                    {/* Player outcomes / Scoreboard */}
+                    <div className="w-full max-w-md mx-auto mt-2">
+                      <div className="rounded-xl bg-[#23202a] border border-[#28222e] overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2 bg-[#18141c] border-b border-[#28222e]">
+                          <span className="text-[#ffe066] font-bold text-lg">Scoreboard (After This Turn)</span>
+                        </div>
+                        <table className="min-w-full text-base">
+                          <tbody>
+                            {turnRecap.players.map((player, idx) => {
+                              const outcome = turnRecap.playerOutcomes[player.player_id];
+                              let badgeClass = "";
+                              let badgeText = "";
+                              if (outcome === "correct") {
+                                badgeClass = "bg-[#232e1b] text-[#aaff66] border border-[#aaff66]";
+                                badgeText = "Correct";
+                              } else if (outcome === "wrong") {
+                                badgeClass = "bg-[#2e1b1b] text-[#ff6666] border border-[#ff6666]";
+                                badgeText = "Wrong";
+                              } else if (outcome === "storyteller") {
+                                badgeClass = "bg-[#1b233a] text-[#66aaff] border border-[#66aaff]";
+                                badgeText = "Storyteller";
+                              } else {
+                                badgeClass = "bg-[#23202a] text-[#bdbdbd] border border-[#444]";
+                                badgeText = "No Guess";
+                              }
+
+                              // Score: show points in gold, bold, right-aligned
+                              return (
+                                <tr key={player.player_id} className="border-b border-[#28222e] last:border-b-0">
+                                  <td className="px-4 py-3 font-semibold whitespace-nowrap flex items-center gap-2">
+                                    <span className="text-[#ffe066] font-bold text-lg mr-2">{idx + 1}.</span>
+                                    <span className="text-[#ffe066] font-bold">{player.name}</span>
+                                    {badgeText && (
+                                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}`}>{badgeText}</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-right align-middle">
+                                    <span className="text-[#ffe066] font-bold text-lg">{player.score} pts</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 text-center">
-              <p className="text-xs text-muted-foreground">The Wisp</p>
-              <p className="text-xl font-bold text-primary">{turnRecap?.whisp || "?"}</p>
-            </div>
-
-            <div className="bg-muted/40 border rounded-lg p-3 text-center">
-              <p className="text-xs text-muted-foreground">Your Answer Result</p>
-              {turnRecap?.guessOutcome === "correct" && (
-                <p className="text-lg font-semibold text-green-600">Correct</p>
-              )}
-              {turnRecap?.guessOutcome === "wrong" && (
-                <p className="text-lg font-semibold text-red-600">Wrong</p>
-              )}
-              {turnRecap?.guessOutcome === "storyteller" && (
-                <p className="text-lg font-semibold text-primary">You were the storyteller</p>
-              )}
-              {turnRecap?.guessOutcome === "not_answered" && (
-                <p className="text-lg font-semibold text-muted-foreground">No guess submitted</p>
+            <div className="text-center space-y-1">
+              {turnRecap?.turnInRound === turnRecap?.turnsPerRound && cumulativeRoundSummary ? (
+                <>
+                  <h2 className="text-xl font-bold mb-2 text-primary">Turn Recap + Round Summary</h2>
+                  <p className="text-sm text-muted-foreground">Moving to the next round...</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Moving to the next turn...</p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-center text-muted-foreground">Scoreboard (After This Turn)</p>
-              <div className="space-y-1">
-                {(turnRecap?.players || []).map((p, idx) => (
-                  <div key={p.player_id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                    <span className="text-sm flex items-center gap-2">
-                      {idx + 1}. {p.name}
-                      {turnRecap?.playerOutcomes?.[p.player_id] === "correct" && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">Correct</span>
-                      )}
-                      {turnRecap?.playerOutcomes?.[p.player_id] === "wrong" && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-600">Wrong</span>
-                      )}
-                      {turnRecap?.playerOutcomes?.[p.player_id] === "storyteller" && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">Storyteller</span>
-                      )}
-                      {turnRecap?.playerOutcomes?.[p.player_id] === "not_answered" && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">No Guess</span>
-                      )}
-                    </span>
-                    <span className="font-semibold text-primary">{p.score || 0} pts</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="text-center text-xs text-muted-foreground">
-              Moving to the next turn...
-            </div>
-
-            {!turnRecap && (
-              <div className="text-center py-2">
-                <p className="text-sm text-muted-foreground animate-pulse">Preparing recap...</p>
+            {/* Cumulative Round Summary Table (only on last turn of round) */}
+            {turnRecap?.turnInRound === turnRecap?.turnsPerRound && cumulativeRoundSummary && (
+              <div className="overflow-x-auto mt-6">
+                <table className="min-w-full border border-muted rounded-lg">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="px-3 py-3 text-left font-semibold">Player</th>
+                      {Array.from({ length: cumulativeRoundSummary.rounds }).map((_, r) => (
+                        <>
+                          {Array.from({ length: cumulativeRoundSummary.turnsPerRound }).map((_, t) => (
+                            <th key={`r${r}-t${t}`} className="px-3 py-3 text-center font-semibold">
+                              R{r + 1} T{t + 1}
+                            </th>
+                          ))}
+                          <th key={`r${r}-total`} className="px-3 py-3 text-center font-semibold bg-muted/20">R{r + 1} Total</th>
+                        </>
+                      ))}
+                      <th className="px-3 py-3 text-center font-semibold bg-primary/10">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cumulativeRoundSummary.rows.map((row) => (
+                      <tr key={row.playerId} className="border-b last:border-b-0">
+                        <td className="px-3 py-3 font-medium whitespace-nowrap">{row.name}</td>
+                        {row.roundTurnPoints.map((turns, r) => (
+                          <>
+                            {turns.map((points, t) => {
+                              const turnIndex = r * cumulativeRoundSummary.turnsPerRound + t;
+                              const allTurns = cumulativeRoundSummary.allTurns || [];
+                              const turn = allTurns[turnIndex];
+                              const isStoryteller = turn && turn.storyteller_id === row.playerId;
+                              return (
+                                <td
+                                  key={`p${row.playerId}-r${r}-t${t}`}
+                                  className={`px-3 py-3 text-center font-medium${isStoryteller && points > 0 ? ' text-red-600' : ''}`}
+                                >
+                                  {points}
+                                </td>
+                              );
+                            })}
+                            <td key={`p${row.playerId}-r${r}-total`} className="px-3 py-3 text-center font-semibold bg-muted/20">{row.roundTotals[r]}</td>
+                          </>
+                        ))}
+                        {/* Use the latest player.score for the Total column to match the scoreboard */}
+                        <td className="px-3 py-3 text-center font-semibold bg-primary/10">
+                          {(() => {
+                            const playerObj = players.find((p) => p.player_id === row.playerId);
+                            return playerObj ? playerObj.score : row.total;
+                          })()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -2221,7 +2594,7 @@ export default function Game() {
       {/* Game Completed Winner Dialog - CANNOT BE SKIPPED */}
       <Dialog open={gameCompleted} onOpenChange={() => { }}>
         <DialogContent
-          className="sm:max-w-md"
+          className="sm:max-w-5xl"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
@@ -2291,8 +2664,152 @@ export default function Game() {
               Back to Home
             </Button>
           </div>
+
+          {/* --- Final Turn Recap and Final Round Summary (Final Results) --- */}
+          {cumulativeRoundSummary && turnRecap && turnRecap.turnInRound === turnRecap.turnsPerRound && gameRoundNumber === GAME_ROUNDS_PER_GAME && (
+            <div className="mt-10">
+              {/* Turn Recap Section */}
+              <div className="mb-8">
+                <div className="bg-background border border-[#28222e] rounded-2xl shadow-2xl p-6 max-w-2xl mx-auto">
+                  <h2 className="text-2xl font-extrabold mb-4 text-center tracking-wide text-[#ffe066] drop-shadow-lg">Final Turn Recap</h2>
+                  <div className="flex flex-col items-center gap-4">
+                    {/* Icons shown for the turn */}
+                    <div className="flex gap-4 mb-3 rounded-xl px-4 py-3 w-full justify-center" style={{ background: 'rgba(20, 20, 20, 0.65)', backdropFilter: 'blur(4px)' }}>
+                      {turnRecap.icons.map((icon) => (
+                        <div key={icon.id} className="flex flex-col items-center">
+                          {icon.image_url ? (
+                            <img
+                              src={icon.image_url}
+                              alt={icon.name}
+                              className="h-10 w-10 rounded-full drop-shadow-lg"
+                              style={{ background: icon.color || '#bdbdbd', objectFit: 'contain' }}
+                            />
+                          ) : (
+                            <span className="text-4xl drop-shadow-lg" style={{ color: '#bdbdbd' }}>{icon.icon}</span>
+                          )}
+                          <span className="text-xs mt-1 text-[#ffe066]">{icon.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Whisp/Secret word */}
+                    <div className="mb-2 text-center">
+                      <div className="text-sm font-medium text-[#bdbdbd] mb-1">The Wisp</div>
+                      <span className="inline-block bg-[#3a2f1b] text-[#ffe066] font-extrabold px-6 py-2 rounded-lg text-2xl tracking-wide shadow-md border-2 border-[#ffe066]">
+                        {turnRecap.whisp}
+                      </span>
+                    </div>
+                    {/* Player outcomes / Scoreboard */}
+                    <div className="w-full max-w-md mx-auto mt-2">
+                      <div className="rounded-xl bg-[#23202a] border border-[#28222e] overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2 bg-[#18141c] border-b border-[#28222e]">
+                          <span className="text-[#ffe066] font-bold text-lg">Scoreboard (Final Turn)</span>
+                        </div>
+                        <table className="min-w-full text-base">
+                          <tbody>
+                            {turnRecap.players.map((player, idx) => {
+                              const outcome = turnRecap.playerOutcomes[player.player_id];
+                              let badgeClass = "";
+                              let badgeText = "";
+                              if (outcome === "correct") {
+                                badgeClass = "bg-[#232e1b] text-[#aaff66] border border-[#aaff66]";
+                                badgeText = "Correct";
+                              } else if (outcome === "wrong") {
+                                badgeClass = "bg-[#2e1b1b] text-[#ff6666] border border-[#ff6666]";
+                                badgeText = "Wrong";
+                              } else if (outcome === "storyteller") {
+                                badgeClass = "bg-[#1b233a] text-[#66aaff] border border-[#66aaff]";
+                                badgeText = "Storyteller";
+                              } else {
+                                badgeClass = "bg-[#23202a] text-[#bdbdbd] border border-[#444]";
+                                badgeText = "No Guess";
+                              }
+
+                              // Find the storyteller's icon (first icon in recap.icons)
+                              const isStoryteller = outcome === "storyteller";
+                              let storytellerIcon = null;
+                              if (isStoryteller && turnRecap.icons.length > 0) {
+                                storytellerIcon = turnRecap.icons[0];
+                              }
+
+                              // Score: show points in gold, bold, right-aligned
+                              return (
+                                <tr key={player.player_id} className="border-b border-[#28222e] last:border-b-0">
+                                  <td className="px-4 py-3 font-semibold whitespace-nowrap flex items-center gap-2">
+                                    <span className="text-[#ffe066] font-bold text-lg mr-2">{idx + 1}.</span>
+                                    <span className="text-[#ffe066] font-bold">{player.name}</span>
+                                    {badgeText && (
+                                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}`}>{badgeText}</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-right align-middle">
+                                    <span className="text-[#ffe066] font-bold text-lg">{player.score} pts</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Final Round Summary table placed at the very bottom */}
+              {cumulativeRoundSummary && (
+                <div className="overflow-x-auto mt-6">
+                  <h2 className="text-xl font-bold mb-2 text-primary">Final Round Summary</h2>
+                  <table className="min-w-full border border-muted rounded-lg">
+                    <thead>
+                      <tr className="border-b bg-muted/30">
+                        <th className="px-3 py-3 text-left font-semibold">Player</th>
+                        {Array.from({ length: cumulativeRoundSummary.rounds }).map((_, r) => (
+                          <>
+                            {Array.from({ length: cumulativeRoundSummary.turnsPerRound }).map((_, t) => (
+                              <th key={`r${r}-t${t}`} className="px-3 py-3 text-center font-semibold">
+                                R{r + 1} T{t + 1}
+                              </th>
+                            ))}
+                            <th key={`r${r}-total`} className="px-3 py-3 text-center font-semibold bg-muted/20">R{r + 1} Total</th>
+                          </>
+                        ))}
+                        <th className="px-3 py-3 text-center font-semibold bg-primary/10">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cumulativeRoundSummary.rows.map((row) => (
+                        <tr key={row.playerId} className="border-b last:border-b-0">
+                          <td className="px-3 py-3 font-medium whitespace-nowrap">{row.name}</td>
+                          {row.roundTurnPoints.map((turns, r) => (
+                            <>
+                              {turns.map((points, t) => {
+                                const turnIndex = r * cumulativeRoundSummary.turnsPerRound + t;
+                                const allTurns = cumulativeRoundSummary.allTurns || [];
+                                const turn = allTurns[turnIndex];
+                                const isStoryteller = turn && turn.storyteller_id === row.playerId;
+                                return (
+                                  <td
+                                    key={`p${row.playerId}-r${r}-t${t}`}
+                                    className={`px-3 py-3 text-center font-medium${isStoryteller && points > 0 ? ' text-red-600' : ''}`}
+                                  >
+                                    {points}
+                                  </td>
+                                );
+                              })}
+                              <td key={`p${row.playerId}-r${r}-total`} className="px-3 py-3 text-center font-semibold bg-muted/20">{row.roundTotals[r]}</td>
+                            </>
+                          ))}
+                          <td className="px-3 py-3 text-center font-semibold bg-primary/10">{row.total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }
