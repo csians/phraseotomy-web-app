@@ -1092,6 +1092,21 @@ export default function Game() {
 
         if (error) {
           console.log("poll:get-game-state error", error);
+          const msg = error.message || error.context?.error || "";
+          const isNotFound =
+            error.status === 404 ||
+            msg.toLowerCase().includes("session not found") ||
+            msg.toLowerCase().includes("game not found");
+
+          if (isNotFound) {
+            toast({
+              title: "Game not found",
+              description: "This game session doesn't exist or has already ended.",
+              variant: "destructive",
+            });
+            navigate("/play/host", { replace: true });
+            window.clearInterval(pollId);
+          }
           return;
         }
 
@@ -1213,17 +1228,23 @@ export default function Game() {
         console.error("Error from get-game-state:", error);
         // Always clear loading on error
         setLoading(false);
-        // Check if session was deleted (game completed and cleaned up)
-        if (error.message?.includes("Session not found") || session?.status === "expired") {
-          console.log("Session was cleaned up, redirecting...");
-          toast({
-            title: "Game Ended",
-            description: "This game session has been cleaned up.",
-          });
-          navigate("/play/host");
-          return;
-        }
-        throw error;
+
+        const msg = error.message || error.context?.error || "Unable to load this game.";
+        const isNotFound =
+          error.status === 404 ||
+          msg.toLowerCase().includes("session not found") ||
+          msg.toLowerCase().includes("game not found");
+
+        toast({
+          title: isNotFound ? "Game not found" : "Game error",
+          description: isNotFound
+            ? "This game session doesn't exist or has already ended."
+            : msg,
+          variant: "destructive",
+        });
+
+        navigate("/play/host", { replace: true });
+        return;
       }
 
       // If session not found in response, it was deleted
