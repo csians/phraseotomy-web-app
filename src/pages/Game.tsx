@@ -741,7 +741,7 @@ export default function Game() {
         roundTransitionTriggeredRef.current = null;
         initializeGame({ showLoading: false });
       }, 6000);
-    },  [currentTurn, players, selectedIcons, session, currentPlayerId, buildCumulativeRoundSummary, coreElementsForSelection]
+    }, [currentTurn, players, selectedIcons, session, currentPlayerId, buildCumulativeRoundSummary, coreElementsForSelection]
   );
   // useEffect(() => {
   useEffect(() => {
@@ -2427,408 +2427,629 @@ export default function Game() {
       {/* Turn Recap Dialog - shown after each completed turn, and merged with Round Summary if last turn of round */}
       <Dialog open={isRoundTransitioning} onOpenChange={() => { }}>
         <DialogContent
-          className="sm:max-w-5xl"
+          className="sm:max-w-5xl max-h-[90vh] overflow-y-auto"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
           hideCloseButton
         >
-          <div className="py-4 space-y-5">
-            {/* Turn Recap Section - always shown */}
+          <div className="py-6 space-y-6">
+
+            {/* ================= TURN RECAP ================= */}
+
             {turnRecap && (
-              <div className="mb-6">
-                <div className="bg-background border border-[#28222e] rounded-2xl shadow-2xl p-6 max-w-2xl mx-auto">
-                  <h2 className="text-2xl font-extrabold mb-4 text-center tracking-wide text-[#ffe066] drop-shadow-lg">Turn Recap</h2>
-                  <div className="flex flex-col items-center gap-4">
-                    {/* Icons shown for the turn */}
-                    <div className="flex gap-4 mb-3 rounded-xl px-5 py-4 w-full justify-center" style={{ background: 'rgba(20, 20, 20, 0.65)', backdropFilter: 'blur(4px)' }}>
+              <div className="w-full flex justify-center">
+
+                <div className="w-full max-w-4xl bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl p-8 shadow-2xl">
+
+                  <h2 className="text-center text-3xl font-bold text-yellow-400">
+                    Turn Recap
+                  </h2>
+
+                  <div className="flex flex-col items-center gap-8 mt-8">
+
+                    {/* Icons */}
+                    <div className="flex flex-wrap justify-center gap-6 w-full">
                       {turnRecap.icons.map((icon) => (
-                        <div key={icon.id} className="flex flex-col items-center">
-                          {icon.image_url ? (
-                            <img
-                              src={icon.image_url}
-                              alt={icon.name}
-                              className="h-10 w-10 rounded-full drop-shadow-lg"
-                              style={{ background: icon.color || '#bdbdbd', objectFit: 'contain' }}
-                            />
-                          ) : (
-                            <span className="text-4xl drop-shadow-lg" style={{ color: '#ffffff' }}>{icon.icon}</span>
-                          )}
-                          <span className="text-xs mt-1 text-[#ffe066]">{icon.name}</span>
+                        <div key={icon.id} className="flex flex-col items-center w-20">
+
+                          <div
+                            className="h-14 w-14 rounded-full flex items-center justify-center shadow-lg"
+                            style={{ background: icon.color || "#ff3b30" }}
+                          >
+                            {icon.image_url ? (
+                              <img
+                                src={icon.image_url}
+                                alt={icon.name}
+                                className="h-10 w-10 object-contain filter brightness-0 invert"
+                              />
+                            ) : (
+                              <span className="text-3xl text-white">
+                                {icon.icon}
+                              </span>
+                            )}
+                          </div>
+
+                          <span className="text-xs mt-2 text-[#ffe066] text-center truncate w-full">
+                            {icon.name}
+                          </span>
+
                         </div>
                       ))}
                     </div>
-                    {/* Whisp/Secret word */}
-                    <div className="mb-2 text-center">
-                      <div className="text-sm font-medium text-[#bdbdbd] mb-1">The Wisp</div>
-                      <span className="inline-block bg-[#3a2f1b] text-[#ffe066] font-extrabold px-6 py-2 rounded-lg text-2xl tracking-wide shadow-md border-2 border-[#ffe066]">
+
+                    {/* Wisp */}
+                    <div className="bg-[#2a230f] border border-yellow-700 rounded-xl p-6 text-center w-full">
+
+                      <div className="text-yellow-400 text-sm">
+                        The Wisp
+                      </div>
+
+                      <div className="text-4xl font-bold text-yellow-300 mt-2">
                         {turnRecap.whisp}
-                      </span>
+                      </div>
+
                     </div>
-                    {/* Player outcomes / Scoreboard */}
-                    <div className="w-full max-w-md mx-auto mt-2">
-                      <div className="rounded-xl bg-[#23202a] border border-[#28222e] overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-2 bg-[#18141c] border-b border-[#28222e]">
-                          <span className="text-[#ffe066] font-bold text-lg">Scoreboard (After This Turn)</span>
+
+                    {/* Scoreboard */}
+                    <div className="w-full">
+
+                      <div className="rounded-xl border border-[#28222e] overflow-hidden">
+
+                        <div className="px-6 py-4 text-center border-b border-[#28222e]">
+                          <span className="text-[#ffe066] font-bold text-lg">
+                            Scoreboard (After This Turn)
+                          </span>
                         </div>
-                        <table className="min-w-full text-base">
+
+                        <table className="w-full text-base">
+
                           <tbody>
+
                             {turnRecap.players.map((player, idx) => {
-                              const outcome = turnRecap.playerOutcomes[player.player_id];
-                              let badgeClass = "";
-                              let badgeText = "";
+
+                              const outcome =
+                                turnRecap.playerOutcomes[player.player_id]
+
+                              let badgeClass = ""
+                              let badgeText = ""
+
                               if (outcome === "correct") {
-                                badgeClass = "bg-[#232e1b] text-[#aaff66] border border-[#aaff66]";
-                                badgeText = "Correct";
-                              } else if (outcome === "wrong") {
-                                badgeClass = "bg-[#2e1b1b] text-[#ff6666] border border-[#ff6666]";
-                                badgeText = "Wrong";
-                              } else if (outcome === "storyteller") {
-                                badgeClass = "bg-[#1b233a] text-[#66aaff] border border-[#66aaff]";
-                                badgeText = "Storyteller";
-                              } else {
-                                badgeClass = "bg-[#23202a] text-[#bdbdbd] border border-[#444]";
-                                badgeText = "No Guess";
+                                badgeClass = "bg-[#232e1b] text-[#aaff66] border border-[#aaff66]"
+                                badgeText = "Correct"
+                              }
+                              else if (outcome === "wrong") {
+                                badgeClass = "bg-[#2e1b1b] text-[#ff6666] border border-[#ff6666]"
+                                badgeText = "Wrong"
+                              }
+                              else if (outcome === "storyteller") {
+                                badgeClass = "bg-[#1b233a] text-[#66aaff] border border-[#66aaff]"
+                                badgeText = "Storyteller"
+                              }
+                              else {
+                                badgeClass = "bg-[#23202a] text-[#bdbdbd] border border-[#444]"
+                                badgeText = "No Guess"
                               }
 
-                              // Score: show points in gold, bold, right-aligned
                               return (
-                                <tr key={player.player_id} className="border-b border-[#28222e] last:border-b-0">
-                                  <td className="px-4 py-3 font-semibold whitespace-nowrap flex items-center gap-2">
-                                    <span className="text-[#ffe066] font-bold text-lg mr-2">{idx + 1}.</span>
-                                    <span className="text-[#ffe066] font-bold">{player.name}</span>
-                                    {badgeText && (
-                                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}`}>{badgeText}</span>
-                                    )}
+                                <tr
+                                  key={player.player_id}
+                                  className="border-b border-[#28222e] last:border-none"
+                                >
+
+                                  <td className="px-6 py-4 flex items-center gap-3">
+
+                                    <span className="text-[#ffe066] font-bold text-lg">
+                                      {idx + 1}.
+                                    </span>
+
+                                    <span className="text-[#ffe066] font-bold">
+                                      {player.name}
+                                    </span>
+
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}`}>
+                                      {badgeText}
+                                    </span>
+
                                   </td>
-                                  <td className="px-4 py-3 text-right align-middle">
-                                    <span className="text-[#ffe066] font-bold text-lg">{player.score} pts</span>
+
+                                  <td className="px-6 py-4 text-right">
+                                    <span className="text-[#ffe066] font-bold text-lg">
+                                      {player.score} pts
+                                    </span>
                                   </td>
+
                                 </tr>
-                              );
+                              )
+
                             })}
+
                           </tbody>
+
                         </table>
+
                       </div>
+
                     </div>
+
                   </div>
                 </div>
               </div>
             )}
 
+            {/* ================= TRANSITION TEXT ================= */}
+
             <div className="text-center space-y-1">
+
               {turnRecap?.turnInRound === turnRecap?.turnsPerRound && cumulativeRoundSummary ? (
                 <>
-                  <h2 className="text-xl font-bold mb-2 text-primary">Turn Recap + Round Summary</h2>
-                  <p className="text-sm text-muted-foreground">Moving to the next round...</p>
+                  <h2 className="text-xl font-bold text-primary">
+                    Round Summary
+                  </h2>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">Moving to the next turn...</p>
+                <p className="text-sm text-muted-foreground">
+                  Moving to the next turn...
+                </p>
               )}
+
             </div>
 
-            {/* Cumulative Round Summary Table (only on last turn of round) */}
+            {/* ================= ROUND SUMMARY ================= */}
+
             {turnRecap?.turnInRound === turnRecap?.turnsPerRound && cumulativeRoundSummary && (
-              <div className="overflow-x-auto mt-6">
+              <div className="w-full border rounded-xl overflow-hidden">
+
                 <table className="min-w-full border border-muted rounded-lg">
+
                   <thead>
                     <tr className="border-b bg-muted/30">
-                      <th className="px-3 py-3 text-left font-semibold">Player</th>
+                      <th className="px-3 py-3 text-left font-semibold">
+                        Player
+                      </th>
+
                       {Array.from({ length: cumulativeRoundSummary.rounds }).map((_, r) => (
-                        <>
+                        <React.Fragment key={r}>
+
                           {Array.from({ length: cumulativeRoundSummary.turnsPerRound }).map((_, t) => (
-                            <th key={`r${r}-t${t}`} className="px-3 py-3 text-center font-semibold">
+                            <th
+                              key={`r${r}-t${t}`}
+                              className="px-3 py-3 text-center font-semibold"
+                            >
                               R{r + 1} T{t + 1}
                             </th>
                           ))}
-                          <th key={`r${r}-total`} className="px-3 py-3 text-center font-semibold bg-muted/20">R{r + 1} Total</th>
-                        </>
+
+                          <th className="px-3 py-3 text-center font-semibold bg-muted/20">
+                            R{r + 1} Total
+                          </th>
+
+                        </React.Fragment>
                       ))}
-                      <th className="px-3 py-3 text-center font-semibold bg-primary/10">Total</th>
+
+                      <th className="px-3 py-3 text-center font-semibold bg-primary/10">
+                        Total
+                      </th>
+
                     </tr>
                   </thead>
+
                   <tbody>
+
                     {cumulativeRoundSummary.rows.map((row) => (
                       <tr key={row.playerId} className="border-b last:border-b-0">
-                        <td className="px-3 py-3 font-medium whitespace-nowrap">{row.name}</td>
+
+                        <td className="px-3 py-3 font-medium whitespace-nowrap">
+                          {row.name}
+                        </td>
+
                         {row.roundTurnPoints.map((turns, r) => (
-                          <>
+                          <React.Fragment key={r}>
+
                             {turns.map((points, t) => {
-                              const turnIndex = r * cumulativeRoundSummary.turnsPerRound + t;
-                              const allTurns = cumulativeRoundSummary.allTurns || [];
-                              const turn = allTurns[turnIndex];
-                              const isStoryteller = turn && turn.storyteller_id === row.playerId;
+
+                              const turnIndex =
+                                r * cumulativeRoundSummary.turnsPerRound + t
+
+                              const turn =
+                                cumulativeRoundSummary.allTurns?.[turnIndex]
+
+                              const isStoryteller =
+                                turn && turn.storyteller_id === row.playerId
+
                               return (
                                 <td
-                                  key={`p${row.playerId}-r${r}-t${t}`}
-                                  className={`px-3 py-3 text-center font-medium${isStoryteller && points > 0 ? ' text-red-600' : ''}`}
+                                  key={t}
+                                  className={`px-3 py-3 text-center font-medium ${isStoryteller && points > 0 ? "text-red-600" : ""
+                                    }`}
                                 >
                                   {points}
                                 </td>
-                              );
+                              )
+
                             })}
-                            <td key={`p${row.playerId}-r${r}-total`} className="px-3 py-3 text-center font-semibold bg-muted/20">{row.roundTotals[r]}</td>
-                          </>
+
+                            <td className="px-3 py-3 text-center font-semibold bg-muted/20">
+                              {row.roundTotals[r]}
+                            </td>
+
+                          </React.Fragment>
+
                         ))}
-                        {/* Use the latest player.score for the Total column to match the scoreboard */}
+
                         <td className="px-3 py-3 text-center font-semibold bg-primary/10">
-                          {(() => {
-                            const playerObj = players.find((p) => p.player_id === row.playerId);
-                            return playerObj ? playerObj.score : row.total;
-                          })()}
+                          {players.find(p => p.player_id === row.playerId)?.score ?? row.total}
                         </td>
+
                       </tr>
+
                     ))}
+
                   </tbody>
+
                 </table>
+
               </div>
+
             )}
+
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Announcing Winner Loading Dialog - CANNOT BE SKIPPED */}
-      <Dialog open={isAnnouncingWinner} onOpenChange={() => { }}>
-        <DialogContent
-          className="sm:max-w-md"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-          hideCloseButton
-        >
-          <div className="flex flex-col items-center justify-center py-8 space-y-6">
-            <div className="relative">
-              <div className="h-20 w-20 rounded-full bg-primary/20 flex items-center justify-center animate-pulse">
-                <Trophy className="h-10 w-10 text-primary animate-bounce" />
-              </div>
-              <div className="absolute inset-0 h-20 w-20 rounded-full border-4 border-primary/30 animate-ping" />
-            </div>
-            <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-foreground">Game Complete!</h2>
-              <p className="text-lg text-muted-foreground animate-pulse">Announcing winner...</p>
-            </div>
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Game Completed Winner Dialog - CANNOT BE SKIPPED */}
       <Dialog open={gameCompleted} onOpenChange={() => { }}>
-        <DialogContent
-          className="sm:max-w-5xl"
+        <DialogContent 
+          className="sm:max-w-5xl h-[90vh] overflow-y-scroll scrollbar-none scroll-smooth overscroll-contain"
           onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
+          onEscapeKeyDown= {(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
           hideCloseButton
         >
-          <DialogHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <Trophy className="h-8 w-8 text-primary" />
-            </div>
-            <DialogTitle className="text-2xl text-center">Game Over! 🎊</DialogTitle>
-            <DialogDescription className="text-center space-y-4">
-              {isTieGame ? (
-                <div className="space-y-2 pt-4">
-                  <p className="text-lg font-semibold text-foreground">🤝 It's a Tie!</p>
-                  <p className="text-muted-foreground">
-                    {(() => {
-                      const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
-                      const highestScore = sortedPlayers[0]?.score || 0;
-                      const tiedPlayers = sortedPlayers.filter(p => (p.score || 0) === highestScore);
-                      return `${tiedPlayers.map(p => p.name).join(" & ")} tied with ${highestScore} points!`;
-                    })()}
-                  </p>
-                </div>
-              ) : gameWinner ? (
-                <div className="space-y-2 pt-4">
-                  <p className="text-lg font-semibold text-foreground">🏆 {gameWinner.name} wins!</p>
-                  <p className="text-muted-foreground">Final Score: {gameWinner.score || 0} points</p>
-                </div>
-              ) : (
-                <p>Thanks for playing!</p>
-              )}
 
-              {/* Final Standings */}
-              <div className="mt-6 space-y-2 text-left">
-                <p className="text-sm font-medium text-foreground">Final Standings:</p>
-                {(() => {
-                  const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
-                  const highestScore = sortedPlayers[0]?.score || 0;
-                  return sortedPlayers.map((player, index) => {
-                    const isTied = isTieGame && (player.score || 0) === highestScore;
-                    return (
-                      <div key={player.id} className="flex items-center justify-between py-2 px-3 rounded bg-muted/50">
-                        <span className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{index + 1}.</span>
-                          <span>{player.name}</span>
-                          {isTied && <span>🤝</span>}
-                          {!isTieGame && index === 0 && <span>👑</span>}
-                        </span>
-                        <div className="flex flex-col items-end">
-                          <span className="font-semibold">{player.score || 0} pts</span>
-                          {lifetimePoints[player.player_id] !== undefined && (
-                            <span className="text-xs text-muted-foreground">
-                              Total: {lifetimePoints[player.player_id]} pts
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
+          <div className="flex flex-col gap-6 min-h-full">
+
+            {/* ================= GAME OVER HEADER ================= */}
+
+            <DialogHeader className="text-center">
+
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <Trophy className="h-8 w-8 text-primary" />
               </div>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center pt-4">
-            <Button onClick={() => navigate("/play/host")} className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Home
-            </Button>
-          </div>
 
-          {/* --- Final Turn Recap and Final Round Summary (Final Results) --- */}
-          {cumulativeRoundSummary && turnRecap && turnRecap.turnInRound === turnRecap.turnsPerRound && gameRoundNumber === GAME_ROUNDS_PER_GAME && (
-            <div className="mt-10">
-              {/* Turn Recap Section */}
-              <div className="mb-8">
-                <div className="bg-background border border-[#28222e] rounded-2xl shadow-2xl p-6 max-w-2xl mx-auto">
-                  <h2 className="text-2xl font-extrabold mb-4 text-center tracking-wide text-[#ffe066] drop-shadow-lg">Final Turn Recap</h2>
-                  <div className="flex flex-col items-center gap-4">
-                    {/* Icons shown for the turn */}
-                    <div className="flex gap-4 mb-3 rounded-xl px-4 py-3 w-full justify-center" style={{ background: 'rgba(20, 20, 20, 0.65)', backdropFilter: 'blur(4px)' }}>
-                      {turnRecap.icons.map((icon) => (
-                        <div key={icon.id} className="flex flex-col items-center">
+              <DialogTitle className="text-2xl text-center">
+                Game Over! 🎊
+              </DialogTitle>
+
+              <DialogDescription className="text-center space-y-8">
+
+                {isTieGame ? (
+                  <div className="space-y-2 pt-4">
+                    <p className="text-lg font-semibold">🤝 It's a Tie!</p>
+
+                    <p className="text-muted-foreground">
+                      {(() => {
+                        const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+                        const highestScore = sortedPlayers[0]?.score || 0;
+                        const tiedPlayers = sortedPlayers.filter(p => (p.score || 0) === highestScore);
+                        return `${tiedPlayers.map(p => p.name).join(" & ")} tied with ${highestScore} points!`;
+                      })()}
+                    </p>
+                  </div>
+                ) : gameWinner ? (
+                  <div className="space-y-2 pt-4">
+                    <p className="text-lg font-semibold">
+                      🏆 {gameWinner.name} wins!
+                    </p>
+
+                    <p className="text-muted-foreground">
+                      Final Score: {gameWinner.score || 0} points
+                    </p>
+                  </div>
+                ) : (
+                  <p>Thanks for playing!</p>
+                )}
+
+                {/* ================= FINAL STANDINGS ================= */}
+
+                <div className="mt-6 space-y-2 text-left">
+                  <p className="text-sm font-medium">Final Standings:</p>
+
+                  {[...players]
+                    .sort((a, b) => (b.score || 0) - (a.score || 0))
+                    .map((player, index) => {
+
+                      const highestScore = Math.max(...players.map(p => p.score || 0))
+                      const isTied = isTieGame && (player.score || 0) === highestScore
+
+                      return (
+                        <div
+                          key={player.id}
+                          className="flex items-center justify-between py-2 px-3 rounded bg-muted/50"
+                        >
+
+                          <span className="flex items-center gap-2">
+                            <span className="text-sm font-medium">
+                              {index + 1}.
+                            </span>
+
+                            <span>{player.name}</span>
+
+                            {isTied && <span>🤝</span>}
+                            {!isTieGame && index === 0 && <span>👑</span>}
+                          </span>
+
+                          <div className="flex flex-col items-end">
+
+                            <span className="font-semibold">
+                              {player.score || 0} pts
+                            </span>
+
+                            {lifetimePoints[player.player_id] !== undefined && (
+                              <span className="text-xs text-muted-foreground">
+                                Total: {lifetimePoints[player.player_id]} pts
+                              </span>
+                            )}
+
+                          </div>
+
+                        </div>
+                      )
+                    })}
+                </div>
+
+              </DialogDescription>
+            </DialogHeader>
+
+
+            {/* ================= FINAL TURN RECAP ================= */}
+
+            {cumulativeRoundSummary && turnRecap && turnRecap.turnInRound === turnRecap.turnsPerRound && gameRoundNumber === GAME_ROUNDS_PER_GAME && (
+
+              <div className="w-full flex flex-col items-center gap-6 py-6">
+
+                <div className="w-full max-w-4xl bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl p-8">
+
+                  <h2 className="text-center text-3xl font-bold text-yellow-400">
+                    Last Turn Recap
+                  </h2>
+
+                  <div className="flex flex-wrap justify-center gap-6 mt-6">
+
+                    {turnRecap.icons.map(icon => (
+                      <div key={icon.id} className="flex flex-col items-center">
+
+                        <div
+                          className="h-14 w-14 rounded-full flex items-center justify-center"
+                          style={{ background: icon.color || "#ff3b30" }}
+                        >
+
                           {icon.image_url ? (
                             <img
                               src={icon.image_url}
                               alt={icon.name}
-                              className="h-10 w-10 rounded-full drop-shadow-lg"
-                              style={{ background: icon.color || '#bdbdbd', objectFit: 'contain' }}
+                              className="h-10 w-10 object-contain filter brightness-0 invert"
                             />
                           ) : (
-                            <span className="text-4xl drop-shadow-lg" style={{ color: '#bdbdbd' }}>{icon.icon}</span>
+                            <span className="text-white text-2xl">
+                              {icon.icon}
+                            </span>
                           )}
-                          <span className="text-xs mt-1 text-[#ffe066]">{icon.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Whisp/Secret word */}
-                    <div className="mb-2 text-center">
-                      <div className="text-sm font-medium text-[#bdbdbd] mb-1">The Wisp</div>
-                      <span className="inline-block bg-[#3a2f1b] text-[#ffe066] font-extrabold px-6 py-2 rounded-lg text-2xl tracking-wide shadow-md border-2 border-[#ffe066]">
-                        {turnRecap.whisp}
-                      </span>
-                    </div>
-                    {/* Player outcomes / Scoreboard */}
-                    <div className="w-full max-w-md mx-auto mt-2">
-                      <div className="rounded-xl bg-[#23202a] border border-[#28222e] overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-2 bg-[#18141c] border-b border-[#28222e]">
-                          <span className="text-[#ffe066] font-bold text-lg">Scoreboard (Final Turn)</span>
-                        </div>
-                        <table className="min-w-full text-base">
-                          <tbody>
-                            {turnRecap.players.map((player, idx) => {
-                              const outcome = turnRecap.playerOutcomes[player.player_id];
-                              let badgeClass = "";
-                              let badgeText = "";
-                              if (outcome === "correct") {
-                                badgeClass = "bg-[#232e1b] text-[#aaff66] border border-[#aaff66]";
-                                badgeText = "Correct";
-                              } else if (outcome === "wrong") {
-                                badgeClass = "bg-[#2e1b1b] text-[#ff6666] border border-[#ff6666]";
-                                badgeText = "Wrong";
-                              } else if (outcome === "storyteller") {
-                                badgeClass = "bg-[#1b233a] text-[#66aaff] border border-[#66aaff]";
-                                badgeText = "Storyteller";
-                              } else {
-                                badgeClass = "bg-[#23202a] text-[#bdbdbd] border border-[#444]";
-                                badgeText = "No Guess";
-                              }
 
-                              // Find the storyteller's icon (first icon in recap.icons)
-                              const isStoryteller = outcome === "storyteller";
-                              let storytellerIcon = null;
-                              if (isStoryteller && turnRecap.icons.length > 0) {
-                                storytellerIcon = turnRecap.icons[0];
-                              }
+                        </div>
 
-                              // Score: show points in gold, bold, right-aligned
-                              return (
-                                <tr key={player.player_id} className="border-b border-[#28222e] last:border-b-0">
-                                  <td className="px-4 py-3 font-semibold whitespace-nowrap flex items-center gap-2">
-                                    <span className="text-[#ffe066] font-bold text-lg mr-2">{idx + 1}.</span>
-                                    <span className="text-[#ffe066] font-bold">{player.name}</span>
-                                    {badgeText && (
-                                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}`}>{badgeText}</span>
-                                    )}
-                                  </td>
-                                  <td className="px-4 py-3 text-right align-middle">
-                                    <span className="text-[#ffe066] font-bold text-lg">{player.score} pts</span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                        <span className="text-xs mt-2 text-yellow-400">
+                          {icon.name}
+                        </span>
+
                       </div>
+                    ))}
+
+                  </div>
+
+                  {/* Wisp */}
+
+                  <div className="mt-6 mb-6 bg-[#2a230f] border border-yellow-700 rounded-xl p-6 text-center">
+
+                    <div className="text-yellow-400 text-sm">
+                      The Wisp
+                    </div>
+
+                    <div className="text-4xl font-bold text-yellow-300 mt-2">
+                      {turnRecap.whisp}
+                    </div>
+
+                  </div>
+                  <div className="w-full">
+
+                    <div className="rounded-xl border border-[#28222e] overflow-hidden">
+
+                      <div className="px-6 py-4 text-center border-b border-[#28222e]">
+                        <span className="text-[#ffe066] font-bold text-lg">
+                          Scoreboard (After This Turn)
+                        </span>
+                      </div>
+
+                      <table className="w-full text-base">
+
+                        <tbody>
+
+                          {turnRecap.players.map((player, idx) => {
+
+                            const outcome =
+                              turnRecap.playerOutcomes[player.player_id]
+
+                            let badgeClass = ""
+                            let badgeText = ""
+
+                            if (outcome === "correct") {
+                              badgeClass = "bg-[#232e1b] text-[#aaff66] border border-[#aaff66]"
+                              badgeText = "Correct"
+                            }
+                            else if (outcome === "wrong") {
+                              badgeClass = "bg-[#2e1b1b] text-[#ff6666] border border-[#ff6666]"
+                              badgeText = "Wrong"
+                            }
+                            else if (outcome === "storyteller") {
+                              badgeClass = "bg-[#1b233a] text-[#66aaff] border border-[#66aaff]"
+                              badgeText = "Storyteller"
+                            }
+                            else {
+                              badgeClass = "bg-[#23202a] text-[#bdbdbd] border border-[#444]"
+                              badgeText = "No Guess"
+                            }
+
+                            return (
+                              <tr
+                                key={player.player_id}
+                                className="border-b border-[#28222e] last:border-none"
+                              >
+
+                                <td className="px-6 py-4 flex items-center gap-3">
+
+                                  <span className="text-[#ffe066] font-bold text-lg">
+                                    {idx + 1}.
+                                  </span>
+
+                                  <span className="text-[#ffe066] font-bold">
+                                    {player.name}
+                                  </span>
+
+                                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}`}>
+                                    {badgeText}
+                                  </span>
+
+                                </td>
+
+                                <td className="px-6 py-4 text-right">
+                                  <span className="text-[#ffe066] font-bold text-lg">
+                                    {player.score} pts
+                                  </span>
+                                </td>
+
+                              </tr>
+                            )
+
+                          })}
+
+                        </tbody>
+
+                      </table>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* ================= FINAL ROUND SUMMARY ================= */}
+                <div className="w-full flex flex-col items-center gap-6 py-6">
+                  <div className="w-full max-w-6xl">
+
+                    <h2 className="text-3xl font-bold text-center mb-6">
+                      Final Summary
+                    </h2>
+                    <div className="w-full border rounded-xl overflow-hidden">
+                     <table className="w-full table-fixed border rounded-lg">
+                        <thead>
+                          <tr className="border-b bg-muted/30">
+
+                            <th className="px-3 py-3 text-left">Player</th>
+
+                            {Array.from({ length: cumulativeRoundSummary.rounds }).map((_, r) => (
+
+                              <React.Fragment key={r}>
+
+                                {Array.from({ length: cumulativeRoundSummary.turnsPerRound }).map((_, t) => (
+                                  <th key={t} className="px-3 py-3 text-center">
+                                    R{r + 1} T{t + 1}
+                                  </th>
+                                ))}
+
+                                <th className="px-3 py-3 text-center bg-muted/20">
+                                  R{r + 1} Total
+                                </th>
+
+                              </React.Fragment>
+
+                            ))}
+
+                            <th className="px-3 py-3 text-center bg-primary/10">
+                              Total
+                            </th>
+
+                          </tr>
+                        </thead>
+
+
+                        <tbody>
+
+                          {cumulativeRoundSummary.rows.map(row => (
+
+                            <tr key={row.playerId} className="border-b">
+
+                              <td className="px-3 py-3">
+                                {row.name}
+                              </td>
+
+                              {row.roundTurnPoints.map((turns, r) => (
+
+                                <React.Fragment key={r}>
+
+                                  {turns.map((points, t) => (
+
+                                    <td key={t} className="text-center">
+                                      {points}
+                                    </td>
+
+                                  ))}
+
+                                  <td className="text-center bg-muted/20">
+                                    {row.roundTotals[r]}
+                                  </td>
+
+                                </React.Fragment>
+
+                              ))}
+
+                              <td className="text-center font-semibold bg-primary/10">
+                                {players.find(p => p.player_id === row.playerId)?.score ?? row.total}
+                              </td>
+
+                            </tr>
+
+                          ))}
+
+                        </tbody>
+
+                      </table>
+
                     </div>
                   </div>
+
+                  {/* ================= BACK BUTTON ================= */}
+
+                  <div className="flex justify-center mt-6">
+
+                    <Button
+                      onClick={() => navigate("/play/host")}
+                      className="gap-2"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to Home
+                    </Button>
+
+                  </div>
+
                 </div>
+
               </div>
 
-              {/* Final Round Summary table placed at the very bottom */}
-              {cumulativeRoundSummary && (
-                <div className="overflow-x-auto mt-6">
-                  <h2 className="text-xl font-bold mb-2 text-primary">Final Round Summary</h2>
-                  <table className="min-w-full border border-muted rounded-lg">
-                    <thead>
-                      <tr className="border-b bg-muted/30">
-                        <th className="px-3 py-3 text-left font-semibold">Player</th>
-                        {Array.from({ length: cumulativeRoundSummary.rounds }).map((_, r) => (
-                          <>
-                            {Array.from({ length: cumulativeRoundSummary.turnsPerRound }).map((_, t) => (
-                              <th key={`r${r}-t${t}`} className="px-3 py-3 text-center font-semibold">
-                                R{r + 1} T{t + 1}
-                              </th>
-                            ))}
-                            <th key={`r${r}-total`} className="px-3 py-3 text-center font-semibold bg-muted/20">R{r + 1} Total</th>
-                          </>
-                        ))}
-                        <th className="px-3 py-3 text-center font-semibold bg-primary/10">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cumulativeRoundSummary.rows.map((row) => (
-                        <tr key={row.playerId} className="border-b last:border-b-0">
-                          <td className="px-3 py-3 font-medium whitespace-nowrap">{row.name}</td>
-                          {row.roundTurnPoints.map((turns, r) => (
-                            <>
-                              {turns.map((points, t) => {
-                                const turnIndex = r * cumulativeRoundSummary.turnsPerRound + t;
-                                const allTurns = cumulativeRoundSummary.allTurns || [];
-                                const turn = allTurns[turnIndex];
-                                const isStoryteller = turn && turn.storyteller_id === row.playerId;
-                                return (
-                                  <td
-                                    key={`p${row.playerId}-r${r}-t${t}`}
-                                    className={`px-3 py-3 text-center font-medium${isStoryteller && points > 0 ? ' text-red-600' : ''}`}
-                                  >
-                                    {points}
-                                  </td>
-                                );
-                              })}
-                              <td key={`p${row.playerId}-r${r}-total`} className="px-3 py-3 text-center font-semibold bg-muted/20">{row.roundTotals[r]}</td>
-                            </>
-                          ))}
-                          <td className="px-3 py-3 text-center font-semibold bg-primary/10">{row.total}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
+            )}
+
+          </div>
+
         </DialogContent>
       </Dialog>
     </div >
