@@ -101,14 +101,14 @@ function SortableElement({
       <div className="text-xs text-muted-foreground font-medium">{index + 1}</div>
 
       <div
-        className="h-14 w-14 rounded-full flex items-center justify-center overflow-hidden"
+        className="h-20 w-20 rounded-full flex items-center justify-center overflow-hidden"
         style={{ backgroundColor: bgColor }}
       >
         {element.image_url ? (
           <img
             src={element.image_url}
             alt={element.name}
-            className="h-8 w-8 object-contain"
+             className="h-12 w-12 object-contain"
             style={{ filter: "brightness(0) invert(1)" }}
           />
         ) : (

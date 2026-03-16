@@ -149,6 +149,7 @@ export default function Game() {
   const [isRoundSummaryOpen, setIsRoundSummaryOpen] = useState(false);
   // --- Cumulative round summary state ---
   const [cumulativeRoundSummary, setCumulativeRoundSummary] = useState<CumulativeRoundSummary | null>(null);
+  const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   // Build cumulative round summary up to the current round
   const buildCumulativeRoundSummary = useCallback(
     async (currentRoundNumber: number, playersData: Player[]): Promise<CumulativeRoundSummary | null> => {
@@ -733,14 +734,12 @@ export default function Game() {
 
         setIsRoundTransitioning(false);
 
-        if (!isFinalTurn) {
-          setTurnRecap(null);
-        }
-
+        // Do NOT clear turnRecap here so that the last turn's
+        // wisp and elements remain available in the summary dialog.
         setHasSeenRecapForTurn(true);
         roundTransitionTriggeredRef.current = null;
         initializeGame({ showLoading: false });
-      }, 6000);
+      }, 10000);
     }, [currentTurn, players, selectedIcons, session, currentPlayerId, buildCumulativeRoundSummary, coreElementsForSelection]
   );
   // useEffect(() => {
@@ -2200,7 +2199,7 @@ export default function Game() {
       {/* Main content area with responsive layout */}
       <div className="flex-1 flex flex-col md:flex-row">
         {/* Scoreboard - top on mobile, sidebar on desktop */}
-        <aside className="w-full md:w-64 lg:w-80 flex-shrink-0 p-2 md:p-4 md:sticky md:top-0 md:h-[calc(100vh-64px)] md:overflow-y-auto">
+        <aside className="w-full md:w-64 lg:w-80 flex-shrink-0 p-2 md:p-4 md:sticky md:top-0 md:h-[calc(100vh-64px)] md:overflow-y-auto space-y-3">
           <Scoreboard
             players={scoreboardPlayers}
             currentRound={gameRoundNumber}
@@ -2235,6 +2234,15 @@ export default function Game() {
               ) : undefined
             }
           />
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => setIsSummaryDialogOpen(true)}
+          >
+            View Game Summary
+          </Button>
         </aside>
 
         {/* Status Indicators - Timer and Connection (desktop only) */}
@@ -2693,6 +2701,168 @@ export default function Game() {
 
             )}
 
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Persistent Summary Dialog - can be opened from sidebar button any time after first summary is available */}
+      <Dialog open={isSummaryDialogOpen} onOpenChange={(open) => setIsSummaryDialogOpen(open)}>
+        <DialogContent className="sm:max-w-5xl max-h-[85vh] overflow-y-auto bg-[#0b0b0b] border border-[#2a2a2a]">
+          <div className="py-4 space-y-5">
+            {!turnRecap && !cumulativeRoundSummary && (
+              <p className="text-center text-sm text-muted-foreground">
+                Summary will appear here after the first turn is completed.
+              </p>
+            )}
+
+            {turnRecap && (
+              <div className="mb-6">
+                <div className="bg-background border border-[#28222e] rounded-2xl shadow-2xl p-6 max-w-2xl mx-auto">
+                  <h2 className="text-2xl font-extrabold mb-4 text-center tracking-wide text-[#ffe066] drop-shadow-lg">
+                    Last Turn Recap
+                  </h2>
+                  <div className="flex flex-col items-center gap-4">
+                    <div
+                      className="flex gap-4 mb-3 rounded-xl px-5 py-4 w-full justify-center"
+                      style={{ background: "rgba(20, 20, 20, 0.65)", backdropFilter: "blur(4px)" }}
+                    >
+                      {turnRecap.icons.map((icon) => (
+                        <div key={icon.id} className="flex flex-col items-center">
+                          {icon.image_url ? (
+                            <img
+                              src={icon.image_url}
+                              alt={icon.name}
+                              className="h-10 w-10 rounded-full drop-shadow-lg"
+                              style={{ background: icon.color || "#bdbdbd", objectFit: "contain" }}
+                            />
+                          ) : (
+                            <span className="text-4xl drop-shadow-lg" style={{ color: "#ffffff" }}>
+                              {icon.icon}
+                            </span>
+                          )}
+                          <span className="text-xs mt-1 text-[#ffe066]">{icon.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mb-2 text-center">
+                      <div className="text-sm font-medium text-[#bdbdbd] mb-1">The Wisp</div>
+                      <span className="inline-block bg-[#3a2f1b] text-[#ffe066] font-extrabold px-6 py-2 rounded-lg text-2xl tracking-wide shadow-md border-2 border-[#ffe066]">
+                        {turnRecap.whisp}
+                      </span>
+                    </div>
+                    <div className="w-full max-w-md mx-auto mt-2">
+                      <div className="rounded-xl bg-[#23202a] border border-[#28222e] overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2 bg-[#18141c] border-b border-[#28222e]">
+                          <span className="text-[#ffe066] font-bold text-lg">Scoreboard (Last Turn)</span>
+                        </div>
+                        <table className="min-w-full text-base">
+                          <tbody>
+                            {turnRecap.players.map((player, idx) => {
+                              const outcome = turnRecap.playerOutcomes[player.player_id];
+                              let badgeClass = "";
+                              let badgeText = "";
+                              if (outcome === "correct") {
+                                badgeClass = "bg-[#232e1b] text-[#aaff66] border border-[#aaff66]";
+                                badgeText = "Correct";
+                              } else if (outcome === "wrong") {
+                                badgeClass = "bg-[#2e1b1b] text-[#ff6666] border border-[#ff6666]";
+                                badgeText = "Wrong";
+                              } else if (outcome === "storyteller") {
+                                badgeClass = "bg-[#1b233a] text-[#66aaff] border border-[#66aaff]";
+                                badgeText = "Storyteller";
+                              } else {
+                                badgeClass = "bg-[#23202a] text-[#bdbdbd] border border-[#444]";
+                                badgeText = "No Guess";
+                              }
+
+                              return (
+                                <tr key={player.player_id} className="border-b border-[#28222e] last:border-b-0">
+                                  <td className="px-4 py-3 font-semibold whitespace-nowrap flex items-center gap-2">
+                                    <span className="text-[#ffe066] font-bold text-lg mr-2">{idx + 1}.</span>
+                                    <span className="text-[#ffe066] font-bold">{player.name}</span>
+                                    {badgeText && (
+                                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}`}>
+                                        {badgeText}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-right align-middle">
+                                    <span className="text-[#ffe066] font-bold text-lg">{player.score} pts</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {cumulativeRoundSummary && (
+              <div className="overflow-x-auto mt-2">
+                <h2 className="text-xl font-bold mb-2 text-primary text-center">Round & Turn Summary</h2>
+                <table className="min-w-full border border-muted rounded-lg">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="px-3 py-3 text-left font-semibold">Player</th>
+                      {Array.from({ length: cumulativeRoundSummary.rounds }).map((_, r) => (
+                        <>
+                          {Array.from({ length: cumulativeRoundSummary.turnsPerRound }).map((_, t) => (
+                            <th key={`summary-r${r}-t${t}`} className="px-3 py-3 text-center font-semibold">
+                              R{r + 1} T{t + 1}
+                            </th>
+                          ))}
+                          <th
+                            key={`summary-r${r}-total`}
+                            className="px-3 py-3 text-center font-semibold bg-muted/20"
+                          >
+                            R{r + 1} Total
+                          </th>
+                        </>
+                      ))}
+                      <th className="px-3 py-3 text-center font-semibold bg-primary/10">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cumulativeRoundSummary.rows.map((row) => (
+                      <tr key={row.playerId} className="border-b last:border-b-0">
+                        <td className="px-3 py-3 font-medium whitespace-nowrap">{row.name}</td>
+                        {row.roundTurnPoints.map((turns, r) => (
+                          <>
+                            {turns.map((points, t) => {
+                              const turnIndex = r * cumulativeRoundSummary.turnsPerRound + t;
+                              const allTurns = cumulativeRoundSummary.allTurns || [];
+                              const turn = allTurns[turnIndex];
+                              const isStoryteller = turn && turn.storyteller_id === row.playerId;
+                              return (
+                                <td
+                                  key={`summary-p${row.playerId}-r${r}-t${t}`}
+                                  className={`px-3 py-3 text-center font-medium${
+                                    isStoryteller && points > 0 ? " text-red-600" : ""
+                                  }`}
+                                >
+                                  {points}
+                                </td>
+                              );
+                            })}
+                            <td
+                              key={`summary-p${row.playerId}-r${r}-total`}
+                              className="px-3 py-3 text-center font-semibold bg-muted/20"
+                            >
+                              {row.roundTotals[r]}
+                            </td>
+                          </>
+                        ))}
+                        <td className="px-3 py-3 text-center font-semibold bg-primary/10">{row.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
