@@ -2008,9 +2008,9 @@ export default function Lobby() {
               )}
             </div>
             <CardDescription>{isHost ? "You are the host" : "You are a player in this lobby"}</CardDescription>
-            {/* {isHost && session.status === "waiting" && (
+            {isHost && session.status === "waiting" && (
               <p className="text-xs text-muted-foreground mt-2">Drag and drop players to reorder turns</p>
-            )} */}
+            )}
           </CardHeader>
           <CardContent>
             {players.length === 0 && !joiningPlayerName ? (
