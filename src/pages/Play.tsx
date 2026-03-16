@@ -816,7 +816,7 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
               </Button>
               <Button
                 onClick={() => {
-                  window.open("https://phraseotomy.com/pages/redeem-code", "_blank");
+                  window.open("https://phraseotomy.com/account#redeem", "_blank");
                   setShowRedeemDialog(false);
                 }}
                 className="bg-game-yellow hover:bg-game-yellow/90 text-game-black"
