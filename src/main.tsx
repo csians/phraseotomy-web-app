@@ -8,7 +8,7 @@ import { getTenantByAppDomain } from "./lib/tenants";
 // When visiting ourstagingserver.com directly, there's no parent to postMessage the cookie.
 // Redirect to phraseotomy.com so the proxy returns the page with the parent script.
 let isRedirecting = false;
-if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com" && window.self === window.top) {
+if (typeof window !== "undefined" && window.location.hostname === "phraseotomy-game.vercel.app" && window.self === window.top) {
   const urlParams = getAllUrlParams();
   const hasCustomer = !!urlParams.get("customer") || !!urlParams.get("customer_id");
   const hasSession = !!localStorage.getItem("phraseotomy_session_token");
@@ -26,7 +26,7 @@ if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.o
 
 // When iframe origin (ourstagingserver.com) is outside top-level (phraseotomy.com),
 // the parent reads the cookie and postMessages it. Listen for that.
-const ALLOWED_ORIGINS = ["https://phraseotomy.com", "https://phraseotomy.ourstagingserver.com"];
+const ALLOWED_ORIGINS = ["https://phraseotomy.com", "https://phraseotomy-game.vercel.app"];
 window.addEventListener("message", (e) => {
   if (!ALLOWED_ORIGINS.includes(e.origin)) return;
   const msg = e.data;
@@ -47,7 +47,7 @@ window.addEventListener("message", (e) => {
   (window as any).__PHRASEOTOMY_CUSTOMER__ = customerData;
   const tenant = getTenantByAppDomain(window.location.hostname);
   if (tenant?.shopDomain) localStorage.setItem("shop_domain", tenant.shopDomain);
-  if (window.location.hostname === "phraseotomy.ourstagingserver.com") {
+  if (window.location.hostname === "phraseotomy-game.vercel.app") {
     setCustomerDataCookie(customerData);
   }
   console.log("✅ [INIT] Customer from parent postMessage (cookie)");
@@ -74,7 +74,7 @@ if (customerParam) {
     localStorage.removeItem('customerData');
     localStorage.removeItem('phraseotomy_session_token');
     if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
-    if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+    if (typeof window !== "undefined" && window.location.hostname === "phraseotomy-game.vercel.app") {
       clearCustomerDataCookie();
     }
     
@@ -105,7 +105,7 @@ if (customerParam) {
       };
       localStorage.setItem('customerData', JSON.stringify(normalized));
       (window as any).__PHRASEOTOMY_CUSTOMER__ = normalized;
-      if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+      if (typeof window !== "undefined" && window.location.hostname === "phraseotomy-game.vercel.app") {
         setCustomerDataCookie(normalized);
       }
       console.log('✅ [INIT] Customer data stored');
@@ -137,7 +137,7 @@ if (isPlayOnlinePath && !cookieCustomerCheck) {
   localStorage.removeItem('phraseotomy_session_token');
   localStorage.removeItem('shop_domain');
   if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
-  if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+  if (typeof window !== "undefined" && window.location.hostname === "phraseotomy-game.vercel.app") {
     clearCustomerDataCookie();
   }
 }
@@ -162,7 +162,7 @@ if (!customerParam) {
     if (tenant?.shopDomain) {
       localStorage.setItem('shop_domain', tenant.shopDomain);
     }
-    if (window.location.hostname === "phraseotomy.ourstagingserver.com") {
+    if (window.location.hostname === "phraseotomy-game.vercel.app") {
       setCustomerDataCookie(cookieCustomer);
     }
     console.log('✅ [INIT] Customer from cookie stored');

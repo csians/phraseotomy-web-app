@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
     // Return HTML with application/liquid content type so Shopify renders it
     const headers = new Headers({
       "Content-Type": "application/liquid",
-      "Content-Security-Policy": "frame-ancestors https://phraseotomy.com https://*.phraseotomy.com https://phraseotomy.ourstagingserver.com https://admin.shopify.com https://*.myshopify.com 'self'",
+      "Content-Security-Policy": "frame-ancestors https://phraseotomy.com https://*.phraseotomy.com https://phraseotomy-game.vercel.app https://admin.shopify.com https://*.myshopify.com 'self'",
     });
 
     // Pass token and customer data to app
@@ -356,7 +356,7 @@ function generateLoginRedirectHtml(loginUrl: string, shop: string, environment: 
   const baseUrl =
     tenant.environment === "production"
       ? "https://phraseotomy.com/pages/play-online"
-      : "https://phraseotomy.ourstagingserver.com";
+      : "https://phraseotomy-game.vercel.app";
   return `<style nonce="${crypto.randomUUID()}">
   #header-group,.header-group, footer, header {
     display: none !important;
@@ -450,7 +450,7 @@ function generateAppHtml(
 
   // Always use ourstagingserver.com for iframe to avoid infinite loop
   // (iframe loading phraseotomy.com/pages/play-online would re-trigger proxy → same HTML → nested iframes → broken page)
-  const baseUrl = "https://phraseotomy.ourstagingserver.com";
+  const baseUrl = "https://phraseotomy-game.vercel.app";
 
   // Encode configuration as URL parameters (before hash for HashRouter)
   const configParams = new URLSearchParams({

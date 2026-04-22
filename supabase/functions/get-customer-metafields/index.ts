@@ -13,7 +13,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 // Custom domains must resolve to *.myshopify.com for Admin API (avoid phraseotomy.com.myshopify.com / HandshakeFailure)
 const CUSTOM_DOMAIN_TO_MYSHOPIFY: Record<string, string> = {
   'phraseotomy.com': 'qxqtbf-21.myshopify.com',
-  'phraseotomy.ourstagingserver.com': 'testing-cs-store.myshopify.com',
+  'phraseotomy-game.vercel.app': 'testing-cs-store.myshopify.com',
 };
 
 function getShopifyApiHost(shopDomain: string): string {

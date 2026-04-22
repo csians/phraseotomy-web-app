@@ -17,7 +17,7 @@ const corsHeaders = {
 
 const CUSTOM_DOMAIN_TO_MYSHOPIFY: Record<string, string> = {
   'phraseotomy.com': 'qxqtbf-21.myshopify.com',
-  'phraseotomy.ourstagingserver.com': 'testing-cs-store.myshopify.com',
+  'phraseotomy-game.vercel.app': 'testing-cs-store.myshopify.com',
 };
 
 function getShopifyApiHost(shopDomain: string): string {
