@@ -274,7 +274,7 @@ const Login = () => {
         localStorage.removeItem("customerData");
         localStorage.removeItem("phraseotomy_session_token");
         if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
-        if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+        if (typeof window !== "undefined" && window.location.hostname === "phraseotomy-game.vercel.app") {
           clearCustomerDataCookie();
         }
         // Store in localStorage using the shape the app expects (so Play and store-customer can use name/email)
@@ -295,7 +295,7 @@ const Login = () => {
         if (parsed.shop_domain || parsed.shop) {
           localStorage.setItem("shop_domain", parsed.shop_domain || parsed.shop);
         }
-        if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+        if (typeof window !== "undefined" && window.location.hostname === "phraseotomy-game.vercel.app") {
           setCustomerDataCookie(parsed);
         }
         // Clear after use
@@ -318,7 +318,7 @@ const Login = () => {
           localStorage.removeItem("customerData");
           localStorage.removeItem("phraseotomy_session_token");
           if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
-          if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+          if (typeof window !== "undefined" && window.location.hostname === "phraseotomy-game.vercel.app") {
             clearCustomerDataCookie();
           }
           // Resolve custom domain to .myshopify.com domain
@@ -403,7 +403,7 @@ const Login = () => {
             
             localStorage.setItem("customerData", JSON.stringify(immediateCustomerData));
             localStorage.setItem("shop_domain", shopParam);
-            if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+            if (typeof window !== "undefined" && window.location.hostname === "phraseotomy-game.vercel.app") {
               setCustomerDataCookie(immediateCustomerData);
             }
 
@@ -433,7 +433,7 @@ const Login = () => {
                 last_name: mergedLastName,
               };
               localStorage.setItem("customerData", JSON.stringify(mergedCustomerData));
-              if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+              if (typeof window !== "undefined" && window.location.hostname === "phraseotomy-game.vercel.app") {
                 setCustomerDataCookie(mergedCustomerData);
               }
 
@@ -594,7 +594,7 @@ const Login = () => {
               localStorage.removeItem("customerData");
               localStorage.removeItem("phraseotomy_session_token");
               if ((window as any).__PHRASEOTOMY_CUSTOMER__) delete (window as any).__PHRASEOTOMY_CUSTOMER__;
-              if (typeof window !== "undefined" && window.location.hostname === "phraseotomy.ourstagingserver.com") {
+              if (typeof window !== "undefined" && window.location.hostname === "phraseotomy-game.vercel.app") {
                 clearCustomerDataCookie();
               }
 

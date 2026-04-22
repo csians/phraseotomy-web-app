@@ -10,7 +10,7 @@ const APP_SECRET = Deno.env.get('APP_SIGNING_SECRET')!;
 // Custom domains must resolve to *.myshopify.com for Admin API
 const CUSTOM_DOMAIN_TO_MYSHOPIFY: Record<string, string> = {
   'phraseotomy.com': 'qxqtbf-21.myshopify.com',
-  'phraseotomy.ourstagingserver.com': 'testing-cs-store.myshopify.com',
+  'phraseotomy-game.vercel.app': 'testing-cs-store.myshopify.com',
 };
 
 function getShopifyApiHost(shopDomain: string): string {

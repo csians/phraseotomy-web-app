@@ -37,7 +37,7 @@ const tenants: TenantConfig[] = [
     shopDomain: "phraseotomy.com",
     displayName: "Phraseotomy",
     themeColor: "#FBBF24",
-    appDomains: ["phraseotomy.com", "phraseotomy.ourstagingserver.com", "localhost"],
+    appDomains: ["phraseotomy.com", "phraseotomy-game.vercel.app", "localhost"],
     customShopDomains: ["phraseotomy.com", "qxqtbf-21.myshopify.com"], // phraseotomy.com for redirects (user-facing)
     proxyPath: "/pages/play-online", // Shopify App Proxy path
   },
