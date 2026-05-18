@@ -739,7 +739,7 @@ export default function Game() {
         setHasSeenRecapForTurn(true);
         roundTransitionTriggeredRef.current = null;
         initializeGame({ showLoading: false });
-      }, 10000);
+      }, 30000);
     }, [currentTurn, players, selectedIcons, session, currentPlayerId, buildCumulativeRoundSummary, coreElementsForSelection]
   );
   // useEffect(() => {
