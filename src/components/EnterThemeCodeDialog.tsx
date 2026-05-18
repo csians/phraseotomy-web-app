@@ -74,7 +74,9 @@ export function EnterThemeCodeDialog({
       });
 
       if (error || !data?.success) {
-        throw new Error(data?.error || error?.message || "Invalid theme code");
+        throw new Error(
+          data?.message || data?.error || error?.message || "Invalid theme code",
+        );
       }
 
       const themeNames = data.themesUnlocked?.join(", ") || "themes";

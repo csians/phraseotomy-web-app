@@ -233,7 +233,7 @@ export default function CreateLobby() {
 
       toast({
         title: "Lobby Created!",
-        description: `Lobby Code: ${lobbyCode}`,
+        description: `Lobby code: ${lobbyCode}. Share this code with your friends so that they can join the lobby.`,
       });
 
       // Redirect to lobby page (replace to avoid back navigation issues)

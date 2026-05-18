@@ -1961,11 +1961,14 @@ export default function Lobby() {
           <CardContent>
             <div className="space-y-3">
               {isHost && (
-                <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
-                  <p className="text-sm font-semibold text-primary">
-                    {" "}
-                    <span className="text-lg font-bold">{session?.lobby_code}</span>
-                  </p>
+                <div className="p-3 bg-primary/10 rounded-lg border border-primary/20 space-y-2">
+                  <p className="text-sm font-medium text-foreground">Lobby code</p>
+                  <p className="text-lg font-bold tracking-wider text-primary font-mono">{session?.lobby_code}</p>
+                  {session?.status === "waiting" && (
+                    <p className="text-sm text-muted-foreground">
+                      Share this code with your friends so that they can join the lobby.
+                    </p>
+                  )}
                 </div>
               )}
               <div className="space-y-1">

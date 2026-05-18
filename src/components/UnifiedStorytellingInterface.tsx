@@ -406,7 +406,7 @@ export function UnifiedStorytellingInterface({
           <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center">
             <p className="text-sm text-muted-foreground mb-1">Your Secret Wisp</p>
             <p className="text-2xl font-bold text-primary">{whisp}</p>
-            <p className="text-xs text-muted-foreground mt-2">Don't say this word. Describe it using your selected elements.</p>
+            {/* <p className="text-xs text-muted-foreground mt-2">Don't say this word. Describe it using your selected elements.</p> */}
           </div>
 
           {/* <div className="space-y-5">

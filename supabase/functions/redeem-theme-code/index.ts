@@ -5,7 +5,8 @@
  * No auth required - called from user flow with code, customerId, shopDomain.
  *
  * Request: { code: string, customerId: string, shopDomain: string }
- * Response: { success: boolean, message: string, themesUnlocked: string[], themesUnlockedWithNames: { id, name }[] }
+ * Response (success): { success: true, message, themesUnlocked, themesUnlockedWithNames?, ... }
+ * Response (error): { success: false, error: string (machine code), message: string (human text), ... }
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
@@ -26,6 +27,18 @@ function getRelatedDomains(shopDomain: string): string[] {
   return RELATED_SHOP_DOMAINS[shopDomain.toLowerCase()] || [shopDomain];
 }
 
+function jsonError(
+  status: number,
+  errorCode: string,
+  message: string,
+  extra?: Record<string, unknown>
+): Response {
+  return new Response(JSON.stringify({ success: false, error: errorCode, message, ...extra }), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -35,9 +48,10 @@ Deno.serve(async (req) => {
     const { code, customerId, shopDomain } = await req.json();
 
     if (!code || !customerId || !shopDomain) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Missing required fields (code, customerId, shopDomain)' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return jsonError(
+        400,
+        'MISSING_FIELDS',
+        'Missing required fields (code, customerId, shopDomain)'
       );
     }
 
@@ -75,10 +89,7 @@ Deno.serve(async (req) => {
     }
 
     if (tenantError || !tenant) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid shop domain' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonError(404, 'INVALID_SHOP', 'Invalid shop domain');
     }
 
     const { data: themeCode, error: codeError } = await supabase
@@ -89,19 +100,40 @@ Deno.serve(async (req) => {
       .in('status', ['unused', 'active'])
       .maybeSingle();
 
-    if (codeError || !themeCode) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Theme code not found or inactive' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (codeError) {
+      console.error('Error loading theme_codes:', codeError);
+      return jsonError(500, 'THEME_CODE_LOOKUP_FAILED', 'Unable to verify theme code. Try again.');
+    }
+
+    if (!themeCode) {
+      const { data: codeRow } = await supabase
+        .from('theme_codes')
+        .select('status, redeemed_by')
+        .eq('code', normalizedCode)
+        .eq('tenant_id', tenant.id)
+        .maybeSingle();
+
+      let errorCode = 'CODE_NOT_FOUND';
+      let errorMessage = 'Theme code not found';
+      if (codeRow) {
+        if (codeRow.status === 'expired') {
+          errorCode = 'CODE_EXPIRED';
+          errorMessage = 'This code has expired';
+        } else if (codeRow.status === 'void') {
+          errorCode = 'CODE_VOID';
+          errorMessage = 'This code is no longer valid';
+        } else {
+          errorCode = 'CODE_NOT_REDEEMABLE';
+          errorMessage = 'This code cannot be redeemed';
+        }
+      }
+
+      return jsonError(400, errorCode, errorMessage);
     }
 
     const unlockedThemeIds = themeCode.themes_unlocked || [];
     if (unlockedThemeIds.length === 0) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Theme code is not configured for any themes' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonError(400, 'CODE_NO_THEMES', 'Theme code is not configured for any themes');
     }
 
     // Check if already redeemed by this customer
@@ -146,10 +178,7 @@ Deno.serve(async (req) => {
 
     // Redeemed by someone else?
     if (themeCode.redeemed_at && themeCode.redeemed_by && themeCode.redeemed_by !== customerId) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Theme code has already been redeemed' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonError(400, 'CODE_USED', 'Code already in use');
     }
 
     // Check if all themes from this code are already active for this customer (via other theme codes)
@@ -192,13 +221,10 @@ Deno.serve(async (req) => {
     const newThemeIds = unlockedThemeIds;
     const allAlreadyActive = newThemeIds.length > 0 && newThemeIds.every((id: string) => alreadyActiveThemeIds.has(id));
     if (allAlreadyActive) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'THEMES_ALREADY_ACTIVE',
-          message: 'You already have access to all themes from this code.',
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return jsonError(
+        400,
+        'THEMES_ALREADY_ACTIVE',
+        'You already have access to all themes from this code.'
       );
     }
 
@@ -215,10 +241,7 @@ Deno.serve(async (req) => {
 
     if (insertError) {
       console.error('Error creating customer_theme_codes:', insertError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to redeem theme code' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonError(500, 'REDEEM_FAILED', 'Failed to redeem theme code');
     }
 
     // Set expires_at to 30 days from now when redeeming
@@ -238,10 +261,7 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error('Error updating theme_codes:', updateError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to update theme code' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonError(500, 'REDEEM_UPDATE_FAILED', 'Failed to update theme code');
     }
 
     // Fetch theme names (safely handle empty or invalid IDs)
@@ -268,13 +288,6 @@ Deno.serve(async (req) => {
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error('redeem-theme-code error:', err);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: 'An unexpected error occurred',
-        details: errMsg,
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return jsonError(500, 'INTERNAL_ERROR', 'An unexpected error occurred', { details: errMsg });
   }
 });
