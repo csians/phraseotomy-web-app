@@ -1,3 +1,4 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 interface ConnectedClient {
   socket: WebSocket;
@@ -45,7 +46,7 @@ const broadcastToAll = (sessionId: string, message: any) => {
   });
 };
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   const upgrade = req.headers.get("upgrade") || "";
   
   if (upgrade.toLowerCase() !== "websocket") {

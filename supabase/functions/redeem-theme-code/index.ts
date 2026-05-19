@@ -9,7 +9,7 @@
  * Response (error): { success: false, error: string (machine code), message: string (human text), ... }
  */
 
-import { createClient } from "../_shared/supabase.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
