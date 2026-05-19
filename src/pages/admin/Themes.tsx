@@ -12,7 +12,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { RefreshCw, Plus, Trash2, ArrowLeft, Upload, Image, Palette, Type, Pencil } from "lucide-react";
 import { useTenant } from "@/hooks/useTenant";
 import { getAllUrlParams } from "@/lib/urlUtils";
-import * as XLSX from "xlsx";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
@@ -414,47 +413,29 @@ export default function Themes() {
     return wispWords;
   };
 
-  const parseXlsx = (file: File): Promise<string[]> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          
-          // Get the first sheet
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          
-          // Convert to JSON array
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as string[][];
-          
-          if (jsonData.length === 0) {
-            resolve([]);
-            return;
-          }
-          
-          // First row, first column is theme name, skip it
-          // Rest of rows, first column contains wisp words
-          const wispWords: string[] = [];
-          
-          for (let i = 1; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            const firstColumn = row[0];
-            
-            if (firstColumn && typeof firstColumn === 'string' && firstColumn.trim().length > 0) {
-              wispWords.push(firstColumn.trim());
-            }
-          }
-          
-          resolve(wispWords);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsArrayBuffer(file);
-    });
+  const parseXlsx = async (file: File): Promise<string[]> => {
+    const XLSX = await import("xlsx");
+    const data = new Uint8Array(await file.arrayBuffer());
+    const workbook = XLSX.read(data, { type: "array" });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      defval: "",
+    }) as string[][];
+
+    if (jsonData.length === 0) {
+      return [];
+    }
+
+    const wispWords: string[] = [];
+    for (let i = 1; i < jsonData.length; i++) {
+      const firstColumn = jsonData[i][0];
+      if (firstColumn && typeof firstColumn === "string" && firstColumn.trim().length > 0) {
+        wispWords.push(firstColumn.trim());
+      }
+    }
+    return wispWords;
   };
 
   const parseFile = async (file: File): Promise<string[]> => {
