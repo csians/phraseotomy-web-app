@@ -5,7 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: '/',
+  base: "/",
   server: {
     host: "::",
     port: 8080,
@@ -17,9 +17,27 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: undefined,
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("xlsx")) return "vendor-xlsx";
+          if (id.includes("@supabase")) return "vendor-supabase";
+          if (id.includes("@tanstack")) return "vendor-query";
+          if (id.includes("@radix-ui")) return "vendor-radix";
+          if (id.includes("lucide-react")) return "vendor-icons";
+          if (id.includes("@shopify")) return "vendor-shopify";
+          if (id.includes("@dnd-kit")) return "vendor-dnd";
+          if (id.includes("recharts")) return "vendor-charts";
+          if (
+            id.includes("react-dom") ||
+            id.includes("react-router") ||
+            /\/react\//.test(id)
+          ) {
+            return "vendor-react";
+          }
+        },
       },
     },
   },

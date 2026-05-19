@@ -3,21 +3,28 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { getAllUrlParams } from "@/lib/urlUtils";
-import Play from "./pages/Play";
-import Login from "./pages/Login";
-import CreateLobby from "./pages/CreateLobby";
-import Lobby from "./pages/Lobby";
-import Game from "./pages/Game";
-import RedeemCode from "./pages/Redeem";
 
-import NotFound from "./pages/NotFound";
-import AdminHome from "./pages/admin/AdminHome";
-import Codes from "./pages/admin/Codes";
-import ThemeCodes from "./pages/admin/ThemeCodes";
-import Packs from "./pages/admin/Packs";
-import Themes from "./pages/admin/Themes";
+const Play = lazy(() => import("./pages/Play"));
+const Login = lazy(() => import("./pages/Login"));
+const CreateLobby = lazy(() => import("./pages/CreateLobby"));
+const Lobby = lazy(() => import("./pages/Lobby"));
+const Game = lazy(() => import("./pages/Game"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const AdminHome = lazy(() => import("./pages/admin/AdminHome"));
+const Codes = lazy(() => import("./pages/admin/Codes"));
+const ThemeCodes = lazy(() => import("./pages/admin/ThemeCodes"));
+const Packs = lazy(() => import("./pages/admin/Packs"));
+const Themes = lazy(() => import("./pages/admin/Themes"));
+
+function PageLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  );
+}
 
 const queryClient = new QueryClient();
 
@@ -258,6 +265,7 @@ const App = () => {
       <Toaster />
       <Sonner />
       <HashRouter>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
@@ -276,6 +284,7 @@ const App = () => {
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
       </HashRouter>
     </TooltipProvider>
   </QueryClientProvider>
