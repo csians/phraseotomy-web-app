@@ -8,8 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, AlertCircle, Check, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import * as XLSX from 'xlsx';
-
 type ThemeCSVRow = {
   code: string;
   themes: string[];
@@ -112,9 +110,9 @@ export const ThemeCSVImport = ({ tenantId, onImportComplete }: ThemeCSVImportPro
           return row;
         });
       } else {
-        // Handle XLSX files
+        const XLSX = await import("xlsx");
         const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
+        const workbook = XLSX.read(buffer, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         data = XLSX.utils.sheet_to_json(worksheet);
