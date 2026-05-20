@@ -804,7 +804,7 @@ if (!loading && customer?.id && shopDomain && !isUpdatingName) {
             <DialogHeader>
               <DialogTitle>Redeem Code Required</DialogTitle>
               <DialogDescription>
-                If you want to host a game, you need to redeem a code first.
+              You need to redeem base game code in order to host a game.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
